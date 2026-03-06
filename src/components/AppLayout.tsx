@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
+import { ThemeToggle } from "./ThemeToggle";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -44,17 +45,25 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
           {!collapsed && (
-            <Link to="/dashboard" className="font-display text-lg font-bold">
-              <span className="gradient-text">Field</span>
-              <span className="text-sidebar-foreground">IQ</span>
+            <Link to="/dashboard" className="font-display text-lg font-bold flex items-center gap-1">
+              <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
+              <span className="text-foreground">Field</span>
+              <span className="gradient-text">IQ</span>
             </Link>
           )}
-          <button
-            onClick={() => { setCollapsed(!collapsed); setMobileOpen(false); }}
-            className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground transition-colors"
-          >
-            <ChevronLeft className={`h-4 w-4 transition-transform ${collapsed ? "rotate-180" : ""}`} />
-          </button>
+          {collapsed && (
+            <Link to="/dashboard" className="mx-auto">
+              <span className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground text-sm font-black">F</span>
+            </Link>
+          )}
+          {!collapsed && (
+            <button
+              onClick={() => { setCollapsed(!collapsed); setMobileOpen(false); }}
+              className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground transition-colors"
+            >
+              <ChevronLeft className={`h-4 w-4 transition-transform ${collapsed ? "rotate-180" : ""}`} />
+            </button>
+          )}
         </div>
 
         <nav className="flex-1 py-4 px-2 space-y-1">
@@ -67,8 +76,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
                   ${active
-                    ? "bg-sidebar-accent text-sidebar-primary"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }
                   ${collapsed ? "justify-center" : ""}
                 `}
@@ -83,7 +92,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <div className="px-2 py-4 border-t border-sidebar-border">
           <button
             onClick={handleSignOut}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all w-full ${collapsed ? "justify-center" : ""}`}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all w-full ${collapsed ? "justify-center" : ""}`}
           >
             <LogOut className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Abmelden</span>}
@@ -93,16 +102,25 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <main className="flex-1 min-h-screen">
-        <header className="h-16 border-b border-border flex items-center px-4 md:px-6 gap-4">
+        <header className="h-16 border-b border-border flex items-center px-4 md:px-6 gap-4 bg-card/50">
           <button className="md:hidden p-2 hover:bg-muted rounded-lg" onClick={() => setMobileOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
+          {collapsed && (
+            <button
+              onClick={() => setCollapsed(false)}
+              className="hidden md:block p-1.5 rounded-md hover:bg-muted text-muted-foreground transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4 rotate-180" />
+            </button>
+          )}
           {clubName && (
             <span className="text-sm font-medium font-display hidden sm:block">{clubName}</span>
           )}
           <div className="flex-1" />
           <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">{planLabel}</span>
+            <ThemeToggle />
+            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">{planLabel}</span>
           </div>
         </header>
         <div className="p-4 md:p-6 lg:p-8">

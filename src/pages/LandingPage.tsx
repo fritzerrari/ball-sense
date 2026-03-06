@@ -1,11 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Smartphone, Brain, BarChart3, Check, X, ChevronRight } from "lucide-react";
-
-const formations = [
-  { label: "4-4-2" }, { label: "4-3-3" }, { label: "3-5-2" },
-  { label: "4-2-3-1" }, { label: "3-4-3" }, { label: "5-3-2" },
-];
+import { Smartphone, Brain, BarChart3, Check, ChevronRight } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const features = [
   {
@@ -58,9 +54,10 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link to="/" className="font-display text-xl font-bold tracking-tight">
-            <span className="gradient-text">Field</span>
-            <span className="text-foreground">IQ</span>
+          <Link to="/" className="font-display text-xl font-bold tracking-tight flex items-center gap-1.5">
+            <span className="w-7 h-7 rounded bg-primary flex items-center justify-center text-primary-foreground text-sm font-black">F</span>
+            <span className="text-foreground">Field</span>
+            <span className="gradient-text">IQ</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
@@ -68,6 +65,7 @@ export default function LandingPage() {
             <a href="#compare" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Vergleich</a>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Button variant="ghost" size="sm" asChild>
               <Link to="/login">Anmelden</Link>
             </Button>
@@ -225,7 +223,7 @@ export default function LandingPage() {
               </thead>
               <tbody>
                 {comparison.map((row) => (
-                  <tr key={row.feature} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <tr key={row.feature} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
                     <td className="py-4 px-4 font-medium">{row.feature}</td>
                     <td className="py-4 px-4 text-center text-primary font-semibold">{row.fieldiq}</td>
                     <td className="py-4 px-4 text-center text-muted-foreground">{row.veo}</td>
@@ -242,8 +240,10 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-border py-12">
         <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="font-display text-lg font-bold">
-            <span className="gradient-text">Field</span>IQ
+          <div className="font-display text-lg font-bold flex items-center gap-1.5">
+            <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
+            <span className="text-foreground">Field</span>
+            <span className="gradient-text">IQ</span>
           </div>
           <p className="text-sm text-muted-foreground">
             © 2026 FieldIQ. Alle Rechte vorbehalten.

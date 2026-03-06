@@ -34,7 +34,7 @@ export const MATCH_STATUS_LABELS: Record<string, string> = {
 
 export const MATCH_STATUS_COLORS: Record<string, string> = {
   setup: "bg-muted text-muted-foreground",
-  live: "bg-primary/20 text-primary",
-  processing: "bg-yellow-500/20 text-yellow-400",
-  done: "bg-emerald-500/20 text-emerald-400",
+  live: "bg-primary/15 text-primary",
+  processing: "bg-warning/15 text-warning",
+  done: "bg-success/15 text-success",
 };

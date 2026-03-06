@@ -6,53 +6,110 @@
 
 @layer base {
   :root {
-    --background: 220 40% 6%;
-    --foreground: 210 20% 92%;
+    /* Light mode — clean stadium white with pitch green */
+    --background: 0 0% 98%;
+    --foreground: 150 10% 15%;
 
-    --card: 220 35% 9%;
-    --card-foreground: 210 20% 92%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 10% 15%;
 
-    --popover: 220 35% 9%;
-    --popover-foreground: 210 20% 92%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 10% 15%;
 
-    --primary: 190 100% 50%;
-    --primary-foreground: 220 40% 6%;
+    --primary: 152 60% 36%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 30% 14%;
-    --secondary-foreground: 210 20% 85%;
+    --secondary: 145 15% 93%;
+    --secondary-foreground: 150 10% 25%;
 
-    --muted: 220 25% 12%;
-    --muted-foreground: 215 15% 55%;
+    --muted: 150 10% 95%;
+    --muted-foreground: 150 5% 45%;
 
-    --accent: 190 100% 50%;
-    --accent-foreground: 220 40% 6%;
+    --accent: 152 60% 36%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 20% 16%;
-    --input: 220 20% 16%;
-    --ring: 190 100% 50%;
+    --border: 150 10% 88%;
+    --input: 150 10% 88%;
+    --ring: 152 60% 36%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 220 38% 7%;
-    --sidebar-foreground: 210 20% 85%;
-    --sidebar-primary: 190 100% 50%;
-    --sidebar-primary-foreground: 220 40% 6%;
-    --sidebar-accent: 220 30% 12%;
-    --sidebar-accent-foreground: 210 20% 92%;
-    --sidebar-border: 220 20% 14%;
-    --sidebar-ring: 190 100% 50%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 150 10% 25%;
+    --sidebar-primary: 152 60% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 145 15% 95%;
+    --sidebar-accent-foreground: 150 10% 15%;
+    --sidebar-border: 150 10% 90%;
+    --sidebar-ring: 152 60% 36%;
 
-    /* Custom tokens */
-    --gradient-primary: linear-gradient(135deg, hsl(190 100% 50%), hsl(200 100% 60%));
-    --gradient-hero: linear-gradient(180deg, hsl(220 40% 6%) 0%, hsl(220 45% 10%) 100%);
-    --shadow-glow: 0 0 30px hsl(190 100% 50% / 0.15);
-    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.3);
+    /* Football tokens */
+    --pitch: 142 55% 42%;
+    --pitch-line: 0 0% 100%;
+    --pitch-dark: 142 60% 28%;
+    --success: 152 60% 40%;
+    --warning: 38 92% 50%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(152 60% 36%), hsl(142 55% 42%));
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 98%) 0%, hsl(145 15% 95%) 100%);
+    --shadow-glow: 0 0 30px hsl(152 60% 36% / 0.12);
+    --shadow-card: 0 2px 12px hsl(150 10% 15% / 0.06);
 
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
+  }
+
+  .dark {
+    --background: 160 15% 6%;
+    --foreground: 140 10% 92%;
+
+    --card: 155 15% 9%;
+    --card-foreground: 140 10% 92%;
+
+    --popover: 155 15% 9%;
+    --popover-foreground: 140 10% 92%;
+
+    --primary: 152 65% 45%;
+    --primary-foreground: 160 15% 6%;
+
+    --secondary: 155 15% 14%;
+    --secondary-foreground: 140 10% 85%;
+
+    --muted: 155 12% 12%;
+    --muted-foreground: 150 8% 50%;
+
+    --accent: 152 65% 45%;
+    --accent-foreground: 160 15% 6%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 155 12% 18%;
+    --input: 155 12% 18%;
+    --ring: 152 65% 45%;
+
+    --sidebar-background: 160 15% 7%;
+    --sidebar-foreground: 140 10% 85%;
+    --sidebar-primary: 152 65% 45%;
+    --sidebar-primary-foreground: 160 15% 6%;
+    --sidebar-accent: 155 15% 12%;
+    --sidebar-accent-foreground: 140 10% 92%;
+    --sidebar-border: 155 12% 15%;
+    --sidebar-ring: 152 65% 45%;
+
+    --pitch: 142 55% 35%;
+    --pitch-line: 0 0% 90%;
+    --pitch-dark: 142 60% 20%;
+    --success: 152 60% 40%;
+    --warning: 38 92% 50%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(152 65% 45%), hsl(142 55% 50%));
+    --gradient-hero: linear-gradient(180deg, hsl(160 15% 6%) 0%, hsl(155 15% 10%) 100%);
+    --shadow-glow: 0 0 30px hsl(152 65% 45% / 0.15);
+    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.3);
   }
 }
 
@@ -73,8 +130,12 @@
 
 @layer components {
   .glass-card {
-    @apply bg-card/50 backdrop-blur-xl border border-border/50 rounded-lg;
+    @apply bg-card border border-border rounded-lg;
     box-shadow: var(--shadow-card);
+  }
+
+  .dark .glass-card {
+    @apply bg-card/50 backdrop-blur-xl border-border/50;
   }
 
   .glow-border {
@@ -89,8 +150,22 @@
 
   .field-grid {
     background-image:
-      linear-gradient(hsl(var(--primary) / 0.1) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--primary) / 0.1) 1px, transparent 1px);
+      linear-gradient(hsl(var(--pitch) / 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--pitch) / 0.08) 1px, transparent 1px);
     background-size: 20px 20px;
+  }
+
+  .dark .field-grid {
+    background-image:
+      linear-gradient(hsl(var(--pitch) / 0.15) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--pitch) / 0.15) 1px, transparent 1px);
+  }
+
+  /* Football pitch pattern for hero backgrounds */
+  .pitch-pattern {
+    background: 
+      linear-gradient(90deg, transparent 49.5%, hsl(var(--pitch-line) / 0.06) 49.5%, hsl(var(--pitch-line) / 0.06) 50.5%, transparent 50.5%),
+      linear-gradient(180deg, transparent 49.5%, hsl(var(--pitch-line) / 0.06) 49.5%, hsl(var(--pitch-line) / 0.06) 50.5%, transparent 50.5%);
+    background-size: 100% 100%;
   }
 }
