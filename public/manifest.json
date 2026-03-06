@@ -1,0 +1,16 @@
+{
+  "name": "FieldIQ Tracker",
+  "short_name": "FieldIQ",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0f1e",
+  "theme_color": "#00d4ff",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

@@ -17,6 +17,7 @@ import PlayerProfile from "./pages/PlayerProfile";
 import Fields from "./pages/Fields";
 import FieldCalibration from "./pages/FieldCalibration";
 import SettingsPage from "./pages/Settings";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/fields" element={<ProtectedRoute><Fields /></ProtectedRoute>} />
             <Route path="/fields/:id/calibrate" element={<ProtectedRoute><FieldCalibration /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
