@@ -17,6 +17,7 @@ import PlayerProfile from "./pages/PlayerProfile";
 import Fields from "./pages/Fields";
 import FieldCalibration from "./pages/FieldCalibration";
 import SettingsPage from "./pages/Settings";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
