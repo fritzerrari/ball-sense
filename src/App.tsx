@@ -3,7 +3,18 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Matches from "./pages/Matches";
+import NewMatch from "./pages/NewMatch";
+import MatchReport from "./pages/MatchReport";
+import TrackingPage from "./pages/TrackingPage";
+import Players from "./pages/Players";
+import PlayerProfile from "./pages/PlayerProfile";
+import Fields from "./pages/Fields";
+import FieldCalibration from "./pages/FieldCalibration";
+import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -15,8 +26,18 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/matches" element={<Matches />} />
+          <Route path="/matches/new" element={<NewMatch />} />
+          <Route path="/matches/:id" element={<MatchReport />} />
+          <Route path="/matches/:id/track" element={<TrackingPage />} />
+          <Route path="/players" element={<Players />} />
+          <Route path="/players/:id" element={<PlayerProfile />} />
+          <Route path="/fields" element={<Fields />} />
+          <Route path="/fields/:id/calibrate" element={<FieldCalibration />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
