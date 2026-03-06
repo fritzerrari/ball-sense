@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
 import { Navigate } from "react-router-dom";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Login() {
   const { user, loading } = useAuth();
@@ -17,7 +18,6 @@ export default function Login() {
   const [clubName, setClubName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Redirect if already logged in
   if (!loading && user) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -59,7 +59,6 @@ export default function Login() {
         toast.success("Erfolgreich angemeldet!");
         navigate("/dashboard");
       } else {
-        // Register
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -76,14 +75,11 @@ export default function Login() {
           return;
         }
 
-        // Check if email confirmation is required
         if (signUpData.session) {
-          // Auto-confirmed — create club now
           await createClubForUser(signUpData.user.id);
           toast.success("Konto erstellt! Willkommen bei FieldIQ.");
           navigate("/dashboard");
         } else {
-          // Email confirmation required
           toast.success("Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse.");
         }
       }
@@ -95,7 +91,6 @@ export default function Login() {
   };
 
   const createClubForUser = async (userId: string) => {
-    // Create club
     const { data: club, error: clubError } = await supabase
       .from("clubs")
       .insert({ name: clubName.trim() })
@@ -107,7 +102,6 @@ export default function Login() {
       return;
     }
 
-    // Link profile to club
     const { error: profileError } = await supabase
       .from("profiles")
       .update({ club_id: club.id })
@@ -123,14 +117,21 @@ export default function Login() {
       <div className="absolute inset-0 field-grid opacity-20" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px]" />
 
+      {/* Theme toggle */}
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
+
       <div className="w-full max-w-sm relative z-10 space-y-6">
         <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" /> Zurück
         </Link>
 
         <div>
-          <Link to="/" className="font-display text-2xl font-bold">
-            <span className="gradient-text">Field</span>IQ
+          <Link to="/" className="font-display text-2xl font-bold flex items-center gap-1.5">
+            <span className="w-7 h-7 rounded bg-primary flex items-center justify-center text-primary-foreground text-sm font-black">F</span>
+            <span className="text-foreground">Field</span>
+            <span className="gradient-text">IQ</span>
           </Link>
           <h1 className="text-xl font-semibold font-display mt-4">
             {isLogin ? "Willkommen zurück" : "Konto erstellen"}
