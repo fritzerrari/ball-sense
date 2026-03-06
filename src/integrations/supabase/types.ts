@@ -14,13 +14,401 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clubs: {
+        Row: {
+          city: string | null
+          created_at: string
+          id: string
+          league: string | null
+          name: string
+          plan: string
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          league?: string | null
+          name: string
+          plan?: string
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          league?: string | null
+          name?: string
+          plan?: string
+        }
+        Relationships: []
+      }
+      fields: {
+        Row: {
+          calibration: Json | null
+          club_id: string
+          created_at: string
+          height_m: number
+          id: string
+          name: string
+          width_m: number
+        }
+        Insert: {
+          calibration?: Json | null
+          club_id: string
+          created_at?: string
+          height_m?: number
+          id?: string
+          name: string
+          width_m?: number
+        }
+        Update: {
+          calibration?: Json | null
+          club_id?: string
+          created_at?: string
+          height_m?: number
+          id?: string
+          name?: string
+          width_m?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fields_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_lineups: {
+        Row: {
+          id: string
+          match_id: string
+          player_id: string | null
+          player_name: string | null
+          shirt_number: number | null
+          starting: boolean
+          subbed_in_min: number | null
+          subbed_out_min: number | null
+          team: string
+        }
+        Insert: {
+          id?: string
+          match_id: string
+          player_id?: string | null
+          player_name?: string | null
+          shirt_number?: number | null
+          starting?: boolean
+          subbed_in_min?: number | null
+          subbed_out_min?: number | null
+          team: string
+        }
+        Update: {
+          id?: string
+          match_id?: string
+          player_id?: string | null
+          player_name?: string | null
+          shirt_number?: number | null
+          starting?: boolean
+          subbed_in_min?: number | null
+          subbed_out_min?: number | null
+          team?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_lineups_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_lineups_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matches: {
+        Row: {
+          away_club_id: string | null
+          away_club_name: string | null
+          away_formation: string | null
+          created_at: string
+          date: string
+          field_id: string
+          home_club_id: string
+          home_formation: string | null
+          id: string
+          kickoff: string | null
+          status: string
+        }
+        Insert: {
+          away_club_id?: string | null
+          away_club_name?: string | null
+          away_formation?: string | null
+          created_at?: string
+          date: string
+          field_id: string
+          home_club_id: string
+          home_formation?: string | null
+          id?: string
+          kickoff?: string | null
+          status?: string
+        }
+        Update: {
+          away_club_id?: string | null
+          away_club_name?: string | null
+          away_formation?: string | null
+          created_at?: string
+          date?: string
+          field_id?: string
+          home_club_id?: string
+          home_formation?: string | null
+          id?: string
+          kickoff?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matches_away_club_id_fkey"
+            columns: ["away_club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_home_club_id_fkey"
+            columns: ["home_club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_match_stats: {
+        Row: {
+          avg_speed_kmh: number | null
+          distance_km: number | null
+          heatmap_grid: Json | null
+          id: string
+          match_id: string
+          minutes_played: number | null
+          player_id: string | null
+          positions_raw: Json | null
+          sprint_count: number | null
+          sprint_distance_m: number | null
+          team: string
+          top_speed_kmh: number | null
+        }
+        Insert: {
+          avg_speed_kmh?: number | null
+          distance_km?: number | null
+          heatmap_grid?: Json | null
+          id?: string
+          match_id: string
+          minutes_played?: number | null
+          player_id?: string | null
+          positions_raw?: Json | null
+          sprint_count?: number | null
+          sprint_distance_m?: number | null
+          team: string
+          top_speed_kmh?: number | null
+        }
+        Update: {
+          avg_speed_kmh?: number | null
+          distance_km?: number | null
+          heatmap_grid?: Json | null
+          id?: string
+          match_id?: string
+          minutes_played?: number | null
+          player_id?: string | null
+          positions_raw?: Json | null
+          sprint_count?: number | null
+          sprint_distance_m?: number | null
+          team?: string
+          top_speed_kmh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_match_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_match_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      players: {
+        Row: {
+          active: boolean
+          club_id: string
+          created_at: string
+          id: string
+          name: string
+          number: number | null
+          position: string | null
+        }
+        Insert: {
+          active?: boolean
+          club_id: string
+          created_at?: string
+          id?: string
+          name: string
+          number?: number | null
+          position?: string | null
+        }
+        Update: {
+          active?: boolean
+          club_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          number?: number | null
+          position?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          club_id: string | null
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          club_id?: string | null
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          club_id?: string | null
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_match_stats: {
+        Row: {
+          avg_distance_km: number | null
+          formation_heatmap: Json | null
+          id: string
+          match_id: string
+          possession_pct: number | null
+          team: string
+          top_speed_kmh: number | null
+          total_distance_km: number | null
+        }
+        Insert: {
+          avg_distance_km?: number | null
+          formation_heatmap?: Json | null
+          id?: string
+          match_id: string
+          possession_pct?: number | null
+          team: string
+          top_speed_kmh?: number | null
+          total_distance_km?: number | null
+        }
+        Update: {
+          avg_distance_km?: number | null
+          formation_heatmap?: Json | null
+          id?: string
+          match_id?: string
+          possession_pct?: number | null
+          team?: string
+          top_speed_kmh?: number | null
+          total_distance_km?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_match_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_uploads: {
+        Row: {
+          camera_index: number
+          duration_sec: number | null
+          file_path: string | null
+          frames_count: number | null
+          id: string
+          match_id: string
+          status: string
+          uploaded_at: string
+        }
+        Insert: {
+          camera_index?: number
+          duration_sec?: number | null
+          file_path?: string | null
+          frames_count?: number | null
+          id?: string
+          match_id: string
+          status?: string
+          uploaded_at?: string
+        }
+        Update: {
+          camera_index?: number
+          duration_sec?: number | null
+          file_path?: string | null
+          frames_count?: number | null
+          id?: string
+          match_id?: string
+          status?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_uploads_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_club_id: { Args: { _user_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
