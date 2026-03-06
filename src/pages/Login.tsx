@@ -1,11 +1,122 @@
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { ArrowLeft, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Mail, Lock, Eye, EyeOff, Building2, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useAuth } from "@/components/AuthProvider";
+import { Navigate } from "react-router-dom";
 
 export default function Login() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [clubName, setClubName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Redirect if already logged in
+  if (!loading && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    if (!email.trim() || !password.trim()) {
+      toast.error("Bitte E-Mail und Passwort eingeben.");
+      return;
+    }
+
+    if (!isLogin && !clubName.trim()) {
+      toast.error("Bitte Vereinsnamen eingeben.");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Passwort muss mindestens 6 Zeichen lang sein.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          if (error.message.includes("Invalid login")) {
+            toast.error("Ungültige E-Mail oder Passwort.");
+          } else if (error.message.includes("Email not confirmed")) {
+            toast.error("Bitte bestätige zuerst deine E-Mail-Adresse.");
+          } else {
+            toast.error(error.message);
+          }
+          return;
+        }
+        toast.success("Erfolgreich angemeldet!");
+        navigate("/dashboard");
+      } else {
+        // Register
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+
+        if (signUpError) {
+          toast.error(signUpError.message);
+          return;
+        }
+
+        if (!signUpData.user) {
+          toast.error("Registrierung fehlgeschlagen.");
+          return;
+        }
+
+        // Check if email confirmation is required
+        if (signUpData.session) {
+          // Auto-confirmed — create club now
+          await createClubForUser(signUpData.user.id);
+          toast.success("Konto erstellt! Willkommen bei FieldIQ.");
+          navigate("/dashboard");
+        } else {
+          // Email confirmation required
+          toast.success("Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse.");
+        }
+      }
+    } catch (err) {
+      toast.error("Ein unerwarteter Fehler ist aufgetreten.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const createClubForUser = async (userId: string) => {
+    // Create club
+    const { data: club, error: clubError } = await supabase
+      .from("clubs")
+      .insert({ name: clubName.trim() })
+      .select("id")
+      .single();
+
+    if (clubError || !club) {
+      console.error("Club creation failed:", clubError);
+      return;
+    }
+
+    // Link profile to club
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ club_id: club.id })
+      .eq("user_id", userId);
+
+    if (profileError) {
+      console.error("Profile update failed:", profileError);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -29,18 +140,33 @@ export default function Login() {
           </p>
         </div>
 
-        <div className="glass-card p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4">
           {!isLogin && (
             <div>
               <label className="text-sm text-muted-foreground block mb-1">Vereinsname</label>
-              <input type="text" placeholder="FC Musterstadt" className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground" />
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={clubName}
+                  onChange={(e) => setClubName(e.target.value)}
+                  placeholder="FC Musterstadt"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground"
+                />
+              </div>
             </div>
           )}
           <div>
             <label className="text-sm text-muted-foreground block mb-1">E-Mail</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input type="email" placeholder="trainer@verein.de" className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="trainer@verein.de"
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground"
+              />
             </div>
           </div>
           <div>
@@ -49,18 +175,21 @@ export default function Login() {
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full pl-10 pr-10 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground"
               />
-              <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
-          <Button variant="hero" className="w-full">
+          <Button variant="hero" className="w-full" type="submit" disabled={submitting}>
+            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isLogin ? "Anmelden" : "Konto erstellen"}
           </Button>
-        </div>
+        </form>
 
         <p className="text-sm text-center text-muted-foreground">
           {isLogin ? "Noch kein Konto?" : "Schon ein Konto?"}{" "}

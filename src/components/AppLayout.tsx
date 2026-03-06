@@ -1,10 +1,10 @@
 import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useAuth } from "./AuthProvider";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -16,8 +16,17 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { clubName, clubPlan, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
+  const planLabel = clubPlan === "starter" ? "Starter" : clubPlan === "club" ? "Club" : clubPlan === "pro" ? "Pro" : "Trial";
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -72,7 +81,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="px-2 py-4 border-t border-sidebar-border">
-          <button className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all w-full ${collapsed ? "justify-center" : ""}`}>
+          <button
+            onClick={handleSignOut}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all w-full ${collapsed ? "justify-center" : ""}`}
+          >
             <LogOut className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Abmelden</span>}
           </button>
@@ -85,9 +97,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <button className="md:hidden p-2 hover:bg-muted rounded-lg" onClick={() => setMobileOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
+          {clubName && (
+            <span className="text-sm font-medium font-display hidden sm:block">{clubName}</span>
+          )}
           <div className="flex-1" />
           <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">Trial</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">{planLabel}</span>
           </div>
         </header>
         <div className="p-4 md:p-6 lg:p-8">
