@@ -67,7 +67,7 @@ export default function TrackingPage() {
               </div>
               {/* Quality indicator */}
               <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded-full bg-card/80 backdrop-blur-sm border border-border text-xs">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <div className="w-2 h-2 rounded-full bg-primary" />
                 <span className="text-muted-foreground">Gut</span>
               </div>
             </div>
