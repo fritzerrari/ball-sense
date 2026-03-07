@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2 } from "lucide-react";
+import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2, Route, Flame } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import PitchVisualization, { getPlayerColor } from "@/components/PitchVisualization";
@@ -89,6 +89,7 @@ export default function AssistantPage() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
+  const [pitchMode, setPitchMode] = useState<"trails" | "heatmap">("trails");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -453,15 +454,39 @@ export default function AssistantPage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                Spielfeld — Laufwege
+                Spielfeld — {pitchMode === "trails" ? "Laufwege" : "Heatmap"}
               </span>
-              {selectedPlayerIds.size > 0 && (
-                <span className="text-[10px] text-muted-foreground">
-                  {selectedPlayerIds.size} Spieler aktiv
-                </span>
-              )}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPitchMode("trails")}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+                    pitchMode === "trails"
+                      ? "bg-primary/15 text-primary border border-primary/25"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Route className="h-3 w-3" />
+                  Laufwege
+                </button>
+                <button
+                  onClick={() => setPitchMode("heatmap")}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+                    pitchMode === "heatmap"
+                      ? "bg-primary/15 text-primary border border-primary/25"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Flame className="h-3 w-3" />
+                  Heatmap
+                </button>
+                {selectedPlayerIds.size > 0 && (
+                  <span className="text-[10px] text-muted-foreground ml-1">
+                    {selectedPlayerIds.size} aktiv
+                  </span>
+                )}
+              </div>
             </div>
-            <PitchVisualization players={pitchPlayers} className="rounded-lg overflow-hidden" />
+            <PitchVisualization players={pitchPlayers} mode={pitchMode} className="rounded-lg overflow-hidden" />
           </div>
 
           {/* Roster */}
