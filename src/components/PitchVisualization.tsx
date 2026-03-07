@@ -69,7 +69,7 @@ function heatmapColor(intensity: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export default function PitchVisualization({ players = [], className = "", mode = "trails" }: PitchVisualizationProps) {
+export default function PitchVisualization({ players = [], className = "", mode = "trails", timeRange }: PitchVisualizationProps) {
   const W = 680;
   const H = 440;
   const PAD = 20;
