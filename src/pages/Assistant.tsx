@@ -1,9 +1,15 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import PitchVisualization, { getPlayerColor } from "@/components/PitchVisualization";
+import PlayerRosterPanel from "@/components/PlayerRosterPanel";
+import { usePlayers } from "@/hooks/use-players";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/AuthProvider";
+import { useQuery } from "@tanstack/react-query";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -16,12 +22,185 @@ const quickActions = [
   { label: "Kaderstärken", icon: Sparkles, message: "Analysiere die Stärken und Schwächen unseres Kaders. Wo sollten wir verstärken?" },
 ];
 
+// Generate realistic mock movement trails for a player based on position
+function generateMockTrail(position: string | null, seed: number): { x: number; y: number }[] {
+  const rng = (i: number) => {
+    const s = Math.sin(seed * 9301 + i * 49297) * 49297;
+    return s - Math.floor(s);
+  };
+
+  // Define base zones by position
+  const zones: Record<string, { cx: number; cy: number; rx: number; ry: number }> = {
+    TW:  { cx: 0.06, cy: 0.5,  rx: 0.04, ry: 0.15 },
+    IV:  { cx: 0.18, cy: 0.5,  rx: 0.08, ry: 0.2  },
+    LIV: { cx: 0.18, cy: 0.35, rx: 0.08, ry: 0.15 },
+    RIV: { cx: 0.18, cy: 0.65, rx: 0.08, ry: 0.15 },
+    LV:  { cx: 0.15, cy: 0.15, rx: 0.12, ry: 0.12 },
+    RV:  { cx: 0.15, cy: 0.85, rx: 0.12, ry: 0.12 },
+    ZDM: { cx: 0.35, cy: 0.5,  rx: 0.1,  ry: 0.2  },
+    ZM:  { cx: 0.45, cy: 0.5,  rx: 0.15, ry: 0.25 },
+    LM:  { cx: 0.4,  cy: 0.2,  rx: 0.15, ry: 0.15 },
+    RM:  { cx: 0.4,  cy: 0.8,  rx: 0.15, ry: 0.15 },
+    ZOM: { cx: 0.6,  cy: 0.5,  rx: 0.12, ry: 0.2  },
+    LA:  { cx: 0.65, cy: 0.15, rx: 0.18, ry: 0.12 },
+    RA:  { cx: 0.65, cy: 0.85, rx: 0.18, ry: 0.12 },
+    ST:  { cx: 0.78, cy: 0.5,  rx: 0.12, ry: 0.2  },
+    HS:  { cx: 0.7,  cy: 0.5,  rx: 0.15, ry: 0.25 },
+  };
+
+  const zone = zones[position ?? "ZM"] ?? zones.ZM;
+  const points: { x: number; y: number }[] = [];
+  const count = 12 + Math.floor(rng(0) * 8);
+
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + rng(i * 3) * 1.5;
+    const dist = 0.3 + rng(i * 7) * 0.7;
+    const x = Math.max(0.02, Math.min(0.98, zone.cx + Math.cos(angle) * zone.rx * dist));
+    const y = Math.max(0.02, Math.min(0.98, zone.cy + Math.sin(angle) * zone.ry * dist));
+    points.push({ x, y });
+  }
+
+  return points;
+}
+
+// Mock stats generator
+function generateMockStats(position: string | null, seed: number) {
+  const rng = (offset: number) => {
+    const s = Math.sin(seed * 1301 + offset * 7927) * 49297;
+    return s - Math.floor(s);
+  };
+
+  const isGK = position === "TW";
+  const isDefender = ["IV", "LV", "RV", "LIV", "RIV"].includes(position ?? "");
+  const isAttacker = ["ST", "HS", "LA", "RA"].includes(position ?? "");
+
+  return {
+    distance_km: isGK ? 4.5 + rng(1) * 2 : isDefender ? 8 + rng(2) * 3 : isAttacker ? 9 + rng(3) * 3.5 : 9.5 + rng(4) * 3,
+    top_speed_kmh: isGK ? 18 + rng(5) * 8 : 25 + rng(6) * 10,
+    avg_speed_kmh: isGK ? 3 + rng(7) * 2 : 6 + rng(8) * 3,
+    sprint_count: isGK ? Math.floor(rng(9) * 5) : Math.floor(10 + rng(10) * 30),
+    minutes_played: Math.floor(70 + rng(11) * 25),
+    sprint_distance_m: isGK ? Math.floor(rng(12) * 100) : Math.floor(200 + rng(13) * 600),
+  };
+}
+
 export default function AssistantPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: playersRaw = [] } = usePlayers();
+  const { clubId } = useAuth();
+
+  // Get latest match stats for players
+  const { data: latestStats } = useQuery({
+    queryKey: ["latest_player_stats", clubId],
+    queryFn: async () => {
+      if (!clubId) return {};
+      // Get latest done match
+      const { data: latestMatch } = await supabase
+        .from("matches")
+        .select("id")
+        .eq("home_club_id", clubId)
+        .eq("status", "done")
+        .order("date", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!latestMatch) return {};
+
+      const { data: stats } = await supabase
+        .from("player_match_stats")
+        .select("player_id, distance_km, top_speed_kmh, avg_speed_kmh, sprint_count, sprint_distance_m, minutes_played, positions_raw")
+        .eq("match_id", latestMatch.id);
+
+      const map: Record<string, any> = {};
+      stats?.forEach(s => {
+        if (s.player_id) map[s.player_id] = s;
+      });
+      return map;
+    },
+    enabled: !!clubId,
+  });
+
+  // Build enriched player list
+  const players = useMemo(() => {
+    return playersRaw.map((p, i) => {
+      const realStats = latestStats?.[p.id];
+      return {
+        id: p.id,
+        name: p.name,
+        number: p.number,
+        position: p.position,
+        active: p.active,
+        stats: realStats ? {
+          distance_km: realStats.distance_km,
+          top_speed_kmh: realStats.top_speed_kmh,
+          avg_speed_kmh: realStats.avg_speed_kmh,
+          sprint_count: realStats.sprint_count,
+          sprint_distance_m: realStats.sprint_distance_m,
+          minutes_played: realStats.minutes_played,
+        } : generateMockStats(p.position, i + 1),
+        positionsRaw: realStats?.positions_raw ?? null,
+      };
+    });
+  }, [playersRaw, latestStats]);
+
+  // Color mapping for selected players
+  const colorMap = useMemo(() => {
+    const map = new Map<string, { color: string; index: number }>();
+    let idx = 0;
+    players.forEach(p => {
+      if (selectedPlayerIds.has(p.id)) {
+        map.set(p.id, { color: getPlayerColor(idx), index: idx });
+        idx++;
+      }
+    });
+    return map;
+  }, [players, selectedPlayerIds]);
+
+  // Build pitch data for selected players
+  const pitchPlayers = useMemo(() => {
+    return players
+      .filter(p => selectedPlayerIds.has(p.id))
+      .map((p, _i) => {
+        const cm = colorMap.get(p.id);
+        // Use real positions if available, else mock
+        const positions = p.positionsRaw
+          ? (p.positionsRaw as { x: number; y: number }[]).map(pt => ({ x: pt.x, y: pt.y }))
+          : generateMockTrail(p.position, players.indexOf(p) + 1);
+
+        return {
+          id: p.id,
+          name: p.name,
+          number: p.number,
+          color: cm?.color ?? "hsl(150, 10%, 45%)",
+          positions,
+          currentPos: positions[positions.length - 1],
+        };
+      });
+  }, [players, selectedPlayerIds, colorMap]);
+
+  // Handlers
+  const togglePlayer = useCallback((id: string) => {
+    setSelectedPlayerIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelectedPlayerIds(new Set(players.filter(p => p.active).map(p => p.id)));
+  }, [players]);
+
+  const deselectAll = useCallback(() => {
+    setSelectedPlayerIds(new Set());
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -143,129 +322,159 @@ export default function AssistantPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <BrainCircuit className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold font-display flex items-center gap-2">
-              KI Co-Trainer
-              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-normal">
-                Add-on · €79/Mo
-              </span>
-            </h1>
-            <p className="text-sm text-muted-foreground">Taktische Analyse, Aufstellungsempfehlungen & Spielauswertung</p>
-          </div>
-          {messages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto text-muted-foreground hover:text-destructive"
-              onClick={() => setMessages([])}
-            >
-              <Trash2 className="h-4 w-4 mr-1" /> Neuer Chat
-            </Button>
-          )}
-        </div>
+      <div className="flex flex-col xl:flex-row gap-4 h-[calc(100vh-8rem)]">
 
-        {/* Chat area */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pr-1">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-6 py-12">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <BrainCircuit className="h-8 w-8 text-primary" />
-              </div>
-              <div className="text-center max-w-md">
-                <h2 className="text-lg font-semibold font-display mb-2">Dein KI Co-Trainer</h2>
-                <p className="text-sm text-muted-foreground">
-                  Stelle Fragen zu deinem Kader, analysiere Spiele oder lass dir taktische Empfehlungen geben.
-                  Ich kenne deine Vereinsdaten und Statistiken.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
-                {quickActions.map((action) => (
-                  <button
-                    key={action.label}
-                    onClick={() => sendMessage(action.message)}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all text-left group"
-                  >
-                    <action.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                    <span className="text-sm font-medium">{action.label}</span>
-                  </button>
-                ))}
-              </div>
+        {/* LEFT — Chat */}
+        <div className="flex-1 min-w-0 flex flex-col xl:max-w-[480px] 2xl:max-w-[540px]">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <BrainCircuit className="h-4.5 w-4.5 text-primary" />
             </div>
-          ) : (
-            messages.map((msg, i) => (
-              <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                {msg.role === "assistant" && (
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-1">
-                    <BrainCircuit className="h-4 w-4 text-primary" />
-                  </div>
-                )}
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card border border-border"
-                  }`}
-                >
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold font-display flex items-center gap-2">
+                KI Co-Trainer
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-normal whitespace-nowrap">
+                  Add-on · €79/Mo
+                </span>
+              </h1>
+            </div>
+            {messages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto text-muted-foreground hover:text-destructive shrink-0"
+                onClick={() => setMessages([])}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+
+          {/* Messages */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-5 py-8">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <BrainCircuit className="h-7 w-7 text-primary" />
+                </div>
+                <div className="text-center max-w-sm">
+                  <h2 className="text-base font-semibold font-display mb-1.5">Dein KI Co-Trainer</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Analysiere Spiele, erhalte Aufstellungsempfehlungen. Wähle rechts Spieler aus, um Laufwege und Statistiken zu sehen.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.label}
+                      onClick={() => sendMessage(action.message)}
+                      className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all text-left group"
+                    >
+                      <action.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                      <span className="text-xs font-medium">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              messages.map((msg, i) => (
+                <div key={i} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {msg.role === "assistant" && (
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <BrainCircuit className="h-3.5 w-3.5 text-primary" />
                     </div>
-                  ) : (
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  )}
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card border border-border"
+                    }`}
+                  >
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 text-xs leading-relaxed">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap text-xs">{msg.content}</p>
+                    )}
+                  </div>
+                  {msg.role === "user" && (
+                    <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                      <Zap className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
                   )}
                 </div>
-                {msg.role === "user" && (
-                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-1">
-                    <Zap className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                )}
+              ))
+            )}
+            {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
+              <div className="flex gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                  <BrainCircuit className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <div className="bg-card border border-border rounded-2xl px-3.5 py-2.5">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                </div>
               </div>
-            ))
-          )}
-          {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                <BrainCircuit className="h-4 w-4 text-primary" />
-              </div>
-              <div className="bg-card border border-border rounded-2xl px-4 py-3">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              </div>
+            )}
+          </div>
+
+          {/* Input */}
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="flex gap-2 items-end">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                placeholder="Frage deinen Co-Trainer..."
+                className="flex-1 resize-none px-3.5 py-2.5 rounded-xl bg-muted border border-border text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
+                style={{ minHeight: "40px", maxHeight: "100px" }}
+              />
+              <Button
+                variant="hero"
+                size="icon"
+                className="h-10 w-10 shrink-0 rounded-xl"
+                onClick={() => sendMessage(input)}
+                disabled={!input.trim() || isLoading}
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Input */}
-        <div className="mt-4 border-t border-border pt-4">
-          <div className="flex gap-2 items-end">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              placeholder="Frage deinen Co-Trainer..."
-              className="flex-1 resize-none px-4 py-3 rounded-xl bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
-              style={{ minHeight: "44px", maxHeight: "120px" }}
-            />
-            <Button
-              variant="hero"
-              size="icon"
-              className="h-11 w-11 shrink-0 rounded-xl"
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim() || isLoading}
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
+        {/* RIGHT — Pitch + Roster */}
+        <div className="flex-1 min-w-0 flex flex-col gap-3">
+          {/* Pitch */}
+          <div className="glass-card p-3 flex-shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                Spielfeld — Laufwege
+              </span>
+              {selectedPlayerIds.size > 0 && (
+                <span className="text-[10px] text-muted-foreground">
+                  {selectedPlayerIds.size} Spieler aktiv
+                </span>
+              )}
+            </div>
+            <PitchVisualization players={pitchPlayers} className="rounded-lg overflow-hidden" />
           </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            KI-Analysen basieren auf deinen Vereinsdaten. Ergebnisse sind Empfehlungen, keine Garantien.
-          </p>
+
+          {/* Roster */}
+          <div className="glass-card flex-1 min-h-0 overflow-hidden flex flex-col">
+            <PlayerRosterPanel
+              players={players}
+              selectedIds={selectedPlayerIds}
+              onToggle={togglePlayer}
+              onSelectAll={selectAll}
+              onDeselectAll={deselectAll}
+              colorMap={colorMap}
+            />
+          </div>
         </div>
       </div>
     </AppLayout>
