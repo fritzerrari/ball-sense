@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2 } from "lucide-react";
+import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2, Route, Flame } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import PitchVisualization, { getPlayerColor } from "@/components/PitchVisualization";
