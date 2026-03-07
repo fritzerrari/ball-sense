@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import {
   Building2, Users, Map, Download, CheckCircle2,
   Plus, Trash2, ChevronRight, ChevronLeft, Loader2, Smartphone,
+  Camera, X, ImageIcon,
 } from "lucide-react";
 
 const POSITIONS = ["TW", "IV", "LV", "RV", "ZM", "ZDM", "ZOM", "LA", "RA", "ST"];
@@ -37,21 +38,25 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  // Step 1 — club
+  // Step 0 — club
   const [city, setCity] = useState("");
   const [league, setLeague] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Step 2 — players
+  // Step 1 — players
   const [players, setPlayers] = useState<PlayerEntry[]>([
     { name: "", number: "", position: "" },
   ]);
 
-  // Step 3 — field
+  // Step 2 — field
   const [fieldName, setFieldName] = useState("Hauptplatz");
   const [fieldWidth, setFieldWidth] = useState("105");
   const [fieldHeight, setFieldHeight] = useState("68");
 
-  // Step 4 — PWA
+  // Step 3 — PWA
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // Listen for install prompt
@@ -74,11 +79,63 @@ export default function Onboarding() {
     setPlayers(updated);
   };
 
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Bitte wähle eine Bilddatei aus.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Maximale Dateigröße: 5 MB");
+      return;
+    }
+    setLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile || !clubId) return null;
+    setUploadingLogo(true);
+    try {
+      const ext = logoFile.name.split(".").pop() || "png";
+      const path = `${clubId}/logo.${ext}`;
+      const { error } = await supabase.storage
+        .from("club-logos")
+        .upload(path, logoFile, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage
+        .from("club-logos")
+        .getPublicUrl(path);
+      return urlData.publicUrl;
+    } catch {
+      toast.error("Logo-Upload fehlgeschlagen.");
+      return null;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const saveClubDetails = async () => {
     if (!clubId) return;
-    const updates: any = {};
+    const updates: Record<string, string> = {};
     if (city.trim()) updates.city = city.trim();
     if (league.trim()) updates.league = league.trim();
+
+    // Upload logo if selected
+    if (logoFile) {
+      const logoUrl = await uploadLogo();
+      if (logoUrl) updates.logo_url = logoUrl;
+    }
+
     if (Object.keys(updates).length > 0) {
       await supabase.from("clubs").update(updates).eq("id", clubId);
     }
@@ -171,10 +228,52 @@ export default function Onboarding() {
               <div>
                 <h2 className="text-xl font-bold font-display">Vereinsdaten bestätigen</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Ergänze optional Stadt und Liga.
+                  Ergänze optional Stadt, Liga und dein Vereinslogo.
                 </p>
               </div>
               <div className="glass-card p-5 space-y-4">
+                {/* Logo Upload */}
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-2">Vereinslogo / Teamfoto <span className="text-muted-foreground/60">(optional)</span></label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoSelect}
+                    className="hidden"
+                  />
+                  {logoPreview ? (
+                    <div className="relative w-full flex justify-center">
+                      <div className="relative">
+                        <img
+                          src={logoPreview}
+                          alt="Logo-Vorschau"
+                          className="w-28 h-28 rounded-xl object-cover border-2 border-border shadow-sm"
+                        />
+                        <button
+                          onClick={removeLogo}
+                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full flex flex-col items-center gap-2 p-6 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-muted/50 transition-all cursor-pointer"
+                    >
+                      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Camera className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium">Logo oder Foto hochladen</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG – max. 5 MB</p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+
                 <div>
                   <label className="text-sm text-muted-foreground block mb-1">Vereinsname</label>
                   <div className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
@@ -348,9 +447,13 @@ export default function Onboarding() {
           {/* Step 4 — Done */}
           {step === 4 && (
             <div className="space-y-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="h-8 w-8 text-primary" />
-              </div>
+              {logoPreview ? (
+                <img src={logoPreview} alt="Vereinslogo" className="w-20 h-20 rounded-xl object-cover mx-auto shadow-md border border-border" />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="h-8 w-8 text-primary" />
+                </div>
+              )}
               <div>
                 <h2 className="text-xl font-bold font-display">Alles eingerichtet!</h2>
                 <p className="text-sm text-muted-foreground mt-2">
@@ -360,7 +463,7 @@ export default function Onboarding() {
               <div className="glass-card p-5 text-left space-y-3">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-sm">Verein eingerichtet</span>
+                  <span className="text-sm">Verein eingerichtet {logoFile ? "inkl. Logo" : ""}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
@@ -400,10 +503,10 @@ export default function Onboarding() {
                 <Button
                   variant="hero"
                   onClick={handleNext}
-                  disabled={saving || !canProceed()}
+                  disabled={saving || uploadingLogo || !canProceed()}
                   className="flex-1"
                 >
-                  {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {(saving || uploadingLogo) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                   Weiter <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               )}

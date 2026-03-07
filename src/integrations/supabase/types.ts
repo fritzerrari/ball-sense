@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           id: string
           league: string | null
+          logo_url: string | null
           name: string
           plan: string
         }
@@ -28,6 +29,7 @@ export type Database = {
           created_at?: string
           id?: string
           league?: string | null
+          logo_url?: string | null
           name: string
           plan?: string
         }
@@ -36,6 +38,7 @@ export type Database = {
           created_at?: string
           id?: string
           league?: string | null
+          logo_url?: string | null
           name?: string
           plan?: string
         }
