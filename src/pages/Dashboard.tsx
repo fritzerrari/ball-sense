@@ -14,7 +14,7 @@ import { SetupChecklist } from "@/components/SetupChecklist";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 export default function Dashboard() {
-  const { clubName, clubPlan } = useAuth();
+  const { clubName, clubPlan, clubLogoUrl } = useAuth();
   const { data: matches, isLoading: matchesLoading } = useMatches();
   const { data: stats, isLoading: statsLoading } = useSeasonStats();
   const { data: players } = usePlayers();
@@ -36,11 +36,16 @@ export default function Dashboard() {
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold font-display">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
-              {clubName ? `Willkommen, ${clubName}` : "Willkommen bei FieldIQ"}
-            </p>
+          <div className="flex items-center gap-4">
+            {clubLogoUrl && (
+              <img src={clubLogoUrl} alt={clubName || "Logo"} className="w-12 h-12 rounded-xl object-cover border border-border shadow-sm" />
+            )}
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold font-display">Dashboard</h1>
+              <p className="text-muted-foreground mt-1">
+                {clubName ? `Willkommen, ${clubName}` : "Willkommen bei FieldIQ"}
+              </p>
+            </div>
           </div>
           {clubPlan && <PlanBadge plan={clubPlan} />}
         </div>

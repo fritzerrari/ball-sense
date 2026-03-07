@@ -19,7 +19,7 @@ const navItems = [
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { clubName, clubPlan, signOut } = useAuth();
+  const { clubName, clubPlan, clubLogoUrl, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -46,8 +46,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
           {!collapsed && (
-            <Link to="/dashboard" className="font-display text-lg font-bold flex items-center gap-1">
-              <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
+            <Link to="/dashboard" className="font-display text-lg font-bold flex items-center gap-1.5">
+              {clubLogoUrl ? (
+                <img src={clubLogoUrl} alt="Logo" className="w-7 h-7 rounded-md object-cover border border-border" />
+              ) : (
+                <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
+              )}
               <span className="text-foreground">Field</span>
               <span className="gradient-text">IQ</span>
             </Link>
@@ -116,7 +120,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </button>
           )}
           {clubName && (
-            <span className="text-sm font-medium font-display hidden sm:block">{clubName}</span>
+            <div className="flex items-center gap-2 hidden sm:flex">
+              {clubLogoUrl && (
+                <img src={clubLogoUrl} alt={clubName} className="w-7 h-7 rounded-md object-cover border border-border" />
+              )}
+              <span className="text-sm font-medium font-display">{clubName}</span>
+            </div>
           )}
           <div className="flex-1" />
           <div className="flex items-center gap-2">

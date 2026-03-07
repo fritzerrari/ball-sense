@@ -9,6 +9,7 @@ interface AuthContextType {
   clubId: string | null;
   clubName: string | null;
   clubPlan: string | null;
+  clubLogoUrl: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   clubId: null,
   clubName: null,
   clubPlan: null,
+  clubLogoUrl: null,
   signOut: async () => {},
 });
 
@@ -31,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [clubId, setClubId] = useState<string | null>(null);
   const [clubName, setClubName] = useState<string | null>(null);
   const [clubPlan, setClubPlan] = useState<string | null>(null);
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
 
   const fetchClubData = async (userId: string) => {
     // Get profile with club_id
@@ -44,17 +47,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClubId(profile.club_id);
       const { data: club } = await supabase
         .from("clubs")
-        .select("name, plan")
+        .select("name, plan, logo_url")
         .eq("id", profile.club_id)
         .single();
       if (club) {
         setClubName(club.name);
         setClubPlan(club.plan);
+        setClubLogoUrl((club as any).logo_url ?? null);
       }
     } else {
       setClubId(null);
       setClubName(null);
       setClubPlan(null);
+      setClubLogoUrl(null);
     }
   };
 
@@ -72,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setClubId(null);
           setClubName(null);
           setClubPlan(null);
+          setClubLogoUrl(null);
         }
         setLoading(false);
       }
@@ -97,10 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setClubId(null);
     setClubName(null);
     setClubPlan(null);
+    setClubLogoUrl(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, signOut }}>
       {children}
     </AuthContext.Provider>
   );
