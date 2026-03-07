@@ -12,6 +12,7 @@ const navItems = [
   { label: "Spiele", icon: Swords, href: "/matches" },
   { label: "Kader", icon: Users, href: "/players" },
   { label: "Plätze", icon: Map, href: "/fields" },
+  { label: "KI Assistent", icon: BrainCircuit, href: "/assistant" },
   { label: "Einstellungen", icon: Settings, href: "/settings" },
 ];
 

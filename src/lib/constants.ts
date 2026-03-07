@@ -22,6 +22,8 @@ export const PLAN_CONFIG: Record<PlanType, { label: string; price: number; maxMa
   pro: { label: "Pro", price: 199, maxMatches: null },
 };
 
+export const AI_ADDON_PRICE = 79; // €/Monat, zubuchbar zu jedem Plan
+
 export const HEATMAP_COLS = 21;
 export const HEATMAP_ROWS = 14;
 
