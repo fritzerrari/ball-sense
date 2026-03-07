@@ -14,6 +14,8 @@ interface PitchVisualizationProps {
   players?: PlayerTrail[];
   className?: string;
   mode?: "trails" | "heatmap";
+  /** Normalized time range [0-1, 0-1] to filter positions */
+  timeRange?: [number, number];
 }
 
 const PLAYER_COLORS = [
