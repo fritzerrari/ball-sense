@@ -60,7 +60,7 @@ serve(async (req) => {
 
     const userId = claimsData.claims.sub as string;
 
-    const { messages, includeContext } = await req.json();
+    const { messages, includeContext, selectedPlayersContext } = await req.json();
 
     // Build context from DB if requested
     let contextBlock = "";
@@ -114,6 +114,14 @@ ${teamStatsData.length > 0 ? `TEAM-STATISTIKEN:
 ${teamStatsData.map((s: any) => `- Match ${s.match_id?.slice(0, 8)} (${s.team}): ${s.total_distance_km?.toFixed(1) || "?"}km gesamt, Top ${s.top_speed_kmh?.toFixed(1) || "?"}km/h, Ballbesitz ${s.possession_pct?.toFixed(0) || "?"}%`).join("\n")}` : "Noch keine Team-Statistiken vorhanden."}
 --- ENDE VEREINSDATEN ---`;
       }
+    }
+
+    // Append selected players context if provided
+    if (selectedPlayersContext) {
+      contextBlock += `\n\n--- AKTUELL AUSGEWÄHLTE SPIELER ---
+Der Trainer hat folgende Spieler in der Analyse-Ansicht ausgewählt. Beziehe dich bei Antworten besonders auf diese Spieler:
+${selectedPlayersContext}
+--- ENDE AUSWAHL ---`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
