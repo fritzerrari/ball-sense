@@ -20,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   clubId: null,
   clubName: null,
   clubPlan: null,
+  clubLogoUrl: null,
   signOut: async () => {},
 });
 
