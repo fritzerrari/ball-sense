@@ -14,7 +14,7 @@ import { SetupChecklist } from "@/components/SetupChecklist";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 export default function Dashboard() {
-  const { clubName, clubPlan } = useAuth();
+  const { clubName, clubPlan, clubLogoUrl } = useAuth();
   const { data: matches, isLoading: matchesLoading } = useMatches();
   const { data: stats, isLoading: statsLoading } = useSeasonStats();
   const { data: players } = usePlayers();
