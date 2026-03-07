@@ -10,6 +10,8 @@ import { useFields } from "@/hooks/use-fields";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { PlanBadge } from "@/components/PlanBadge";
+import { SetupChecklist } from "@/components/SetupChecklist";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 export default function Dashboard() {
   const { clubName, clubPlan } = useAuth();

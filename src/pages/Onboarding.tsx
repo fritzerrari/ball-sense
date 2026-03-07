@@ -394,7 +394,7 @@ export default function Onboarding() {
               )}
               {step === 3 ? (
                 <Button variant="hero" onClick={() => setStep(4)} className="flex-1">
-                  {step === 0 && !city && !league ? "Überspringen" : "Weiter"} <ChevronRight className="h-4 w-4 ml-1" />
+                  Weiter <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               ) : (
                 <Button
