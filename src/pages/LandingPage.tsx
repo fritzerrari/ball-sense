@@ -87,8 +87,8 @@ export default function LandingPage() {
               Jetzt in der Beta
             </div>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 font-display">
-              Pro-Tracking für die{" "}
-              <span className="gradient-text">Regionalliga</span>
+              Pro-Tracking für{" "}
+              <span className="gradient-text">alle Ligen</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl mx-auto leading-relaxed">
               Nur 3 Smartphones. Keine Installation.
