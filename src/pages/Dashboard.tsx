@@ -45,6 +45,12 @@ export default function Dashboard() {
           {clubPlan && <PlanBadge plan={clubPlan} />}
         </div>
 
+        {/* PWA Install Banner */}
+        <PwaInstallPrompt />
+
+        {/* Setup Checklist */}
+        <SetupChecklist hasPlayers={!!hasPlayers} hasFields={!!hasFields} />
+
         {/* Quickstart — show if no done matches */}
         {!hasMatches && (
           <div className="glass-card p-6 glow-border">
