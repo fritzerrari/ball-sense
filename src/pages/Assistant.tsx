@@ -217,6 +217,15 @@ export default function AssistantPage() {
     let assistantSoFar = "";
     const allMessages = [...messages, userMsg];
 
+    // Build selected players context
+    const selectedContext = pitchPlayers.length > 0
+      ? pitchPlayers.map(p => {
+          const full = players.find(pl => pl.id === p.id);
+          const s = full?.stats;
+          return `- #${p.number ?? "?"} ${p.name} (${full?.position ?? "?"}): ${s?.distance_km?.toFixed(1) ?? "?"}km, Top ${s?.top_speed_kmh?.toFixed(1) ?? "?"}km/h, Ø ${s?.avg_speed_kmh?.toFixed(1) ?? "?"}km/h, ${s?.sprint_count ?? 0} Sprints, ${s?.sprint_distance_m?.toFixed(0) ?? "?"}m Sprintdistanz, ${s?.minutes_played ?? "?"}min`;
+        }).join("\n")
+      : null;
+
     try {
       const resp = await fetch(CHAT_URL, {
         method: "POST",
@@ -227,6 +236,7 @@ export default function AssistantPage() {
         body: JSON.stringify({
           messages: allMessages.map(m => ({ role: m.role, content: m.content })),
           includeContext: true,
+          selectedPlayersContext: selectedContext,
         }),
       });
 

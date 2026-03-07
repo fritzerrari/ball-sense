@@ -116,6 +116,14 @@ ${teamStatsData.map((s: any) => `- Match ${s.match_id?.slice(0, 8)} (${s.team}):
       }
     }
 
+    // Append selected players context if provided
+    if (selectedPlayersContext) {
+      contextBlock += `\n\n--- AKTUELL AUSGEWÄHLTE SPIELER ---
+Der Trainer hat folgende Spieler in der Analyse-Ansicht ausgewählt. Beziehe dich bei Antworten besonders auf diese Spieler:
+${selectedPlayersContext}
+--- ENDE AUSWAHL ---`;
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
