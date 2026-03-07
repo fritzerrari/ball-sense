@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClubId(profile.club_id);
       const { data: club } = await supabase
         .from("clubs")
-        .select("name, plan")
+        .select("name, plan, logo_url")
         .eq("id", profile.club_id)
         .single();
       if (club) {
