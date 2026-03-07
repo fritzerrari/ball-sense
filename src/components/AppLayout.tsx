@@ -116,7 +116,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </button>
           )}
           {clubName && (
-            <span className="text-sm font-medium font-display hidden sm:block">{clubName}</span>
+            <div className="flex items-center gap-2 hidden sm:flex">
+              {clubLogoUrl && (
+                <img src={clubLogoUrl} alt={clubName} className="w-7 h-7 rounded-md object-cover border border-border" />
+              )}
+              <span className="text-sm font-medium font-display">{clubName}</span>
+            </div>
           )}
           <div className="flex-1" />
           <div className="flex items-center gap-2">
