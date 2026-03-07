@@ -91,6 +91,7 @@ export default function AssistantPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [pitchMode, setPitchMode] = useState<"trails" | "heatmap">("trails");
+  const [timeRange, setTimeRange] = useState<[number, number]>([0, 1]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
