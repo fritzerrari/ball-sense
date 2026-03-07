@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (club) {
         setClubName(club.name);
         setClubPlan(club.plan);
+        setClubLogoUrl((club as any).logo_url ?? null);
       }
     } else {
       setClubId(null);
