@@ -105,14 +105,13 @@ export default function PitchVisualization({ players = [], className = "", mode 
 
   // Heatmap grid (used in heatmap mode)
   const heatmapGrid = useMemo(() => {
-    if (mode !== "heatmap" || players.length === 0) return null;
+    if (mode !== "heatmap" || filteredPlayers.length === 0) return null;
 
     const cols = HEATMAP_COLS;
     const rows = HEATMAP_ROWS;
     const grid: number[][] = Array.from({ length: rows }, () => Array(cols).fill(0));
 
-    // Accumulate all selected player positions into the grid
-    players.forEach(player => {
+    filteredPlayers.forEach(player => {
       player.positions.forEach(pos => {
         const col = Math.min(cols - 1, Math.max(0, Math.floor(pos.x * cols)));
         const row = Math.min(rows - 1, Math.max(0, Math.floor(pos.y * rows)));
@@ -120,7 +119,6 @@ export default function PitchVisualization({ players = [], className = "", mode 
       });
     });
 
-    // Find max value for normalization
     let max = 0;
     grid.forEach(r => r.forEach(v => { if (v > max) max = v; }));
 
@@ -128,7 +126,7 @@ export default function PitchVisualization({ players = [], className = "", mode 
     const cellH = PH / rows;
 
     return { grid, max, cols, rows, cellW, cellH };
-  }, [players, mode]);
+  }, [filteredPlayers, mode]);
 
   return (
     <div className={`relative ${className}`}>
