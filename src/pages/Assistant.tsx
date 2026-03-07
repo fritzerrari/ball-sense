@@ -454,15 +454,39 @@ export default function AssistantPage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                Spielfeld — Laufwege
+                Spielfeld — {pitchMode === "trails" ? "Laufwege" : "Heatmap"}
               </span>
-              {selectedPlayerIds.size > 0 && (
-                <span className="text-[10px] text-muted-foreground">
-                  {selectedPlayerIds.size} Spieler aktiv
-                </span>
-              )}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPitchMode("trails")}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+                    pitchMode === "trails"
+                      ? "bg-primary/15 text-primary border border-primary/25"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Route className="h-3 w-3" />
+                  Laufwege
+                </button>
+                <button
+                  onClick={() => setPitchMode("heatmap")}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+                    pitchMode === "heatmap"
+                      ? "bg-primary/15 text-primary border border-primary/25"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Flame className="h-3 w-3" />
+                  Heatmap
+                </button>
+                {selectedPlayerIds.size > 0 && (
+                  <span className="text-[10px] text-muted-foreground ml-1">
+                    {selectedPlayerIds.size} aktiv
+                  </span>
+                )}
+              </div>
             </div>
-            <PitchVisualization players={pitchPlayers} className="rounded-lg overflow-hidden" />
+            <PitchVisualization players={pitchPlayers} mode={pitchMode} className="rounded-lg overflow-hidden" />
           </div>
 
           {/* Roster */}
