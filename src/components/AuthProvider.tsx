@@ -33,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [clubId, setClubId] = useState<string | null>(null);
   const [clubName, setClubName] = useState<string | null>(null);
   const [clubPlan, setClubPlan] = useState<string | null>(null);
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
 
   const fetchClubData = async (userId: string) => {
     // Get profile with club_id
