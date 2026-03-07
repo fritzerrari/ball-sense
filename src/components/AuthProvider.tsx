@@ -9,6 +9,7 @@ interface AuthContextType {
   clubId: string | null;
   clubName: string | null;
   clubPlan: string | null;
+  clubLogoUrl: string | null;
   signOut: () => Promise<void>;
 }
 
