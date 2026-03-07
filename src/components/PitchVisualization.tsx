@@ -81,16 +81,27 @@ export default function PitchVisualization({ players = [], className = "", mode 
     sy: PAD + y * PH,
   });
 
+  // Filter players' positions by timeRange
+  const filteredPlayers = useMemo(() => {
+    if (!timeRange) return players;
+    return players.map(p => {
+      const len = p.positions.length;
+      const start = Math.floor(timeRange[0] * len);
+      const end = Math.ceil(timeRange[1] * len);
+      return { ...p, positions: p.positions.slice(start, end) };
+    });
+  }, [players, timeRange]);
+
   // Trail paths (used in trails mode)
   const trails = useMemo(() => {
     if (mode !== "trails") return [];
-    return players.map(player => {
+    return filteredPlayers.map(player => {
       if (player.positions.length < 2) return null;
       const points = player.positions.map(p => toSvg(p.x, p.y));
       const d = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.sx} ${p.sy}`).join(" ");
       return { ...player, pathD: d, svgPoints: points };
     }).filter(Boolean);
-  }, [players, mode]);
+  }, [filteredPlayers, mode]);
 
   // Heatmap grid (used in heatmap mode)
   const heatmapGrid = useMemo(() => {
