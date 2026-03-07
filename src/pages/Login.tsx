@@ -78,7 +78,7 @@ export default function Login() {
         if (signUpData.session) {
           await createClubForUser(signUpData.user.id);
           toast.success("Konto erstellt! Willkommen bei FieldIQ.");
-          navigate("/dashboard");
+          navigate("/onboarding");
         } else {
           toast.success("Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse.");
         }

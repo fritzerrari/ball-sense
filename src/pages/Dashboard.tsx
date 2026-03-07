@@ -10,6 +10,8 @@ import { useFields } from "@/hooks/use-fields";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { PlanBadge } from "@/components/PlanBadge";
+import { SetupChecklist } from "@/components/SetupChecklist";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 export default function Dashboard() {
   const { clubName, clubPlan } = useAuth();
@@ -42,6 +44,12 @@ export default function Dashboard() {
           </div>
           {clubPlan && <PlanBadge plan={clubPlan} />}
         </div>
+
+        {/* PWA Install Banner */}
+        <PwaInstallPrompt />
+
+        {/* Setup Checklist */}
+        <SetupChecklist hasPlayers={!!hasPlayers} hasFields={!!hasFields} />
 
         {/* Quickstart — show if no done matches */}
         {!hasMatches && (
