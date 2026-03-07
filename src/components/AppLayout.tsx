@@ -46,8 +46,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
           {!collapsed && (
-            <Link to="/dashboard" className="font-display text-lg font-bold flex items-center gap-1">
-              <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
+            <Link to="/dashboard" className="font-display text-lg font-bold flex items-center gap-1.5">
+              {clubLogoUrl ? (
+                <img src={clubLogoUrl} alt="Logo" className="w-7 h-7 rounded-md object-cover border border-border" />
+              ) : (
+                <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
+              )}
               <span className="text-foreground">Field</span>
               <span className="gradient-text">IQ</span>
             </Link>
