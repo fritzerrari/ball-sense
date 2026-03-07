@@ -19,7 +19,7 @@ const navItems = [
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { clubName, clubPlan, signOut } = useAuth();
+  const { clubName, clubPlan, clubLogoUrl, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
