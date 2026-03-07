@@ -45,7 +45,7 @@ const comparison = [
   { feature: "Hardware nötig", fieldiq: "Nein", veo: "Ja (Kamera)", pixellot: "Ja (Kamera)", gps: "Ja (Westen)" },
   { feature: "Installation", fieldiq: "Keine", veo: "Profi-Montage", pixellot: "Profi-Montage", gps: "Keine" },
   { feature: "Datenschutz", fieldiq: "On-Device", veo: "Cloud-Upload", pixellot: "Cloud-Upload", gps: "Lokal" },
-  { feature: "Regionalliga-tauglich", fieldiq: "✓", veo: "Bedingt", pixellot: "Bedingt", gps: "✓" },
+  { feature: "Für alle Ligen geeignet", fieldiq: "✓", veo: "Bedingt", pixellot: "Bedingt", gps: "✓" },
 ];
 
 export default function LandingPage() {
