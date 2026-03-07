@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu,
+  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu, BrainCircuit,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
@@ -12,6 +12,7 @@ const navItems = [
   { label: "Spiele", icon: Swords, href: "/matches" },
   { label: "Kader", icon: Users, href: "/players" },
   { label: "Plätze", icon: Map, href: "/fields" },
+  { label: "KI Assistent", icon: BrainCircuit, href: "/assistant" },
   { label: "Einstellungen", icon: Settings, href: "/settings" },
 ];
 
