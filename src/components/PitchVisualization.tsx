@@ -14,6 +14,8 @@ interface PitchVisualizationProps {
   players?: PlayerTrail[];
   className?: string;
   mode?: "trails" | "heatmap";
+  /** Normalized time range [0-1, 0-1] to filter positions */
+  timeRange?: [number, number];
 }
 
 const PLAYER_COLORS = [
@@ -67,7 +69,7 @@ function heatmapColor(intensity: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export default function PitchVisualization({ players = [], className = "", mode = "trails" }: PitchVisualizationProps) {
+export default function PitchVisualization({ players = [], className = "", mode = "trails", timeRange }: PitchVisualizationProps) {
   const W = 680;
   const H = 440;
   const PAD = 20;
@@ -79,27 +81,37 @@ export default function PitchVisualization({ players = [], className = "", mode 
     sy: PAD + y * PH,
   });
 
+  // Filter players' positions by timeRange
+  const filteredPlayers = useMemo(() => {
+    if (!timeRange) return players;
+    return players.map(p => {
+      const len = p.positions.length;
+      const start = Math.floor(timeRange[0] * len);
+      const end = Math.ceil(timeRange[1] * len);
+      return { ...p, positions: p.positions.slice(start, end) };
+    });
+  }, [players, timeRange]);
+
   // Trail paths (used in trails mode)
   const trails = useMemo(() => {
     if (mode !== "trails") return [];
-    return players.map(player => {
+    return filteredPlayers.map(player => {
       if (player.positions.length < 2) return null;
       const points = player.positions.map(p => toSvg(p.x, p.y));
       const d = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.sx} ${p.sy}`).join(" ");
       return { ...player, pathD: d, svgPoints: points };
     }).filter(Boolean);
-  }, [players, mode]);
+  }, [filteredPlayers, mode]);
 
   // Heatmap grid (used in heatmap mode)
   const heatmapGrid = useMemo(() => {
-    if (mode !== "heatmap" || players.length === 0) return null;
+    if (mode !== "heatmap" || filteredPlayers.length === 0) return null;
 
     const cols = HEATMAP_COLS;
     const rows = HEATMAP_ROWS;
     const grid: number[][] = Array.from({ length: rows }, () => Array(cols).fill(0));
 
-    // Accumulate all selected player positions into the grid
-    players.forEach(player => {
+    filteredPlayers.forEach(player => {
       player.positions.forEach(pos => {
         const col = Math.min(cols - 1, Math.max(0, Math.floor(pos.x * cols)));
         const row = Math.min(rows - 1, Math.max(0, Math.floor(pos.y * rows)));
@@ -107,7 +119,6 @@ export default function PitchVisualization({ players = [], className = "", mode 
       });
     });
 
-    // Find max value for normalization
     let max = 0;
     grid.forEach(r => r.forEach(v => { if (v > max) max = v; }));
 
@@ -115,7 +126,7 @@ export default function PitchVisualization({ players = [], className = "", mode 
     const cellH = PH / rows;
 
     return { grid, max, cols, rows, cellW, cellH };
-  }, [players, mode]);
+  }, [filteredPlayers, mode]);
 
   return (
     <div className={`relative ${className}`}>

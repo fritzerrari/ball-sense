@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2, Route, Flame } from "lucide-react";
+import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2, Route, Flame, Clock } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import PitchVisualization, { getPlayerColor } from "@/components/PitchVisualization";
@@ -90,6 +91,7 @@ export default function AssistantPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [pitchMode, setPitchMode] = useState<"trails" | "heatmap">("trails");
+  const [timeRange, setTimeRange] = useState<[number, number]>([0, 1]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -496,7 +498,51 @@ export default function AssistantPage() {
                 )}
               </div>
             </div>
-            <PitchVisualization players={pitchPlayers} mode={pitchMode} className="rounded-lg overflow-hidden" />
+            <PitchVisualization players={pitchPlayers} mode={pitchMode} timeRange={timeRange[0] === 0 && timeRange[1] === 1 ? undefined : timeRange} className="rounded-lg overflow-hidden" />
+            
+            {/* Time Range Slider */}
+            {pitchMode === "heatmap" && selectedPlayerIds.size > 0 && (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground font-medium">Spielphase</span>
+                  <span className="text-[10px] text-primary font-semibold ml-auto">
+                    {Math.round(timeRange[0] * 90)}' – {Math.round(timeRange[1] * 90)}'
+                  </span>
+                </div>
+                <Slider
+                  value={[timeRange[0] * 100, timeRange[1] * 100]}
+                  onValueChange={(val) => setTimeRange([val[0] / 100, val[1] / 100])}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex gap-1">
+                  {[
+                    { label: "Gesamt", range: [0, 1] as [number, number] },
+                    { label: "1. HZ", range: [0, 0.5] as [number, number] },
+                    { label: "2. HZ", range: [0.5, 1] as [number, number] },
+                    { label: "Letzte 15'", range: [0.833, 1] as [number, number] },
+                  ].map(preset => {
+                    const active = timeRange[0] === preset.range[0] && timeRange[1] === preset.range[1];
+                    return (
+                      <button
+                        key={preset.label}
+                        onClick={() => setTimeRange(preset.range)}
+                        className={`flex-1 text-[10px] font-medium py-1 rounded-md transition-all ${
+                          active
+                            ? "bg-primary/15 text-primary border border-primary/25"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Roster */}
