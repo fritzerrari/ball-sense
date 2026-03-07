@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClubId(null);
       setClubName(null);
       setClubPlan(null);
+      setClubLogoUrl(null);
     }
   };
 
