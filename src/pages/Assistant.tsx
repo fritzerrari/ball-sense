@@ -458,6 +458,17 @@ export default function AssistantPage() {
                     Analysiere Spiele, erhalte Aufstellungsempfehlungen. Wähle rechts Spieler aus, um Laufwege und Statistiken zu sehen.
                   </p>
                 </div>
+                {liveMatch && (
+                  <div className="w-full max-w-sm p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-center">
+                    <p className="text-xs font-semibold text-emerald-600 flex items-center justify-center gap-1.5">
+                      <Radio className="h-3.5 w-3.5 animate-pulse" />
+                      Live-Spiel erkannt: vs {liveMatch.away_club_name || "Gegner"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Aktiviere den Live-Modus oben für automatische taktische Hinweise alle 60 Sekunden.
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
                   {quickActions.map((action) => (
                     <button
