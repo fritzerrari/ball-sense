@@ -127,12 +127,16 @@ export default function TrackingPage() {
   const handleUpload = async () => {
     if (!trackerRef.current || !id) return;
     setUploading(true);
+    setUploadProgress(0);
     try {
+      // Simulate progress stages
+      setUploadProgress(10);
       const result = await trackerRef.current.uploadMatch(
         id, cam,
         import.meta.env.VITE_SUPABASE_URL,
         import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       );
+      setUploadProgress(60);
 
       // Create tracking_uploads entry
       await supabase.from("tracking_uploads").insert({
@@ -143,10 +147,16 @@ export default function TrackingPage() {
         frames_count: result.framesCount,
         duration_sec: result.durationSec,
       });
+      setUploadProgress(90);
 
-      toast.success("Tracking-Daten hochgeladen!");
+      // Update match status
+      await updateMatch.mutateAsync({ id, status: "processing" });
+      setUploadProgress(100);
+      setUploadDone(true);
+      toast.success("Tracking-Daten erfolgreich hochgeladen!");
     } catch (err) {
       toast.error("Upload fehlgeschlagen — Daten lokal gespeichert");
+      setUploadProgress(0);
     } finally {
       setUploading(false);
     }
