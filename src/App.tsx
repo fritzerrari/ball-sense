@@ -23,6 +23,7 @@ import Assistant from "./pages/Assistant";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import LegalPage from "./pages/LegalPage";
+import InstallGuide from "./pages/InstallGuide";
 
 const queryClient = new QueryClient();
 
