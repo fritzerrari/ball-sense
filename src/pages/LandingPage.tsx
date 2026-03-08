@@ -316,9 +316,9 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              Transparente Preise
+              {t("landing.pricingTitle")}
             </h2>
-            <p className="text-muted-foreground">Alle Pläne 30 Tage kostenlos testen</p>
+            <p className="text-muted-foreground">{t("landing.pricingDesc")}</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {plans.map((plan) => (
@@ -330,26 +330,26 @@ export default function LandingPage() {
               >
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                    Beliebt
+                    {t("landing.popular")}
                   </div>
                 )}
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold text-muted-foreground tracking-wider mb-2">{plan.name}</h3>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold font-display">€{plan.price}</span>
-                    <span className="text-muted-foreground text-sm">/Mo</span>
+                    <span className="text-muted-foreground text-sm">{t("landing.perMonth")}</span>
                   </div>
                 </div>
                 <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm">
+                  {plan.features.map((fKey) => (
+                    <li key={fKey} className="flex items-center gap-2 text-sm">
                       <Check className="h-4 w-4 text-primary shrink-0" />
-                      <span className="text-muted-foreground">{f}</span>
+                      <span className="text-muted-foreground">{t(fKey)}</span>
                     </li>
                   ))}
                 </ul>
                 <Button variant={plan.popular ? "hero" : "heroOutline"} className="w-full" asChild>
-                  <Link to="/login">Jetzt starten</Link>
+                  <Link to="/login">{t("landing.startNow")}</Link>
                 </Button>
               </div>
             ))}
