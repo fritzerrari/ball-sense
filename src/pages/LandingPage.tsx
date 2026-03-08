@@ -17,18 +17,18 @@ import {
 const features = [
   {
     icon: Smartphone,
-    title: "Nur Smartphones nötig",
-    description: "Einfach Browser öffnen — fertig. Keine App, keine Hardware-Kosten.",
+    titleKey: "landing.feat1Title",
+    descKey: "landing.feat1Desc",
   },
   {
     icon: Brain,
-    title: "KI erkennt alle Spieler",
-    description: "Intelligente Erkennung läuft direkt auf dem Gerät. Kein Video verlässt das Handy.",
+    titleKey: "landing.feat2Title",
+    descKey: "landing.feat2Desc",
   },
   {
     icon: BarChart3,
-    title: "Report in 30 Sekunden",
-    description: "Nach dem Spiel: 1 Klick. Heatmaps, km, Topspeed — sofort.",
+    titleKey: "landing.feat3Title",
+    descKey: "landing.feat3Desc",
   },
 ];
 
