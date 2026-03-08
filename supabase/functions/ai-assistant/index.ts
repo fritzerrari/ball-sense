@@ -60,7 +60,7 @@ serve(async (req) => {
 
     const userId = claimsData.claims.sub as string;
 
-    const { messages, includeContext, selectedPlayersContext } = await req.json();
+    const { messages, includeContext, selectedPlayersContext, liveMode, liveMatchId } = await req.json();
 
     // Build context from DB if requested
     let contextBlock = "";
