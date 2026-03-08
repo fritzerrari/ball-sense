@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2, Route, Flame, Clock } from "lucide-react";
+import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2, Route, Flame, Clock, Radio, Pause } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { usePlayers } from "@/hooks/use-players";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { useQuery } from "@tanstack/react-query";
+import { useMatches } from "@/hooks/use-matches";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -92,11 +93,21 @@ export default function AssistantPage() {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [pitchMode, setPitchMode] = useState<"trails" | "heatmap">("trails");
   const [timeRange, setTimeRange] = useState<[number, number]>([0, 1]);
+  const [liveMode, setLiveMode] = useState(false);
+  const [liveCountdown, setLiveCountdown] = useState(60);
+  const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const liveSendingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: playersRaw = [] } = usePlayers();
   const { clubId } = useAuth();
+  const { data: matchesData } = useMatches();
+
+  // Find currently live match (status = "live" or "tracking")
+  const liveMatch = useMemo(() => {
+    return matchesData?.find(m => m.status === "live" || m.status === "tracking") ?? null;
+  }, [matchesData]);
 
   // Get latest match stats for players
   const { data: latestStats } = useQuery({
@@ -209,11 +220,57 @@ export default function AssistantPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || isLoading) return;
-    const userMsg: Msg = { role: "user", content: text.trim() };
+  // Live Mode: auto-send tactical update every 60 seconds
+  useEffect(() => {
+    if (!liveMode || !liveMatch) {
+      if (liveIntervalRef.current) {
+        clearInterval(liveIntervalRef.current);
+        liveIntervalRef.current = null;
+      }
+      setLiveCountdown(60);
+      return;
+    }
+
+    // Send initial live analysis
+    if (!liveSendingRef.current) {
+      sendLiveUpdate();
+    }
+
+    let count = 60;
+    setLiveCountdown(60);
+    liveIntervalRef.current = setInterval(() => {
+      count--;
+      setLiveCountdown(count);
+      if (count <= 0) {
+        count = 60;
+        setLiveCountdown(60);
+        sendLiveUpdate();
+      }
+    }, 1000);
+
+    return () => {
+      if (liveIntervalRef.current) {
+        clearInterval(liveIntervalRef.current);
+        liveIntervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveMode, liveMatch?.id]);
+
+  const sendLiveUpdate = async () => {
+    if (liveSendingRef.current || isLoading) return;
+    liveSendingRef.current = true;
+    const autoMsg = `[Live-Modus] Gib eine kurze taktische Analyse und Handlungsempfehlung basierend auf den aktuellen Spielerdaten dieses laufenden Spiels. Fokussiere dich auf: Positionierung, Laufverhalten, Ermüdungszeichen und taktische Anpassungen. Maximal 4-5 Sätze.`;
+    await sendMessage(autoMsg, true);
+    liveSendingRef.current = false;
+  };
+
+  const sendMessage = async (text: string, isLiveAuto = false) => {
+    if (!text.trim() || (isLoading && !isLiveAuto)) return;
+    const displayContent = isLiveAuto ? `⚡ Live-Analyse (${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })})` : text.trim();
+    const userMsg: Msg = { role: "user", content: displayContent };
     setMessages(prev => [...prev, userMsg]);
-    setInput("");
+    if (!isLiveAuto) setInput("");
     setIsLoading(true);
 
     let assistantSoFar = "";
@@ -236,9 +293,11 @@ export default function AssistantPage() {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          messages: allMessages.map(m => ({ role: m.role, content: m.content })),
+          messages: [{ role: "user", content: text.trim() }],
           includeContext: true,
           selectedPlayersContext: selectedContext,
+          liveMode: isLiveAuto,
+          liveMatchId: liveMatch?.id,
         }),
       });
 
@@ -352,16 +411,38 @@ export default function AssistantPage() {
                 </span>
               </h1>
             </div>
-            {messages.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto text-muted-foreground hover:text-destructive shrink-0"
-                onClick={() => setMessages([])}
+            <div className="ml-auto flex items-center gap-1.5 shrink-0">
+              {/* Live Mode Toggle */}
+              <button
+                onClick={() => {
+                  if (!liveMatch && !liveMode) {
+                    toast.error("Kein laufendes Spiel gefunden. Starte zuerst ein Spiel mit Status \"live\".");
+                    return;
+                  }
+                  setLiveMode(prev => !prev);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
+                  liveMode
+                    ? "bg-destructive/15 text-destructive border border-destructive/30 animate-pulse"
+                    : liveMatch
+                      ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/25 hover:bg-emerald-500/20"
+                      : "bg-muted text-muted-foreground border border-border hover:bg-muted/80"
+                }`}
               >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
+                {liveMode ? <Pause className="h-3 w-3" /> : <Radio className="h-3 w-3" />}
+                {liveMode ? `Live (${liveCountdown}s)` : "Live-Modus"}
+              </button>
+              {messages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => { setMessages([]); setLiveMode(false); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Messages */}
@@ -377,6 +458,17 @@ export default function AssistantPage() {
                     Analysiere Spiele, erhalte Aufstellungsempfehlungen. Wähle rechts Spieler aus, um Laufwege und Statistiken zu sehen.
                   </p>
                 </div>
+                {liveMatch && (
+                  <div className="w-full max-w-sm p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-center">
+                    <p className="text-xs font-semibold text-emerald-600 flex items-center justify-center gap-1.5">
+                      <Radio className="h-3.5 w-3.5 animate-pulse" />
+                      Live-Spiel erkannt: vs {liveMatch.away_club_name || "Gegner"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Aktiviere den Live-Modus oben für automatische taktische Hinweise alle 60 Sekunden.
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
                   {quickActions.map((action) => (
                     <button

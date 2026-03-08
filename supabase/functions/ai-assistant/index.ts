@@ -60,7 +60,7 @@ serve(async (req) => {
 
     const userId = claimsData.claims.sub as string;
 
-    const { messages, includeContext, selectedPlayersContext } = await req.json();
+    const { messages, includeContext, selectedPlayersContext, liveMode, liveMatchId } = await req.json();
 
     // Build context from DB if requested
     let contextBlock = "";
@@ -124,6 +124,26 @@ ${selectedPlayersContext}
 --- ENDE AUSWAHL ---`;
     }
 
+    // If live mode, fetch current match stats and add live context
+    if (liveMode && liveMatchId) {
+      const [livePlayerStats, liveTeamStats] = await Promise.all([
+        supabase.from("player_match_stats").select("player_id, distance_km, top_speed_kmh, avg_speed_kmh, sprint_count, sprint_distance_m, minutes_played").eq("match_id", liveMatchId),
+        supabase.from("team_match_stats").select("team, total_distance_km, top_speed_kmh, possession_pct, avg_distance_km").eq("match_id", liveMatchId),
+      ]);
+
+      contextBlock += `\n\n--- LIVE-SPIEL DATEN (Echtzeit) ---
+SPIELER-LIVE-STATS:
+${(livePlayerStats.data || []).map((s: any) => `- Spieler ${s.player_id?.slice(0, 8)}: ${s.distance_km?.toFixed(1) ?? "?"}km, Top ${s.top_speed_kmh?.toFixed(1) ?? "?"}km/h, Ø ${s.avg_speed_kmh?.toFixed(1) ?? "?"}km/h, ${s.sprint_count ?? 0} Sprints, ${s.sprint_distance_m?.toFixed(0) ?? "?"}m Sprintdist., ${s.minutes_played ?? "?"}min`).join("\n") || "Noch keine Live-Daten"}
+
+TEAM-LIVE-STATS:
+${(liveTeamStats.data || []).map((s: any) => `- ${s.team}: ${s.total_distance_km?.toFixed(1) ?? "?"}km gesamt, Top ${s.top_speed_kmh?.toFixed(1) ?? "?"}km/h, Ballbesitz ${s.possession_pct?.toFixed(0) ?? "?"}%, Ø ${s.avg_distance_km?.toFixed(1) ?? "?"}km/Spieler`).join("\n") || "Noch keine Team-Live-Daten"}
+--- ENDE LIVE-DATEN ---`;
+    }
+
+    const systemContent = liveMode
+      ? SYSTEM_PROMPT + "\n\nDu bist im LIVE-MODUS. Das Spiel läuft gerade. Gib kurze, sofort umsetzbare taktische Hinweise. Maximal 4-5 Sätze. Achte besonders auf Ermüdungszeichen (hohe Laufdistanz, sinkende Geschwindigkeit), taktische Lücken und Auswechslungsempfehlungen." + contextBlock
+      : SYSTEM_PROMPT + contextBlock;
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -133,7 +153,7 @@ ${selectedPlayersContext}
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT + contextBlock },
+          { role: "system", content: systemContent },
           ...messages,
         ],
         stream: true,
