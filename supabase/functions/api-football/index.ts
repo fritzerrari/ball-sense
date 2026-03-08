@@ -289,6 +289,19 @@ serve(async (req) => {
         });
       }
 
+      // Get API usage/status
+      case "api_status": {
+        const url = new URL(`${API_FOOTBALL_BASE}/status`);
+        const resp = await fetch(url.toString(), {
+          headers: { "x-apisports-key": API_KEY! },
+        });
+        if (!resp.ok) throw new Error("Status-Abfrage fehlgeschlagen");
+        const result = await resp.json();
+        return new Response(JSON.stringify({ status: result.response ?? result }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // Get upcoming fixtures
       case "next_fixtures": {
         const config = await getConfig(club_id);
