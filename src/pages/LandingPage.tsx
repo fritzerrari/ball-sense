@@ -2,9 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import {
   Smartphone, Brain, BarChart3, Check, ChevronRight,
-  MonitorSmartphone, Zap, FileBarChart, Quote, HelpCircle, Download,
+  MonitorSmartphone, Zap, FileBarChart, Quote, Download,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useTranslation } from "@/lib/i18n";
 import {
   Accordion,
   AccordionContent,
