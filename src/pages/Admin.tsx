@@ -215,6 +215,9 @@ export default function Admin() {
             <TabsTrigger value="guides" className="rounded-lg text-xs">
               <BookOpen className="h-4 w-4 mr-1.5" /> Anleitungen
             </TabsTrigger>
+            <TabsTrigger value="api-football" className="rounded-lg text-xs">
+              <Globe className="h-4 w-4 mr-1.5" /> API-Football
+            </TabsTrigger>
             <TabsTrigger value="system" className="rounded-lg text-xs">
               <Activity className="h-4 w-4 mr-1.5" /> System
             </TabsTrigger>
