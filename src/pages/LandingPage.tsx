@@ -35,18 +35,18 @@ const features = [
 const steps = [
   {
     icon: MonitorSmartphone,
-    title: "Smartphones aufstellen",
-    description: "Platziere 2–3 Smartphones am Spielfeldrand. Keine Halterung nötig — einfach anlehnen.",
+    titleKey: "landing.step1Title",
+    descKey: "landing.step1Desc",
   },
   {
     icon: Zap,
-    title: "Spiel tracken",
-    description: "Starte das Tracking mit einem Klick. Die KI erkennt automatisch alle Spieler auf dem Feld.",
+    titleKey: "landing.step2Title",
+    descKey: "landing.step2Desc",
   },
   {
     icon: FileBarChart,
-    title: "Report erhalten",
-    description: "Nach Abpfiff bekommst du Heatmaps, Laufdistanzen, Sprints und Topspeed — in Sekunden.",
+    titleKey: "landing.step3Title",
+    descKey: "landing.step3Desc",
   },
 ];
 
