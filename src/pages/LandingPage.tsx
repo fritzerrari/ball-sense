@@ -262,24 +262,24 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              So einfach wie noch nie
+              {t("landing.featuresTitle")}
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Professionelles Tracking ohne teure Hardware oder komplizierte Software.
+              {t("landing.featuresDesc")}
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {features.map((f, i) => (
               <div
-                key={f.title}
+                key={t(f.titleKey)}
                 className="glass-card p-8 hover:border-primary/30 transition-all group"
                 style={{ animationDelay: `${i * 100}ms` }}
               >
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
                   <f.icon className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold font-display mb-2">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
+                <h3 className="text-lg font-semibold font-display mb-2">{t(f.titleKey)}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{t(f.descKey)}</p>
               </div>
             ))}
           </div>
