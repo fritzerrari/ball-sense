@@ -22,6 +22,7 @@ import Admin from "./pages/Admin";
 import Assistant from "./pages/Assistant";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
+import LegalPage from "./pages/LegalPage";
 
 const queryClient = new QueryClient();
 
