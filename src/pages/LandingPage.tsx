@@ -242,14 +242,14 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="glass-card glow-border p-8 md:p-12 text-center max-w-3xl mx-auto">
             <h2 className="text-2xl md:text-3xl font-bold font-display mb-3">
-              Jetzt 30 Tage kostenlos testen
+              {t("landing.ctaTitle")}
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Keine Kreditkarte nötig. Starte sofort mit deinem Team.
+              {t("landing.ctaDesc")}
             </p>
             <Button variant="hero" size="xl" asChild>
               <Link to="/login">
-                Kostenlos starten
+                {t("landing.ctaBtn")}
                 <ChevronRight className="ml-1 h-5 w-5" />
               </Link>
             </Button>
