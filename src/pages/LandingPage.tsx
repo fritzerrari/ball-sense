@@ -159,6 +159,7 @@ export default function LandingPage() {
       </section>
 
       <KeyNumbers />
+      <DemoSection />
       <HowItWorks />
       <AnalyticsShowcase />
       <FeatureCards />
