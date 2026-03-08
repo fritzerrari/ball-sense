@@ -459,6 +459,19 @@ export default function AssistantPage() {
                 {liveMode ? <Pause className="h-3 w-3" /> : <Radio className="h-3 w-3" />}
                 {liveMode ? `Live (${liveCountdown}s)` : "Live-Modus"}
               </button>
+              {liveMode && (
+                <button
+                  onClick={() => setLiveSoundEnabled(prev => !prev)}
+                  className={`p-1.5 rounded-lg text-[10px] transition-all border ${
+                    liveSoundEnabled
+                      ? "bg-primary/10 text-primary border-primary/25"
+                      : "bg-muted text-muted-foreground border-border"
+                  }`}
+                  title={liveSoundEnabled ? "Sound aus" : "Sound an"}
+                >
+                  {liveSoundEnabled ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
+                </button>
+              )}
               {messages.length > 0 && (
                 <Button
                   variant="ghost"
