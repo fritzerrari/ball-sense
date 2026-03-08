@@ -14,6 +14,263 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_football_config: {
+        Row: {
+          api_league_id: number | null
+          api_season: number | null
+          api_team_id: number | null
+          club_id: string
+          created_at: string
+          id: string
+          last_sync_at: string | null
+          sync_enabled: boolean
+        }
+        Insert: {
+          api_league_id?: number | null
+          api_season?: number | null
+          api_team_id?: number | null
+          club_id: string
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          sync_enabled?: boolean
+        }
+        Update: {
+          api_league_id?: number | null
+          api_season?: number | null
+          api_team_id?: number | null
+          club_id?: string
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          sync_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_football_config_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_football_match_stats: {
+        Row: {
+          api_fixture_id: number | null
+          away_goals: number | null
+          club_id: string
+          corners_away: number | null
+          corners_home: number | null
+          data_source: string
+          fetched_at: string
+          fouls_away: number | null
+          fouls_home: number | null
+          home_goals: number | null
+          id: string
+          match_id: string | null
+          offsides_away: number | null
+          offsides_home: number | null
+          pass_accuracy_away: number | null
+          pass_accuracy_home: number | null
+          passes_away: number | null
+          passes_home: number | null
+          possession_away: number | null
+          possession_home: number | null
+          raw_data: Json | null
+          red_cards_away: number | null
+          red_cards_home: number | null
+          shots_away: number | null
+          shots_home: number | null
+          shots_on_target_away: number | null
+          shots_on_target_home: number | null
+          yellow_cards_away: number | null
+          yellow_cards_home: number | null
+        }
+        Insert: {
+          api_fixture_id?: number | null
+          away_goals?: number | null
+          club_id: string
+          corners_away?: number | null
+          corners_home?: number | null
+          data_source?: string
+          fetched_at?: string
+          fouls_away?: number | null
+          fouls_home?: number | null
+          home_goals?: number | null
+          id?: string
+          match_id?: string | null
+          offsides_away?: number | null
+          offsides_home?: number | null
+          pass_accuracy_away?: number | null
+          pass_accuracy_home?: number | null
+          passes_away?: number | null
+          passes_home?: number | null
+          possession_away?: number | null
+          possession_home?: number | null
+          raw_data?: Json | null
+          red_cards_away?: number | null
+          red_cards_home?: number | null
+          shots_away?: number | null
+          shots_home?: number | null
+          shots_on_target_away?: number | null
+          shots_on_target_home?: number | null
+          yellow_cards_away?: number | null
+          yellow_cards_home?: number | null
+        }
+        Update: {
+          api_fixture_id?: number | null
+          away_goals?: number | null
+          club_id?: string
+          corners_away?: number | null
+          corners_home?: number | null
+          data_source?: string
+          fetched_at?: string
+          fouls_away?: number | null
+          fouls_home?: number | null
+          home_goals?: number | null
+          id?: string
+          match_id?: string | null
+          offsides_away?: number | null
+          offsides_home?: number | null
+          pass_accuracy_away?: number | null
+          pass_accuracy_home?: number | null
+          passes_away?: number | null
+          passes_home?: number | null
+          possession_away?: number | null
+          possession_home?: number | null
+          raw_data?: Json | null
+          red_cards_away?: number | null
+          red_cards_home?: number | null
+          shots_away?: number | null
+          shots_home?: number | null
+          shots_on_target_away?: number | null
+          shots_on_target_home?: number | null
+          yellow_cards_away?: number | null
+          yellow_cards_home?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_football_match_stats_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_football_match_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_football_player_stats: {
+        Row: {
+          api_fixture_id: number | null
+          api_player_id: number | null
+          assists: number | null
+          club_id: string
+          data_source: string
+          dribbles_success: number | null
+          duels_total: number | null
+          duels_won: number | null
+          fetched_at: string
+          fouls_committed: number | null
+          fouls_drawn: number | null
+          goals: number | null
+          id: string
+          minutes_played: number | null
+          passes_accuracy: number | null
+          passes_total: number | null
+          penalty_missed: number | null
+          penalty_scored: number | null
+          player_id: string | null
+          player_name: string | null
+          rating: number | null
+          raw_data: Json | null
+          red_cards: number | null
+          shots_on_goal: number | null
+          shots_total: number | null
+          tackles: number | null
+          yellow_cards: number | null
+        }
+        Insert: {
+          api_fixture_id?: number | null
+          api_player_id?: number | null
+          assists?: number | null
+          club_id: string
+          data_source?: string
+          dribbles_success?: number | null
+          duels_total?: number | null
+          duels_won?: number | null
+          fetched_at?: string
+          fouls_committed?: number | null
+          fouls_drawn?: number | null
+          goals?: number | null
+          id?: string
+          minutes_played?: number | null
+          passes_accuracy?: number | null
+          passes_total?: number | null
+          penalty_missed?: number | null
+          penalty_scored?: number | null
+          player_id?: string | null
+          player_name?: string | null
+          rating?: number | null
+          raw_data?: Json | null
+          red_cards?: number | null
+          shots_on_goal?: number | null
+          shots_total?: number | null
+          tackles?: number | null
+          yellow_cards?: number | null
+        }
+        Update: {
+          api_fixture_id?: number | null
+          api_player_id?: number | null
+          assists?: number | null
+          club_id?: string
+          data_source?: string
+          dribbles_success?: number | null
+          duels_total?: number | null
+          duels_won?: number | null
+          fetched_at?: string
+          fouls_committed?: number | null
+          fouls_drawn?: number | null
+          goals?: number | null
+          id?: string
+          minutes_played?: number | null
+          passes_accuracy?: number | null
+          passes_total?: number | null
+          penalty_missed?: number | null
+          penalty_scored?: number | null
+          player_id?: string | null
+          player_name?: string | null
+          rating?: number | null
+          raw_data?: Json | null
+          red_cards?: number | null
+          shots_on_goal?: number | null
+          shots_total?: number | null
+          tackles?: number | null
+          yellow_cards?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_football_player_stats_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_football_player_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -299,6 +556,7 @@ export type Database = {
       player_match_stats: {
         Row: {
           avg_speed_kmh: number | null
+          data_source: string
           distance_km: number | null
           heatmap_grid: Json | null
           id: string
@@ -313,6 +571,7 @@ export type Database = {
         }
         Insert: {
           avg_speed_kmh?: number | null
+          data_source?: string
           distance_km?: number | null
           heatmap_grid?: Json | null
           id?: string
@@ -327,6 +586,7 @@ export type Database = {
         }
         Update: {
           avg_speed_kmh?: number | null
+          data_source?: string
           distance_km?: number | null
           heatmap_grid?: Json | null
           id?: string
@@ -468,6 +728,7 @@ export type Database = {
       team_match_stats: {
         Row: {
           avg_distance_km: number | null
+          data_source: string
           formation_heatmap: Json | null
           id: string
           match_id: string
@@ -478,6 +739,7 @@ export type Database = {
         }
         Insert: {
           avg_distance_km?: number | null
+          data_source?: string
           formation_heatmap?: Json | null
           id?: string
           match_id: string
@@ -488,6 +750,7 @@ export type Database = {
         }
         Update: {
           avg_distance_km?: number | null
+          data_source?: string
           formation_heatmap?: Json | null
           id?: string
           match_id?: string
