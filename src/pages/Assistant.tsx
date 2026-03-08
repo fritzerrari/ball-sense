@@ -93,11 +93,21 @@ export default function AssistantPage() {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
   const [pitchMode, setPitchMode] = useState<"trails" | "heatmap">("trails");
   const [timeRange, setTimeRange] = useState<[number, number]>([0, 1]);
+  const [liveMode, setLiveMode] = useState(false);
+  const [liveCountdown, setLiveCountdown] = useState(60);
+  const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const liveSendingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: playersRaw = [] } = usePlayers();
   const { clubId } = useAuth();
+  const { data: matchesData } = useMatches();
+
+  // Find currently live match (status = "live" or "tracking")
+  const liveMatch = useMemo(() => {
+    return matchesData?.find(m => m.status === "live" || m.status === "tracking") ?? null;
+  }, [matchesData]);
 
   // Get latest match stats for players
   const { data: latestStats } = useQuery({
