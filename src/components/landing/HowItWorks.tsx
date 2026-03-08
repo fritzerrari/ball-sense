@@ -3,90 +3,78 @@ import { Smartphone, Play, FileBarChart } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 const steps = [
-  {
-    icon: Smartphone,
-    titleKey: "landing.step1Title",
-    descKey: "landing.step1Desc",
-    visual: "📱📱📱",
-  },
-  {
-    icon: Play,
-    titleKey: "landing.step2Title",
-    descKey: "landing.step2Desc",
-    visual: "⚽",
-  },
-  {
-    icon: FileBarChart,
-    titleKey: "landing.step3Title",
-    descKey: "landing.step3Desc",
-    visual: "📊",
-  },
+  { icon: Smartphone, titleKey: "landing.step1Title", descKey: "landing.step1Desc", num: "01" },
+  { icon: Play, titleKey: "landing.step2Title", descKey: "landing.step2Desc", num: "02" },
+  { icon: FileBarChart, titleKey: "landing.step3Title", descKey: "landing.step3Desc", num: "03" },
 ];
 
 export function HowItWorks() {
   const { t } = useTranslation();
 
   return (
-    <section id="how-it-works" className="py-24 md:py-36 bg-muted/30 relative overflow-hidden">
-      <div className="absolute inset-0 field-grid opacity-20" />
+    <section id="how-it-works" className="py-24 md:py-36 relative overflow-hidden">
+      <div className="absolute inset-0 field-grid opacity-[0.04]" />
 
       <div className="container mx-auto px-4 relative z-10">
-        <motion.div
-          className="text-center mb-20"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-        >
-          <h2 className="text-3xl md:text-5xl font-bold font-display mb-4">
-            {t("landing.howItWorksTitle")}
-          </h2>
-          <p className="text-muted-foreground max-w-md mx-auto text-lg">
-            {t("landing.howItWorksDesc")}
-          </p>
-        </motion.div>
+        {/* Left-aligned header */}
+        <div className="grid lg:grid-cols-3 gap-8 lg:gap-12 max-w-6xl mx-auto mb-16">
+          <motion.div
+            className="lg:col-span-1"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <span className="text-xs font-semibold text-primary font-display tracking-wider uppercase mb-3 block">{t("landing.howItWorks")}</span>
+            <h2 className="text-3xl md:text-4xl font-bold font-display leading-tight">
+              {t("landing.howItWorksTitle")}
+            </h2>
+          </motion.div>
+          <motion.div
+            className="lg:col-span-2 flex items-end"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+          >
+            <p className="text-muted-foreground max-w-lg text-base leading-relaxed">
+              {t("landing.howItWorksDesc")}
+            </p>
+          </motion.div>
+        </div>
 
-        <div className="max-w-4xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-12 md:gap-8 relative">
-            {/* Connecting line */}
-            <div className="hidden md:block absolute top-16 left-[20%] right-[20%] h-px">
-              <motion.div
-                className="h-full w-full"
-                style={{ background: "linear-gradient(90deg, transparent, hsl(152 60% 36% / 0.3), transparent)" }}
-                initial={{ scaleX: 0 }}
-                whileInView={{ scaleX: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 1, delay: 0.5 }}
-              />
-            </div>
+        {/* Steps — horizontal cards with large numbers */}
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4">
+          {steps.map((step, i) => (
+            <motion.div
+              key={i}
+              className="group relative rounded-2xl border border-border/50 bg-card/50 p-8 hover:border-primary/30 hover:bg-card transition-all duration-300 overflow-hidden"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.15 }}
+              whileHover={{ y: -4 }}
+            >
+              {/* Large bg number */}
+              <span className="absolute -top-4 -right-2 text-[120px] font-display font-bold text-foreground/[0.03] leading-none select-none pointer-events-none">
+                {step.num}
+              </span>
 
-            {steps.map((step, i) => (
-              <motion.div
-                key={i}
-                className="text-center relative"
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: i * 0.2 }}
-              >
-                {/* Step number */}
-                <motion.div
-                  className="w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center relative"
-                  style={{ background: "linear-gradient(135deg, hsl(152 60% 36% / 0.15), hsl(142 55% 42% / 0.08))" }}
-                  whileHover={{ scale: 1.05 }}
-                >
-                  <step.icon className="h-8 w-8 text-primary" />
-                  <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center font-display shadow-lg">
-                    {i + 1}
-                  </div>
-                </motion.div>
+              <div className="relative">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/15 transition-colors">
+                  <step.icon className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold font-display mb-2">{t(step.titleKey)}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{t(step.descKey)}</p>
+              </div>
 
-                <h3 className="text-xl font-semibold font-display mb-3">{t(step.titleKey)}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-[280px] mx-auto">
-                  {t(step.descKey)}
-                </p>
-              </motion.div>
-            ))}
-          </div>
+              {/* Connecting arrow for desktop */}
+              {i < 2 && (
+                <div className="hidden md:block absolute top-1/2 -right-2 translate-x-full -translate-y-1/2 z-10">
+                  <div className="w-4 h-px bg-border" />
+                </div>
+              )}
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>
