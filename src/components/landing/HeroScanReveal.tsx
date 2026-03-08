@@ -70,7 +70,7 @@ export function HeroScanReveal() {
 }
 
 // Headline text that reveals as if being scanned
-export function ScanRevealText({ children, delay = 0 }: { children: string; delay?: number }) {
+export function ScanRevealText({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   return (
     <motion.span
       className="inline-block"
