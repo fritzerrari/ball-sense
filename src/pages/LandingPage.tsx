@@ -291,19 +291,19 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              Das sagen unsere Nutzer
+              {t("landing.testimonialsTitle")}
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {testimonials.map((t) => (
-              <div key={t.author} className="glass-card p-6 flex flex-col">
+            {testimonials.map((tItem, i) => (
+              <div key={i} className="glass-card p-6 flex flex-col">
                 <Quote className="h-6 w-6 text-primary/40 mb-3 shrink-0" />
                 <p className="text-sm text-foreground leading-relaxed flex-1 italic">
-                  "{t.quote}"
+                  "{t(tItem.quoteKey)}"
                 </p>
                 <div className="mt-4 pt-4 border-t border-border">
-                  <div className="text-sm font-semibold">{t.author}</div>
-                  <div className="text-xs text-muted-foreground">{t.role}</div>
+                  <div className="text-sm font-semibold">{t(tItem.authorKey)}</div>
+                  <div className="text-xs text-muted-foreground">{t(tItem.roleKey)}</div>
                 </div>
               </div>
             ))}
