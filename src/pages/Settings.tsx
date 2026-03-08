@@ -69,6 +69,12 @@ export default function SettingsPage() {
               <input type="text" value={league} onChange={e => setLeague(e.target.value)} placeholder="Regionalliga Bayern" className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground" />
             </div>
           </div>
+          {/* Logo Upload */}
+          <div>
+            <label className="text-sm text-muted-foreground block mb-2">Vereinslogo</label>
+            <ClubLogoUpload />
+          </div>
+
           <Button variant="hero" size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
             Speichern

@@ -170,6 +170,9 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Season Charts */}
+        <DashboardCharts />
       </div>
     </AppLayout>
   );
