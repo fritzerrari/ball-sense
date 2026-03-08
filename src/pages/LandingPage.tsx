@@ -137,7 +137,7 @@ export default function LandingPage() {
 
             {/* Right — Product Mockup */}
             <div className="lg:pl-4">
-              <HeroDashboardMockup />
+              <HeroSlider />
             </div>
           </div>
 
