@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Shield, Users, Building2, BarChart3, Activity, Crown,
-  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload,
+  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload, BookOpen,
 } from "lucide-react";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +21,7 @@ import AdminUsers from "@/components/AdminUsers";
 import AdminLegal from "@/components/AdminLegal";
 import AdminLogs from "@/components/AdminLogs";
 import AdminUploads from "@/components/AdminUploads";
+import AdminGuides from "@/components/AdminGuides";
 
 // ---------- hooks ----------
 function useAdminRole(userId: string | undefined) {
@@ -210,6 +211,9 @@ export default function Admin() {
             <TabsTrigger value="logs" className="rounded-lg text-xs">
               <ScrollText className="h-4 w-4 mr-1.5" /> Protokolle
             </TabsTrigger>
+            <TabsTrigger value="guides" className="rounded-lg text-xs">
+              <BookOpen className="h-4 w-4 mr-1.5" /> Anleitungen
+            </TabsTrigger>
             <TabsTrigger value="system" className="rounded-lg text-xs">
               <Activity className="h-4 w-4 mr-1.5" /> System
             </TabsTrigger>
@@ -344,6 +348,11 @@ export default function Admin() {
           {/* ---- Logs Tab ---- */}
           <TabsContent value="logs">
             <AdminLogs />
+          </TabsContent>
+
+          {/* ---- Guides Tab ---- */}
+          <TabsContent value="guides">
+            <AdminGuides />
           </TabsContent>
 
           {/* ---- System Tab ---- */}

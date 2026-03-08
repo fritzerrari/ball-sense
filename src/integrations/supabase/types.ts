@@ -77,6 +77,39 @@ export type Database = {
         }
         Relationships: []
       }
+      device_guides: {
+        Row: {
+          active: boolean
+          brand: string
+          created_at: string
+          guide_chapters: Json
+          id: string
+          model: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          brand: string
+          created_at?: string
+          guide_chapters?: Json
+          id?: string
+          model: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          brand?: string
+          created_at?: string
+          guide_chapters?: Json
+          id?: string
+          model?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       fields: {
         Row: {
           calibration: Json | null

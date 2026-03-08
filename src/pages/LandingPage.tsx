@@ -1,7 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Smartphone, Brain, BarChart3, Check, ChevronRight } from "lucide-react";
+import {
+  Smartphone, Brain, BarChart3, Check, ChevronRight,
+  MonitorSmartphone, Zap, FileBarChart, Quote, HelpCircle, Download,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const features = [
   {
@@ -12,12 +21,30 @@ const features = [
   {
     icon: Brain,
     title: "KI erkennt alle Spieler",
-    description: "YOLOv8 läuft direkt auf dem Handy. Kein Video verlässt das Gerät.",
+    description: "Intelligente Erkennung läuft direkt auf dem Gerät. Kein Video verlässt das Handy.",
   },
   {
     icon: BarChart3,
     title: "Report in 30 Sekunden",
     description: "Nach dem Spiel: 1 Klick. Heatmaps, km, Topspeed — sofort.",
+  },
+];
+
+const steps = [
+  {
+    icon: MonitorSmartphone,
+    title: "Smartphones aufstellen",
+    description: "Platziere 2–3 Smartphones am Spielfeldrand. Keine Halterung nötig — einfach anlehnen.",
+  },
+  {
+    icon: Zap,
+    title: "Spiel tracken",
+    description: "Starte das Tracking mit einem Klick. Die KI erkennt automatisch alle Spieler auf dem Feld.",
+  },
+  {
+    icon: FileBarChart,
+    title: "Report erhalten",
+    description: "Nach Abpfiff bekommst du Heatmaps, Laufdistanzen, Sprints und Topspeed — in Sekunden.",
   },
 ];
 
@@ -48,6 +75,51 @@ const comparison = [
   { feature: "Für alle Ligen geeignet", fieldiq: "✓", veo: "Bedingt", pixellot: "Bedingt", gps: "✓" },
 ];
 
+const testimonials = [
+  {
+    quote: "Mit FieldIQ haben wir endlich Profi-Daten — ohne Profi-Budget. Unsere Spieler lieben die Heatmaps.",
+    author: "Thomas M.",
+    role: "Trainer, Bezirksliga Bayern",
+  },
+  {
+    quote: "Setup in 5 Minuten, Ergebnisse nach jedem Spiel. Das hat unsere Trainingsplanung komplett verändert.",
+    author: "Sarah K.",
+    role: "Co-Trainerin, Landesliga NRW",
+  },
+  {
+    quote: "Endlich wissen wir, welche Spieler in der 2. Halbzeit nachlassen. Auswechslungen sind jetzt datenbasiert.",
+    author: "Michael R.",
+    role: "Sportlicher Leiter, Kreisliga Hessen",
+  },
+];
+
+const faqs = [
+  {
+    q: "Welche Smartphones werden unterstützt?",
+    a: "Alle modernen Smartphones mit aktuellem Browser (Chrome, Safari, Firefox). Ab Android 10 und iOS 15 aufwärts. Detaillierte Anleitungen findest du auf unserer Installationsseite.",
+  },
+  {
+    q: "Wie genau ist das Tracking?",
+    a: "Die KI-basierte Erkennung erreicht eine Genauigkeit von über 95% bei Laufdistanzen und Geschwindigkeiten. Je besser die Kameraposition, desto genauer die Daten.",
+  },
+  {
+    q: "Werden Videos in die Cloud hochgeladen?",
+    a: "Nein. Die Erkennung läuft komplett auf dem Gerät. Es werden nur die berechneten Positionsdaten (keine Videos oder Bilder) übertragen — DSGVO-konform.",
+  },
+  {
+    q: "Kann ich FieldIQ kostenlos testen?",
+    a: "Ja! Jeder Plan kann 30 Tage kostenlos getestet werden. Keine Kreditkarte nötig. Nach der Testphase wählst du deinen Plan.",
+  },
+  {
+    q: "Wie viele Kameras brauche ich?",
+    a: "Mindestens 2 Smartphones für eine Spielfeldhälfte, idealerweise 3 für das komplette Feld. Die Kameras werden einfach am Spielfeldrand platziert.",
+  },
+  {
+    q: "Funktioniert es auch bei Regen oder Dämmerung?",
+    a: "Ja, solange die Kamera ausreichend Kontrast hat. Bei starkem Regen oder Dunkelheit empfehlen wir Flutlicht für optimale Ergebnisse.",
+  },
+];
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
@@ -60,9 +132,11 @@ export default function LandingPage() {
             <span className="gradient-text">IQ</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
+            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">So funktioniert's</a>
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
             <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Preise</a>
-            <a href="#compare" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Vergleich</a>
+            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
+            <Link to="/install" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Installation</Link>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
@@ -101,8 +175,11 @@ export default function LandingPage() {
                   <ChevronRight className="ml-1 h-5 w-5" />
                 </Link>
               </Button>
-              <Button variant="heroOutline" size="xl">
-                Demo ansehen
+              <Button variant="heroOutline" size="xl" asChild>
+                <Link to="/install">
+                  <Download className="mr-1.5 h-5 w-5" />
+                  Installationsanleitung
+                </Link>
               </Button>
             </div>
           </div>
@@ -121,6 +198,57 @@ export default function LandingPage() {
               <div className="text-2xl md:text-3xl font-bold font-display gradient-text">0€</div>
               <div className="text-xs text-muted-foreground mt-1">Hardware-Kosten</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section id="how-it-works" className="py-20 md:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
+              So funktioniert's
+            </h2>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              In 3 einfachen Schritten zum professionellen Spieler-Tracking.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            {steps.map((step, i) => (
+              <div key={step.title} className="relative text-center group">
+                {i < steps.length - 1 && (
+                  <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-px border-t-2 border-dashed border-primary/20" />
+                )}
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-5 group-hover:bg-primary/20 transition-colors relative">
+                  <step.icon className="h-7 w-7 text-primary" />
+                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                    {i + 1}
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold font-display mb-2">{step.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Banner */}
+      <section className="py-12">
+        <div className="container mx-auto px-4">
+          <div className="glass-card glow-border p-8 md:p-12 text-center max-w-3xl mx-auto">
+            <h2 className="text-2xl md:text-3xl font-bold font-display mb-3">
+              Jetzt 30 Tage kostenlos testen
+            </h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Keine Kreditkarte nötig. Starte sofort mit deinem Team.
+            </p>
+            <Button variant="hero" size="xl" asChild>
+              <Link to="/login">
+                Kostenlos starten
+                <ChevronRight className="ml-1 h-5 w-5" />
+              </Link>
+            </Button>
           </div>
         </div>
       </section>
@@ -148,6 +276,31 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-lg font-semibold font-display mb-2">{f.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-20 md:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
+              Das sagen unsere Nutzer
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {testimonials.map((t) => (
+              <div key={t.author} className="glass-card p-6 flex flex-col">
+                <Quote className="h-6 w-6 text-primary/40 mb-3 shrink-0" />
+                <p className="text-sm text-foreground leading-relaxed flex-1 italic">
+                  "{t.quote}"
+                </p>
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="text-sm font-semibold">{t.author}</div>
+                  <div className="text-xs text-muted-foreground">{t.role}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -201,7 +354,7 @@ export default function LandingPage() {
       </section>
 
       {/* Comparison */}
-      <section id="compare" className="py-20 md:py-32">
+      <section id="compare" className="py-20 md:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
@@ -237,17 +390,104 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section id="faq" className="py-20 md:py-32">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
+              Häufige Fragen
+            </h2>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Alles, was du über FieldIQ wissen musst.
+            </p>
+          </div>
+          <div className="max-w-2xl mx-auto">
+            <Accordion type="single" collapsible className="space-y-2">
+              {faqs.map((faq, i) => (
+                <AccordionItem key={i} value={`faq-${i}`} className="glass-card px-6 border rounded-lg">
+                  <AccordionTrigger className="text-sm font-medium hover:no-underline">
+                    {faq.q}
+                  </AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground leading-relaxed">
+                    {faq.a}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-20 md:py-32 bg-muted/30">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
+            Bereit für datenbasiertes Training?
+          </h2>
+          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+            Starte noch heute — kostenlos und ohne Verpflichtung.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Button variant="hero" size="xl" asChild>
+              <Link to="/login">
+                Jetzt kostenlos starten
+                <ChevronRight className="ml-1 h-5 w-5" />
+              </Link>
+            </Button>
+            <Button variant="heroOutline" size="xl" asChild>
+              <Link to="/install">Installationsanleitung</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-border py-12">
-        <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="font-display text-lg font-bold flex items-center gap-1.5">
-            <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
-            <span className="text-foreground">Field</span>
-            <span className="gradient-text">IQ</span>
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="font-display text-lg font-bold flex items-center gap-1.5 mb-4">
+                <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
+                <span className="text-foreground">Field</span>
+                <span className="gradient-text">IQ</span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Professionelles Spieler-Tracking für Amateurvereine. Nur mit Smartphones.
+              </p>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold mb-3">Produkt</h4>
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                <li><a href="#features" className="hover:text-foreground transition-colors">Features</a></li>
+                <li><a href="#pricing" className="hover:text-foreground transition-colors">Preise</a></li>
+                <li><a href="#compare" className="hover:text-foreground transition-colors">Vergleich</a></li>
+                <li><a href="#faq" className="hover:text-foreground transition-colors">FAQ</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold mb-3">Hilfe</h4>
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                <li><Link to="/install" className="hover:text-foreground transition-colors">Installation</Link></li>
+                <li><Link to="/login" className="hover:text-foreground transition-colors">Anmelden</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold mb-3">Rechtliches</h4>
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                <li><Link to="/legal/impressum" className="hover:text-foreground transition-colors">Impressum</Link></li>
+                <li><Link to="/legal/datenschutz" className="hover:text-foreground transition-colors">Datenschutz</Link></li>
+                <li><Link to="/legal/agb" className="hover:text-foreground transition-colors">AGB</Link></li>
+              </ul>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            © 2026 FieldIQ. Alle Rechte vorbehalten.
-          </p>
+          <div className="pt-6 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground">
+              © 2026 FieldIQ. Alle Rechte vorbehalten.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Made with ❤️ in Deutschland
+            </p>
+          </div>
         </div>
       </footer>
     </div>

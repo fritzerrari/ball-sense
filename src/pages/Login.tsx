@@ -1,12 +1,29 @@
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import { ArrowLeft, Mail, Lock, Eye, EyeOff, Building2, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { ArrowLeft, Mail, Lock, Eye, EyeOff, Building2, Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
 import { Navigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+
+function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+  let score = 0;
+  if (pw.length >= 6) score++;
+  if (pw.length >= 10) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  if (score <= 1) return { score: 20, label: "Sehr schwach", color: "bg-destructive" };
+  if (score === 2) return { score: 40, label: "Schwach", color: "bg-destructive/70" };
+  if (score === 3) return { score: 60, label: "Mittel", color: "bg-warning" };
+  if (score === 4) return { score: 80, label: "Stark", color: "bg-primary/70" };
+  return { score: 100, label: "Sehr stark", color: "bg-primary" };
+}
 
 export default function Login() {
   const { user, loading } = useAuth();
@@ -17,14 +34,28 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [clubName, setClubName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [acceptedTos, setAcceptedTos] = useState(false);
+
+  // Rate limiting
+  const failCountRef = useRef(0);
+  const lockedUntilRef = useRef<number>(0);
 
   if (!loading && user) {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const pwStrength = getPasswordStrength(password);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
+
+    // Rate limiting check
+    if (Date.now() < lockedUntilRef.current) {
+      const secs = Math.ceil((lockedUntilRef.current - Date.now()) / 1000);
+      toast.error(`Zu viele Versuche. Bitte warte ${secs} Sekunden.`);
+      return;
+    }
 
     if (!email.trim() || !password.trim()) {
       toast.error("Bitte E-Mail und Passwort eingeben.");
@@ -41,12 +72,24 @@ export default function Login() {
       return;
     }
 
+    if (!isLogin && !acceptedTos) {
+      toast.error("Bitte akzeptiere die AGB und Datenschutzrichtlinie.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
+          failCountRef.current++;
+          if (failCountRef.current >= 5) {
+            lockedUntilRef.current = Date.now() + 60000;
+            failCountRef.current = 0;
+            toast.error("Zu viele fehlgeschlagene Versuche. 60 Sekunden Sperre.");
+            return;
+          }
           if (error.message.includes("Invalid login")) {
             toast.error("Ungültige E-Mail oder Passwort.");
           } else if (error.message.includes("Email not confirmed")) {
@@ -56,6 +99,7 @@ export default function Login() {
           }
           return;
         }
+        failCountRef.current = 0;
         toast.success("Erfolgreich angemeldet!");
         navigate("/dashboard");
       } else {
@@ -117,7 +161,6 @@ export default function Login() {
       <div className="absolute inset-0 field-grid opacity-20" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px]" />
 
-      {/* Theme toggle */}
       <div className="absolute top-4 right-4 z-20">
         <ThemeToggle />
       </div>
@@ -185,8 +228,42 @@ export default function Login() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {/* Password strength indicator */}
+            {!isLogin && password.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${pwStrength.color}`}
+                    style={{ width: `${pwStrength.score}%` }}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[11px] text-muted-foreground">{pwStrength.label}</span>
+                </div>
+              </div>
+            )}
           </div>
-          <Button variant="hero" className="w-full" type="submit" disabled={submitting}>
+
+          {/* ToS checkbox for registration */}
+          {!isLogin && (
+            <div className="flex items-start gap-2.5">
+              <Checkbox
+                id="tos"
+                checked={acceptedTos}
+                onCheckedChange={(v) => setAcceptedTos(v === true)}
+                className="mt-0.5"
+              />
+              <label htmlFor="tos" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                Ich akzeptiere die{" "}
+                <Link to="/legal/agb" target="_blank" className="text-primary hover:underline">AGB</Link>
+                {" "}und die{" "}
+                <Link to="/legal/datenschutz" target="_blank" className="text-primary hover:underline">Datenschutzrichtlinie</Link>.
+              </label>
+            </div>
+          )}
+
+          <Button variant="hero" className="w-full" type="submit" disabled={submitting || (!isLogin && !acceptedTos)}>
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isLogin ? "Anmelden" : "Konto erstellen"}
           </Button>
@@ -194,7 +271,7 @@ export default function Login() {
 
         <p className="text-sm text-center text-muted-foreground">
           {isLogin ? "Noch kein Konto?" : "Schon ein Konto?"}{" "}
-          <button onClick={() => setIsLogin(!isLogin)} className="text-primary hover:underline">
+          <button onClick={() => { setIsLogin(!isLogin); setAcceptedTos(false); }} className="text-primary hover:underline">
             {isLogin ? "Jetzt registrieren" : "Anmelden"}
           </button>
         </p>
