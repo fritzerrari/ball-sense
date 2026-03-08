@@ -214,6 +214,15 @@ export default function MatchReport() {
           </div>
         )}
 
+        {activeTab === "KI-Bericht" && (
+          <ReportGenerator
+            matchId={match.id}
+            matchStatus={match.status}
+            clubName={clubName ?? "Heim"}
+            awayClubName={match.away_club_name ?? "Gegner"}
+            matchDate={match.date}
+          />
+        )}
         {activeTab === "Heim" && renderPlayerTable(homePlayerStats)}
         {activeTab === "Auswärts" && renderPlayerTable(awayPlayerStats)}
 
