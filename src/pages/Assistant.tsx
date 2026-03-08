@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2, Route, Flame, Clock, Radio, Pause } from "lucide-react";
+import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, Trash2, Route, Flame, Clock, Radio, Pause, Volume2, VolumeX } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
