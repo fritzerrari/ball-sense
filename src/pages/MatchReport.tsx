@@ -12,7 +12,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich"];
+const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich", "KI-Bericht"];
 
 export default function MatchReport() {
   const { id } = useParams();
