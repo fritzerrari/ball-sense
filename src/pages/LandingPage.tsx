@@ -79,19 +79,19 @@ const comparison = [
 
 const testimonials = [
   {
-    quote: "Mit FieldIQ haben wir endlich Profi-Daten — ohne Profi-Budget. Unsere Spieler lieben die Heatmaps.",
-    author: "Thomas M.",
-    role: "Trainer, Bezirksliga Bayern",
+    quoteKey: "landing.testimonial1",
+    authorKey: "landing.testimonial1Author",
+    roleKey: "landing.testimonial1Role",
   },
   {
-    quote: "Setup in 5 Minuten, Ergebnisse nach jedem Spiel. Das hat unsere Trainingsplanung komplett verändert.",
-    author: "Sarah K.",
-    role: "Co-Trainerin, Landesliga NRW",
+    quoteKey: "landing.testimonial2",
+    authorKey: "landing.testimonial2Author",
+    roleKey: "landing.testimonial2Role",
   },
   {
-    quote: "Endlich wissen wir, welche Spieler in der 2. Halbzeit nachlassen. Auswechslungen sind jetzt datenbasiert.",
-    author: "Michael R.",
-    role: "Sportlicher Leiter, Kreisliga Hessen",
+    quoteKey: "landing.testimonial3",
+    authorKey: "landing.testimonial3Author",
+    roleKey: "landing.testimonial3Role",
   },
 ];
 
