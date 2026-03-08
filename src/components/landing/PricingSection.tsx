@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/lib/i18n";
@@ -14,52 +14,88 @@ export function PricingSection() {
   const { t } = useTranslation();
 
   return (
-    <section id="pricing" className="py-24 md:py-36">
-      <div className="container mx-auto px-4">
+    <section id="pricing" className="py-24 md:py-36 relative overflow-hidden">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 field-grid opacity-[0.03]" />
+      
+      <div className="container mx-auto px-4 relative z-10">
         <motion.div
           className="text-center mb-16"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
         >
-          <h2 className="text-3xl md:text-5xl font-bold font-display mb-4">{t("landing.pricingTitle")}</h2>
-          <p className="text-muted-foreground text-lg">{t("landing.pricingDesc")}</p>
+          <span className="text-xs font-semibold text-primary font-display tracking-wider uppercase mb-3 block">{t("landing.pricing")}</span>
+          <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">{t("landing.pricingTitle")}</h2>
+          <p className="text-muted-foreground max-w-md mx-auto">{t("landing.pricingDesc")}</p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-5 max-w-4xl mx-auto items-stretch">
           {plans.map((plan, i) => (
             <motion.div
               key={plan.name}
-              className={`rounded-2xl p-8 flex flex-col border transition-all ${
+              className={`group relative rounded-2xl p-8 flex flex-col border transition-all duration-500 overflow-hidden ${
                 plan.popular
-                  ? "border-primary/30 bg-card relative shadow-[0_0_40px_hsl(152_60%_36%/0.1)]"
-                  : "border-border/50 bg-card/50"
+                  ? "border-primary/40 bg-card scale-[1.02] z-10"
+                  : "border-border/50 bg-card/50 hover:border-primary/20"
               }`}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              whileInView={{ opacity: 1, y: 0, scale: plan.popular ? 1.02 : 1 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
+              transition={{ duration: 0.6, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ y: -8 }}
             >
+              {/* Popular glow */}
               {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold font-display">
-                  {t("landing.popular")}
-                </div>
+                <>
+                  <div className="absolute -inset-px rounded-2xl" style={{ boxShadow: "var(--shadow-glow)" }} />
+                  <motion.div
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold font-display flex items-center gap-1.5 shadow-lg"
+                    initial={{ opacity: 0, y: -10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {t("landing.popular")}
+                  </motion.div>
+                </>
               )}
-              <div className="mb-6">
+
+              <div className="relative mb-6">
                 <h3 className="text-xs font-semibold text-muted-foreground tracking-widest mb-3">{plan.name}</h3>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-5xl font-bold font-display">€{plan.price}</span>
+                  <motion.span
+                    className="text-5xl font-bold font-display"
+                    initial={{ opacity: 0, x: -10 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 + i * 0.1, duration: 0.5 }}
+                  >
+                    €{plan.price}
+                  </motion.span>
                   <span className="text-muted-foreground text-sm">{t("landing.perMonth")}</span>
                 </div>
               </div>
-              <ul className="space-y-3 mb-8 flex-1">
-                {plan.features.map((fKey) => (
-                  <li key={fKey} className="flex items-center gap-2.5 text-sm">
-                    <Check className="h-4 w-4 text-primary shrink-0" />
+
+              <ul className="space-y-3 mb-8 flex-1 relative">
+                {plan.features.map((fKey, fi) => (
+                  <motion.li
+                    key={fKey}
+                    className="flex items-center gap-2.5 text-sm"
+                    initial={{ opacity: 0, x: -10 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.4 + fi * 0.06, duration: 0.3 }}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Check className="h-2.5 w-2.5 text-primary" />
+                    </div>
                     <span className="text-muted-foreground">{t(fKey)}</span>
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
+
               <Button variant={plan.popular ? "hero" : "heroOutline"} className="w-full" asChild>
                 <Link to="/login">
                   {t("landing.startNow")}
