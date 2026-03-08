@@ -3,8 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { useState } from "react";
 import { BarChart3, Zap, Route, Users, ArrowUpDown, ArrowLeft, FileText, Download, Share2, ChevronDown, ChevronUp } from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
+import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
 import { useMatch, useMatchLineups, useTrackingUploads } from "@/hooks/use-matches";
-import { usePlayerMatchStats, useTeamMatchStats } from "@/hooks/use-match-stats";
+import { usePlayerMatchStats, useTeamMatchStats, useApiFootballStats } from "@/hooks/use-match-stats";
 import { useAuth } from "@/components/AuthProvider";
 import { HeatmapField } from "@/components/HeatmapField";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -22,6 +23,7 @@ export default function MatchReport() {
   const { data: playerStats } = usePlayerMatchStats(id);
   const { data: teamStats } = useTeamMatchStats(id);
   const { data: uploads } = useTrackingUploads(id);
+  const { data: apiStats } = useApiFootballStats(id);
   const [activeTab, setActiveTab] = useState("Übersicht");
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string>("distance_km");
@@ -196,6 +198,15 @@ export default function MatchReport() {
 
         {activeTab === "Übersicht" && (
           <div className="space-y-6">
+            {/* API-Football Stats */}
+            {apiStats && (
+              <ApiFootballStatsCard
+                stats={apiStats}
+                homeLabel={clubName ?? "Heim"}
+                awayLabel={match.away_club_name ?? "Auswärts"}
+              />
+            )}
+
             <div className="grid sm:grid-cols-2 gap-4">
               {renderTeamCard(clubName ?? "Heim", homeTeamStats)}
               {renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats)}

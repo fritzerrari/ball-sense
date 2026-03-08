@@ -2,6 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 
+export function useApiFootballStats(matchId: string | undefined) {
+  return useQuery({
+    queryKey: ["api_football_match_stats", matchId],
+    queryFn: async () => {
+      if (!matchId) return null;
+      const { data, error } = await supabase
+        .from("api_football_match_stats")
+        .select("*")
+        .eq("match_id", matchId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!matchId,
+  });
+}
+
 export function usePlayerMatchStats(matchId: string | undefined) {
   return useQuery({
     queryKey: ["player_match_stats", matchId],

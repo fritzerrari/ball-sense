@@ -37,6 +37,10 @@ export default function TrackingPage() {
   const [uploadDone, setUploadDone] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [half, setHalf] = useState(1);
+  const [showHalftimeUpload, setShowHalftimeUpload] = useState(false);
+  const [halftimeUploading, setHalftimeUploading] = useState(false);
+  const [halftimeUploadProgress, setHalftimeUploadProgress] = useState(0);
+  const [halftimeUploadDone, setHalftimeUploadDone] = useState(false);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -116,12 +120,51 @@ export default function TrackingPage() {
     trackerRef.current?.pauseTracking();
     setPaused(true);
     setHalf(2);
-    toast.success("Halbzeit! Drücke Weiter wenn es losgeht.");
+    setShowHalftimeUpload(true);
+    toast.success("Halbzeit! Du kannst jetzt die erste Hälfte hochladen.");
   };
 
   const handleEnd = () => {
     trackerRef.current?.stopTracking();
     setPhase("ended");
+  };
+
+  const handleHalftimeUpload = async () => {
+    if (!trackerRef.current || !id) return;
+    setHalftimeUploading(true);
+    setHalftimeUploadProgress(0);
+    try {
+      setHalftimeUploadProgress(15);
+      const result = await trackerRef.current.uploadMatch(
+        id, cam,
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      );
+      setHalftimeUploadProgress(60);
+
+      await supabase.from("tracking_uploads").insert({
+        match_id: id,
+        camera_index: cam,
+        file_path: result.filePath,
+        status: "uploaded",
+        frames_count: result.framesCount,
+        duration_sec: result.durationSec,
+      });
+      setHalftimeUploadProgress(100);
+      setHalftimeUploadDone(true);
+      toast.success("1. Halbzeit hochgeladen! Starte die 2. Halbzeit wenn es losgeht.");
+    } catch {
+      toast.error("Upload fehlgeschlagen — wird nach Spielende erneut versucht");
+      setHalftimeUploadProgress(0);
+    } finally {
+      setHalftimeUploading(false);
+    }
+  };
+
+  const handleResumeSecondHalf = () => {
+    setShowHalftimeUpload(false);
+    trackerRef.current?.resumeTracking();
+    setPaused(false);
   };
 
   const handleUpload = async () => {
@@ -317,6 +360,65 @@ export default function TrackingPage() {
                 <Flag className="h-6 w-6 mr-2" /> ENDE
               </Button>
             </div>
+
+            {/* Halftime Upload Overlay */}
+            {showHalftimeUpload && (
+              <div className="glass-card p-5 space-y-4 border-primary/30">
+                <div className="text-center">
+                  <Timer className="h-8 w-8 text-primary mx-auto mb-2" />
+                  <h3 className="font-bold font-display text-lg">Halbzeitpause</h3>
+                  <p className="text-sm text-muted-foreground">Lade die Daten der 1. Halbzeit jetzt hoch für eine erste Analyse.</p>
+                </div>
+
+                {(halftimeUploading || halftimeUploadDone) && (
+                  <div className="space-y-2">
+                    <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${halftimeUploadDone ? "bg-primary" : "bg-primary/70"}`}
+                        style={{ width: `${halftimeUploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {halftimeUploadDone ? "✓ 1. Halbzeit hochgeladen" : `${halftimeUploadProgress}% — Upload läuft...`}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  {!halftimeUploadDone && (
+                    <Button
+                      variant="hero"
+                      className="flex-1 min-h-[50px]"
+                      onClick={handleHalftimeUpload}
+                      disabled={halftimeUploading}
+                    >
+                      {halftimeUploading ? (
+                        <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Wird hochgeladen...</>
+                      ) : (
+                        <><Upload className="h-5 w-5 mr-2" /> 1. HZ hochladen</>
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    variant={halftimeUploadDone ? "hero" : "heroOutline"}
+                    className="flex-1 min-h-[50px]"
+                    onClick={handleResumeSecondHalf}
+                    disabled={halftimeUploading}
+                  >
+                    <Play className="h-5 w-5 mr-2" /> 2. HZ starten
+                  </Button>
+                </div>
+
+                {!halftimeUploadDone && !halftimeUploading && (
+                  <button
+                    onClick={handleResumeSecondHalf}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors block mx-auto"
+                  >
+                    Überspringen — nach dem Spiel alles hochladen
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
