@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useTranslation } from "@/lib/i18n";
-import { HeroPitch } from "@/components/landing/HeroPitch";
+import { HeroScanReveal, ScanRevealText, ScanRevealSub, SmartphoneIndicator } from "@/components/landing/HeroScanReveal";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { AnalyticsShowcase } from "@/components/landing/AnalyticsShowcase";
 import { FeatureCards } from "@/components/landing/FeatureCards";
@@ -48,106 +48,89 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="relative pt-28 pb-16 md:pt-40 md:pb-28 overflow-hidden min-h-[90vh] flex items-center">
-        {/* Animated pitch background */}
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 60%, hsl(152 60% 36% / 0.06) 0%, transparent 70%)" }} />
-        <HeroPitch />
+      <section className="relative pt-28 pb-16 md:pt-36 md:pb-24 overflow-hidden min-h-[85vh] flex items-center">
+        {/* Subtle grid bg */}
+        <div className="absolute inset-0 field-grid opacity-20" />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 50%, hsl(152 60% 36% / 0.04) 0%, transparent 60%)" }} />
         
+        {/* Scanning animation */}
+        <HeroScanReveal />
+
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
+            {/* Beta badge */}
             <motion.div
               className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-medium mb-8"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 2.4 }}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
               {t("landing.betaTag")}
             </motion.div>
 
-            <motion.h1
-              className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6 font-display leading-[0.95]"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
-            >
-              {t("landing.heroTitle2")}{" "}
-              <span className="gradient-text">{t("landing.heroHighlight2")}</span>
-            </motion.h1>
+            {/* Headline — scanned into existence */}
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 font-display leading-[1.1]">
+              <ScanRevealText delay={0}>
+                {t("landing.heroLine1")}
+              </ScanRevealText>
+              <br />
+              <ScanRevealText delay={0.3}>
+                <span className="gradient-text">{t("landing.heroLine2")}</span>
+              </ScanRevealText>
+            </h1>
 
-            <motion.p
-              className="text-lg md:text-xl text-muted-foreground mb-12 max-w-xl mx-auto leading-relaxed"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              {t("landing.heroDesc2")}
-            </motion.p>
+            {/* Subheadline */}
+            <ScanRevealSub>
+              <p className="text-base md:text-lg text-muted-foreground mb-10 max-w-lg mx-auto leading-relaxed">
+                {t("landing.heroDesc2")}
+              </p>
+            </ScanRevealSub>
 
-            <motion.div
-              className="flex flex-col sm:flex-row items-center justify-center gap-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-            >
-              <Button variant="hero" size="xl" asChild>
-                <Link to="/login">
-                  {t("landing.startFreeTrial")}
-                  <ChevronRight className="ml-1 h-5 w-5" />
-                </Link>
-              </Button>
-              <Button variant="heroOutline" size="xl" asChild>
-                <Link to="/install">
-                  <Play className="mr-1.5 h-4 w-4" />
-                  {t("landing.seeDemo")}
-                </Link>
-              </Button>
-            </motion.div>
+            {/* CTAs */}
+            <ScanRevealSub delay={0.3}>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Button variant="hero" size="xl" asChild>
+                  <Link to="/login">
+                    {t("landing.startFreeTrial")}
+                    <ChevronRight className="ml-1 h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button variant="heroOutline" size="xl" asChild>
+                  <Link to="/install">
+                    <Play className="mr-1.5 h-4 w-4" />
+                    {t("landing.seeDemo")}
+                  </Link>
+                </Button>
+              </div>
+            </ScanRevealSub>
+
+            {/* 3 dots indicator */}
+            <SmartphoneIndicator />
           </div>
         </div>
-
-        {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
       </section>
 
-      {/* Key Numbers */}
       <KeyNumbers />
-
-      {/* How it works */}
       <HowItWorks />
-
-      {/* Analytics Showcase (dark section) */}
       <AnalyticsShowcase />
-
-      {/* Features */}
       <FeatureCards />
-
-      {/* Trust & Testimonials */}
       <TrustSection />
-
-      {/* Pricing */}
       <PricingSection />
-
-      {/* FAQ */}
       <FAQSection />
 
       {/* Final CTA */}
       <section className="py-24 md:py-36 relative overflow-hidden">
         <div className="absolute inset-0 field-grid opacity-20" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px]" />
-        
         <div className="container mx-auto px-4 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl md:text-5xl font-bold font-display mb-5">
-              {t("landing.finalCtaTitle")}
-            </h2>
-            <p className="text-muted-foreground mb-10 max-w-md mx-auto text-lg">
-              {t("landing.finalCtaDesc")}
-            </p>
+            <h2 className="text-3xl md:text-5xl font-bold font-display mb-5">{t("landing.finalCtaTitle")}</h2>
+            <p className="text-muted-foreground mb-10 max-w-md mx-auto text-lg">{t("landing.finalCtaDesc")}</p>
             <Button variant="hero" size="xl" asChild>
               <Link to="/login">
                 {t("landing.finalCtaBtn")}
@@ -158,7 +141,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <Footer />
     </div>
   );
