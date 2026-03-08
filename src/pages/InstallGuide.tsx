@@ -23,23 +23,23 @@ interface DeviceGuide {
 const genericGuide: GuideChapter[] = [
   {
     title: "App installieren",
-    text: "FieldIQ ist eine Web-App (PWA). Öffne den Browser auf deinem Smartphone und navigiere zur FieldIQ-Adresse. Tippe auf „Zum Startbildschirm hinzufügen" (iOS: Teilen-Button → „Zum Home-Bildschirm"; Android: Drei-Punkte-Menü → „Zum Startbildschirm hinzufügen"). Die App erscheint jetzt wie eine normale App auf deinem Gerät.",
+    text: 'FieldIQ ist eine Web-App (PWA). Oeffne den Browser auf deinem Smartphone und navigiere zur FieldIQ-Adresse. Tippe auf "Zum Startbildschirm hinzufuegen" (iOS: Teilen-Button > "Zum Home-Bildschirm"; Android: Drei-Punkte-Menu > "Zum Startbildschirm hinzufuegen"). Die App erscheint jetzt wie eine normale App auf deinem Geraet.',
   },
   {
     title: "Kamera-Zugriff erlauben",
-    text: "Beim ersten Start fragt FieldIQ nach dem Zugriff auf deine Kamera. Tippe auf „Erlauben". Falls du versehentlich auf „Ablehnen" gedrückt hast: Gehe in die Einstellungen deines Browsers → Website-Einstellungen → Kamera → Erlauben.",
+    text: 'Beim ersten Start fragt FieldIQ nach dem Zugriff auf deine Kamera. Tippe auf "Erlauben". Falls du versehentlich auf "Ablehnen" gedrueckt hast: Gehe in die Einstellungen deines Browsers > Website-Einstellungen > Kamera > Erlauben.',
   },
   {
     title: "Smartphones positionieren",
-    text: "Platziere 2–3 Smartphones entlang der Seitenlinie, möglichst erhöht (ca. 1,5–2m). Du kannst sie an Absperrzäune lehnen, auf Stative setzen oder Halterungen nutzen. Achte darauf, dass das gesamte Spielfeld von den Kameras abgedeckt wird. Tipp: Ein Smartphone in der Mitte und je eines an den 16-Meter-Linien ergibt die beste Abdeckung.",
+    text: "Platziere 2-3 Smartphones entlang der Seitenlinie, moeglichst erhoeht (ca. 1,5-2m). Du kannst sie an Absperrzaeune lehnen, auf Stative setzen oder Halterungen nutzen. Achte darauf, dass das gesamte Spielfeld von den Kameras abgedeckt wird. Tipp: Ein Smartphone in der Mitte und je eines an den 16-Meter-Linien ergibt die beste Abdeckung.",
   },
   {
     title: "Tracking starten",
-    text: "Öffne FieldIQ auf jedem Smartphone und navigiere zum aktuellen Spiel. Tippe auf „Tracking starten". Die KI beginnt automatisch, alle Spieler auf dem Feld zu erkennen und ihre Bewegungen aufzuzeichnen. Du siehst einen grünen Indikator, wenn die Erkennung läuft.",
+    text: 'Oeffne FieldIQ auf jedem Smartphone und navigiere zum aktuellen Spiel. Tippe auf "Tracking starten". Die KI beginnt automatisch, alle Spieler auf dem Feld zu erkennen und ihre Bewegungen aufzuzeichnen. Du siehst einen gruenen Indikator, wenn die Erkennung laeuft.',
   },
   {
     title: "Nach dem Spiel",
-    text: "Tippe auf „Tracking beenden". Die Positionsdaten werden automatisch an FieldIQ übertragen und analysiert. Nach wenigen Sekunden stehen dir Heatmaps, Laufdistanzen, Sprints und Topspeed für jeden Spieler zur Verfügung. Tipp: Stelle sicher, dass dein Smartphone eine Internetverbindung hat (WLAN oder Mobilfunk).",
+    text: 'Tippe auf "Tracking beenden". Die Positionsdaten werden automatisch an FieldIQ uebertragen und analysiert. Nach wenigen Sekunden stehen dir Heatmaps, Laufdistanzen, Sprints und Topspeed fuer jeden Spieler zur Verfuegung. Tipp: Stelle sicher, dass dein Smartphone eine Internetverbindung hat (WLAN oder Mobilfunk).',
   },
 ];
 
