@@ -116,7 +116,8 @@ export default function TrackingPage() {
     trackerRef.current?.pauseTracking();
     setPaused(true);
     setHalf(2);
-    toast.success("Halbzeit! Drücke Weiter wenn es losgeht.");
+    setShowHalftimeUpload(true);
+    toast.success("Halbzeit! Du kannst jetzt die erste Hälfte hochladen.");
   };
 
   const handleEnd = () => {
