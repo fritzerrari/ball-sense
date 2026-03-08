@@ -163,27 +163,26 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-glow-pulse" />
-              Jetzt in der Beta
+              {t("landing.betaTag")}
             </div>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 font-display">
-              Pro-Tracking für{" "}
-              <span className="gradient-text">alle Ligen</span>
+              {t("landing.heroTitle")}{" "}
+              <span className="gradient-text">{t("landing.heroHighlight")}</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl mx-auto leading-relaxed">
-              Nur 3 Smartphones. Keine Installation.
-              Heatmaps & Laufdaten nach jedem Spiel.
+              {t("landing.heroDesc")}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button variant="hero" size="xl" asChild>
                 <Link to="/login">
-                  Kostenlos testen
+                  {t("landing.tryFree")}
                   <ChevronRight className="ml-1 h-5 w-5" />
                 </Link>
               </Button>
               <Button variant="heroOutline" size="xl" asChild>
                 <Link to="/install">
                   <Download className="mr-1.5 h-5 w-5" />
-                  Installationsanleitung
+                  {t("landing.installGuide")}
                 </Link>
               </Button>
             </div>
@@ -193,15 +192,15 @@ export default function LandingPage() {
           <div className="mt-20 glass-card p-6 max-w-2xl mx-auto grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-2xl md:text-3xl font-bold font-display gradient-text">3</div>
-              <div className="text-xs text-muted-foreground mt-1">Smartphones reichen</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("landing.smartphonesEnough")}</div>
             </div>
             <div>
               <div className="text-2xl md:text-3xl font-bold font-display gradient-text">30s</div>
-              <div className="text-xs text-muted-foreground mt-1">bis zum Report</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("landing.toReport")}</div>
             </div>
             <div>
               <div className="text-2xl md:text-3xl font-bold font-display gradient-text">0€</div>
-              <div className="text-xs text-muted-foreground mt-1">Hardware-Kosten</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("landing.hardwareCost")}</div>
             </div>
           </div>
         </div>
