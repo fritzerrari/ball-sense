@@ -211,15 +211,15 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              So funktioniert's
+              {t("landing.howItWorksTitle")}
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              In 3 einfachen Schritten zum professionellen Spieler-Tracking.
+              {t("landing.howItWorksDesc")}
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {steps.map((step, i) => (
-              <div key={step.title} className="relative text-center group">
+              <div key={t(step.titleKey)} className="relative text-center group">
                 {i < steps.length - 1 && (
                   <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-px border-t-2 border-dashed border-primary/20" />
                 )}
@@ -229,8 +229,8 @@ export default function LandingPage() {
                     {i + 1}
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold font-display mb-2">{step.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.description}</p>
+                <h3 className="text-lg font-semibold font-display mb-2">{t(step.titleKey)}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{t(step.descKey)}</p>
               </div>
             ))}
           </div>
