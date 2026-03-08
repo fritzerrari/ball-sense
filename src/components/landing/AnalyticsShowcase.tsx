@@ -2,62 +2,47 @@ import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useTranslation } from "@/lib/i18n";
 import { useTheme } from "@/components/ThemeProvider";
+import { HEATMAP_COLS, HEATMAP_ROWS } from "@/lib/constants";
 
-function HeatmapCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { theme } = useTheme();
+/** Realistic heatmap grid matching the real HeatmapField component */
+function HeatmapPreview() {
+  const grid = generateMockHeatmap();
+  const maxVal = Math.max(...grid.flat(), 0.01);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = 400 * dpr;
-    canvas.height = 260 * dpr;
-    ctx.scale(dpr, dpr);
+  return (
+    <div className="aspect-[105/68] bg-muted/20 rounded-lg border border-border/50 relative overflow-hidden">
+      {/* Field lines SVG — same as real component */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 105 68" preserveAspectRatio="none">
+        <rect x="0" y="0" width="105" height="68" fill="none" stroke="hsl(var(--primary) / 0.12)" strokeWidth="0.5" />
+        <line x1="52.5" y1="0" x2="52.5" y2="68" stroke="hsl(var(--primary) / 0.1)" strokeWidth="0.3" />
+        <circle cx="52.5" cy="34" r="9.15" fill="none" stroke="hsl(var(--primary) / 0.1)" strokeWidth="0.3" />
+        <rect x="0" y="13.84" width="16.5" height="40.32" fill="none" stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.3" />
+        <rect x="88.5" y="13.84" width="16.5" height="40.32" fill="none" stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.3" />
+        <rect x="0" y="24.84" width="5.5" height="18.32" fill="none" stroke="hsl(var(--primary) / 0.06)" strokeWidth="0.3" />
+        <rect x="99.5" y="24.84" width="5.5" height="18.32" fill="none" stroke="hsl(var(--primary) / 0.06)" strokeWidth="0.3" />
+      </svg>
 
-    const isDark = theme === "dark";
-
-    // Draw pitch
-    ctx.fillStyle = isDark ? "rgba(16, 30, 22, 1)" : "rgba(34, 120, 70, 0.9)";
-    ctx.fillRect(0, 0, 400, 260);
-
-    // Pitch lines
-    ctx.strokeStyle = isDark ? "rgba(74, 222, 128, 0.15)" : "rgba(255, 255, 255, 0.3)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(10, 10, 380, 240);
-    ctx.beginPath();
-    ctx.moveTo(200, 10);
-    ctx.lineTo(200, 250);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(200, 130, 40, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Heat zones
-    const zones = [
-      { x: 120, y: 100, r: 60, intensity: 0.7 },
-      { x: 180, y: 140, r: 45, intensity: 0.5 },
-      { x: 100, y: 180, r: 50, intensity: 0.6 },
-      { x: 250, y: 120, r: 35, intensity: 0.4 },
-      { x: 80, y: 130, r: 55, intensity: 0.65 },
-      { x: 160, y: 80, r: 30, intensity: 0.35 },
-    ];
-
-    for (const zone of zones) {
-      const grad = ctx.createRadialGradient(zone.x, zone.y, 0, zone.x, zone.y, zone.r);
-      grad.addColorStop(0, `rgba(74, 222, 128, ${zone.intensity * 0.6})`);
-      grad.addColorStop(0.4, `rgba(234, 179, 8, ${zone.intensity * 0.3})`);
-      grad.addColorStop(0.7, `rgba(239, 68, 68, ${zone.intensity * 0.15})`);
-      grad.addColorStop(1, "rgba(0, 0, 0, 0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }, [theme]);
-
-  return <canvas ref={canvasRef} className="w-full h-auto rounded-lg" style={{ maxWidth: 400 }} />;
+      {/* Grid cells — exact same rendering as real HeatmapField */}
+      <div className="absolute inset-1 grid gap-px" style={{ gridTemplateColumns: `repeat(${HEATMAP_COLS}, 1fr)`, gridTemplateRows: `repeat(${HEATMAP_ROWS}, 1fr)` }}>
+        {grid.flat().map((val, i) => {
+          const norm = val / maxVal;
+          const hue = norm > 0.7 ? 0 : norm > 0.4 ? 40 : norm > 0.2 ? 120 : 200;
+          const alpha = Math.max(norm * 0.7, 0.02);
+          return (
+            <motion.div
+              key={i}
+              className="rounded-[1px]"
+              style={{ backgroundColor: `hsla(${hue}, 80%, 50%, ${alpha})` }}
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.001, duration: 0.2 }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function StatsBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
@@ -86,26 +71,37 @@ export function AnalyticsShowcase() {
 
   return (
     <section className="py-24 md:py-40 relative overflow-hidden bg-secondary/50">
-      <div className="absolute inset-0 field-grid opacity-20" />
+      <div className="absolute inset-0 field-grid opacity-[0.04]" />
       
       <div className="container mx-auto px-4 relative z-10">
-        <motion.div
-          className="text-center mb-16"
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
-          <h2 className="text-3xl md:text-5xl font-bold font-display mb-4 text-foreground">
-            {t("landing.analyticsTitle")}
-          </h2>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            {t("landing.analyticsDesc")}
-          </p>
-        </motion.div>
+        {/* Left-aligned header */}
+        <div className="max-w-5xl mx-auto mb-16 grid lg:grid-cols-3 gap-6">
+          <motion.div
+            className="lg:col-span-1"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <span className="text-xs font-semibold text-primary font-display tracking-wider uppercase mb-3 block">Analytics</span>
+            <h2 className="text-3xl md:text-4xl font-bold font-display leading-tight">
+              {t("landing.analyticsTitle")}
+            </h2>
+          </motion.div>
+          <motion.div
+            className="lg:col-span-2 flex items-end"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+          >
+            <p className="text-muted-foreground max-w-lg text-base leading-relaxed">
+              {t("landing.analyticsDesc")}
+            </p>
+          </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto items-center">
-          {/* Heatmap */}
+          {/* Heatmap — now uses the REAL grid-based rendering */}
           <motion.div
             className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6"
             initial={{ opacity: 0, x: -40 }}
@@ -115,15 +111,16 @@ export function AnalyticsShowcase() {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground/80 font-display">{t("landing.playerHeatmap")}</h3>
-              <span className="text-xs text-primary px-2 py-0.5 rounded-full border border-primary/30 bg-primary/10">#10 — L. Müller</span>
+              <span className="text-xs text-primary px-2 py-0.5 rounded-full border border-primary/30 bg-primary/10">#10 — A. Vogt</span>
             </div>
-            <HeatmapCanvas />
+            <HeatmapPreview />
             <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
               <span>{t("landing.lowActivity")}</span>
               <div className="flex gap-1">
-                <div className="w-4 h-2 rounded-sm bg-red-500/50" />
-                <div className="w-4 h-2 rounded-sm bg-yellow-500/50" />
-                <div className="w-4 h-2 rounded-sm bg-green-500/50" />
+                <div className="w-4 h-2 rounded-sm" style={{ backgroundColor: "hsla(200, 80%, 50%, 0.5)" }} />
+                <div className="w-4 h-2 rounded-sm" style={{ backgroundColor: "hsla(120, 80%, 50%, 0.5)" }} />
+                <div className="w-4 h-2 rounded-sm" style={{ backgroundColor: "hsla(40, 80%, 50%, 0.5)" }} />
+                <div className="w-4 h-2 rounded-sm" style={{ backgroundColor: "hsla(0, 80%, 50%, 0.5)" }} />
               </div>
               <span>{t("landing.highActivity")}</span>
             </div>
@@ -137,7 +134,6 @@ export function AnalyticsShowcase() {
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: 0.2 }}
           >
-            {/* Player stats card */}
             <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6">
               <h3 className="text-sm font-semibold text-foreground/80 font-display mb-4">{t("landing.movementData")}</h3>
               <div className="grid grid-cols-3 gap-4 mb-6">
@@ -161,7 +157,6 @@ export function AnalyticsShowcase() {
               </div>
             </div>
 
-            {/* Tracking lines mockup */}
             <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6">
               <h3 className="text-sm font-semibold text-foreground/80 font-display mb-3">{t("landing.positionTracking")}</h3>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -170,7 +165,7 @@ export function AnalyticsShowcase() {
                   <span>{t("landing.firstHalf")}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                  <div className="w-2 h-2 rounded-full bg-warning" />
                   <span>{t("landing.secondHalf")}</span>
                 </div>
                 <div className="ml-auto text-primary font-medium">95.2% {t("landing.accuracy")}</div>
@@ -181,4 +176,37 @@ export function AnalyticsShowcase() {
       </div>
     </section>
   );
+}
+
+/** Generate a realistic-looking heatmap for a midfielder */
+function generateMockHeatmap(): number[][] {
+  const rows = HEATMAP_ROWS;
+  const cols = HEATMAP_COLS;
+  const grid: number[][] = [];
+
+  const hotspots = [
+    { cx: 8, cy: 6, strength: 1.0, radius: 4 },
+    { cx: 10, cy: 7, strength: 0.9, radius: 3.5 },
+    { cx: 12, cy: 5, strength: 0.7, radius: 3 },
+    { cx: 7, cy: 9, strength: 0.6, radius: 3 },
+    { cx: 14, cy: 7, strength: 0.5, radius: 2.5 },
+    { cx: 5, cy: 7, strength: 0.4, radius: 3 },
+  ];
+
+  for (let r = 0; r < rows; r++) {
+    const row: number[] = [];
+    for (let c = 0; c < cols; c++) {
+      let val = 0;
+      for (const hs of hotspots) {
+        const dist = Math.sqrt((c - hs.cx) ** 2 + (r - hs.cy) ** 2);
+        if (dist < hs.radius * 2) {
+          val += hs.strength * Math.exp(-(dist * dist) / (2 * (hs.radius * 0.8) ** 2));
+        }
+      }
+      val += Math.random() * 0.05;
+      row.push(Math.min(val, 1));
+    }
+    grid.push(row);
+  }
+  return grid;
 }
