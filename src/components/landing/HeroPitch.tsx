@@ -1,166 +1,191 @@
 import { useEffect, useRef } from "react";
 
-interface Player {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  trail: { x: number; y: number; age: number }[];
-  team: 0 | 1;
-  hue: number;
-}
-
 export function HeroPitch() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
-  const playersRef = useRef<Player[]>([]);
-  const timeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    
+
+    let w = 0, h = 0;
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
+      w = rect.width;
+      h = rect.height;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
     window.addEventListener("resize", resize);
 
-    // Initialize players
-    const players: Player[] = [];
-    for (let i = 0; i < 22; i++) {
-      const team = i < 11 ? 0 : 1;
-      players.push({
-        x: team === 0 ? 100 + Math.random() * 300 : 400 + Math.random() * 300,
-        y: 50 + Math.random() * 300,
-        vx: (Math.random() - 0.5) * 0.8,
-        vy: (Math.random() - 0.5) * 0.8,
-        trail: [],
-        team: team as 0 | 1,
-        hue: team === 0 ? 152 : 38,
-      });
+    // Players with organic movement
+    interface Dot {
+      x: number; y: number;
+      baseX: number; baseY: number;
+      vx: number; vy: number;
+      team: 0 | 1;
+      trail: { x: number; y: number }[];
+      phase: number;
+      speed: number;
     }
-    playersRef.current = players;
 
-    const animate = () => {
-      const rect = canvas.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
-      timeRef.current += 1;
+    const dots: Dot[] = [];
+    // Team 0 (green) — left half positions
+    const team0Positions = [
+      [0.12, 0.5], [0.22, 0.2], [0.22, 0.4], [0.22, 0.6], [0.22, 0.8],
+      [0.32, 0.15], [0.32, 0.5], [0.32, 0.85],
+      [0.4, 0.3], [0.4, 0.7], [0.45, 0.5],
+    ];
+    // Team 1 (amber) — right half
+    const team1Positions = [
+      [0.88, 0.5], [0.78, 0.2], [0.78, 0.4], [0.78, 0.6], [0.78, 0.8],
+      [0.68, 0.15], [0.68, 0.5], [0.68, 0.85],
+      [0.6, 0.3], [0.6, 0.7], [0.55, 0.5],
+    ];
 
+    [...team0Positions, ...team1Positions].forEach(([bx, by], i) => {
+      dots.push({
+        x: bx, y: by,
+        baseX: bx, baseY: by,
+        vx: 0, vy: 0,
+        team: i < 11 ? 0 : 1,
+        trail: [],
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.3 + Math.random() * 0.5,
+      });
+    });
+
+    let t = 0;
+
+    const draw = () => {
+      t += 0.016;
       ctx.clearRect(0, 0, w, h);
 
-      // Draw pitch lines
-      const margin = 40;
-      const pw = w - margin * 2;
-      const ph = h - margin * 2;
+      // Pitch background — subtle dark gradient in center
+      const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.6);
+      bgGrad.addColorStop(0, "rgba(22, 163, 74, 0.04)");
+      bgGrad.addColorStop(1, "rgba(22, 163, 74, 0)");
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = "rgba(74, 222, 128, 0.12)";
+      const mx = w * 0.06; // margin
+      const my = h * 0.1;
+      const pw = w - mx * 2;
+      const ph = h - my * 2;
+
+      // Pitch lines
+      ctx.strokeStyle = "rgba(22, 163, 74, 0.1)";
       ctx.lineWidth = 1;
+      ctx.setLineDash([]);
 
-      // Outer boundary
-      ctx.strokeRect(margin, margin, pw, ph);
+      // Outer rect
+      ctx.strokeRect(mx, my, pw, ph);
 
       // Center line
       ctx.beginPath();
-      ctx.moveTo(w / 2, margin);
-      ctx.lineTo(w / 2, margin + ph);
+      ctx.moveTo(w / 2, my);
+      ctx.lineTo(w / 2, my + ph);
       ctx.stroke();
 
       // Center circle
       ctx.beginPath();
-      ctx.arc(w / 2, h / 2, Math.min(pw, ph) * 0.12, 0, Math.PI * 2);
+      ctx.arc(w / 2, h / 2, Math.min(pw, ph) * 0.13, 0, Math.PI * 2);
       ctx.stroke();
 
+      // Center dot
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 2, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(22, 163, 74, 0.2)";
+      ctx.fill();
+
       // Penalty areas
-      const paW = pw * 0.16;
-      const paH = ph * 0.4;
-      ctx.strokeRect(margin, h / 2 - paH / 2, paW, paH);
-      ctx.strokeRect(margin + pw - paW, h / 2 - paH / 2, paW, paH);
+      const paW = pw * 0.15;
+      const paH = ph * 0.44;
+      ctx.strokeRect(mx, h / 2 - paH / 2, paW, paH);
+      ctx.strokeRect(mx + pw - paW, h / 2 - paH / 2, paW, paH);
 
       // Goal areas
       const gaW = pw * 0.06;
-      const gaH = ph * 0.18;
-      ctx.strokeRect(margin, h / 2 - gaH / 2, gaW, gaH);
-      ctx.strokeRect(margin + pw - gaW, h / 2 - gaH / 2, gaW, gaH);
+      const gaH = ph * 0.2;
+      ctx.strokeRect(mx, h / 2 - gaH / 2, gaW, gaH);
+      ctx.strokeRect(mx + pw - gaW, h / 2 - gaH / 2, gaW, gaH);
 
-      // Update and draw players
-      for (const p of players) {
-        // Wander behavior
-        p.vx += (Math.random() - 0.5) * 0.15;
-        p.vy += (Math.random() - 0.5) * 0.15;
+      // Update & draw players
+      for (const d of dots) {
+        // Organic wandering around base position
+        d.phase += 0.008 * d.speed;
+        const wanderRadius = 0.04;
+        const targetX = d.baseX + Math.sin(d.phase * 1.3 + d.speed * 10) * wanderRadius;
+        const targetY = d.baseY + Math.cos(d.phase * 0.9 + d.speed * 7) * wanderRadius * 1.5;
 
-        // Damping
-        p.vx *= 0.98;
-        p.vy *= 0.98;
+        d.vx += (targetX - d.x) * 0.02;
+        d.vy += (targetY - d.y) * 0.02;
+        d.vx *= 0.95;
+        d.vy *= 0.95;
+        d.x += d.vx;
+        d.y += d.vy;
 
-        // Speed limit
-        const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-        if (speed > 1.2) {
-          p.vx = (p.vx / speed) * 1.2;
-          p.vy = (p.vy / speed) * 1.2;
+        const sx = mx + d.x * pw;
+        const sy = my + d.y * ph;
+
+        // Trail
+        d.trail.push({ x: sx, y: sy });
+        if (d.trail.length > 80) d.trail.shift();
+
+        // Draw trail — gradient fade
+        const color = d.team === 0 ? "22, 163, 74" : "234, 179, 8";
+        if (d.trail.length > 2) {
+          for (let i = 1; i < d.trail.length; i++) {
+            const alpha = (i / d.trail.length) * 0.25;
+            ctx.beginPath();
+            ctx.moveTo(d.trail[i - 1].x, d.trail[i - 1].y);
+            ctx.lineTo(d.trail[i].x, d.trail[i].y);
+            ctx.strokeStyle = `rgba(${color}, ${alpha})`;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
         }
 
-        // Scale positions to canvas
-        const scaledX = (p.x / 800) * w;
-        const scaledY = (p.y / 400) * h;
-
-        p.x += p.vx;
-        p.y += p.vy;
-
-        // Bounce
-        if (p.x < 50) { p.x = 50; p.vx *= -1; }
-        if (p.x > 750) { p.x = 750; p.vx *= -1; }
-        if (p.y < 20) { p.y = 20; p.vy *= -1; }
-        if (p.y > 380) { p.y = 380; p.vy *= -1; }
-
-        // Add trail
-        p.trail.push({ x: scaledX, y: scaledY, age: 0 });
-        if (p.trail.length > 60) p.trail.shift();
-
-        // Draw trail with heatmap gradient
-        for (let i = 1; i < p.trail.length; i++) {
-          const t = p.trail[i];
-          t.age += 1;
-          const alpha = Math.max(0, 0.4 - t.age * 0.006);
-          ctx.beginPath();
-          ctx.moveTo(p.trail[i - 1].x, p.trail[i - 1].y);
-          ctx.lineTo(t.x, t.y);
-          ctx.strokeStyle = `hsla(${p.hue}, 70%, 55%, ${alpha})`;
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        }
-
-        // Draw heatmap glow at current position
-        const gradient = ctx.createRadialGradient(scaledX, scaledY, 0, scaledX, scaledY, 20);
-        gradient.addColorStop(0, `hsla(${p.hue}, 80%, 50%, 0.15)`);
-        gradient.addColorStop(1, `hsla(${p.hue}, 80%, 50%, 0)`);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(scaledX - 20, scaledY - 20, 40, 40);
-
-        // Draw player dot
+        // Heatmap glow
+        const heatGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 28);
+        heatGrad.addColorStop(0, `rgba(${color}, 0.12)`);
+        heatGrad.addColorStop(1, `rgba(${color}, 0)`);
+        ctx.fillStyle = heatGrad;
         ctx.beginPath();
-        ctx.arc(scaledX, scaledY, 3, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${p.hue}, 70%, 60%, 0.9)`;
+        ctx.arc(sx, sy, 28, 0, Math.PI * 2);
         ctx.fill();
 
-        // Outer glow
+        // Player dot with glow
         ctx.beginPath();
-        ctx.arc(scaledX, scaledY, 5, 0, Math.PI * 2);
-        ctx.strokeStyle = `hsla(${p.hue}, 70%, 60%, 0.3)`;
+        ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${color}, 0.9)`;
+        ctx.fill();
+
+        // Outer ring
+        ctx.beginPath();
+        ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${color}, 0.25)`;
         ctx.lineWidth = 1;
         ctx.stroke();
       }
 
-      animRef.current = requestAnimationFrame(animate);
+      // Scanning line effect
+      const scanY = my + (ph * ((Math.sin(t * 0.5) + 1) / 2));
+      const scanGrad = ctx.createLinearGradient(mx, scanY - 15, mx, scanY + 15);
+      scanGrad.addColorStop(0, "rgba(22, 163, 74, 0)");
+      scanGrad.addColorStop(0.5, "rgba(22, 163, 74, 0.03)");
+      scanGrad.addColorStop(1, "rgba(22, 163, 74, 0)");
+      ctx.fillStyle = scanGrad;
+      ctx.fillRect(mx, scanY - 15, pw, 30);
+
+      animRef.current = requestAnimationFrame(draw);
     };
 
-    animate();
+    draw();
 
     return () => {
       cancelAnimationFrame(animRef.current);
@@ -171,8 +196,7 @@ export function HeroPitch() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 w-full h-full"
-      style={{ opacity: 0.7 }}
+      className="absolute inset-0 w-full h-full pointer-events-none"
     />
   );
 }
