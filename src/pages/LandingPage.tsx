@@ -121,6 +121,8 @@ const faqs = [
 ];
 
 export default function LandingPage() {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
@@ -132,19 +134,20 @@ export default function LandingPage() {
             <span className="gradient-text">IQ</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">So funktioniert's</a>
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Preise</a>
-            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
-            <Link to="/install" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Installation</Link>
+            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.howItWorks")}</a>
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.features")}</a>
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.pricing")}</a>
+            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.faq")}</a>
+            <Link to="/install" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.installation")}</Link>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageToggle />
             <ThemeToggle />
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/login">Anmelden</Link>
+              <Link to="/login">{t("landing.signIn")}</Link>
             </Button>
             <Button variant="hero" size="sm" asChild>
-              <Link to="/login">Kostenlos testen</Link>
+              <Link to="/login">{t("landing.tryFree")}</Link>
             </Button>
           </div>
         </div>
