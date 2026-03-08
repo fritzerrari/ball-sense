@@ -259,11 +259,36 @@ export default function AssistantPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveMode, liveMatch?.id]);
 
+  const playNotificationSound = useCallback(() => {
+    if (!liveSoundEnabled) return;
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioContext();
+      }
+      const ctx = audioCtxRef.current;
+      const now = ctx.currentTime;
+
+      // Two-tone chime
+      [520, 780].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, now + i * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.3);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i * 0.15);
+        osc.stop(now + i * 0.15 + 0.3);
+      });
+    } catch { /* audio not supported */ }
+  }, [liveSoundEnabled]);
+
   const sendLiveUpdate = async () => {
     if (liveSendingRef.current || isLoading) return;
     liveSendingRef.current = true;
     const autoMsg = `[Live-Modus] Gib eine kurze taktische Analyse und Handlungsempfehlung basierend auf den aktuellen Spielerdaten dieses laufenden Spiels. Fokussiere dich auf: Positionierung, Laufverhalten, Ermüdungszeichen und taktische Anpassungen. Maximal 4-5 Sätze.`;
     await sendMessage(autoMsg, true);
+    playNotificationSound();
     liveSendingRef.current = false;
   };
 
