@@ -241,7 +241,7 @@ export default function AdminLegal() {
         title="Dokument löschen"
         description="Dieses Dokument wird unwiderruflich gelöscht."
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
-        variant="destructive"
+        destructive
       />
     </div>
   );

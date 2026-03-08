@@ -167,7 +167,7 @@ export default function AdminLogs() {
         title="Eintrag löschen"
         description="Dieser Protokolleintrag wird unwiderruflich gelöscht."
         onConfirm={() => deleteId && deleteLog.mutate(deleteId)}
-        variant="destructive"
+        destructive
       />
       <ConfirmDialog
         open={clearAll}
@@ -175,7 +175,7 @@ export default function AdminLogs() {
         title="Alle Protokolle löschen"
         description={`${logs.length} Einträge werden unwiderruflich gelöscht. Bist du sicher?`}
         onConfirm={() => clearLogs.mutate()}
-        variant="destructive"
+        destructive
       />
     </div>
   );

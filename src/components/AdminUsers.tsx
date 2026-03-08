@@ -328,15 +328,15 @@ export default function AdminUsers() {
         title="Nutzer löschen"
         description="Dieser Nutzer und alle zugehörigen Daten werden unwiderruflich gelöscht. Bist du sicher?"
         onConfirm={() => deleteUserId && deleteUser.mutate(deleteUserId)}
-        variant="destructive"
+        destructive
       />
       <ConfirmDialog
         open={!!banUserId}
         onOpenChange={() => setBanUserId(null)}
         title={banUserId?.ban ? "Nutzer sperren" : "Nutzer entsperren"}
         description={banUserId?.ban ? "Der Nutzer wird gesperrt und kann sich nicht mehr anmelden." : "Der Nutzer wird entsperrt."}
-        onConfirm={() => banUserId && banUser.mutate(banUserId)}
-        variant={banUserId?.ban ? "destructive" : undefined}
+        onConfirm={() => banUserId && banUser.mutate({ userId: banUserId.id, ban: banUserId.ban })}
+        destructive={banUserId?.ban}
       />
     </div>
   );

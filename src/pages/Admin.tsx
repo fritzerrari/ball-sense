@@ -2,10 +2,10 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/components/AuthProvider";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
-  Shield, Users, Building2, BarChart3, Activity, Crown, UserPlus,
-  Trash2, ChevronDown, Search, RefreshCw, Loader2, Calendar, MapPin,
+  Shield, Users, Building2, BarChart3, Activity, Crown,
+  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload,
 } from "lucide-react";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,11 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import { useState } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import AdminUsers from "@/components/AdminUsers";
+import AdminLegal from "@/components/AdminLegal";
+import AdminLogs from "@/components/AdminLogs";
+import AdminUploads from "@/components/AdminUploads";
 
 // ---------- hooks ----------
 function useAdminRole(userId: string | undefined) {
@@ -42,29 +45,6 @@ function useAdminClubs() {
     queryKey: ["admin_clubs"],
     queryFn: async () => {
       const { data } = await supabase.from("clubs").select("*").order("created_at", { ascending: false });
-      return data ?? [];
-    },
-  });
-}
-
-function useAdminProfiles() {
-  return useQuery({
-    queryKey: ["admin_profiles"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, user_id, club_id, created_at, clubs(name)")
-        .order("created_at", { ascending: false });
-      return data ?? [];
-    },
-  });
-}
-
-function useAdminRoles() {
-  return useQuery({
-    queryKey: ["admin_roles"],
-    queryFn: async () => {
-      const { data } = await supabase.from("user_roles").select("*");
       return data ?? [];
     },
   });
@@ -97,6 +77,16 @@ function useAdminPlayers() {
   });
 }
 
+function useAdminProfiles() {
+  return useQuery({
+    queryKey: ["admin_profiles_count"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id");
+      return data?.length ?? 0;
+    },
+  });
+}
+
 // ---------- Component ----------
 export default function Admin() {
   const { user } = useAuth();
@@ -104,99 +94,88 @@ export default function Admin() {
   const { data: isAdmin, isLoading: roleLoading } = useAdminRole(user?.id);
 
   const { data: clubs = [], isLoading: clubsLoading } = useAdminClubs();
-  const { data: profiles = [], isLoading: profilesLoading } = useAdminProfiles();
-  const { data: roles = [] } = useAdminRoles();
   const { data: matches = [] } = useAdminMatches();
   const { data: players = [] } = useAdminPlayers();
+  const { data: totalUsers = 0 } = useAdminProfiles();
 
-  const [search, setSearch] = useState("");
-  const [deleteClubId, setDeleteClubId] = useState<string | null>(null);
+  const [globalSearch, setGlobalSearch] = useState("");
 
-  // Mutations
   const updateClubPlan = useMutation({
     mutationFn: async ({ clubId, plan }: { clubId: string; plan: string }) => {
       const { error } = await supabase.from("clubs").update({ plan }).eq("id", clubId);
       if (error) throw error;
+      await supabase.from("audit_logs").insert({
+        user_id: user?.id, user_email: user?.email,
+        action: "plan_changed", entity_type: "club", entity_id: clubId,
+        details: { new_plan: plan },
+      });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin_clubs"] }); toast.success("Plan aktualisiert"); },
     onError: () => toast.error("Fehler beim Aktualisieren"),
   });
 
-  const addRole = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: "admin" | "moderator" | "user" }) => {
-      const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin_roles"] }); toast.success("Rolle zugewiesen"); },
-    onError: () => toast.error("Fehler — Rolle existiert evtl. bereits"),
-  });
-
-  const removeRole = useMutation({
-    mutationFn: async (roleId: string) => {
-      const { error } = await supabase.from("user_roles").delete().eq("id", roleId);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin_roles"] }); toast.success("Rolle entfernt"); },
-    onError: () => toast.error("Fehler beim Entfernen"),
-  });
-
   if (roleLoading) return <AppLayout><SkeletonCard count={3} /></AppLayout>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
-  // Stats
-  const totalPlayers = players.length;
-  const totalMatches = matches.length;
   const liveMatches = matches.filter((m: any) => m.status === "live" || m.status === "tracking").length;
-  const totalUsers = profiles.length;
 
-  // Role helper
-  const getUserRoles = (userId: string) => roles.filter((r: any) => r.user_id === userId);
+  const refreshAll = () => {
+    ["admin_clubs", "admin_matches", "admin_players", "admin_profiles_count", "admin_auth_users", "admin_roles", "admin_legal_docs", "admin_audit_logs", "admin_uploads"].forEach(k =>
+      qc.invalidateQueries({ queryKey: [k] })
+    );
+    toast.success("Daten aktualisiert");
+  };
 
-  // Filtered profiles
-  const filteredProfiles = search
-    ? profiles.filter((p: any) => p.user_id?.includes(search) || p.clubs?.name?.toLowerCase().includes(search.toLowerCase()))
-    : profiles;
+  // Filter clubs by global search
+  const filteredClubs = globalSearch
+    ? clubs.filter((c: any) => c.name?.toLowerCase().includes(globalSearch.toLowerCase()) || c.city?.toLowerCase().includes(globalSearch.toLowerCase()))
+    : clubs;
+
+  const filteredMatches = globalSearch
+    ? matches.filter((m: any) => (m as any).clubs?.name?.toLowerCase().includes(globalSearch.toLowerCase()) || m.away_club_name?.toLowerCase().includes(globalSearch.toLowerCase()))
+    : matches;
 
   return (
     <AppLayout>
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Shield className="h-5 w-5 text-primary" />
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Shield className="h-6 w-6 text-primary" />
             </div>
             <div>
               <h1 className="text-2xl font-bold font-display">Admin-Panel</h1>
-              <p className="text-xs text-muted-foreground">Systemverwaltung & Übersicht</p>
+              <p className="text-xs text-muted-foreground">Systemverwaltung, Nutzer, Dokumente & Protokolle</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              qc.invalidateQueries({ queryKey: ["admin_clubs"] });
-              qc.invalidateQueries({ queryKey: ["admin_profiles"] });
-              qc.invalidateQueries({ queryKey: ["admin_roles"] });
-              qc.invalidateQueries({ queryKey: ["admin_matches"] });
-              qc.invalidateQueries({ queryKey: ["admin_players"] });
-              toast.success("Daten aktualisiert");
-            }}
-          >
-            <RefreshCw className="h-4 w-4 mr-1" /> Aktualisieren
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Global suchen..."
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                className="pl-9 w-56"
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={refreshAll}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Aktualisieren
+            </Button>
+          </div>
         </div>
 
         {/* Stats cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           {[
             { label: "Vereine", value: clubs.length, icon: Building2, color: "text-primary" },
             { label: "Nutzer", value: totalUsers, icon: Users, color: "text-blue-400" },
-            { label: "Spieler", value: totalPlayers, icon: Users, color: "text-emerald-400" },
-            { label: "Spiele", value: totalMatches, icon: BarChart3, color: "text-amber-400" },
+            { label: "Spieler", value: players.length, icon: Users, color: "text-emerald-400" },
+            { label: "Spiele", value: matches.length, icon: BarChart3, color: "text-amber-400" },
+            { label: "Live", value: liveMatches, icon: Activity, color: "text-primary" },
           ].map((s) => (
-            <div key={s.label} className="glass-card p-5">
-              <s.icon className={`h-4 w-4 ${s.color} mb-2`} />
+            <div key={s.label} className="glass-card p-4">
+              <s.icon className={`h-4 w-4 ${s.color} mb-1.5`} />
               <div className="text-xs text-muted-foreground">{s.label}</div>
               <div className="text-2xl font-bold font-display">{s.value}</div>
             </div>
@@ -211,28 +190,42 @@ export default function Admin() {
         )}
 
         {/* Tabs */}
-        <Tabs defaultValue="clubs" className="space-y-4">
-          <TabsList className="w-full justify-start bg-muted/50 p-1 rounded-xl">
-            <TabsTrigger value="clubs" className="rounded-lg">
+        <Tabs defaultValue="users" className="space-y-4">
+          <TabsList className="w-full justify-start bg-muted/50 p-1 rounded-xl flex-wrap h-auto gap-1">
+            <TabsTrigger value="users" className="rounded-lg text-xs">
+              <Users className="h-4 w-4 mr-1.5" /> Nutzer
+            </TabsTrigger>
+            <TabsTrigger value="clubs" className="rounded-lg text-xs">
               <Building2 className="h-4 w-4 mr-1.5" /> Vereine
             </TabsTrigger>
-            <TabsTrigger value="users" className="rounded-lg">
-              <Users className="h-4 w-4 mr-1.5" /> Nutzer & Rollen
-            </TabsTrigger>
-            <TabsTrigger value="matches" className="rounded-lg">
+            <TabsTrigger value="matches" className="rounded-lg text-xs">
               <BarChart3 className="h-4 w-4 mr-1.5" /> Spiele
             </TabsTrigger>
-            <TabsTrigger value="system" className="rounded-lg">
+            <TabsTrigger value="uploads" className="rounded-lg text-xs">
+              <Upload className="h-4 w-4 mr-1.5" /> Uploads
+            </TabsTrigger>
+            <TabsTrigger value="legal" className="rounded-lg text-xs">
+              <FileText className="h-4 w-4 mr-1.5" /> Dokumente
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="rounded-lg text-xs">
+              <ScrollText className="h-4 w-4 mr-1.5" /> Protokolle
+            </TabsTrigger>
+            <TabsTrigger value="system" className="rounded-lg text-xs">
               <Activity className="h-4 w-4 mr-1.5" /> System
             </TabsTrigger>
           </TabsList>
+
+          {/* ---- Users Tab ---- */}
+          <TabsContent value="users">
+            <AdminUsers />
+          </TabsContent>
 
           {/* ---- Clubs Tab ---- */}
           <TabsContent value="clubs" className="space-y-4">
             {clubsLoading ? (
               <SkeletonCard count={3} />
             ) : (
-              <div className="glass-card overflow-hidden">
+              <div className="glass-card overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
@@ -245,7 +238,7 @@ export default function Admin() {
                     </tr>
                   </thead>
                   <tbody>
-                    {clubs.map((club: any) => {
+                    {filteredClubs.map((club: any) => {
                       const clubPlayers = players.filter((p: any) => p.club_id === club.id);
                       return (
                         <tr key={club.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
@@ -288,103 +281,8 @@ export default function Admin() {
                     })}
                   </tbody>
                 </table>
-                {clubs.length === 0 && (
-                  <div className="p-8 text-center text-muted-foreground text-sm">Keine Vereine vorhanden</div>
-                )}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* ---- Users Tab ---- */}
-          <TabsContent value="users" className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="User-ID oder Vereinsname suchen..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            {profilesLoading ? (
-              <SkeletonCard count={4} />
-            ) : (
-              <div className="glass-card overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">User-ID</th>
-                      <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Verein</th>
-                      <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Rollen</th>
-                      <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden sm:table-cell">Registriert</th>
-                      <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Aktionen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProfiles.map((profile: any) => {
-                      const userRoles = getUserRoles(profile.user_id);
-                      return (
-                        <tr key={profile.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                          <td className="py-3 px-4 font-mono text-xs text-muted-foreground">
-                            {profile.user_id?.slice(0, 8)}…
-                          </td>
-                          <td className="py-3 px-4">
-                            {(profile as any).clubs?.name ?? <span className="text-muted-foreground">—</span>}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex flex-wrap gap-1">
-                              {userRoles.length === 0 && (
-                                <span className="text-xs text-muted-foreground">Keine</span>
-                              )}
-                              {userRoles.map((r: any) => (
-                                <Badge
-                                  key={r.id}
-                                  variant={r.role === "admin" ? "default" : "secondary"}
-                                  className="text-[10px] gap-1 cursor-pointer hover:bg-destructive/20"
-                                  onClick={() => {
-                                    if (r.user_id === user?.id && r.role === "admin") {
-                                      toast.error("Du kannst dir nicht selbst die Admin-Rolle entziehen");
-                                      return;
-                                    }
-                                    removeRole.mutate(r.id);
-                                  }}
-                                >
-                                  {r.role === "admin" && <Crown className="h-2.5 w-2.5" />}
-                                  {r.role}
-                                  <Trash2 className="h-2.5 w-2.5" />
-                                </Badge>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-muted-foreground text-xs hidden sm:table-cell">
-                            {format(new Date(profile.created_at), "dd.MM.yyyy", { locale: de })}
-                          </td>
-                          <td className="py-3 px-4">
-                            <Select
-                              onValueChange={(val) =>
-                                addRole.mutate({ userId: profile.user_id, role: val as any })
-                              }
-                            >
-                              <SelectTrigger className="h-7 w-28 text-xs">
-                                <SelectValue placeholder="Rolle +" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="admin">Admin</SelectItem>
-                                <SelectItem value="moderator">Moderator</SelectItem>
-                                <SelectItem value="user">User</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {filteredProfiles.length === 0 && (
-                  <div className="p-8 text-center text-muted-foreground text-sm">Keine Nutzer gefunden</div>
+                {filteredClubs.length === 0 && (
+                  <div className="p-8 text-center text-muted-foreground text-sm">Keine Vereine gefunden</div>
                 )}
               </div>
             )}
@@ -392,7 +290,7 @@ export default function Admin() {
 
           {/* ---- Matches Tab ---- */}
           <TabsContent value="matches" className="space-y-4">
-            <div className="glass-card overflow-hidden">
+            <div className="glass-card overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
@@ -404,7 +302,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {matches.map((m: any) => (
+                  {filteredMatches.map((m: any) => (
                     <tr key={m.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                       <td className="py-3 px-4 text-xs">
                         <div className="flex items-center gap-1.5">
@@ -427,10 +325,25 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
-              {matches.length === 0 && (
-                <div className="p-8 text-center text-muted-foreground text-sm">Keine Spiele vorhanden</div>
+              {filteredMatches.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground text-sm">Keine Spiele gefunden</div>
               )}
             </div>
+          </TabsContent>
+
+          {/* ---- Uploads Tab ---- */}
+          <TabsContent value="uploads">
+            <AdminUploads />
+          </TabsContent>
+
+          {/* ---- Legal Tab ---- */}
+          <TabsContent value="legal">
+            <AdminLegal />
+          </TabsContent>
+
+          {/* ---- Logs Tab ---- */}
+          <TabsContent value="logs">
+            <AdminLogs />
           </TabsContent>
 
           {/* ---- System Tab ---- */}
@@ -446,6 +359,7 @@ export default function Admin() {
                     { label: "Authentifizierung", ok: true },
                     { label: "Speicher", ok: true },
                     { label: "KI-Assistent", ok: true },
+                    { label: "Admin-API", ok: true },
                   ].map((s) => (
                     <div key={s.label} className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">{s.label}</span>
