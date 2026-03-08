@@ -1,25 +1,23 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, X } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [dismissed, setDismissed] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
-    // Check if already installed
     if (window.matchMedia("(display-mode: standalone)").matches) {
       setIsStandalone(true);
       return;
     }
-
-    // Check if previously dismissed
     if (sessionStorage.getItem("pwa-dismissed")) {
       setDismissed(true);
       return;
     }
-
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -47,11 +45,11 @@ export function PwaInstallPrompt() {
         <Download className="h-4 w-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">FieldIQ installieren</p>
-        <p className="text-xs text-muted-foreground">Für den schnellsten Zugang zum Homescreen hinzufügen.</p>
+        <p className="text-sm font-medium">{t("pwa.install")}</p>
+        <p className="text-xs text-muted-foreground">{t("pwa.desc")}</p>
       </div>
       <Button variant="hero" size="sm" onClick={handleInstall}>
-        Installieren
+        {t("common.install")}
       </Button>
       <button onClick={handleDismiss} className="text-muted-foreground hover:text-foreground p-1">
         <X className="h-4 w-4" />

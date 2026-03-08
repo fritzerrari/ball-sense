@@ -2,9 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import {
   Smartphone, Brain, BarChart3, Check, ChevronRight,
-  MonitorSmartphone, Zap, FileBarChart, Quote, HelpCircle, Download,
+  MonitorSmartphone, Zap, FileBarChart, Quote, Download,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useTranslation } from "@/lib/i18n";
 import {
   Accordion,
   AccordionContent,
@@ -15,36 +17,36 @@ import {
 const features = [
   {
     icon: Smartphone,
-    title: "Nur Smartphones nötig",
-    description: "Einfach Browser öffnen — fertig. Keine App, keine Hardware-Kosten.",
+    titleKey: "landing.feat1Title",
+    descKey: "landing.feat1Desc",
   },
   {
     icon: Brain,
-    title: "KI erkennt alle Spieler",
-    description: "Intelligente Erkennung läuft direkt auf dem Gerät. Kein Video verlässt das Handy.",
+    titleKey: "landing.feat2Title",
+    descKey: "landing.feat2Desc",
   },
   {
     icon: BarChart3,
-    title: "Report in 30 Sekunden",
-    description: "Nach dem Spiel: 1 Klick. Heatmaps, km, Topspeed — sofort.",
+    titleKey: "landing.feat3Title",
+    descKey: "landing.feat3Desc",
   },
 ];
 
 const steps = [
   {
     icon: MonitorSmartphone,
-    title: "Smartphones aufstellen",
-    description: "Platziere 2–3 Smartphones am Spielfeldrand. Keine Halterung nötig — einfach anlehnen.",
+    titleKey: "landing.step1Title",
+    descKey: "landing.step1Desc",
   },
   {
     icon: Zap,
-    title: "Spiel tracken",
-    description: "Starte das Tracking mit einem Klick. Die KI erkennt automatisch alle Spieler auf dem Feld.",
+    titleKey: "landing.step2Title",
+    descKey: "landing.step2Desc",
   },
   {
     icon: FileBarChart,
-    title: "Report erhalten",
-    description: "Nach Abpfiff bekommst du Heatmaps, Laufdistanzen, Sprints und Topspeed — in Sekunden.",
+    titleKey: "landing.step3Title",
+    descKey: "landing.step3Desc",
   },
 ];
 
@@ -52,18 +54,18 @@ const plans = [
   {
     name: "STARTER",
     price: "49",
-    features: ["4 Spiele/Monat", "1 Team", "Basis-Reports", "E-Mail Support"],
+    features: ["landing.plan1f1", "landing.plan1f2", "landing.plan1f3", "landing.plan1f4"],
   },
   {
     name: "CLUB",
     price: "99",
     popular: true,
-    features: ["12 Spiele/Monat", "2 Teams", "Erweiterte Reports", "PDF Export", "Prioritäts-Support"],
+    features: ["landing.plan2f1", "landing.plan2f2", "landing.plan2f3", "landing.plan2f4", "landing.plan2f5"],
   },
   {
     name: "PRO",
     price: "199",
-    features: ["Unbegrenzte Spiele", "Alle Teams", "Alle Features", "API-Zugang", "Dedizierter Support"],
+    features: ["landing.plan3f1", "landing.plan3f2", "landing.plan3f3", "landing.plan3f4", "landing.plan3f5"],
   },
 ];
 
@@ -77,19 +79,19 @@ const comparison = [
 
 const testimonials = [
   {
-    quote: "Mit FieldIQ haben wir endlich Profi-Daten — ohne Profi-Budget. Unsere Spieler lieben die Heatmaps.",
-    author: "Thomas M.",
-    role: "Trainer, Bezirksliga Bayern",
+    quoteKey: "landing.testimonial1",
+    authorKey: "landing.testimonial1Author",
+    roleKey: "landing.testimonial1Role",
   },
   {
-    quote: "Setup in 5 Minuten, Ergebnisse nach jedem Spiel. Das hat unsere Trainingsplanung komplett verändert.",
-    author: "Sarah K.",
-    role: "Co-Trainerin, Landesliga NRW",
+    quoteKey: "landing.testimonial2",
+    authorKey: "landing.testimonial2Author",
+    roleKey: "landing.testimonial2Role",
   },
   {
-    quote: "Endlich wissen wir, welche Spieler in der 2. Halbzeit nachlassen. Auswechslungen sind jetzt datenbasiert.",
-    author: "Michael R.",
-    role: "Sportlicher Leiter, Kreisliga Hessen",
+    quoteKey: "landing.testimonial3",
+    authorKey: "landing.testimonial3Author",
+    roleKey: "landing.testimonial3Role",
   },
 ];
 
@@ -121,6 +123,8 @@ const faqs = [
 ];
 
 export default function LandingPage() {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
@@ -132,19 +136,20 @@ export default function LandingPage() {
             <span className="gradient-text">IQ</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">So funktioniert's</a>
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Preise</a>
-            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
-            <Link to="/install" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Installation</Link>
+            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.howItWorks")}</a>
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.features")}</a>
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.pricing")}</a>
+            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.faq")}</a>
+            <Link to="/install" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t("landing.installation")}</Link>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageToggle />
             <ThemeToggle />
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/login">Anmelden</Link>
+              <Link to="/login">{t("landing.signIn")}</Link>
             </Button>
             <Button variant="hero" size="sm" asChild>
-              <Link to="/login">Kostenlos testen</Link>
+              <Link to="/login">{t("landing.tryFree")}</Link>
             </Button>
           </div>
         </div>
@@ -158,27 +163,26 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-glow-pulse" />
-              Jetzt in der Beta
+              {t("landing.betaTag")}
             </div>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 font-display">
-              Pro-Tracking für{" "}
-              <span className="gradient-text">alle Ligen</span>
+              {t("landing.heroTitle")}{" "}
+              <span className="gradient-text">{t("landing.heroHighlight")}</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl mx-auto leading-relaxed">
-              Nur 3 Smartphones. Keine Installation.
-              Heatmaps & Laufdaten nach jedem Spiel.
+              {t("landing.heroDesc")}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button variant="hero" size="xl" asChild>
                 <Link to="/login">
-                  Kostenlos testen
+                  {t("landing.tryFree")}
                   <ChevronRight className="ml-1 h-5 w-5" />
                 </Link>
               </Button>
               <Button variant="heroOutline" size="xl" asChild>
                 <Link to="/install">
                   <Download className="mr-1.5 h-5 w-5" />
-                  Installationsanleitung
+                  {t("landing.installGuide")}
                 </Link>
               </Button>
             </div>
@@ -188,15 +192,15 @@ export default function LandingPage() {
           <div className="mt-20 glass-card p-6 max-w-2xl mx-auto grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-2xl md:text-3xl font-bold font-display gradient-text">3</div>
-              <div className="text-xs text-muted-foreground mt-1">Smartphones reichen</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("landing.smartphonesEnough")}</div>
             </div>
             <div>
               <div className="text-2xl md:text-3xl font-bold font-display gradient-text">30s</div>
-              <div className="text-xs text-muted-foreground mt-1">bis zum Report</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("landing.toReport")}</div>
             </div>
             <div>
               <div className="text-2xl md:text-3xl font-bold font-display gradient-text">0€</div>
-              <div className="text-xs text-muted-foreground mt-1">Hardware-Kosten</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("landing.hardwareCost")}</div>
             </div>
           </div>
         </div>
@@ -207,15 +211,15 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              So funktioniert's
+              {t("landing.howItWorksTitle")}
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              In 3 einfachen Schritten zum professionellen Spieler-Tracking.
+              {t("landing.howItWorksDesc")}
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {steps.map((step, i) => (
-              <div key={step.title} className="relative text-center group">
+              <div key={t(step.titleKey)} className="relative text-center group">
                 {i < steps.length - 1 && (
                   <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-px border-t-2 border-dashed border-primary/20" />
                 )}
@@ -225,8 +229,8 @@ export default function LandingPage() {
                     {i + 1}
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold font-display mb-2">{step.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.description}</p>
+                <h3 className="text-lg font-semibold font-display mb-2">{t(step.titleKey)}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{t(step.descKey)}</p>
               </div>
             ))}
           </div>
@@ -238,14 +242,14 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="glass-card glow-border p-8 md:p-12 text-center max-w-3xl mx-auto">
             <h2 className="text-2xl md:text-3xl font-bold font-display mb-3">
-              Jetzt 30 Tage kostenlos testen
+              {t("landing.ctaTitle")}
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Keine Kreditkarte nötig. Starte sofort mit deinem Team.
+              {t("landing.ctaDesc")}
             </p>
             <Button variant="hero" size="xl" asChild>
               <Link to="/login">
-                Kostenlos starten
+                {t("landing.ctaBtn")}
                 <ChevronRight className="ml-1 h-5 w-5" />
               </Link>
             </Button>
@@ -258,24 +262,24 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              So einfach wie noch nie
+              {t("landing.featuresTitle")}
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Professionelles Tracking ohne teure Hardware oder komplizierte Software.
+              {t("landing.featuresDesc")}
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {features.map((f, i) => (
               <div
-                key={f.title}
+                key={t(f.titleKey)}
                 className="glass-card p-8 hover:border-primary/30 transition-all group"
                 style={{ animationDelay: `${i * 100}ms` }}
               >
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
                   <f.icon className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold font-display mb-2">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
+                <h3 className="text-lg font-semibold font-display mb-2">{t(f.titleKey)}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{t(f.descKey)}</p>
               </div>
             ))}
           </div>
@@ -287,19 +291,19 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              Das sagen unsere Nutzer
+              {t("landing.testimonialsTitle")}
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {testimonials.map((t) => (
-              <div key={t.author} className="glass-card p-6 flex flex-col">
+            {testimonials.map((tItem, i) => (
+              <div key={i} className="glass-card p-6 flex flex-col">
                 <Quote className="h-6 w-6 text-primary/40 mb-3 shrink-0" />
                 <p className="text-sm text-foreground leading-relaxed flex-1 italic">
-                  "{t.quote}"
+                  "{t(tItem.quoteKey)}"
                 </p>
                 <div className="mt-4 pt-4 border-t border-border">
-                  <div className="text-sm font-semibold">{t.author}</div>
-                  <div className="text-xs text-muted-foreground">{t.role}</div>
+                  <div className="text-sm font-semibold">{t(tItem.authorKey)}</div>
+                  <div className="text-xs text-muted-foreground">{t(tItem.roleKey)}</div>
                 </div>
               </div>
             ))}
@@ -312,9 +316,9 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              Transparente Preise
+              {t("landing.pricingTitle")}
             </h2>
-            <p className="text-muted-foreground">Alle Pläne 30 Tage kostenlos testen</p>
+            <p className="text-muted-foreground">{t("landing.pricingDesc")}</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {plans.map((plan) => (
@@ -326,26 +330,26 @@ export default function LandingPage() {
               >
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                    Beliebt
+                    {t("landing.popular")}
                   </div>
                 )}
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold text-muted-foreground tracking-wider mb-2">{plan.name}</h3>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold font-display">€{plan.price}</span>
-                    <span className="text-muted-foreground text-sm">/Mo</span>
+                    <span className="text-muted-foreground text-sm">{t("landing.perMonth")}</span>
                   </div>
                 </div>
                 <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm">
+                  {plan.features.map((fKey) => (
+                    <li key={fKey} className="flex items-center gap-2 text-sm">
                       <Check className="h-4 w-4 text-primary shrink-0" />
-                      <span className="text-muted-foreground">{f}</span>
+                      <span className="text-muted-foreground">{t(fKey)}</span>
                     </li>
                   ))}
                 </ul>
                 <Button variant={plan.popular ? "hero" : "heroOutline"} className="w-full" asChild>
-                  <Link to="/login">Jetzt starten</Link>
+                  <Link to="/login">{t("landing.startNow")}</Link>
                 </Button>
               </div>
             ))}

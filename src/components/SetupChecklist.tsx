@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { CheckCircle2, Circle, ChevronRight } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 interface SetupChecklistProps {
   hasPlayers: boolean;
@@ -7,13 +8,14 @@ interface SetupChecklistProps {
 }
 
 export function SetupChecklist({ hasPlayers, hasFields }: SetupChecklistProps) {
+  const { t } = useTranslation();
   const allDone = hasPlayers && hasFields;
   if (allDone) return null;
 
   const items = [
-    { label: "Verein erstellt", done: true, href: "/settings" },
-    { label: "Spieler hinzufügen", done: hasPlayers, href: "/players" },
-    { label: "Spielfeld anlegen", done: hasFields, href: "/fields" },
+    { label: t("dashboard.clubCreated"), done: true, href: "/settings" },
+    { label: t("dashboard.addPlayers"), done: hasPlayers, href: "/players" },
+    { label: t("dashboard.addField"), done: hasFields, href: "/fields" },
   ];
 
   const doneCount = items.filter((i) => i.done).length;
@@ -21,8 +23,8 @@ export function SetupChecklist({ hasPlayers, hasFields }: SetupChecklistProps) {
   return (
     <div className="glass-card p-5 glow-border">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold font-display">Einrichtung</h3>
-        <span className="text-xs text-muted-foreground">{doneCount}/{items.length} erledigt</span>
+        <h3 className="text-sm font-semibold font-display">{t("dashboard.setupTitle")}</h3>
+        <span className="text-xs text-muted-foreground">{t("dashboard.setupDone", { count: doneCount, total: items.length })}</span>
       </div>
       <div className="space-y-2">
         {items.map((item) => (
