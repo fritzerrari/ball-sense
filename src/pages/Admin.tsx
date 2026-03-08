@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Shield, Users, Building2, BarChart3, Activity, Crown,
-  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload, BookOpen,
+  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload, BookOpen, Globe,
 } from "lucide-react";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +22,7 @@ import AdminLegal from "@/components/AdminLegal";
 import AdminLogs from "@/components/AdminLogs";
 import AdminUploads from "@/components/AdminUploads";
 import AdminGuides from "@/components/AdminGuides";
+import AdminApiFootball from "@/components/AdminApiFootball";
 
 // ---------- hooks ----------
 function useAdminRole(userId: string | undefined) {
@@ -214,6 +215,9 @@ export default function Admin() {
             <TabsTrigger value="guides" className="rounded-lg text-xs">
               <BookOpen className="h-4 w-4 mr-1.5" /> Anleitungen
             </TabsTrigger>
+            <TabsTrigger value="api-football" className="rounded-lg text-xs">
+              <Globe className="h-4 w-4 mr-1.5" /> API-Football
+            </TabsTrigger>
             <TabsTrigger value="system" className="rounded-lg text-xs">
               <Activity className="h-4 w-4 mr-1.5" /> System
             </TabsTrigger>
@@ -353,6 +357,11 @@ export default function Admin() {
           {/* ---- Guides Tab ---- */}
           <TabsContent value="guides">
             <AdminGuides />
+          </TabsContent>
+
+          {/* ---- API-Football Tab ---- */}
+          <TabsContent value="api-football">
+            <AdminApiFootball />
           </TabsContent>
 
           {/* ---- System Tab ---- */}
