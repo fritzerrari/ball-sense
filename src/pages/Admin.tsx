@@ -21,6 +21,7 @@ import AdminUsers from "@/components/AdminUsers";
 import AdminLegal from "@/components/AdminLegal";
 import AdminLogs from "@/components/AdminLogs";
 import AdminUploads from "@/components/AdminUploads";
+import AdminGuides from "@/components/AdminGuides";
 
 // ---------- hooks ----------
 function useAdminRole(userId: string | undefined) {
