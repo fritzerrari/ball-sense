@@ -359,6 +359,11 @@ export default function Admin() {
             <AdminGuides />
           </TabsContent>
 
+          {/* ---- API-Football Tab ---- */}
+          <TabsContent value="api-football">
+            <AdminApiFootball />
+          </TabsContent>
+
           {/* ---- System Tab ---- */}
           <TabsContent value="system" className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
