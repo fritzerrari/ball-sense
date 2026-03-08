@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
 import { useState } from "react";
 import { BarChart3, Zap, Route, Users, ArrowUpDown, ArrowLeft, FileText, Download, Share2, ChevronDown, ChevronUp } from "lucide-react";
+import ReportGenerator from "@/components/ReportGenerator";
 import { useMatch, useMatchLineups, useTrackingUploads } from "@/hooks/use-matches";
 import { usePlayerMatchStats, useTeamMatchStats } from "@/hooks/use-match-stats";
 import { useAuth } from "@/components/AuthProvider";
