@@ -360,6 +360,65 @@ export default function TrackingPage() {
                 <Flag className="h-6 w-6 mr-2" /> ENDE
               </Button>
             </div>
+
+            {/* Halftime Upload Overlay */}
+            {showHalftimeUpload && (
+              <div className="glass-card p-5 space-y-4 border-primary/30">
+                <div className="text-center">
+                  <Timer className="h-8 w-8 text-primary mx-auto mb-2" />
+                  <h3 className="font-bold font-display text-lg">Halbzeitpause</h3>
+                  <p className="text-sm text-muted-foreground">Lade die Daten der 1. Halbzeit jetzt hoch für eine erste Analyse.</p>
+                </div>
+
+                {(halftimeUploading || halftimeUploadDone) && (
+                  <div className="space-y-2">
+                    <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${halftimeUploadDone ? "bg-primary" : "bg-primary/70"}`}
+                        style={{ width: `${halftimeUploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {halftimeUploadDone ? "✓ 1. Halbzeit hochgeladen" : `${halftimeUploadProgress}% — Upload läuft...`}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  {!halftimeUploadDone && (
+                    <Button
+                      variant="hero"
+                      className="flex-1 min-h-[50px]"
+                      onClick={handleHalftimeUpload}
+                      disabled={halftimeUploading}
+                    >
+                      {halftimeUploading ? (
+                        <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Wird hochgeladen...</>
+                      ) : (
+                        <><Upload className="h-5 w-5 mr-2" /> 1. HZ hochladen</>
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    variant={halftimeUploadDone ? "hero" : "heroOutline"}
+                    className="flex-1 min-h-[50px]"
+                    onClick={handleResumeSecondHalf}
+                    disabled={halftimeUploading}
+                  >
+                    <Play className="h-5 w-5 mr-2" /> 2. HZ starten
+                  </Button>
+                </div>
+
+                {!halftimeUploadDone && !halftimeUploading && (
+                  <button
+                    onClick={handleResumeSecondHalf}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors block mx-auto"
+                  >
+                    Überspringen — nach dem Spiel alles hochladen
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
