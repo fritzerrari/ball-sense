@@ -12,6 +12,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { PlanBadge } from "@/components/PlanBadge";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+import { DashboardCharts } from "@/components/DashboardCharts";
 
 export default function Dashboard() {
   const { clubName, clubPlan, clubLogoUrl } = useAuth();
@@ -169,6 +170,9 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Season Charts */}
+        <DashboardCharts />
       </div>
     </AppLayout>
   );

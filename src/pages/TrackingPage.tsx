@@ -33,6 +33,8 @@ export default function TrackingPage() {
   const [subOut, setSubOut] = useState("");
   const [subIn, setSubIn] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadDone, setUploadDone] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [half, setHalf] = useState(1);
 
@@ -125,12 +127,16 @@ export default function TrackingPage() {
   const handleUpload = async () => {
     if (!trackerRef.current || !id) return;
     setUploading(true);
+    setUploadProgress(0);
     try {
+      // Simulate progress stages
+      setUploadProgress(10);
       const result = await trackerRef.current.uploadMatch(
         id, cam,
         import.meta.env.VITE_SUPABASE_URL,
         import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       );
+      setUploadProgress(60);
 
       // Create tracking_uploads entry
       await supabase.from("tracking_uploads").insert({
@@ -141,10 +147,16 @@ export default function TrackingPage() {
         frames_count: result.framesCount,
         duration_sec: result.durationSec,
       });
+      setUploadProgress(90);
 
-      toast.success("Tracking-Daten hochgeladen!");
+      // Update match status
+      await updateMatch.mutateAsync({ id, status: "processing" });
+      setUploadProgress(100);
+      setUploadDone(true);
+      toast.success("Tracking-Daten erfolgreich hochgeladen!");
     } catch (err) {
       toast.error("Upload fehlgeschlagen — Daten lokal gespeichert");
+      setUploadProgress(0);
     } finally {
       setUploading(false);
     }
@@ -343,14 +355,45 @@ export default function TrackingPage() {
               ))}
             </div>
 
-            <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleUpload} disabled={uploading}>
-              {uploading ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Wird hochgeladen...</> : <><Upload className="h-5 w-5 mr-2" /> Hochladen & Report erstellen</>}
-            </Button>
+            {/* Upload Progress */}
+            {(uploading || uploadDone) && (
+              <div className="space-y-2">
+                <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${uploadDone ? "bg-emerald-500" : "bg-primary"}`}
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  {uploadDone ? "✓ Upload abgeschlossen" : `${uploadProgress}% — Daten werden hochgeladen...`}
+                </p>
+              </div>
+            )}
 
-            {id && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link to={`/matches/${id}`}>Zum Match-Report</Link>
-              </Button>
+            {uploadDone ? (
+              <div className="space-y-3">
+                <div className="glass-card p-4 text-center border-emerald-500/30">
+                  <Check className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
+                  <p className="font-semibold font-display">Upload erfolgreich!</p>
+                  <p className="text-sm text-muted-foreground">Die Daten werden jetzt verarbeitet.</p>
+                </div>
+                {id && (
+                  <Button variant="hero" size="xl" className="w-full min-h-[56px]" asChild>
+                    <Link to={`/matches/${id}`}>Zum Match-Report</Link>
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <>
+                <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleUpload} disabled={uploading}>
+                  {uploading ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Wird hochgeladen...</> : <><Upload className="h-5 w-5 mr-2" /> Hochladen & Report erstellen</>}
+                </Button>
+                {id && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to={`/matches/${id}`}>Zum Match-Report</Link>
+                  </Button>
+                )}
+              </>
             )}
           </div>
         )}
