@@ -23,6 +23,7 @@ export default function MatchReport() {
   const { data: playerStats } = usePlayerMatchStats(id);
   const { data: teamStats } = useTeamMatchStats(id);
   const { data: uploads } = useTrackingUploads(id);
+  const { data: apiStats } = useApiFootballStats(id);
   const [activeTab, setActiveTab] = useState("Übersicht");
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string>("distance_km");
