@@ -411,16 +411,38 @@ export default function AssistantPage() {
                 </span>
               </h1>
             </div>
-            {messages.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto text-muted-foreground hover:text-destructive shrink-0"
-                onClick={() => setMessages([])}
+            <div className="ml-auto flex items-center gap-1.5 shrink-0">
+              {/* Live Mode Toggle */}
+              <button
+                onClick={() => {
+                  if (!liveMatch && !liveMode) {
+                    toast.error("Kein laufendes Spiel gefunden. Starte zuerst ein Spiel mit Status \"live\".");
+                    return;
+                  }
+                  setLiveMode(prev => !prev);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
+                  liveMode
+                    ? "bg-destructive/15 text-destructive border border-destructive/30 animate-pulse"
+                    : liveMatch
+                      ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/25 hover:bg-emerald-500/20"
+                      : "bg-muted text-muted-foreground border border-border hover:bg-muted/80"
+                }`}
               >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
+                {liveMode ? <Pause className="h-3 w-3" /> : <Radio className="h-3 w-3" />}
+                {liveMode ? `Live (${liveCountdown}s)` : "Live-Modus"}
+              </button>
+              {messages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => { setMessages([]); setLiveMode(false); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Messages */}
