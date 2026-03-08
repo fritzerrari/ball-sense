@@ -121,6 +121,20 @@ Deno.serve(async (req) => {
         });
       }
 
+      case "assignClub": {
+        const { userId, clubId } = params;
+        if (!userId) throw new Error("userId required");
+        // clubId can be null to remove assignment
+        const { error } = await adminClient
+          .from("profiles")
+          .update({ club_id: clubId || null })
+          .eq("user_id", userId);
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400,
