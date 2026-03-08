@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import {
   Search, Loader2, RefreshCw, Globe, Trophy, Users, Calendar,
-  CheckCircle2, AlertCircle, Zap,
+  CheckCircle2, AlertCircle, Zap, AlertTriangle, BarChart3,
 } from "lucide-react";
 
 interface ApiConfig {
@@ -57,6 +58,16 @@ export default function AdminApiFootball() {
         .select("id, club_id");
       return data ?? [];
     },
+  });
+
+  // Load API usage status
+  const { data: apiUsage, isLoading: usageLoading } = useQuery({
+    queryKey: ["admin_api_football_usage"],
+    queryFn: async () => {
+      const data = await callApiFootball("api_status", {});
+      return data.status;
+    },
+    refetchInterval: 5 * 60 * 1000, // refresh every 5 min
   });
 
   async function callApiFootball(action: string, params: Record<string, any> = {}) {
@@ -136,6 +147,7 @@ export default function AdminApiFootball() {
       const data = await callApiFootball("sync_fixtures", { club_id: clubId });
       toast.success(`${data.synced} neue Spiele synchronisiert (${data.total} gesamt)`);
       qc.invalidateQueries({ queryKey: ["admin_api_football_stats_count"] });
+      qc.invalidateQueries({ queryKey: ["admin_api_football_usage"] });
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -158,8 +170,104 @@ export default function AdminApiFootball() {
     }
   };
 
+  // Parse API usage
+  const requestsCurrent = apiUsage?.requests?.current ?? 0;
+  const requestsLimit = apiUsage?.requests?.limit_day ?? 100;
+  const usagePct = requestsLimit > 0 ? Math.round((requestsCurrent / requestsLimit) * 100) : 0;
+  const isWarning = usagePct >= 70;
+  const isCritical = usagePct >= 90;
+  const planName = apiUsage?.subscription?.plan ?? "—";
+  const endDate = apiUsage?.subscription?.end ?? null;
+
   return (
     <div className="space-y-6">
+      {/* API Usage Card */}
+      <div className={`glass-card p-5 space-y-4 ${isCritical ? "border-destructive/50" : isWarning ? "border-yellow-500/50" : ""}`}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold font-display flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            API-Verbrauch
+          </h3>
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => qc.invalidateQueries({ queryKey: ["admin_api_football_usage"] })}
+            className="h-7 text-xs"
+          >
+            <RefreshCw className="h-3 w-3 mr-1" /> Aktualisieren
+          </Button>
+        </div>
+
+        {usageLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Lade Verbrauch...
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Requests heute</div>
+                <div className="text-xl font-bold font-display">{requestsCurrent}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Tages-Limit</div>
+                <div className="text-xl font-bold font-display">{requestsLimit}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Plan</div>
+                <div className="text-xl font-bold font-display capitalize">{planName}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Verbleibend</div>
+                <div className="text-xl font-bold font-display">{requestsLimit - requestsCurrent}</div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Auslastung</span>
+                <span className={`font-medium ${isCritical ? "text-destructive" : isWarning ? "text-yellow-500" : "text-primary"}`}>
+                  {usagePct}%
+                </span>
+              </div>
+              <Progress
+                value={usagePct}
+                className={`h-2.5 ${isCritical ? "[&>div]:bg-destructive" : isWarning ? "[&>div]:bg-yellow-500" : ""}`}
+              />
+            </div>
+
+            {isCritical && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <div className="text-xs">
+                  <p className="font-semibold text-destructive">Kritisch: API-Limit fast erreicht!</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    {usagePct}% des Tages-Limits verbraucht. Synchronisierungen sollten pausiert werden, um Ausfälle zu vermeiden.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {isWarning && !isCritical && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                <div className="text-xs">
+                  <p className="font-semibold text-yellow-600 dark:text-yellow-400">Warnung: Hohes API-Volumen</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    {usagePct}% des Tages-Limits verbraucht. Bitte sparsam synchronisieren.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {endDate && (
+              <div className="text-xs text-muted-foreground">
+                Abo gültig bis: <span className="font-medium text-foreground">{endDate}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Current configs */}
       <div className="glass-card overflow-x-auto">
         <div className="p-4 border-b border-border flex items-center gap-2">
@@ -196,8 +304,9 @@ export default function AdminApiFootball() {
                       variant="outline"
                       size="sm"
                       onClick={() => syncFixtures(c.club_id)}
-                      disabled={syncing}
+                      disabled={syncing || isCritical}
                       className="text-xs h-7"
+                      title={isCritical ? "Sync gesperrt — API-Limit fast erreicht" : ""}
                     >
                       {syncing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
                       Sync

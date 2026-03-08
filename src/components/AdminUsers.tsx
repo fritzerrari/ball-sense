@@ -10,11 +10,14 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import {
   Search, Crown, Trash2, Lock, Unlock, KeyRound, Loader2, ChevronLeft, ChevronRight,
-  Filter, UserX, ShieldCheck, ShieldAlert,
+  Filter, UserX, ShieldCheck, ShieldAlert, Building2, Pencil, X, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 
 interface AuthUser {
   id: string;
@@ -33,6 +36,7 @@ export default function AdminUsers() {
   const [page, setPage] = useState(1);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [banUserId, setBanUserId] = useState<{ id: string; ban: boolean } | null>(null);
+  const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
 
   // Fetch auth users via edge function
   const { data: authData, isLoading: usersLoading } = useQuery({
@@ -66,12 +70,19 @@ export default function AdminUsers() {
     },
   });
 
+  const { data: allClubs = [] } = useQuery({
+    queryKey: ["admin_all_clubs"],
+    queryFn: async () => {
+      const { data } = await supabase.from("clubs").select("id, name").order("name");
+      return data ?? [];
+    },
+  });
+
   // Mutations
   const addRole = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
       const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: role as any });
       if (error) throw error;
-      // Audit log
       await supabase.from("audit_logs").insert({
         user_id: user?.id, user_email: user?.email,
         action: "role_assigned", entity_type: "user", entity_id: userId,
@@ -94,6 +105,26 @@ export default function AdminUsers() {
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin_roles"] }); toast.success("Rolle entfernt"); },
     onError: () => toast.error("Fehler beim Entfernen"),
+  });
+
+  const assignClub = useMutation({
+    mutationFn: async ({ userId, clubId }: { userId: string; clubId: string | null }) => {
+      const { data, error } = await supabase.functions.invoke("admin-users", {
+        body: { action: "assignClub", userId, clubId },
+      });
+      if (error) throw error;
+      await supabase.from("audit_logs").insert({
+        user_id: user?.id, user_email: user?.email,
+        action: "club_assigned", entity_type: "user", entity_id: userId,
+        details: { club_id: clubId },
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_profiles"] });
+      toast.success("Verein zugeordnet");
+      setEditingUser(null);
+    },
+    onError: (e: any) => toast.error(e.message || "Fehler"),
   });
 
   const banUser = useMutation({
@@ -223,7 +254,9 @@ export default function AdminUsers() {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-muted-foreground text-xs hidden md:table-cell">
-                      {(profile as any)?.clubs?.name ?? "—"}
+                      <div className="flex items-center gap-1.5">
+                        <span>{(profile as any)?.clubs?.name ?? "—"}</span>
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex flex-wrap gap-1">
@@ -262,6 +295,13 @@ export default function AdminUsers() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost" size="icon" className="h-7 w-7"
+                          onClick={() => setEditingUser(u)}
+                          title="Bearbeiten"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
                         <Select onValueChange={(val) => addRole.mutate({ userId: u.id, role: val })}>
                           <SelectTrigger className="h-7 w-24 text-[10px]">
                             <SelectValue placeholder="Rolle +" />
@@ -321,6 +361,27 @@ export default function AdminUsers() {
         </div>
       )}
 
+      {/* Edit User Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4" /> Nutzer bearbeiten
+            </DialogTitle>
+            <DialogDescription>{editingUser?.email}</DialogDescription>
+          </DialogHeader>
+          {editingUser && (
+            <UserEditForm
+              userId={editingUser.id}
+              currentClubId={(getProfile(editingUser.id) as any)?.club_id ?? null}
+              clubs={allClubs}
+              onAssignClub={(clubId) => assignClub.mutate({ userId: editingUser.id, clubId })}
+              isLoading={assignClub.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Confirm dialogs */}
       <ConfirmDialog
         open={!!deleteUserId}
@@ -338,6 +399,57 @@ export default function AdminUsers() {
         onConfirm={() => banUserId && banUser.mutate({ userId: banUserId.id, ban: banUserId.ban })}
         destructive={banUserId?.ban}
       />
+    </div>
+  );
+}
+
+function UserEditForm({
+  userId,
+  currentClubId,
+  clubs,
+  onAssignClub,
+  isLoading,
+}: {
+  userId: string;
+  currentClubId: string | null;
+  clubs: { id: string; name: string }[];
+  onAssignClub: (clubId: string | null) => void;
+  isLoading: boolean;
+}) {
+  const [selectedClub, setSelectedClub] = useState<string>(currentClubId ?? "none");
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">Verein zuordnen</label>
+        <Select value={selectedClub} onValueChange={setSelectedClub}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Verein wählen..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Kein Verein —</SelectItem>
+            {clubs.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-3 w-3 text-primary" />
+                  {c.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button
+          onClick={() => onAssignClub(selectedClub === "none" ? null : selectedClub)}
+          disabled={isLoading || selectedClub === (currentClubId ?? "none")}
+          size="sm"
+        >
+          {isLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+          Speichern
+        </Button>
+      </div>
     </div>
   );
 }
