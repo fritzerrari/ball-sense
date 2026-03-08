@@ -106,10 +106,10 @@ export default function LandingPage() {
                   </Link>
                 </Button>
                 <Button variant="heroOutline" size="lg" asChild>
-                  <Link to="/install">
+                  <a href="#demo">
                     <Play className="mr-1 h-3.5 w-3.5" />
                     {t("landing.seeDemo")}
-                  </Link>
+                  </a>
                 </Button>
               </motion.div>
 
