@@ -220,7 +220,52 @@ export default function AssistantPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = async (text: string) => {
+  // Live Mode: auto-send tactical update every 60 seconds
+  useEffect(() => {
+    if (!liveMode || !liveMatch) {
+      if (liveIntervalRef.current) {
+        clearInterval(liveIntervalRef.current);
+        liveIntervalRef.current = null;
+      }
+      setLiveCountdown(60);
+      return;
+    }
+
+    // Send initial live analysis
+    if (!liveSendingRef.current) {
+      sendLiveUpdate();
+    }
+
+    let count = 60;
+    setLiveCountdown(60);
+    liveIntervalRef.current = setInterval(() => {
+      count--;
+      setLiveCountdown(count);
+      if (count <= 0) {
+        count = 60;
+        setLiveCountdown(60);
+        sendLiveUpdate();
+      }
+    }, 1000);
+
+    return () => {
+      if (liveIntervalRef.current) {
+        clearInterval(liveIntervalRef.current);
+        liveIntervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveMode, liveMatch?.id]);
+
+  const sendLiveUpdate = async () => {
+    if (liveSendingRef.current || isLoading) return;
+    liveSendingRef.current = true;
+    const autoMsg = `[Live-Modus] Gib eine kurze taktische Analyse und Handlungsempfehlung basierend auf den aktuellen Spielerdaten dieses laufenden Spiels. Fokussiere dich auf: Positionierung, Laufverhalten, Ermüdungszeichen und taktische Anpassungen. Maximal 4-5 Sätze.`;
+    await sendMessage(autoMsg, true);
+    liveSendingRef.current = false;
+  };
+
+  const sendMessage = async (text: string, isLiveAuto = false) => {
     if (!text.trim() || isLoading) return;
     const userMsg: Msg = { role: "user", content: text.trim() };
     setMessages(prev => [...prev, userMsg]);
