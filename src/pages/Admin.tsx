@@ -350,6 +350,11 @@ export default function Admin() {
             <AdminLogs />
           </TabsContent>
 
+          {/* ---- Guides Tab ---- */}
+          <TabsContent value="guides">
+            <AdminGuides />
+          </TabsContent>
+
           {/* ---- System Tab ---- */}
           <TabsContent value="system" className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
