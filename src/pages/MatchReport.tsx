@@ -198,6 +198,15 @@ export default function MatchReport() {
 
         {activeTab === "Übersicht" && (
           <div className="space-y-6">
+            {/* API-Football Stats */}
+            {apiStats && (
+              <ApiFootballStatsCard
+                stats={apiStats}
+                homeLabel={clubName ?? "Heim"}
+                awayLabel={match.away_club_name ?? "Auswärts"}
+              />
+            )}
+
             <div className="grid sm:grid-cols-2 gap-4">
               {renderTeamCard(clubName ?? "Heim", homeTeamStats)}
               {renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats)}
