@@ -266,10 +266,11 @@ export default function AssistantPage() {
   };
 
   const sendMessage = async (text: string, isLiveAuto = false) => {
-    if (!text.trim() || isLoading) return;
-    const userMsg: Msg = { role: "user", content: text.trim() };
+    if (!text.trim() || (isLoading && !isLiveAuto)) return;
+    const displayContent = isLiveAuto ? `⚡ Live-Analyse (${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })})` : text.trim();
+    const userMsg: Msg = { role: "user", content: displayContent };
     setMessages(prev => [...prev, userMsg]);
-    setInput("");
+    if (!isLiveAuto) setInput("");
     setIsLoading(true);
 
     let assistantSoFar = "";
@@ -292,9 +293,11 @@ export default function AssistantPage() {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          messages: allMessages.map(m => ({ role: m.role, content: m.content })),
+          messages: [{ role: "user", content: text.trim() }],
           includeContext: true,
           selectedPlayersContext: selectedContext,
+          liveMode: isLiveAuto,
+          liveMatchId: liveMatch?.id,
         }),
       });
 
