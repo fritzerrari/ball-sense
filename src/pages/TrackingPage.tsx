@@ -355,14 +355,45 @@ export default function TrackingPage() {
               ))}
             </div>
 
-            <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleUpload} disabled={uploading}>
-              {uploading ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Wird hochgeladen...</> : <><Upload className="h-5 w-5 mr-2" /> Hochladen & Report erstellen</>}
-            </Button>
+            {/* Upload Progress */}
+            {(uploading || uploadDone) && (
+              <div className="space-y-2">
+                <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${uploadDone ? "bg-emerald-500" : "bg-primary"}`}
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  {uploadDone ? "✓ Upload abgeschlossen" : `${uploadProgress}% — Daten werden hochgeladen...`}
+                </p>
+              </div>
+            )}
 
-            {id && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link to={`/matches/${id}`}>Zum Match-Report</Link>
-              </Button>
+            {uploadDone ? (
+              <div className="space-y-3">
+                <div className="glass-card p-4 text-center border-emerald-500/30">
+                  <Check className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
+                  <p className="font-semibold font-display">Upload erfolgreich!</p>
+                  <p className="text-sm text-muted-foreground">Die Daten werden jetzt verarbeitet.</p>
+                </div>
+                {id && (
+                  <Button variant="hero" size="xl" className="w-full min-h-[56px]" asChild>
+                    <Link to={`/matches/${id}`}>Zum Match-Report</Link>
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <>
+                <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleUpload} disabled={uploading}>
+                  {uploading ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Wird hochgeladen...</> : <><Upload className="h-5 w-5 mr-2" /> Hochladen & Report erstellen</>}
+                </Button>
+                {id && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to={`/matches/${id}`}>Zum Match-Report</Link>
+                  </Button>
+                )}
+              </>
             )}
           </div>
         )}
