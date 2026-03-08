@@ -37,6 +37,10 @@ export default function TrackingPage() {
   const [uploadDone, setUploadDone] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [half, setHalf] = useState(1);
+  const [showHalftimeUpload, setShowHalftimeUpload] = useState(false);
+  const [halftimeUploading, setHalftimeUploading] = useState(false);
+  const [halftimeUploadProgress, setHalftimeUploadProgress] = useState(0);
+  const [halftimeUploadDone, setHalftimeUploadDone] = useState(false);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
