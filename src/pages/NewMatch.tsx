@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, Calendar, Users, Camera, QrCode, Loader2, Check } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { usePlayers } from "@/hooks/use-players";
@@ -157,9 +157,11 @@ export default function NewMatch() {
   };
 
   // Auto-select first field
-  if (fields && fields.length > 0 && !fieldId) {
-    setFieldId(fields[0].id);
-  }
+  useEffect(() => {
+    if (fields && fields.length > 0 && !fieldId) {
+      setFieldId(fields[0].id);
+    }
+  }, [fields, fieldId]);
 
   return (
     <AppLayout>
