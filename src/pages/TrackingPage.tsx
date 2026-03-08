@@ -129,6 +129,44 @@ export default function TrackingPage() {
     setPhase("ended");
   };
 
+  const handleHalftimeUpload = async () => {
+    if (!trackerRef.current || !id) return;
+    setHalftimeUploading(true);
+    setHalftimeUploadProgress(0);
+    try {
+      setHalftimeUploadProgress(15);
+      const result = await trackerRef.current.uploadMatch(
+        id, cam,
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      );
+      setHalftimeUploadProgress(60);
+
+      await supabase.from("tracking_uploads").insert({
+        match_id: id,
+        camera_index: cam,
+        file_path: result.filePath,
+        status: "uploaded",
+        frames_count: result.framesCount,
+        duration_sec: result.durationSec,
+      });
+      setHalftimeUploadProgress(100);
+      setHalftimeUploadDone(true);
+      toast.success("1. Halbzeit hochgeladen! Starte die 2. Halbzeit wenn es losgeht.");
+    } catch {
+      toast.error("Upload fehlgeschlagen — wird nach Spielende erneut versucht");
+      setHalftimeUploadProgress(0);
+    } finally {
+      setHalftimeUploading(false);
+    }
+  };
+
+  const handleResumeSecondHalf = () => {
+    setShowHalftimeUpload(false);
+    trackerRef.current?.resumeTracking();
+    setPaused(false);
+  };
+
   const handleUpload = async () => {
     if (!trackerRef.current || !id) return;
     setUploading(true);
