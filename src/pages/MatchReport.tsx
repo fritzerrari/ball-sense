@@ -94,8 +94,8 @@ export default function MatchReport() {
           </thead>
           <tbody>
             {sortPlayers(stats).map((p: any) => (
-              <>
-                <tr key={p.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
+              <Fragment key={p.id}>
+                <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
                   <td className="py-3 px-4 font-medium">{p.players?.name ?? "—"}</td>
                   <td className="py-3 px-4 text-muted-foreground">{p.players?.number ?? "—"}</td>
                   <td className="py-3 px-4 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
@@ -105,7 +105,7 @@ export default function MatchReport() {
                   <td className="py-3 px-4">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
                 </tr>
                 {expandedPlayer === p.id && (
-                  <tr key={`${p.id}-detail`}>
+                  <tr>
                     <td colSpan={7} className="p-4 bg-muted/10">
                       <div className="grid md:grid-cols-2 gap-4">
                         <HeatmapField label="Heatmap" grid={p.heatmap_grid as number[][] | null} compact />
@@ -123,7 +123,7 @@ export default function MatchReport() {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
