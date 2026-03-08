@@ -95,8 +95,10 @@ export default function AssistantPage() {
   const [timeRange, setTimeRange] = useState<[number, number]>([0, 1]);
   const [liveMode, setLiveMode] = useState(false);
   const [liveCountdown, setLiveCountdown] = useState(60);
+  const [liveSoundEnabled, setLiveSoundEnabled] = useState(true);
   const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const liveSendingRef = useRef(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
