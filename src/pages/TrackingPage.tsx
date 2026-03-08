@@ -33,6 +33,8 @@ export default function TrackingPage() {
   const [subOut, setSubOut] = useState("");
   const [subIn, setSubIn] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadDone, setUploadDone] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [half, setHalf] = useState(1);
 
