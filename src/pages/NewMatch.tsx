@@ -157,9 +157,11 @@ export default function NewMatch() {
   };
 
   // Auto-select first field
-  if (fields && fields.length > 0 && !fieldId) {
-    setFieldId(fields[0].id);
-  }
+  useEffect(() => {
+    if (fields && fields.length > 0 && !fieldId) {
+      setFieldId(fields[0].id);
+    }
+  }, [fields, fieldId]);
 
   return (
     <AppLayout>
