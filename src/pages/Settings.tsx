@@ -10,6 +10,7 @@ import type { PlanType } from "@/lib/types";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { useMonthlyMatchCount } from "@/hooks/use-match-stats";
 import { Check } from "lucide-react";
+import { ClubLogoUpload } from "@/components/ClubLogoUpload";
 
 export default function SettingsPage() {
   const { clubId, clubName, clubPlan } = useAuth();
