@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useTranslation } from "@/lib/i18n";
-import { HeroDashboardMockup } from "@/components/landing/HeroDashboardMockup";
+import { HeroSlider } from "@/components/landing/HeroSlider";
+import { DemoSection } from "@/components/landing/DemoSection";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { AnalyticsShowcase } from "@/components/landing/AnalyticsShowcase";
 import { FeatureCards } from "@/components/landing/FeatureCards";
@@ -136,7 +137,7 @@ export default function LandingPage() {
 
             {/* Right — Product Mockup */}
             <div className="lg:pl-4">
-              <HeroDashboardMockup />
+              <HeroSlider />
             </div>
           </div>
 
@@ -158,6 +159,7 @@ export default function LandingPage() {
       </section>
 
       <KeyNumbers />
+      <DemoSection />
       <HowItWorks />
       <AnalyticsShowcase />
       <FeatureCards />
