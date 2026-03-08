@@ -6,17 +6,10 @@ import {
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageToggle } from "./LanguageToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-  { label: "Spiele", icon: Swords, href: "/matches" },
-  { label: "Kader", icon: Users, href: "/players" },
-  { label: "Plätze", icon: Map, href: "/fields" },
-  { label: "KI Assistent", icon: BrainCircuit, href: "/assistant" },
-  { label: "Einstellungen", icon: Settings, href: "/settings" },
-];
+import { useTranslation } from "@/lib/i18n";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -24,6 +17,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, clubName, clubPlan, clubLogoUrl, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t } = useTranslation();
 
   const { data: isAdmin } = useQuery({
     queryKey: ["user_role_sidebar", user?.id],
@@ -41,9 +35,18 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const navItems = [
+    { label: t("nav.dashboard"), icon: LayoutDashboard, href: "/dashboard" },
+    { label: t("nav.matches"), icon: Swords, href: "/matches" },
+    { label: t("nav.squad"), icon: Users, href: "/players" },
+    { label: t("nav.fields"), icon: Map, href: "/fields" },
+    { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
+    { label: t("nav.settings"), icon: Settings, href: "/settings" },
+  ];
+
   const allNavItems = [
     ...navItems,
-    ...(isAdmin ? [{ label: "Admin", icon: Shield, href: "/admin" }] : []),
+    ...(isAdmin ? [{ label: t("nav.admin"), icon: Shield, href: "/admin" }] : []),
   ];
 
   const handleSignOut = async () => {
@@ -55,12 +58,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`fixed md:sticky top-0 left-0 z-50 h-screen flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200
           ${collapsed ? "w-16" : "w-56"}
@@ -123,12 +124,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all w-full ${collapsed ? "justify-center" : ""}`}
           >
             <LogOut className="h-5 w-5 shrink-0" />
-            {!collapsed && <span>Abmelden</span>}
+            {!collapsed && <span>{t("nav.signout")}</span>}
           </button>
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 min-h-screen">
         <header className="h-16 border-b border-border flex items-center px-4 md:px-6 gap-4 bg-card/50">
           <button className="md:hidden p-2 hover:bg-muted rounded-lg" onClick={() => setMobileOpen(true)}>
@@ -152,6 +152,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           )}
           <div className="flex-1" />
           <div className="flex items-center gap-2">
+            <LanguageToggle />
             <ThemeToggle />
             <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">{planLabel}</span>
           </div>

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { useTranslation, useLocale } from "@/lib/i18n";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Area, AreaChart,
@@ -8,28 +9,13 @@ import {
 
 export function DashboardCharts() {
   const { clubId } = useAuth();
-
-  const { data: matchChartData } = useQuery({
-    queryKey: ["dashboard_chart_matches", clubId],
-    queryFn: async () => {
-      if (!clubId) return [];
-      const { data } = await supabase
-        .from("matches")
-        .select("id, date, away_club_name, status")
-        .eq("home_club_id", clubId)
-        .eq("status", "done")
-        .order("date", { ascending: true })
-        .limit(20);
-      return data ?? [];
-    },
-    enabled: !!clubId,
-  });
+  const { t } = useTranslation();
+  const locale = useLocale();
 
   const { data: distanceData } = useQuery({
     queryKey: ["dashboard_chart_distance", clubId],
     queryFn: async () => {
       if (!clubId) return [];
-      // Get team stats joined with match dates
       const { data: matches } = await supabase
         .from("matches")
         .select("id, date, away_club_name")
@@ -52,8 +38,8 @@ export function DashboardCharts() {
       return matches.map((m) => {
         const s = statsMap.get(m.id);
         return {
-          label: m.away_club_name?.substring(0, 10) || new Date(m.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }),
-          date: new Date(m.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }),
+          label: m.away_club_name?.substring(0, 10) || new Date(m.date).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" }),
+          date: new Date(m.date).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" }),
           distanz: s?.total_distance_km ? Math.round(s.total_distance_km * 10) / 10 : 0,
           topSpeed: s?.top_speed_kmh ? Math.round(s.top_speed_kmh * 10) / 10 : 0,
           ballbesitz: s?.possession_pct ? Math.round(s.possession_pct) : 0,
@@ -72,7 +58,7 @@ export function DashboardCharts() {
         <p className="font-semibold font-display text-foreground mb-1">{label}</p>
         {payload.map((p: any) => (
           <p key={p.name} className="text-muted-foreground">
-            {p.name}: <span className="font-medium text-foreground">{p.value}{p.name === "Ballbesitz" ? "%" : p.name === "Top Speed" ? " km/h" : " km"}</span>
+            {p.name}: <span className="font-medium text-foreground">{p.value}{p.name === t("dashboard.possession") ? "%" : p.name === t("dashboard.topSpeedChart") ? " km/h" : " km"}</span>
           </p>
         ))}
       </div>
@@ -81,11 +67,10 @@ export function DashboardCharts() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold font-display">Saisonverlauf</h2>
+      <h2 className="text-lg font-semibold font-display">{t("dashboard.seasonTrend")}</h2>
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Distance Chart */}
         <div className="glass-card p-5">
-          <h3 className="text-sm font-medium text-muted-foreground mb-4">Laufdistanz (km)</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-4">{t("dashboard.distance")}</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={distanceData}>
@@ -99,15 +84,14 @@ export function DashboardCharts() {
                 <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                 <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="distanz" name="Distanz" stroke="hsl(var(--primary))" fill="url(#distGrad)" strokeWidth={2} />
+                <Area type="monotone" dataKey="distanz" name={t("matchReport.distance")} stroke="hsl(var(--primary))" fill="url(#distGrad)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Top Speed Chart */}
         <div className="glass-card p-5">
-          <h3 className="text-sm font-medium text-muted-foreground mb-4">Top Speed (km/h)</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-4">{t("dashboard.topSpeedChart")}</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={distanceData}>
@@ -115,15 +99,14 @@ export function DashboardCharts() {
                 <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                 <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="topSpeed" name="Top Speed" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="topSpeed" name={t("dashboard.topSpeedChart")} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Possession Chart */}
         <div className="glass-card p-5 md:col-span-2">
-          <h3 className="text-sm font-medium text-muted-foreground mb-4">Ballbesitz (%)</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-4">{t("dashboard.possession")}</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={distanceData}>
@@ -131,7 +114,7 @@ export function DashboardCharts() {
                 <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                 <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="ballbesitz" name="Ballbesitz" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} />
+                <Line type="monotone" dataKey="ballbesitz" name={t("dashboard.possession")} stroke="hsl(var(--accent))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
