@@ -54,18 +54,18 @@ const plans = [
   {
     name: "STARTER",
     price: "49",
-    features: ["4 Spiele/Monat", "1 Team", "Basis-Reports", "E-Mail Support"],
+    features: ["landing.plan1f1", "landing.plan1f2", "landing.plan1f3", "landing.plan1f4"],
   },
   {
     name: "CLUB",
     price: "99",
     popular: true,
-    features: ["12 Spiele/Monat", "2 Teams", "Erweiterte Reports", "PDF Export", "Prioritäts-Support"],
+    features: ["landing.plan2f1", "landing.plan2f2", "landing.plan2f3", "landing.plan2f4", "landing.plan2f5"],
   },
   {
     name: "PRO",
     price: "199",
-    features: ["Unbegrenzte Spiele", "Alle Teams", "Alle Features", "API-Zugang", "Dedizierter Support"],
+    features: ["landing.plan3f1", "landing.plan3f2", "landing.plan3f3", "landing.plan3f4", "landing.plan3f5"],
   },
 ];
 
