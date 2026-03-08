@@ -1,11 +1,13 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu, BrainCircuit,
+  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu, BrainCircuit, Shield,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { ThemeToggle } from "./ThemeToggle";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
