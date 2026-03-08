@@ -988,6 +988,8 @@ const en: TranslationDict = {
   "landing.heroHighlight": "all leagues",
   "landing.heroTitle2": "Professional match tracking —",
   "landing.heroHighlight2": "with just 3 smartphones",
+  "landing.heroLine1": "Professional Match Tracking",
+  "landing.heroLine2": "with just 3 Smartphones",
   "landing.heroDesc2": "Automatically generate heatmaps and player movement data after every match. No sensors. No installation.",
   "landing.startFreeTrial": "Start free trial",
   "landing.seeDemo": "See demo",
