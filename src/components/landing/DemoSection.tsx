@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, RotateCcw, AlertTriangle, TrendingUp, Zap, Route, Users, Activity, Timer,
   Bell, ChevronRight, ArrowUpRight, ArrowDownRight, Minus, Target, Shield, Footprints,
-  BarChart3, Eye, Gauge
+  BarChart3, Eye, Gauge, X, ChevronLeft, Crosshair, Award, Goal, Siren,
+  PersonStanding, CircleDot, Radar, TriangleAlert, TrendingDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -16,14 +17,30 @@ interface DemoPlayer {
   name: string;
   num: number;
   pos: string;
+  // FieldIQ Tracking Data
   km: number;
   topSpeed: number;
   sprints: number;
+  sprintDistanceM: number;
   avgSpeed: number;
-  passAccuracy: number;
-  duelsWon: number;
-  rating: number;
+  minutesPlayed: number;
   heatmap: number[][];
+  // API-Football Data
+  passAccuracy: number;
+  passesTotal: number;
+  duelsWon: number;
+  duelsTotal: number;
+  tackles: number;
+  dribblesSuccess: number;
+  shotsTotal: number;
+  shotsOnGoal: number;
+  goals: number;
+  assists: number;
+  foulsCommitted: number;
+  foulsDrawn: number;
+  yellowCards: number;
+  redCards: number;
+  rating: number;
   trend: "up" | "down" | "stable";
 }
 
@@ -32,10 +49,15 @@ interface DemoData {
   teamStats: {
     possession: number; totalKm: number; avgSpeed: number; topSpeed: number;
     sprints: number; passes: number; passAccuracy: number; shotsOnTarget: number;
-    corners: number; fouls: number;
+    shotsTotal: number; corners: number; fouls: number; yellowCards: number; redCards: number;
+    offsides: number;
   };
   heatmapGrid: number[][];
-  apiStats: { xG: number; xGA: number; ppda: number; fieldTilt: number; shotConversion: number; duelWinRate: number };
+  apiStats: { 
+    xG: number; xGA: number; ppda: number; fieldTilt: number; shotConversion: number; 
+    duelWinRate: number; aerialWinRate: number; crossAccuracy: number;
+    counterAttacks: number; setPlayGoals: number;
+  };
 }
 
 export function DemoSection() {
@@ -226,7 +248,7 @@ function LoadingState({ progress, phase }: { progress: number; phase: "load" | "
 
 /* ─── Dashboard State ─── */
 function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: () => void; onReload: () => void }) {
-  const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<DemoPlayer | null>(null);
   const topPlayers = data.players.slice(0, 4);
   const maxHeatVal = Math.max(...data.heatmapGrid.flat(), 0.01);
 
@@ -237,6 +259,16 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
       exit={{ opacity: 0 }}
       className="space-y-4"
     >
+      {/* Player Detail Modal */}
+      <AnimatePresence>
+        {selectedPlayer && (
+          <PlayerDetailModal 
+            player={selectedPlayer} 
+            onClose={() => setSelectedPlayer(null)} 
+          />
+        )}
+      </AnimatePresence>
+
       {/* Banner */}
       <div className="rounded-lg bg-warning/10 border border-warning/30 px-4 py-2 flex items-center gap-3 text-xs">
         <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
@@ -301,17 +333,17 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
             <div className="rounded-xl border border-border/50 bg-card/50 p-4">
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display flex items-center justify-between">
                 <span>Spieler-Distanzen (km)</span>
-                <span className="text-[9px] text-muted-foreground font-normal">Top 11</span>
+                <span className="text-[9px] text-muted-foreground font-normal">Klick für Details</span>
               </div>
               <div className="space-y-2">
                 {data.players.slice(0, 11).map((p, i) => (
                   <motion.div
                     key={p.name}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-muted/20 rounded px-1 -mx-1 transition-colors"
+                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 + i * 0.04 }}
-                    onClick={() => setSelectedPlayer(i < 4 ? i : null)}
+                    onClick={() => setSelectedPlayer(p)}
                   >
                     <span className="text-[10px] text-muted-foreground w-20 truncate">#{p.num} {p.name}</span>
                     <div className="flex-1 h-3 rounded-full bg-muted/30 overflow-hidden">
@@ -350,7 +382,14 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Speed-Ranking</div>
               <div className="space-y-2">
                 {[...data.players].sort((a, b) => b.topSpeed - a.topSpeed).slice(0, 5).map((p, i) => (
-                  <motion.div key={p.name} className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }}>
+                  <motion.div 
+                    key={p.name} 
+                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    transition={{ delay: 0.3 + i * 0.05 }}
+                    onClick={() => setSelectedPlayer(p)}
+                  >
                     <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
                     <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
                     <span className="text-[10px] font-bold text-foreground">{p.topSpeed.toFixed(1)}</span>
@@ -363,7 +402,14 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Sprint-Ranking</div>
               <div className="space-y-2">
                 {[...data.players].sort((a, b) => b.sprints - a.sprints).slice(0, 5).map((p, i) => (
-                  <motion.div key={p.name} className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }}>
+                  <motion.div 
+                    key={p.name} 
+                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    transition={{ delay: 0.3 + i * 0.05 }}
+                    onClick={() => setSelectedPlayer(p)}
+                  >
                     <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
                     <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
                     <span className="text-[10px] font-bold text-foreground">{p.sprints}</span>
@@ -376,11 +422,11 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Spielübersicht</div>
               <div className="space-y-2 text-[10px]">
                 {[
-                  { label: "Schüsse aufs Tor", value: data.teamStats.shotsOnTarget },
+                  { label: "Schüsse / aufs Tor", value: `${data.teamStats.shotsTotal} / ${data.teamStats.shotsOnTarget}` },
                   { label: "Ecken", value: data.teamStats.corners },
                   { label: "Fouls", value: data.teamStats.fouls },
-                  { label: "Pässe gesamt", value: data.teamStats.passes },
-                  { label: "Passquote", value: `${data.teamStats.passAccuracy.toFixed(0)}%` },
+                  { label: "Abseits", value: data.teamStats.offsides },
+                  { label: "Gelbe / Rote", value: `${data.teamStats.yellowCards} / ${data.teamStats.redCards}` },
                 ].map((s) => (
                   <div key={s.label} className="flex items-center justify-between">
                     <span className="text-muted-foreground">{s.label}</span>
@@ -401,13 +447,11 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               return (
                 <motion.div
                   key={p.name}
-                  className={`rounded-xl border bg-card/50 p-4 transition-all ${
-                    selectedPlayer === i ? "border-primary shadow-lg shadow-primary/10" : "border-border/50"
-                  }`}
+                  className="rounded-xl border border-border/50 bg-card/50 p-4 hover:border-primary/50 transition-all cursor-pointer"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
-                  onClick={() => setSelectedPlayer(selectedPlayer === i ? null : i)}
+                  onClick={() => setSelectedPlayer(p)}
                 >
                   <div className="flex items-start gap-3 mb-3">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -428,6 +472,15 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
                         {p.trend === "stable" && <Minus className="w-3 h-3 text-muted-foreground" />}
                       </div>
                     </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-[10px] h-7 gap-1 shrink-0"
+                      onClick={(e) => { e.stopPropagation(); setSelectedPlayer(p); }}
+                    >
+                      <Eye className="w-3 h-3" />
+                      Analysieren
+                    </Button>
                   </div>
 
                   <div className="grid grid-cols-4 gap-2 mb-3">
@@ -454,7 +507,10 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
 
           {/* Full roster table */}
           <div className="rounded-xl border border-border/50 bg-card/50 p-4 overflow-x-auto">
-            <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Kompletter Kader</div>
+            <div className="text-xs font-semibold text-foreground/80 mb-3 font-display flex items-center justify-between">
+              <span>Kompletter Kader</span>
+              <span className="text-[9px] text-muted-foreground font-normal">Klicke auf einen Spieler für Details</span>
+            </div>
             <table className="w-full text-[10px]">
               <thead>
                 <tr className="text-muted-foreground border-b border-border/30">
@@ -468,16 +524,18 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
                   <th className="text-right py-1.5 font-medium">Passquote</th>
                   <th className="text-right py-1.5 font-medium">Zweikämpfe</th>
                   <th className="text-right py-1.5 font-medium">Rating</th>
+                  <th className="text-center py-1.5 font-medium">Aktion</th>
                 </tr>
               </thead>
               <tbody>
                 {data.players.map((p, i) => (
                   <motion.tr
                     key={p.name}
-                    className="border-b border-border/10 hover:bg-muted/20 transition-colors"
+                    className="border-b border-border/10 hover:bg-primary/10 transition-colors cursor-pointer"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.2 + i * 0.03 }}
+                    onClick={() => setSelectedPlayer(p)}
                   >
                     <td className="py-1.5 font-bold text-primary">{p.num}</td>
                     <td className="py-1.5 font-medium text-foreground">{p.name}</td>
@@ -491,6 +549,11 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
                     <td className={`py-1.5 text-right font-bold ${p.rating >= 7.5 ? "text-primary" : p.rating >= 6.5 ? "" : "text-warning"}`}>
                       {p.rating.toFixed(1)}
                     </td>
+                    <td className="py-1.5 text-center">
+                      <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
+                        <Eye className="w-3 h-3 text-primary" />
+                      </Button>
+                    </td>
                   </motion.tr>
                 ))}
               </tbody>
@@ -503,26 +566,31 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
           <div className="rounded-xl border border-border/50 bg-card/50 p-4">
             <div className="flex items-center gap-2 mb-4">
               <div className="text-xs font-semibold text-foreground/80 font-display">Advanced Analytics</div>
-              <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20 font-display">API-Football</span>
+              <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20 font-display">API-Football + FieldIQ</span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {[
-                { label: "xG (Expected Goals)", value: data.apiStats.xG.toFixed(2), desc: "Erwartete Tore basierend auf Schussqualität" },
-                { label: "xGA (Expected Against)", value: data.apiStats.xGA.toFixed(2), desc: "Erwartete Gegentore" },
-                { label: "PPDA (Pressing-Intensität)", value: data.apiStats.ppda.toFixed(1), desc: "Pässe pro Defensivaktion — niedriger = intensiver" },
-                { label: "Field Tilt", value: `${data.apiStats.fieldTilt.toFixed(0)}%`, desc: "Anteil der Aktionen in der gegnerischen Hälfte" },
-                { label: "Schuss-Conversion", value: `${data.apiStats.shotConversion.toFixed(0)}%`, desc: "Anteil der Schüsse die zu Toren führen" },
-                { label: "Zweikampfquote", value: `${data.apiStats.duelWinRate.toFixed(0)}%`, desc: "Gewonnene Zweikämpfe" },
+                { label: "xG (Expected Goals)", value: data.apiStats.xG.toFixed(2), desc: "Erwartete Tore", icon: Target },
+                { label: "xGA (Expected Against)", value: data.apiStats.xGA.toFixed(2), desc: "Erwartete Gegentore", icon: Shield },
+                { label: "PPDA", value: data.apiStats.ppda.toFixed(1), desc: "Pressing-Intensität", icon: Zap },
+                { label: "Field Tilt", value: `${data.apiStats.fieldTilt.toFixed(0)}%`, desc: "Gegnerische Hälfte", icon: BarChart3 },
+                { label: "Schuss-Conv.", value: `${data.apiStats.shotConversion.toFixed(0)}%`, desc: "Torquote", icon: Goal },
+                { label: "Zweikampfquote", value: `${data.apiStats.duelWinRate.toFixed(0)}%`, desc: "Gewonnen", icon: PersonStanding },
+                { label: "Luftkämpfe", value: `${data.apiStats.aerialWinRate.toFixed(0)}%`, desc: "Gewonnen", icon: TrendingUp },
+                { label: "Flankengenau.", value: `${data.apiStats.crossAccuracy.toFixed(0)}%`, desc: "Angekommen", icon: Crosshair },
+                { label: "Konter", value: `${data.apiStats.counterAttacks}`, desc: "Schnelle Angriffe", icon: Zap },
+                { label: "Standardtore", value: `${data.apiStats.setPlayGoals}`, desc: "Tore aus Standards", icon: CircleDot },
               ].map((stat, i) => (
                 <motion.div
                   key={stat.label}
                   className="rounded-lg bg-muted/20 p-3 border border-border/30"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 + i * 0.08 }}
+                  transition={{ delay: 0.2 + i * 0.05 }}
                 >
-                  <div className="text-lg font-bold font-display text-primary mb-1">{stat.value}</div>
-                  <div className="text-[10px] font-medium text-foreground mb-0.5">{stat.label}</div>
+                  <stat.icon className="w-3.5 h-3.5 text-primary mb-1" />
+                  <div className="text-lg font-bold font-display text-primary mb-0.5">{stat.value}</div>
+                  <div className="text-[9px] font-medium text-foreground">{stat.label}</div>
                   <div className="text-[8px] text-muted-foreground">{stat.desc}</div>
                 </motion.div>
               ))}
@@ -536,8 +604,9 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               {[
                 { label: "Ballbesitz", home: data.teamStats.possession, away: 100 - data.teamStats.possession, unit: "%" },
                 { label: "Pässe", home: data.teamStats.passes, away: Math.floor(data.teamStats.passes * 0.75), unit: "" },
-                { label: "Schüsse", home: data.teamStats.shotsOnTarget + 4, away: data.teamStats.shotsOnTarget, unit: "" },
+                { label: "Schüsse", home: data.teamStats.shotsTotal, away: data.teamStats.shotsOnTarget + 2, unit: "" },
                 { label: "Ecken", home: data.teamStats.corners, away: Math.floor(data.teamStats.corners * 0.6), unit: "" },
+                { label: "Fouls", home: data.teamStats.fouls, away: Math.floor(data.teamStats.fouls * 1.2), unit: "" },
               ].map((c, i) => {
                 const total = c.home + c.away;
                 const homePct = (c.home / total) * 100;
@@ -557,7 +626,7 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               })}
             </div>
             <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Intensitätszonen</div>
+              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Intensitätszonen (Team)</div>
               {[
                 { label: "Gehen (0–6 km/h)", pct: 42, color: "bg-blue-500/60" },
                 { label: "Joggen (6–12 km/h)", pct: 28, color: "bg-green-500/60" },
@@ -580,6 +649,296 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
       </Tabs>
     </motion.div>
   );
+}
+
+/* ─── Player Detail Modal ─── */
+function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: () => void }) {
+  const playerMaxHeat = Math.max(...player.heatmap.flat(), 0.01);
+  const duelsPct = player.duelsTotal > 0 ? Math.round((player.duelsWon / 100) * player.duelsTotal) : 0;
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-card border border-border rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto"
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-card/95 backdrop-blur-sm border-b border-border p-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onClose} className="gap-1">
+              <ChevronLeft className="w-4 h-4" />
+              Zurück
+            </Button>
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <span className="text-sm font-bold font-display text-primary">{player.num}</span>
+            </div>
+            <div>
+              <div className="text-base font-bold font-display text-foreground">{player.name}</div>
+              <div className="text-xs text-muted-foreground">{player.pos} · {player.minutesPlayed} Min. gespielt</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">Gesamtbewertung</div>
+              <div className={`text-xl font-bold font-display ${player.rating >= 7.5 ? "text-primary" : player.rating >= 6.5 ? "text-foreground" : "text-warning"}`}>
+                {player.rating.toFixed(1)}
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Primary Stats Grid - FieldIQ Tracking */}
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Radar className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold font-display text-primary">FieldIQ Tracking-Daten</span>
+            </div>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {[
+                { label: "Distanz", value: `${player.km.toFixed(2)} km`, icon: Route },
+                { label: "Topspeed", value: `${player.topSpeed.toFixed(1)} km/h`, icon: Zap },
+                { label: "Ø Tempo", value: `${player.avgSpeed.toFixed(1)} km/h`, icon: Gauge },
+                { label: "Sprints", value: `${player.sprints}`, icon: Footprints },
+                { label: "Sprint-Distanz", value: `${player.sprintDistanceM} m`, icon: TrendingUp },
+                { label: "Spielzeit", value: `${player.minutesPlayed}'`, icon: Timer },
+              ].map((stat) => (
+                <div key={stat.label} className="text-center p-2 rounded-lg bg-card/50 border border-border/30">
+                  <stat.icon className="w-3.5 h-3.5 text-primary mx-auto mb-1" />
+                  <div className="text-sm font-bold font-display text-foreground">{stat.value}</div>
+                  <div className="text-[9px] text-muted-foreground">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Heatmap */}
+            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Positionsheatmap</div>
+              <HeatmapField grid={player.heatmap} maxVal={playerMaxHeat} />
+            </div>
+
+            {/* Radar Chart Mock */}
+            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Leistungsprofil</div>
+              <div className="aspect-square max-w-[200px] mx-auto relative">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                  {/* Background pentagon */}
+                  {[0.2, 0.4, 0.6, 0.8, 1].map((scale, i) => (
+                    <polygon
+                      key={i}
+                      points={getRadarPoints(50, 50, 40 * scale, 6)}
+                      fill="none"
+                      stroke="hsl(var(--border))"
+                      strokeWidth="0.5"
+                      opacity={0.3}
+                    />
+                  ))}
+                  {/* Data polygon */}
+                  <motion.polygon
+                    points={getRadarPoints(50, 50, 40, 6, [
+                      player.km / 13,
+                      player.topSpeed / 35,
+                      player.sprints / 60,
+                      player.passAccuracy / 100,
+                      player.duelsWon / 100,
+                      player.rating / 10
+                    ])}
+                    fill="hsl(var(--primary) / 0.2)"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth="1.5"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-xl font-bold font-display text-primary">{player.rating.toFixed(1)}</div>
+                    <div className="text-[8px] text-muted-foreground">Rating</div>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-1 mt-2 text-[8px] text-muted-foreground text-center">
+                <span>Distanz</span>
+                <span>Speed</span>
+                <span>Sprints</span>
+                <span>Pässe</span>
+                <span>Zweikämpfe</span>
+                <span>Rating</span>
+              </div>
+            </div>
+          </div>
+
+          {/* API-Football Stats */}
+          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-semibold font-display text-foreground/80">API-Football Spielstatistiken</span>
+              <span className="text-[9px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Extern</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Passing */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Passspiel</div>
+                <div className="space-y-1.5">
+                  <StatRow label="Pässe gesamt" value={player.passesTotal} />
+                  <StatRow label="Passquote" value={`${player.passAccuracy}%`} highlight={player.passAccuracy >= 85} />
+                </div>
+              </div>
+              {/* Duels */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Zweikämpfe</div>
+                <div className="space-y-1.5">
+                  <StatRow label="Gesamt" value={player.duelsTotal} />
+                  <StatRow label="Gewonnen" value={`${player.duelsWon}%`} highlight={player.duelsWon >= 55} />
+                  <StatRow label="Tackles" value={player.tackles} />
+                  <StatRow label="Dribblings" value={player.dribblesSuccess} />
+                </div>
+              </div>
+              {/* Offense */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Offensive</div>
+                <div className="space-y-1.5">
+                  <StatRow label="Tore" value={player.goals} highlight={player.goals > 0} />
+                  <StatRow label="Assists" value={player.assists} highlight={player.assists > 0} />
+                  <StatRow label="Schüsse gesamt" value={player.shotsTotal} />
+                  <StatRow label="Schüsse aufs Tor" value={player.shotsOnGoal} />
+                </div>
+              </div>
+              {/* Discipline */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Disziplin</div>
+                <div className="space-y-1.5">
+                  <StatRow label="Fouls begangen" value={player.foulsCommitted} warning={player.foulsCommitted >= 3} />
+                  <StatRow label="Fouls erlitten" value={player.foulsDrawn} />
+                  <StatRow label="Gelbe Karten" value={player.yellowCards} warning={player.yellowCards > 0} />
+                  <StatRow label="Rote Karten" value={player.redCards} warning={player.redCards > 0} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Performance Bars */}
+          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Leistungsindikatoren</div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <PerformanceBar label="Laufleistung" value={player.km} max={13} unit="km" />
+                <PerformanceBar label="Topspeed" value={player.topSpeed} max={35} unit="km/h" />
+                <PerformanceBar label="Sprint-Anteil" value={(player.sprintDistanceM / (player.km * 1000)) * 100} max={20} unit="%" />
+              </div>
+              <div className="space-y-3">
+                <PerformanceBar label="Passgenauigkeit" value={player.passAccuracy} max={100} unit="%" />
+                <PerformanceBar label="Zweikampfquote" value={player.duelsWon} max={100} unit="%" />
+                <PerformanceBar label="Bewertung" value={player.rating} max={10} unit="/10" />
+              </div>
+            </div>
+          </div>
+
+          {/* AI Insights Mock */}
+          <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold font-display text-primary">KI-Analyse</span>
+              <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">Demo</span>
+            </div>
+            <div className="grid md:grid-cols-3 gap-3">
+              <div className="rounded-lg bg-card/50 p-3 border border-border/30">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <ArrowUpRight className="w-3 h-3 text-primary" />
+                  <span className="text-[10px] font-semibold text-foreground">Stärken</span>
+                </div>
+                <ul className="text-[9px] text-muted-foreground space-y-0.5">
+                  {player.topSpeed > 31 && <li>• Überdurchschnittliche Sprintgeschwindigkeit</li>}
+                  {player.passAccuracy > 85 && <li>• Hohe Passgenauigkeit</li>}
+                  {player.km > 11 && <li>• Sehr gute Laufleistung</li>}
+                  {player.duelsWon > 55 && <li>• Stark im Zweikampf</li>}
+                </ul>
+              </div>
+              <div className="rounded-lg bg-card/50 p-3 border border-border/30">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <TrendingDown className="w-3 h-3 text-warning" />
+                  <span className="text-[10px] font-semibold text-foreground">Entwicklungsfelder</span>
+                </div>
+                <ul className="text-[9px] text-muted-foreground space-y-0.5">
+                  {player.passAccuracy < 75 && <li>• Passgenauigkeit verbessern</li>}
+                  {player.duelsWon < 45 && <li>• Zweikampfführung trainieren</li>}
+                  {player.sprints < 30 && <li>• Mehr Tiefenläufe einfordern</li>}
+                </ul>
+              </div>
+              <div className="rounded-lg bg-card/50 p-3 border border-border/30">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <TriangleAlert className="w-3 h-3 text-destructive" />
+                  <span className="text-[10px] font-semibold text-foreground">Hinweise</span>
+                </div>
+                <ul className="text-[9px] text-muted-foreground space-y-0.5">
+                  {player.foulsCommitted >= 3 && <li>• Hohe Foulquote — Gelbgefahr</li>}
+                  {player.yellowCards > 0 && <li>• Verwarnung erhalten</li>}
+                  <li>• Belastungssteuerung beachten</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ─── Helper Components ─── */
+function StatRow({ label, value, highlight, warning }: { label: string; value: string | number; highlight?: boolean; warning?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className={`text-[10px] font-bold ${warning ? "text-destructive" : highlight ? "text-primary" : "text-foreground"}`}>{value}</span>
+    </div>
+  );
+}
+
+function PerformanceBar({ label, value, max, unit }: { label: string; value: number; max: number; unit: string }) {
+  const pct = Math.min((value / max) * 100, 100);
+  return (
+    <div>
+      <div className="flex justify-between text-[10px] mb-1">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium text-foreground">{value.toFixed(1)}{unit}</span>
+      </div>
+      <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
+        <motion.div 
+          className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary" 
+          initial={{ width: 0 }} 
+          animate={{ width: `${pct}%` }} 
+          transition={{ duration: 0.8, delay: 0.2 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function getRadarPoints(cx: number, cy: number, r: number, sides: number, values?: number[]): string {
+  const points: string[] = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (Math.PI * 2 * i) / sides - Math.PI / 2;
+    const radius = values ? r * Math.min(values[i] || 0, 1) : r;
+    const x = cx + radius * Math.cos(angle);
+    const y = cy + radius * Math.sin(angle);
+    points.push(`${x},${y}`);
+  }
+  return points.join(" ");
 }
 
 /* ─── Reusable Heatmap on Football Field ─── */
@@ -647,7 +1006,8 @@ function generateDemoData(): DemoData {
 
   const players: DemoPlayer[] = names.map((n) => {
     const isGK = n.pos === "TW";
-    const isAttacker = ["ST", "RA", "LA"].includes(n.pos);
+    const isAttacker = ["ST", "RA", "LA", "ZOM"].includes(n.pos);
+    const isDefender = ["IV", "LV", "RV"].includes(n.pos);
 
     // Generate individual heatmap
     const spots = positionHotspots[n.pos] || [{ cx: 10, cy: 7 }];
@@ -666,16 +1026,35 @@ function generateDemoData(): DemoData {
       heatmap.push(rowData);
     }
 
+    const km = isGK ? r(5.5, 6.5) : isAttacker ? r(9.5, 11.5) : r(10, 12.5);
+    const sprints = isGK ? ri(5, 12) : ri(25, 55);
+
     return {
       ...n,
-      km: isGK ? r(5.5, 6.5) : isAttacker ? r(9.5, 11.5) : r(10, 12.5),
+      // FieldIQ Tracking
+      km,
       topSpeed: isGK ? r(22, 26) : r(28, 34),
-      sprints: isGK ? ri(5, 12) : ri(25, 55),
+      sprints,
+      sprintDistanceM: sprints * ri(15, 30),
       avgSpeed: isGK ? r(4, 5.5) : r(6.5, 8.5),
-      passAccuracy: isGK ? ri(65, 80) : ri(72, 95),
-      duelsWon: ri(40, 75),
-      rating: isGK ? r(6.0, 8.0) : r(5.8, 8.5),
+      minutesPlayed: isGK ? 90 : ri(65, 90),
       heatmap,
+      // API-Football
+      passAccuracy: isGK ? ri(65, 80) : ri(72, 95),
+      passesTotal: isGK ? ri(20, 35) : ri(25, 75),
+      duelsWon: ri(40, 75),
+      duelsTotal: ri(8, 20),
+      tackles: isDefender ? ri(3, 8) : ri(0, 4),
+      dribblesSuccess: isAttacker ? ri(2, 7) : ri(0, 3),
+      shotsTotal: isAttacker ? ri(2, 6) : ri(0, 2),
+      shotsOnGoal: isAttacker ? ri(1, 4) : ri(0, 1),
+      goals: isAttacker ? (Math.random() > 0.6 ? ri(1, 2) : 0) : 0,
+      assists: isAttacker || n.pos === "ZM" ? (Math.random() > 0.7 ? 1 : 0) : 0,
+      foulsCommitted: ri(0, 4),
+      foulsDrawn: ri(0, 5),
+      yellowCards: Math.random() > 0.85 ? 1 : 0,
+      redCards: 0,
+      rating: isGK ? r(6.0, 8.0) : r(5.8, 8.5),
       trend: (["up", "down", "stable"] as const)[ri(0, 3)],
     };
   });
@@ -718,9 +1097,13 @@ function generateDemoData(): DemoData {
       sprints: players.reduce((s, p) => s + p.sprints, 0),
       passes: ri(380, 520),
       passAccuracy: r(78, 92),
+      shotsTotal: ri(10, 18),
       shotsOnTarget: ri(4, 9),
       corners: ri(3, 8),
       fouls: ri(8, 18),
+      yellowCards: ri(1, 4),
+      redCards: Math.random() > 0.9 ? 1 : 0,
+      offsides: ri(1, 5),
     },
     heatmapGrid,
     apiStats: {
@@ -730,6 +1113,10 @@ function generateDemoData(): DemoData {
       fieldTilt: r(45, 65),
       shotConversion: r(10, 30),
       duelWinRate: r(45, 65),
+      aerialWinRate: r(40, 60),
+      crossAccuracy: r(20, 45),
+      counterAttacks: ri(3, 10),
+      setPlayGoals: ri(0, 2),
     },
   };
 }
