@@ -9,7 +9,6 @@ function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string
 
   useEffect(() => {
     if (!isInView) return;
-    let start = 0;
     const duration = 1500;
     const startTime = Date.now();
     const tick = () => {
@@ -35,27 +34,27 @@ export function KeyNumbers() {
   ];
 
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-16 md:py-24 border-y border-border/30">
       <div className="container mx-auto px-4">
-        <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-8">
+        <div className="max-w-4xl mx-auto grid grid-cols-3 divide-x divide-border/30">
           {stats.map((stat, i) => (
             <motion.div
               key={i}
-              className="text-center"
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileInView={{ opacity: 1, scale: 1 }}
+              className="text-center px-4 md:px-8"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.15 }}
+              transition={{ duration: 0.5, delay: i * 0.12 }}
             >
-              <div className="text-6xl md:text-7xl font-bold font-display gradient-text mb-2">
+              <div className="text-4xl md:text-6xl font-bold font-display gradient-text mb-1">
                 {stat.value === 0 ? (
                   <span>0€</span>
                 ) : (
                   <AnimatedNumber value={stat.value} suffix={stat.suffix} />
                 )}
               </div>
-              <div className="text-lg font-semibold font-display mb-1">{stat.label}</div>
-              <div className="text-sm text-muted-foreground">{stat.sublabel}</div>
+              <div className="text-sm md:text-base font-semibold font-display mb-0.5">{stat.label}</div>
+              <div className="text-xs text-muted-foreground hidden md:block">{stat.sublabel}</div>
             </motion.div>
           ))}
         </div>
