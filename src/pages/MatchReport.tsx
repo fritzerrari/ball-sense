@@ -2,6 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
 import { useState } from "react";
 import { BarChart3, Zap, Route, Users, ArrowUpDown, ArrowLeft, FileText, Download, Share2, ChevronDown, ChevronUp } from "lucide-react";
+import ReportGenerator from "@/components/ReportGenerator";
 import { useMatch, useMatchLineups, useTrackingUploads } from "@/hooks/use-matches";
 import { usePlayerMatchStats, useTeamMatchStats } from "@/hooks/use-match-stats";
 import { useAuth } from "@/components/AuthProvider";
@@ -11,7 +12,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich"];
+const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich", "KI-Bericht"];
 
 export default function MatchReport() {
   const { id } = useParams();
@@ -213,6 +214,15 @@ export default function MatchReport() {
           </div>
         )}
 
+        {activeTab === "KI-Bericht" && (
+          <ReportGenerator
+            matchId={match.id}
+            matchStatus={match.status}
+            clubName={clubName ?? "Heim"}
+            awayClubName={match.away_club_name ?? "Gegner"}
+            matchDate={match.date}
+          />
+        )}
         {activeTab === "Heim" && renderPlayerTable(homePlayerStats)}
         {activeTab === "Auswärts" && renderPlayerTable(awayPlayerStats)}
 
