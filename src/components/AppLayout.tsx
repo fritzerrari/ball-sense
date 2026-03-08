@@ -95,7 +95,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 py-4 px-2 space-y-1">
-          {navItems.map((item) => {
+          {allNavItems.map((item) => {
             const active = location.pathname.startsWith(item.href);
             return (
               <Link
