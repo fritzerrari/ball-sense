@@ -132,6 +132,20 @@ export function DemoSection() {
 
 /* ─── Notification State ─── */
 function NotificationState({ onLoad }: { onLoad: () => void }) {
+  // Previous match data (stale) to show something meaningful before new data loads
+  const staleStats = [
+    { label: "Ø Distanz", value: "9.8 km", trend: "stable" as const },
+    { label: "Topspeed", value: "28.4 km/h", trend: "down" as const },
+    { label: "Sprints", value: "142", trend: "up" as const },
+    { label: "Ballbesitz", value: "48%", trend: "down" as const },
+  ];
+
+  const staleTopRunners = [
+    { name: "L. Schmidt", km: 11.2 },
+    { name: "T. Wagner", km: 10.8 },
+    { name: "M. Fischer", km: 10.3 },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -139,38 +153,89 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
       exit={{ opacity: 0, y: -20 }}
       className="max-w-2xl mx-auto space-y-6"
     >
-      {/* Empty dashboard skeleton */}
-      <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-6 space-y-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <BarChart3 className="w-4 h-4 text-primary/40" />
+      {/* Dashboard with stale data */}
+      <div className="rounded-2xl border border-border bg-card shadow-lg p-6 space-y-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold font-display text-foreground">Mein Dashboard</div>
+              <div className="text-[10px] text-muted-foreground">FC Musterstadt · Saison 2025/26</div>
+            </div>
           </div>
-          <div>
-            <div className="text-sm font-semibold font-display text-foreground/60">Mein Dashboard</div>
-            <div className="text-[10px] text-muted-foreground">FC Musterstadt · Saison 2025/26</div>
+          <div className="text-right">
+            <div className="text-[10px] text-muted-foreground/70">Letztes Spiel</div>
+            <div className="text-xs font-medium text-muted-foreground">vor 7 Tagen</div>
           </div>
         </div>
+
+        {/* Stats cards with actual data */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {["Distanz", "Topspeed", "Sprints", "Ballbesitz"].map((l) => (
-            <div key={l} className="rounded-xl border border-dashed border-border/50 bg-muted/10 p-4 text-center">
-              <div className="text-2xl font-bold font-display text-muted-foreground/20">—</div>
-              <div className="text-[10px] text-muted-foreground/50 mt-1">{l}</div>
+          {staleStats.map((stat) => (
+            <div key={stat.label} className="rounded-xl border border-border bg-muted/30 p-4 text-center">
+              <div className="flex items-center justify-center gap-1">
+                <span className="text-xl font-bold font-display text-foreground">{stat.value}</span>
+                {stat.trend === "up" && <ArrowUpRight className="w-3 h-3 text-success" />}
+                {stat.trend === "down" && <ArrowDownRight className="w-3 h-3 text-destructive/70" />}
+                {stat.trend === "stable" && <Minus className="w-3 h-3 text-muted-foreground" />}
+              </div>
+              <div className="text-[10px] text-muted-foreground mt-1">{stat.label}</div>
             </div>
           ))}
         </div>
+
+        {/* Two columns: Top runners + Mini heatmap */}
         <div className="grid md:grid-cols-2 gap-3">
-          <div className="rounded-xl border border-dashed border-border/50 bg-muted/10 p-4 h-32 flex items-center justify-center">
-            <span className="text-xs text-muted-foreground/30">Keine Spieldaten vorhanden</span>
+          {/* Top runners list */}
+          <div className="rounded-xl border border-border bg-muted/20 p-4">
+            <div className="text-[10px] font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Top-Läufer (letztes Spiel)</div>
+            <div className="space-y-2">
+              {staleTopRunners.map((p, i) => (
+                <div key={p.name} className="flex items-center gap-2">
+                  <span className="text-[10px] font-medium text-foreground/80 w-16 truncate">{p.name}</span>
+                  <div className="flex-1 h-2 rounded-full bg-muted/50 overflow-hidden">
+                    <div 
+                      className="h-full rounded-full bg-primary/50" 
+                      style={{ width: `${(p.km / 12) * 100}%` }} 
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground w-10 text-right">{p.km} km</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="rounded-xl border border-dashed border-border/50 bg-muted/10 p-4 h-32 flex items-center justify-center">
-            <span className="text-xs text-muted-foreground/30">Keine Heatmap verfügbar</span>
+
+          {/* Mini Heatmap preview */}
+          <div className="rounded-xl border border-border bg-muted/20 p-4">
+            <div className="text-[10px] font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Team-Heatmap</div>
+            <div className="aspect-[105/68] rounded-lg bg-pitch/20 relative overflow-hidden">
+              {/* Simple heatmap visualization */}
+              <div className="absolute inset-1 grid grid-cols-8 grid-rows-5 gap-px">
+                {Array.from({ length: 40 }).map((_, i) => {
+                  const intensity = [0.1, 0.2, 0.3, 0.5, 0.6, 0.4, 0.3, 0.2][i % 8] * (i < 16 ? 0.7 : i < 32 ? 1 : 0.5);
+                  return (
+                    <div 
+                      key={i} 
+                      className="rounded-[2px]" 
+                      style={{ backgroundColor: `hsla(160, 70%, 40%, ${intensity * 0.6})` }} 
+                    />
+                  );
+                })}
+              </div>
+              {/* Center line */}
+              <div className="absolute inset-y-0 left-1/2 w-px bg-pitch-line/20" />
+              {/* Center circle */}
+              <div className="absolute top-1/2 left-1/2 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pitch-line/20" />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Notification card */}
       <motion.div
-        className="rounded-2xl border-2 border-primary/40 bg-primary/5 backdrop-blur-sm p-6 cursor-pointer hover:border-primary/60 transition-colors"
+        className="rounded-2xl border-2 border-primary bg-primary/10 backdrop-blur-sm p-6 cursor-pointer hover:bg-primary/15 hover:border-primary transition-all shadow-lg shadow-primary/20"
         onClick={onLoad}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -180,22 +245,26 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
       >
         <div className="flex items-start gap-4">
           <div className="relative shrink-0">
-            <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
               <Bell className="w-6 h-6 text-primary" />
             </div>
-            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive flex items-center justify-center">
-              <span className="text-[8px] font-bold text-destructive-foreground">1</span>
-            </div>
+            <motion.div 
+              className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center"
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              <span className="text-[9px] font-bold text-destructive-foreground">1</span>
+            </motion.div>
           </div>
           <div className="flex-1">
             <div className="text-sm font-bold font-display text-foreground mb-1">
               🎉 Neue Spieldaten verfügbar!
             </div>
-            <div className="text-xs text-muted-foreground mb-3">
+            <div className="text-xs text-foreground/80 mb-2">
               FC Musterstadt vs. SV Beispielburg · Sonntag, 2. März 2026 · 15:30 Uhr
             </div>
-            <div className="text-xs text-muted-foreground/70 mb-4">
-              3 Kameras haben 90 Minuten Tracking-Daten aufgezeichnet. Die Daten sind bereit zur Analyse.
+            <div className="text-xs text-muted-foreground mb-4">
+              3 Kameras haben 90 Minuten Tracking-Daten aufgezeichnet. Bereit zur Analyse.
             </div>
             <Button variant="hero" size="sm" className="gap-2" onClick={onLoad}>
               <Play className="w-4 h-4" />
