@@ -1,5 +1,15 @@
 import { useEffect, useRef } from "react";
 
+interface Player {
+  bx: number;
+  by: number;
+  phase: number;
+  speed: number;
+  x: number;
+  y: number;
+  heatPoints: { x: number; y: number; age: number }[];
+}
+
 export function HeroPitch() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
@@ -22,17 +32,21 @@ export function HeroPitch() {
     resize();
     window.addEventListener("resize", resize);
 
-    // Only 6 key players — clean, minimal
-    const players = [
+    const players: Player[] = [
       { bx: 0.18, by: 0.35, phase: 0, speed: 0.4 },
       { bx: 0.25, by: 0.65, phase: 1.5, speed: 0.35 },
       { bx: 0.38, by: 0.28, phase: 3.0, speed: 0.5 },
       { bx: 0.42, by: 0.72, phase: 4.2, speed: 0.45 },
       { bx: 0.62, by: 0.4, phase: 2.1, speed: 0.38 },
       { bx: 0.7, by: 0.6, phase: 5.0, speed: 0.42 },
-    ].map(p => ({ ...p, x: p.bx, y: p.by, heatPoints: [] as { x: number; y: number; age: number }[] }));
+    ].map(p => ({ ...p, x: p.bx, y: p.by, heatPoints: [] }));
 
     let t = 0;
+
+    // Grass stripe colors
+    const darkStripe = "hsl(145, 52%, 26%)";
+    const lightStripe = "hsl(145, 48%, 24%)";
+    const bgColor = "hsl(145, 50%, 25%)";
 
     const draw = () => {
       t += 0.016;
@@ -43,8 +57,21 @@ export function HeroPitch() {
       const pw = w - mx * 2;
       const ph = h - my * 2;
 
-      // Pitch lines — very subtle
-      ctx.strokeStyle = "rgba(22, 163, 74, 0.07)";
+      // Grass background
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(mx, my, pw, ph);
+
+      // Grass stripes
+      const stripeW = pw / 10;
+      for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = i % 2 === 0 ? darkStripe : lightStripe;
+        ctx.globalAlpha = 0.4;
+        ctx.fillRect(mx + i * stripeW, my, stripeW, ph);
+      }
+      ctx.globalAlpha = 1;
+
+      // Pitch lines
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
       ctx.lineWidth = 1;
       ctx.strokeRect(mx, my, pw, ph);
 
@@ -65,7 +92,7 @@ export function HeroPitch() {
       ctx.strokeRect(mx, h / 2 - paH / 2, paW, paH);
       ctx.strokeRect(mx + pw - paW, h / 2 - paH / 2, paW, paH);
 
-      // Players — just dots + heatmap buildup, NO trails
+      // Players with heatmap
       for (const p of players) {
         p.phase += 0.006 * p.speed;
         const wanderR = 0.025;
@@ -77,17 +104,16 @@ export function HeroPitch() {
         const sx = mx + p.x * pw;
         const sy = my + p.y * ph;
 
-        // Accumulate heatmap points slowly
+        // Accumulate heatmap points
         if (Math.random() < 0.15) {
           p.heatPoints.push({ x: sx, y: sy, age: 0 });
         }
-        // Age and remove old points
         for (let i = p.heatPoints.length - 1; i >= 0; i--) {
           p.heatPoints[i].age += 0.005;
           if (p.heatPoints[i].age > 1) p.heatPoints.splice(i, 1);
         }
 
-        // Draw heatmap — accumulated glow zones
+        // Draw heatmap glow
         for (const hp of p.heatPoints) {
           const alpha = 0.04 * (1 - hp.age);
           const grad = ctx.createRadialGradient(hp.x, hp.y, 0, hp.x, hp.y, 22);
@@ -99,13 +125,13 @@ export function HeroPitch() {
           ctx.fill();
         }
 
-        // Player dot — clean, small
+        // Player dot
         ctx.beginPath();
         ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(22, 163, 74, 0.7)";
         ctx.fill();
 
-        // Subtle pulse ring
+        // Pulse ring
         const pulseR = 6 + Math.sin(t * 2 + p.phase) * 2;
         ctx.beginPath();
         ctx.arc(sx, sy, pulseR, 0, Math.PI * 2);
