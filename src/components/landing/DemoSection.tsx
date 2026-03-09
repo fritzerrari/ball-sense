@@ -980,10 +980,10 @@ function generateDemoData(): DemoData {
   const ri = (min: number, max: number) => Math.floor(r(min, max));
 
   const names = [
-    { name: "L. Müller", pos: "ST", num: 9 },
-    { name: "T. Kroos", pos: "ZM", num: 8 },
-    { name: "J. Kimmich", pos: "ZDM", num: 6 },
-    { name: "S. Gnabry", pos: "RA", num: 7 },
+    { name: "T. Hartmann", pos: "ST", num: 9 },
+    { name: "M. Lindner", pos: "ZM", num: 8 },
+    { name: "S. Braun", pos: "ZDM", num: 6 },
+    { name: "F. König", pos: "RA", num: 7 },
     { name: "A. Vogt", pos: "ZOM", num: 10 },
     { name: "M. Berger", pos: "IV", num: 4 },
     { name: "F. Hauser", pos: "LV", num: 3 },
