@@ -769,7 +769,7 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-xl font-bold font-display text-primary">{player.rating.toFixed(1)}</div>
+                    <div className="text-xl font-bold font-display text-primary">{safeNum(player.rating).toFixed(1)}</div>
                     <div className="text-[8px] text-muted-foreground">Rating</div>
                   </div>
                 </div>
