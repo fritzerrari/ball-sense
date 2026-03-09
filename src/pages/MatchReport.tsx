@@ -79,16 +79,16 @@ export default function MatchReport() {
       );
     }
     return (
-      <div className="glass-card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="glass-card overflow-x-auto">
+        <table className="w-full text-sm min-w-[500px]">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Spieler</th>
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">#</th>
+              <th className="text-left py-3 px-3 sm:px-4 text-muted-foreground font-medium text-xs">Spieler</th>
+              <th className="text-left py-3 px-2 text-muted-foreground font-medium text-xs">#</th>
               <SortHeader label="km" field="distance_km" />
-              <SortHeader label="Top km/h" field="top_speed_kmh" />
-              <SortHeader label="Sprints" field="sprint_count" />
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden md:table-cell">Min</th>
+              <SortHeader label="Top" field="top_speed_kmh" />
+              <SortHeader label="Spr." field="sprint_count" />
+              <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs hidden sm:table-cell">Min</th>
               <th className="w-8" />
             </tr>
           </thead>
