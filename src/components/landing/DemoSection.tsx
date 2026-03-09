@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HEATMAP_COLS, HEATMAP_ROWS } from "@/lib/constants";
+import { MiniHeatmap } from "@/components/HeatmapField";
 
 type DemoState = "notification" | "loading" | "analyzing" | "dashboard";
 
