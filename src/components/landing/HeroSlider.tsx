@@ -95,6 +95,18 @@ export function HeroSlider() {
 function TrackingSlide() {
   const grid = generateMockHeatmap();
   const maxVal = Math.max(...grid.flat(), 0.01);
+  const cw = 105 / HEATMAP_COLS;
+  const ch = 68 / HEATMAP_ROWS;
+
+  // Convert grid to heat spots
+  const heatSpots: { x: number; y: number; intensity: number }[] = [];
+  grid.forEach((row, rowIdx) => {
+    row.forEach((val, colIdx) => {
+      if (val > maxVal * 0.05) {
+        heatSpots.push({ x: colIdx * cw + cw / 2, y: rowIdx * ch + ch / 2, intensity: val / maxVal });
+      }
+    });
+  });
 
   return (
     <motion.div
@@ -109,50 +121,57 @@ function TrackingSlide() {
         {/* Unified grass pitch via SVG */}
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid slice">
           <defs>
-            <linearGradient id="sliderGrassBase" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="hsl(145, 55%, 28%)" />
-              <stop offset="50%" stopColor="hsl(145, 50%, 25%)" />
-              <stop offset="100%" stopColor="hsl(145, 45%, 22%)" />
+            <linearGradient id="sliderGrassBase" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="hsl(160, 45%, 38%)" />
+              <stop offset="50%" stopColor="hsl(155, 42%, 35%)" />
+              <stop offset="100%" stopColor="hsl(150, 40%, 32%)" />
             </linearGradient>
             <pattern id="sliderGrassStripes" patternUnits="userSpaceOnUse" width="10" height="68">
-              <rect x="0" y="0" width="5" height="68" fill="hsl(145, 52%, 26%)" />
-              <rect x="5" y="0" width="5" height="68" fill="hsl(145, 48%, 24%)" />
+              <rect x="0" y="0" width="5" height="68" fill="hsl(158, 44%, 36%)" />
+              <rect x="5" y="0" width="5" height="68" fill="hsl(155, 40%, 34%)" />
             </pattern>
-            <filter id="sliderHeatBlur" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="0.3" />
-            </filter>
+            <radialGradient id="sHeatLow"><stop offset="0%" stopColor="hsl(160,60%,48%)" stopOpacity="0.5" /><stop offset="60%" stopColor="hsl(160,50%,42%)" stopOpacity="0.2" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+            <radialGradient id="sHeatMedLow"><stop offset="0%" stopColor="hsl(120,55%,48%)" stopOpacity="0.65" /><stop offset="50%" stopColor="hsl(140,50%,42%)" stopOpacity="0.3" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+            <radialGradient id="sHeatMed"><stop offset="0%" stopColor="hsl(55,85%,52%)" stopOpacity="0.8" /><stop offset="40%" stopColor="hsl(70,70%,48%)" stopOpacity="0.4" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+            <radialGradient id="sHeatHigh"><stop offset="0%" stopColor="hsl(25,90%,52%)" stopOpacity="0.85" /><stop offset="35%" stopColor="hsl(40,80%,48%)" stopOpacity="0.45" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+            <radialGradient id="sHeatMax"><stop offset="0%" stopColor="hsl(0,85%,50%)" stopOpacity="0.95" /><stop offset="25%" stopColor="hsl(10,90%,48%)" stopOpacity="0.7" /><stop offset="55%" stopColor="hsl(25,80%,45%)" stopOpacity="0.3" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+            <filter id="sHeatBlur1" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur in="SourceGraphic" stdDeviation="4" /></filter>
+            <filter id="sHeatBlur2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur in="SourceGraphic" stdDeviation="2" /></filter>
           </defs>
 
-          {/* Pitch background with grass stripes */}
+          {/* Pitch background */}
           <rect x="0" y="0" width="105" height="68" fill="url(#sliderGrassBase)" />
-          <rect x="0" y="0" width="105" height="68" fill="url(#sliderGrassStripes)" opacity="0.4" />
+          <rect x="0" y="0" width="105" height="68" fill="url(#sliderGrassStripes)" opacity="0.25" />
 
-          {/* Heat cells */}
-          <g filter="url(#sliderHeatBlur)" opacity="0.85">
-            {grid.flat().map((val, i) => {
-              const colIdx = i % HEATMAP_COLS;
-              const rowIdx = Math.floor(i / HEATMAP_COLS);
-              const intensity = val / maxVal;
-              if (intensity < 0.08) return null;
-              const cw = 105 / HEATMAP_COLS;
-              const ch = 68 / HEATMAP_ROWS;
-              const color = intensity < 0.15 ? "hsla(142,70%,35%,0.3)" : intensity < 0.3 ? "hsla(142,65%,40%,0.55)" : intensity < 0.45 ? "hsla(85,60%,45%,0.65)" : intensity < 0.55 ? "hsla(55,75%,50%,0.75)" : intensity < 0.65 ? "hsla(45,85%,50%,0.8)" : intensity < 0.75 ? "hsla(30,90%,50%,0.85)" : intensity < 0.85 ? "hsla(15,95%,50%,0.9)" : "hsla(0,90%,50%,0.95)";
-              return <rect key={i} x={colIdx * cw + 0.1} y={rowIdx * ch + 0.1} width={cw - 0.2} height={ch - 0.2} fill={color} rx="0.2" ry="0.2" />;
+          {/* Smooth heatmap - base layer */}
+          <g filter="url(#sHeatBlur1)" opacity="0.5">
+            {heatSpots.filter(s => s.intensity > 0.15).map((spot, i) => {
+              const gid = spot.intensity > 0.8 ? "sHeatMax" : spot.intensity > 0.6 ? "sHeatHigh" : spot.intensity > 0.4 ? "sHeatMed" : spot.intensity > 0.2 ? "sHeatMedLow" : "sHeatLow";
+              const r = 5 + spot.intensity * 10;
+              return <ellipse key={`b${i}`} cx={spot.x} cy={spot.y} rx={r * 1.3} ry={r} fill={`url(#${gid})`} />;
+            })}
+          </g>
+          {/* Detail layer */}
+          <g filter="url(#sHeatBlur2)" opacity="0.75">
+            {heatSpots.map((spot, i) => {
+              const gid = spot.intensity > 0.8 ? "sHeatMax" : spot.intensity > 0.6 ? "sHeatHigh" : spot.intensity > 0.4 ? "sHeatMed" : spot.intensity > 0.2 ? "sHeatMedLow" : "sHeatLow";
+              const r = 3 + spot.intensity * 7;
+              return <ellipse key={`d${i}`} cx={spot.x} cy={spot.y} rx={r} ry={r * 0.85} fill={`url(#${gid})`} opacity={0.5 + spot.intensity * 0.5} />;
             })}
           </g>
 
           {/* Field lines */}
-          <g stroke="white" strokeOpacity="0.5" fill="none">
+          <g stroke="white" strokeOpacity="0.4" fill="none">
             <rect x="1" y="1" width="103" height="66" strokeWidth="0.35" rx="0.5" />
             <line x1="52.5" y1="1" x2="52.5" y2="67" strokeWidth="0.3" />
             <circle cx="52.5" cy="34" r="9.15" strokeWidth="0.3" />
-            <circle cx="52.5" cy="34" r="0.6" fill="white" fillOpacity="0.5" stroke="none" />
+            <circle cx="52.5" cy="34" r="0.6" fill="white" fillOpacity="0.4" stroke="none" />
             <rect x="1" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
             <rect x="87.5" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
             <rect x="1" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
             <rect x="98.5" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
-            <circle cx="12" cy="34" r="0.4" fill="white" fillOpacity="0.4" stroke="none" />
-            <circle cx="93" cy="34" r="0.4" fill="white" fillOpacity="0.4" stroke="none" />
+            <circle cx="12" cy="34" r="0.4" fill="white" fillOpacity="0.35" stroke="none" />
+            <circle cx="93" cy="34" r="0.4" fill="white" fillOpacity="0.35" stroke="none" />
             <path d="M 17.5 27.5 A 9.15 9.15 0 0 1 17.5 40.5" strokeWidth="0.25" />
             <path d="M 87.5 27.5 A 9.15 9.15 0 0 0 87.5 40.5" strokeWidth="0.25" />
             <path d="M 1 2 A 1 1 0 0 0 2 1" strokeWidth="0.2" />
