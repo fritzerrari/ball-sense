@@ -691,8 +691,8 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
           <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Gesamtbewertung</div>
-              <div className={`text-xl font-bold font-display ${player.rating >= 7.5 ? "text-primary" : player.rating >= 6.5 ? "text-foreground" : "text-warning"}`}>
-                {player.rating.toFixed(1)}
+              <div className={`text-xl font-bold font-display ${safeNum(player.rating) >= 7.5 ? "text-primary" : safeNum(player.rating) >= 6.5 ? "text-foreground" : "text-warning"}`}>
+                {safeNum(player.rating).toFixed(1)}
               </div>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
