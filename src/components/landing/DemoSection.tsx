@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HEATMAP_COLS, HEATMAP_ROWS } from "@/lib/constants";
 import { MiniHeatmap } from "@/components/HeatmapField";
 import useEmblaCarousel from "embla-carousel-react";
+import { getRandomDemoData, type DemoData, type DemoPlayer } from "@/lib/demo-data";
 
 type DemoState = "notification" | "loading" | "analyzing" | "dashboard";
 
