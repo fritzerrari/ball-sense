@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, RotateCcw, AlertTriangle, TrendingUp, Zap, Route, Users, Activity, Timer,
@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HEATMAP_COLS, HEATMAP_ROWS } from "@/lib/constants";
 import { MiniHeatmap } from "@/components/HeatmapField";
+import useEmblaCarousel from "embla-carousel-react";
 
 type DemoState = "notification" | "loading" | "analyzing" | "dashboard";
 
@@ -523,70 +524,8 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
 
         {/* Players Tab */}
         <TabsContent value="players" className="space-y-4">
-          {/* Player spotlight cards */}
-          <div className="grid md:grid-cols-2 gap-4">
-            {topPlayers.map((p, i) => {
-              const playerMaxHeat = Math.max(...p.heatmap.flat(), 0.01);
-              return (
-                <motion.div
-                  key={p.name}
-                  className="rounded-xl border border-border/50 bg-card/50 p-4 hover:border-primary/50 transition-all cursor-pointer"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  onClick={() => setSelectedPlayer(p)}
-                >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold font-display text-primary">{p.num}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold font-display text-foreground truncate">{p.name}</span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{p.pos}</span>
-                      </div>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground">Bewertung:</span>
-                        <span className={`text-xs font-bold ${p.rating >= 7.5 ? "text-primary" : p.rating >= 6.5 ? "text-foreground" : "text-warning"}`}>
-                          {p.rating.toFixed(1)}
-                        </span>
-                        {p.trend === "up" && <ArrowUpRight className="w-3 h-3 text-primary" />}
-                        {p.trend === "down" && <ArrowDownRight className="w-3 h-3 text-destructive" />}
-                        {p.trend === "stable" && <Minus className="w-3 h-3 text-muted-foreground" />}
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-[10px] h-7 gap-1 shrink-0"
-                      onClick={(e) => { e.stopPropagation(); setSelectedPlayer(p); }}
-                    >
-                      <Eye className="w-3 h-3" />
-                      Analysieren
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    {[
-                      { label: "km", value: p.km.toFixed(1) },
-                      { label: "Top km/h", value: p.topSpeed.toFixed(1) },
-                      { label: "Sprints", value: p.sprints.toString() },
-                      { label: "Passquote", value: `${p.passAccuracy}%` },
-                    ].map((s) => (
-                      <div key={s.label} className="text-center">
-                        <div className="text-xs font-bold font-display text-foreground">{s.value}</div>
-                        <div className="text-[8px] text-muted-foreground">{s.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Individual heatmap */}
-                  <div className="text-[9px] text-muted-foreground mb-1 font-display">Individuelle Heatmap</div>
-                  <HeatmapField grid={p.heatmap} maxVal={playerMaxHeat} small />
-                </motion.div>
-              );
-            })}
-          </div>
+          {/* Player spotlight carousel */}
+          <PlayerHeatmapCarousel players={data.players} onSelectPlayer={setSelectedPlayer} />
 
           {/* Full roster table */}
           <div className="rounded-xl border border-border/50 bg-card/50 p-4 overflow-x-auto">
@@ -1246,6 +1185,162 @@ function HeatmapField({ grid, maxVal }: { grid: number[][]; maxVal: number; smal
           <path d="M 105 67 A 1 1 0 0 0 104 68" strokeWidth="0.15" strokeOpacity="0.18" />
         </g>
       </svg>
+    </div>
+  );
+}
+
+/* ─── Player Heatmap Carousel ─── */
+function PlayerHeatmapCarousel({ 
+  players, 
+  onSelectPlayer 
+}: { 
+  players: DemoPlayer[]; 
+  onSelectPlayer: (p: DemoPlayer) => void;
+}) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ 
+    loop: true, 
+    align: "start",
+    dragFree: true,
+  });
+  const autoplayRef = useRef<NodeJS.Timeout | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Auto-scroll effect
+  useEffect(() => {
+    if (!emblaApi || isPaused) return;
+
+    const startAutoplay = () => {
+      autoplayRef.current = setInterval(() => {
+        if (emblaApi.canScrollNext()) {
+          emblaApi.scrollNext();
+        } else {
+          emblaApi.scrollTo(0);
+        }
+      }, 3000);
+    };
+
+    startAutoplay();
+
+    return () => {
+      if (autoplayRef.current) clearInterval(autoplayRef.current);
+    };
+  }, [emblaApi, isPaused]);
+
+  const handleMouseEnter = () => {
+    setIsPaused(true);
+    if (autoplayRef.current) clearInterval(autoplayRef.current);
+  };
+
+  const handleMouseLeave = () => {
+    setIsPaused(false);
+  };
+
+  const scrollPrev = () => emblaApi?.scrollPrev();
+  const scrollNext = () => emblaApi?.scrollNext();
+
+  return (
+    <div className="relative">
+      {/* Navigation buttons */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-background/90 backdrop-blur-sm shadow-lg border-border/50 hover:bg-primary/10"
+        onClick={scrollPrev}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-background/90 backdrop-blur-sm shadow-lg border-border/50 hover:bg-primary/10"
+        onClick={scrollNext}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+
+      {/* Carousel */}
+      <div 
+        ref={emblaRef} 
+        className="overflow-hidden mx-4"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <div className="flex gap-4">
+          {players.map((p, i) => {
+            const playerMaxHeat = Math.max(...p.heatmap.flat(), 0.01);
+            return (
+              <motion.div
+                key={p.name}
+                className="flex-shrink-0 w-[280px] md:w-[320px] rounded-xl border border-border/50 bg-card/50 p-4 hover:border-primary/50 transition-all cursor-pointer"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                onClick={() => onSelectPlayer(p)}
+              >
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold font-display text-primary">{p.num}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold font-display text-foreground truncate">{p.name}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{p.pos}</span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground">Bewertung:</span>
+                      <span className={`text-xs font-bold ${p.rating >= 7.5 ? "text-primary" : p.rating >= 6.5 ? "text-foreground" : "text-warning"}`}>
+                        {p.rating.toFixed(1)}
+                      </span>
+                      {p.trend === "up" && <ArrowUpRight className="w-3 h-3 text-primary" />}
+                      {p.trend === "down" && <ArrowDownRight className="w-3 h-3 text-destructive" />}
+                      {p.trend === "stable" && <Minus className="w-3 h-3 text-muted-foreground" />}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {[
+                    { label: "km", value: p.km.toFixed(1) },
+                    { label: "Top km/h", value: p.topSpeed.toFixed(1) },
+                    { label: "Sprints", value: p.sprints.toString() },
+                    { label: "Passquote", value: `${p.passAccuracy}%` },
+                  ].map((s) => (
+                    <div key={s.label} className="text-center">
+                      <div className="text-xs font-bold font-display text-foreground">{s.value}</div>
+                      <div className="text-[8px] text-muted-foreground">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Individual heatmap */}
+                <div className="text-[9px] text-muted-foreground mb-1 font-display">Individuelle Heatmap</div>
+                <HeatmapField grid={p.heatmap} maxVal={playerMaxHeat} small />
+
+                {/* Analyze button */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mt-3 text-[10px] h-7 gap-1"
+                  onClick={(e) => { e.stopPropagation(); onSelectPlayer(p); }}
+                >
+                  <Eye className="w-3 h-3" />
+                  Analysieren
+                </Button>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Auto-scroll indicator */}
+      <div className="flex items-center justify-center gap-2 mt-3 text-[10px] text-muted-foreground">
+        <motion.div 
+          className={`w-1.5 h-1.5 rounded-full ${isPaused ? 'bg-warning' : 'bg-primary'}`}
+          animate={{ opacity: isPaused ? 1 : [1, 0.4, 1] }}
+          transition={{ duration: 1.5, repeat: isPaused ? 0 : Infinity }}
+        />
+        <span>{isPaused ? "Pausiert — hover verlassen zum Fortsetzen" : "Auto-Scroll aktiv"}</span>
+      </div>
     </div>
   );
 }
