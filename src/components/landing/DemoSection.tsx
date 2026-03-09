@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HEATMAP_COLS, HEATMAP_ROWS } from "@/lib/constants";
+import { MiniHeatmap } from "@/components/HeatmapField";
 
 type DemoState = "notification" | "loading" | "analyzing" | "dashboard";
 
@@ -210,58 +211,16 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
           {/* Mini Heatmap preview */}
           <div className="rounded-xl border border-border bg-muted/20 p-4">
             <div className="text-[10px] font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Team-Heatmap</div>
-            <div className="aspect-[105/68] rounded-lg bg-pitch relative overflow-hidden">
-              {/* Pitch lines */}
-              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="none">
-                <rect x="0" y="0" width="105" height="68" fill="none" stroke="white" strokeWidth="0.5" strokeOpacity="0.3" />
-                <line x1="52.5" y1="0" x2="52.5" y2="68" stroke="white" strokeWidth="0.3" strokeOpacity="0.3" />
-                <circle cx="52.5" cy="34" r="9.15" fill="none" stroke="white" strokeWidth="0.3" strokeOpacity="0.3" />
-                <rect x="0" y="13.84" width="16.5" height="40.32" fill="none" stroke="white" strokeWidth="0.3" strokeOpacity="0.2" />
-                <rect x="88.5" y="13.84" width="16.5" height="40.32" fill="none" stroke="white" strokeWidth="0.3" strokeOpacity="0.2" />
-              </svg>
-              {/* Heatmap grid with realistic intensity */}
-              <div className="absolute inset-0 grid grid-cols-10 grid-rows-6 gap-px p-1">
-                {[
-                  // Row 1 (attacking third left)
-                  0.15, 0.2, 0.3, 0.4, 0.5, 0.5, 0.35, 0.25, 0.15, 0.1,
-                  // Row 2
-                  0.2, 0.35, 0.5, 0.7, 0.85, 0.8, 0.55, 0.4, 0.25, 0.15,
-                  // Row 3 (midfield - high activity)
-                  0.25, 0.45, 0.65, 0.9, 1.0, 0.95, 0.7, 0.5, 0.3, 0.2,
-                  // Row 4 (midfield)
-                  0.2, 0.4, 0.6, 0.85, 0.95, 0.9, 0.65, 0.45, 0.28, 0.18,
-                  // Row 5
-                  0.18, 0.3, 0.45, 0.6, 0.7, 0.65, 0.5, 0.35, 0.2, 0.12,
-                  // Row 6 (defensive third)
-                  0.1, 0.18, 0.25, 0.35, 0.4, 0.38, 0.3, 0.22, 0.15, 0.08,
-                ].map((intensity, i) => {
-                  // Color gradient: blue (low) -> green -> yellow -> red (high)
-                  const hue = intensity > 0.7 ? 0 : intensity > 0.5 ? 35 : intensity > 0.3 ? 120 : 200;
-                  const saturation = 75 + intensity * 20;
-                  const lightness = 45 + (1 - intensity) * 15;
-                  const alpha = Math.max(intensity * 0.85, 0.1);
-                  return (
-                    <div 
-                      key={i} 
-                      className="rounded-sm" 
-                      style={{ 
-                        backgroundColor: `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`,
-                        boxShadow: intensity > 0.6 ? `0 0 8px hsla(${hue}, 80%, 50%, 0.4)` : 'none'
-                      }} 
-                    />
-                  );
-                })}
-              </div>
-            </div>
+            <MiniHeatmap />
             {/* Legend */}
             <div className="flex items-center justify-between mt-2 text-[8px] text-muted-foreground">
-              <span>Wenig</span>
+              <span>Wenig Aktivität</span>
               <div className="flex gap-0.5">
-                {[200, 120, 35, 0].map((hue) => (
-                  <div key={hue} className="w-3 h-2 rounded-sm" style={{ backgroundColor: `hsl(${hue}, 80%, 50%)` }} />
-                ))}
+                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(180 70% 50% / 0.7), hsl(160 60% 45% / 0.5))' }} />
+                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(50 90% 55% / 0.8), hsl(35 80% 50% / 0.6))' }} />
+                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(25 90% 55% / 0.9), hsl(5 85% 50% / 0.8))' }} />
               </div>
-              <span>Viel</span>
+              <span>Viel Aktivität</span>
             </div>
           </div>
         </div>
