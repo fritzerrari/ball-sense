@@ -6,143 +6,149 @@ interface HeatmapFieldProps {
   grid?: number[][] | null;
   className?: string;
   compact?: boolean;
+  small?: boolean;
 }
 
-interface HeatSpot {
-  x: number;
-  y: number;
-  intensity: number;
+// Shared function to get heat color based on intensity
+function getHeatColor(intensity: number): string {
+  if (intensity < 0.15) return "hsla(142, 70%, 35%, 0.3)"; // Dark green - barely visible
+  if (intensity < 0.3) return "hsla(142, 65%, 40%, 0.55)"; // Green
+  if (intensity < 0.45) return "hsla(85, 60%, 45%, 0.65)"; // Yellow-green
+  if (intensity < 0.55) return "hsla(55, 75%, 50%, 0.75)"; // Yellow
+  if (intensity < 0.65) return "hsla(45, 85%, 50%, 0.8)"; // Orange-yellow
+  if (intensity < 0.75) return "hsla(30, 90%, 50%, 0.85)"; // Orange
+  if (intensity < 0.85) return "hsla(15, 95%, 50%, 0.9)"; // Red-orange
+  return "hsla(0, 90%, 50%, 0.95)"; // Red - hottest
 }
 
-export function HeatmapField({ label, grid, className = "", compact = false }: HeatmapFieldProps) {
+export function HeatmapField({ label, grid, className = "", small = false }: HeatmapFieldProps) {
   const displayGrid = grid || generateEmptyGrid();
   const maxVal = Math.max(...displayGrid.flat(), 0.01);
 
-  // Convert grid to heat spots for SVG rendering
-  const heatSpots = useMemo(() => {
-    const spots: HeatSpot[] = [];
-    const cellWidth = 105 / HEATMAP_COLS;
-    const cellHeight = 68 / HEATMAP_ROWS;
+  // Cell dimensions for SVG viewbox
+  const cellWidth = 105 / HEATMAP_COLS;
+  const cellHeight = 68 / HEATMAP_ROWS;
 
+  const cells = useMemo(() => {
+    const result: { x: number; y: number; color: string; intensity: number }[] = [];
+    
     displayGrid.forEach((row, rowIdx) => {
       row.forEach((val, colIdx) => {
-        if (val > maxVal * 0.05) {
-          spots.push({
-            x: colIdx * cellWidth + cellWidth / 2,
-            y: rowIdx * cellHeight + cellHeight / 2,
-            intensity: val / maxVal,
+        const intensity = val / maxVal;
+        if (intensity > 0.08) {
+          result.push({
+            x: colIdx * cellWidth,
+            y: rowIdx * cellHeight,
+            color: getHeatColor(intensity),
+            intensity,
           });
         }
       });
     });
-    return spots;
-  }, [displayGrid, maxVal]);
+    return result;
+  }, [displayGrid, maxVal, cellWidth, cellHeight]);
 
   return (
     <div className={`space-y-2 ${className}`}>
       {label && <div className="text-sm font-medium text-muted-foreground">{label}</div>}
-      <div className={`aspect-[105/68] rounded-xl border border-border relative overflow-hidden`}>
+      <div className={`aspect-[105/68] rounded-xl border border-border/50 relative overflow-hidden shadow-inner ${small ? 'rounded-lg' : ''}`}>
         <svg 
           className="absolute inset-0 w-full h-full" 
           viewBox="0 0 105 68" 
           preserveAspectRatio="xMidYMid slice"
         >
           <defs>
-            {/* Pitch grass gradient */}
-            <linearGradient id="pitchGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="hsl(var(--pitch))" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="hsl(var(--pitch-dark))" stopOpacity="0.95" />
+            {/* Realistic grass texture gradient */}
+            <linearGradient id="grassBase" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="hsl(145, 55%, 28%)" />
+              <stop offset="50%" stopColor="hsl(145, 50%, 25%)" />
+              <stop offset="100%" stopColor="hsl(145, 45%, 22%)" />
             </linearGradient>
             
-            {/* Heat gradients */}
-            <radialGradient id="heatLow">
-              <stop offset="0%" stopColor="hsl(200, 80%, 55%)" stopOpacity="0.6" />
-              <stop offset="50%" stopColor="hsl(200, 70%, 50%)" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="hsl(200, 60%, 45%)" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="heatMedLow">
-              <stop offset="0%" stopColor="hsl(160, 75%, 50%)" stopOpacity="0.7" />
-              <stop offset="40%" stopColor="hsl(140, 70%, 45%)" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="hsl(120, 60%, 40%)" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="heatMed">
-              <stop offset="0%" stopColor="hsl(60, 90%, 55%)" stopOpacity="0.8" />
-              <stop offset="35%" stopColor="hsl(45, 85%, 50%)" stopOpacity="0.5" />
-              <stop offset="100%" stopColor="hsl(30, 80%, 45%)" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="heatHigh">
-              <stop offset="0%" stopColor="hsl(15, 95%, 55%)" stopOpacity="0.9" />
-              <stop offset="30%" stopColor="hsl(5, 90%, 50%)" stopOpacity="0.6" />
-              <stop offset="100%" stopColor="hsl(0, 85%, 45%)" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="heatMax">
-              <stop offset="0%" stopColor="hsl(0, 100%, 60%)" stopOpacity="1" />
-              <stop offset="25%" stopColor="hsl(0, 95%, 55%)" stopOpacity="0.75" />
-              <stop offset="60%" stopColor="hsl(15, 90%, 50%)" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="hsl(30, 80%, 45%)" stopOpacity="0" />
-            </radialGradient>
+            {/* Grass stripe pattern */}
+            <pattern id="grassStripes" patternUnits="userSpaceOnUse" width="10" height="68">
+              <rect x="0" y="0" width="5" height="68" fill="hsl(145, 52%, 26%)" />
+              <rect x="5" y="0" width="5" height="68" fill="hsl(145, 48%, 24%)" />
+            </pattern>
 
-            {/* Blur filter for smooth blending */}
-            <filter id="heatBlur" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" />
+            {/* Subtle cell blur for smoother transitions */}
+            <filter id="cellBlur" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="0.3" />
+            </filter>
+
+            {/* Glow effect for high intensity cells */}
+            <filter id="heatGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
             </filter>
           </defs>
 
-          {/* Pitch background */}
-          <rect x="0" y="0" width="105" height="68" fill="url(#pitchGradient)" />
+          {/* Pitch background with grass stripes */}
+          <rect x="0" y="0" width="105" height="68" fill="url(#grassBase)" />
+          <rect x="0" y="0" width="105" height="68" fill="url(#grassStripes)" opacity="0.4" />
 
-          {/* Heat spots layer */}
-          <g filter="url(#heatBlur)">
-            {heatSpots.map((spot, i) => {
-              const gradientId = 
-                spot.intensity > 0.85 ? "heatMax" :
-                spot.intensity > 0.65 ? "heatHigh" :
-                spot.intensity > 0.45 ? "heatMed" :
-                spot.intensity > 0.25 ? "heatMedLow" : "heatLow";
-              
-              const radius = 4 + spot.intensity * 8;
-              
-              return (
-                <ellipse
-                  key={i}
-                  cx={spot.x}
-                  cy={spot.y}
-                  rx={radius}
-                  ry={radius * 0.85}
-                  fill={`url(#${gradientId})`}
-                  opacity={0.7 + spot.intensity * 0.3}
-                />
-              );
-            })}
+          {/* Heat cells layer */}
+          <g filter="url(#cellBlur)">
+            {cells.map((cell, i) => (
+              <rect
+                key={i}
+                x={cell.x + 0.1}
+                y={cell.y + 0.1}
+                width={cellWidth - 0.2}
+                height={cellHeight - 0.2}
+                fill={cell.color}
+                rx="0.3"
+                ry="0.3"
+              />
+            ))}
           </g>
 
-          {/* Field lines - on top of heat */}
-          <g stroke="hsl(var(--pitch-line))" strokeOpacity="0.35" fill="none">
+          {/* High intensity glow overlay */}
+          <g filter="url(#heatGlow)" opacity="0.4">
+            {cells.filter(c => c.intensity > 0.7).map((cell, i) => (
+              <rect
+                key={i}
+                x={cell.x + 0.5}
+                y={cell.y + 0.5}
+                width={cellWidth - 1}
+                height={cellHeight - 1}
+                fill={cell.color}
+                rx="0.5"
+                ry="0.5"
+              />
+            ))}
+          </g>
+
+          {/* Field lines - crisp white */}
+          <g stroke="white" strokeOpacity="0.5" fill="none">
             {/* Outline */}
-            <rect x="0.5" y="0.5" width="104" height="67" strokeWidth="0.4" />
+            <rect x="1" y="1" width="103" height="66" strokeWidth="0.35" rx="0.5" />
             {/* Center line */}
-            <line x1="52.5" y1="0" x2="52.5" y2="68" strokeWidth="0.3" />
+            <line x1="52.5" y1="1" x2="52.5" y2="67" strokeWidth="0.3" />
             {/* Center circle */}
             <circle cx="52.5" cy="34" r="9.15" strokeWidth="0.3" />
             {/* Center spot */}
-            <circle cx="52.5" cy="34" r="0.5" fill="hsl(var(--pitch-line))" fillOpacity="0.4" />
+            <circle cx="52.5" cy="34" r="0.6" fill="white" fillOpacity="0.5" stroke="none" />
             {/* Penalty areas */}
-            <rect x="0" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" strokeOpacity="0.3" />
-            <rect x="88.5" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" strokeOpacity="0.3" />
+            <rect x="1" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
+            <rect x="87.5" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
             {/* Goal areas */}
-            <rect x="0" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" strokeOpacity="0.25" />
-            <rect x="99.5" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" strokeOpacity="0.25" />
+            <rect x="1" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
+            <rect x="98.5" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
             {/* Penalty spots */}
-            <circle cx="11" cy="34" r="0.4" fill="hsl(var(--pitch-line))" fillOpacity="0.3" />
-            <circle cx="94" cy="34" r="0.4" fill="hsl(var(--pitch-line))" fillOpacity="0.3" />
+            <circle cx="12" cy="34" r="0.4" fill="white" fillOpacity="0.4" stroke="none" />
+            <circle cx="93" cy="34" r="0.4" fill="white" fillOpacity="0.4" stroke="none" />
             {/* Penalty arcs */}
-            <path d="M 16.5 27.5 A 9.15 9.15 0 0 1 16.5 40.5" strokeWidth="0.2" strokeOpacity="0.2" />
-            <path d="M 88.5 27.5 A 9.15 9.15 0 0 0 88.5 40.5" strokeWidth="0.2" strokeOpacity="0.2" />
+            <path d="M 17.5 27.5 A 9.15 9.15 0 0 1 17.5 40.5" strokeWidth="0.25" />
+            <path d="M 87.5 27.5 A 9.15 9.15 0 0 0 87.5 40.5" strokeWidth="0.25" />
             {/* Corner arcs */}
-            <path d="M 0 1 A 1 1 0 0 0 1 0" strokeWidth="0.15" strokeOpacity="0.2" />
-            <path d="M 104 0 A 1 1 0 0 0 105 1" strokeWidth="0.15" strokeOpacity="0.2" />
-            <path d="M 0 67 A 1 1 0 0 1 1 68" strokeWidth="0.15" strokeOpacity="0.2" />
-            <path d="M 105 67 A 1 1 0 0 0 104 68" strokeWidth="0.15" strokeOpacity="0.2" />
+            <path d="M 1 2 A 1 1 0 0 0 2 1" strokeWidth="0.2" />
+            <path d="M 103 1 A 1 1 0 0 0 104 2" strokeWidth="0.2" />
+            <path d="M 1 66 A 1 1 0 0 1 2 67" strokeWidth="0.2" />
+            <path d="M 104 66 A 1 1 0 0 0 103 67" strokeWidth="0.2" />
           </g>
         </svg>
       </div>
@@ -156,94 +162,113 @@ function generateEmptyGrid(): number[][] {
 
 // Compact inline heatmap for demo/preview purposes
 export function MiniHeatmap({ className = "" }: { className?: string }) {
-  // Predefined realistic activity pattern
-  const heatData: HeatSpot[] = [
-    // High activity in central midfield
-    { x: 52, y: 34, intensity: 1.0 },
-    { x: 45, y: 30, intensity: 0.9 },
-    { x: 58, y: 38, intensity: 0.85 },
-    // Left side activity
-    { x: 35, y: 25, intensity: 0.75 },
-    { x: 30, y: 42, intensity: 0.7 },
-    { x: 25, y: 34, intensity: 0.65 },
-    // Right side
-    { x: 70, y: 28, intensity: 0.6 },
-    { x: 75, y: 40, intensity: 0.55 },
-    // Defensive third
-    { x: 18, y: 34, intensity: 0.5 },
-    { x: 15, y: 22, intensity: 0.35 },
-    { x: 15, y: 46, intensity: 0.35 },
-    // Attacking third
-    { x: 85, y: 34, intensity: 0.45 },
-    { x: 90, y: 28, intensity: 0.3 },
-    { x: 90, y: 40, intensity: 0.3 },
-  ];
+  // Generate a realistic grid-based heatmap
+  const grid = useMemo(() => {
+    const result: number[][] = [];
+    const centerX = HEATMAP_COLS / 2;
+    const centerY = HEATMAP_ROWS / 2;
+    
+    // Activity hotspots
+    const hotspots = [
+      { cx: centerX, cy: centerY, strength: 1.0, radius: 5 },
+      { cx: centerX - 4, cy: centerY - 2, strength: 0.8, radius: 3.5 },
+      { cx: centerX + 3, cy: centerY + 1, strength: 0.75, radius: 3 },
+      { cx: centerX - 8, cy: centerY, strength: 0.5, radius: 2.5 },
+      { cx: centerX + 7, cy: centerY - 1, strength: 0.45, radius: 2.5 },
+    ];
+
+    for (let row = 0; row < HEATMAP_ROWS; row++) {
+      const rowData: number[] = [];
+      for (let col = 0; col < HEATMAP_COLS; col++) {
+        let val = 0;
+        for (const hs of hotspots) {
+          const dist = Math.sqrt((col - hs.cx) ** 2 + (row - hs.cy) ** 2);
+          if (dist < hs.radius * 2) {
+            val += hs.strength * Math.exp(-(dist * dist) / (2 * (hs.radius * 0.7) ** 2));
+          }
+        }
+        val += Math.random() * 0.03;
+        rowData.push(Math.min(val, 1));
+      }
+      result.push(rowData);
+    }
+    return result;
+  }, []);
+
+  const maxVal = Math.max(...grid.flat(), 0.01);
+  const cellWidth = 105 / HEATMAP_COLS;
+  const cellHeight = 68 / HEATMAP_ROWS;
+
+  const cells = useMemo(() => {
+    const result: { x: number; y: number; color: string; intensity: number }[] = [];
+    
+    grid.forEach((row, rowIdx) => {
+      row.forEach((val, colIdx) => {
+        const intensity = val / maxVal;
+        if (intensity > 0.08) {
+          result.push({
+            x: colIdx * cellWidth,
+            y: rowIdx * cellHeight,
+            color: getHeatColor(intensity),
+            intensity,
+          });
+        }
+      });
+    });
+    return result;
+  }, [grid, maxVal, cellWidth, cellHeight]);
 
   return (
-    <div className={`aspect-[105/68] rounded-lg overflow-hidden ${className}`}>
+    <div className={`aspect-[105/68] rounded-lg overflow-hidden shadow-inner border border-border/30 ${className}`}>
       <svg 
         className="w-full h-full" 
         viewBox="0 0 105 68" 
         preserveAspectRatio="xMidYMid slice"
       >
         <defs>
-          <linearGradient id="miniPitchGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="hsl(var(--pitch))" />
-            <stop offset="100%" stopColor="hsl(var(--pitch-dark))" />
+          <linearGradient id="miniGrass" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="hsl(145, 55%, 28%)" />
+            <stop offset="100%" stopColor="hsl(145, 45%, 22%)" />
           </linearGradient>
           
-          <radialGradient id="miniHeatCool">
-            <stop offset="0%" stopColor="hsl(180, 70%, 50%)" stopOpacity="0.65" />
-            <stop offset="60%" stopColor="hsl(160, 60%, 45%)" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-          <radialGradient id="miniHeatWarm">
-            <stop offset="0%" stopColor="hsl(50, 90%, 55%)" stopOpacity="0.8" />
-            <stop offset="50%" stopColor="hsl(35, 80%, 50%)" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-          <radialGradient id="miniHeatHot">
-            <stop offset="0%" stopColor="hsl(10, 95%, 55%)" stopOpacity="0.9" />
-            <stop offset="40%" stopColor="hsl(25, 85%, 50%)" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
+          <pattern id="miniStripes" patternUnits="userSpaceOnUse" width="8" height="68">
+            <rect x="0" y="0" width="4" height="68" fill="hsl(145, 50%, 26%)" />
+            <rect x="4" y="0" width="4" height="68" fill="hsl(145, 46%, 24%)" />
+          </pattern>
 
-          <filter id="miniBlur" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
+          <filter id="miniCellBlur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.25" />
           </filter>
         </defs>
 
         {/* Background */}
-        <rect x="0" y="0" width="105" height="68" fill="url(#miniPitchGrad)" />
+        <rect x="0" y="0" width="105" height="68" fill="url(#miniGrass)" />
+        <rect x="0" y="0" width="105" height="68" fill="url(#miniStripes)" opacity="0.35" />
 
-        {/* Heat spots */}
-        <g filter="url(#miniBlur)">
-          {heatData.map((spot, i) => {
-            const gradientId = 
-              spot.intensity > 0.7 ? "miniHeatHot" :
-              spot.intensity > 0.45 ? "miniHeatWarm" : "miniHeatCool";
-            const r = 6 + spot.intensity * 10;
-            
-            return (
-              <ellipse
-                key={i}
-                cx={spot.x}
-                cy={spot.y}
-                rx={r}
-                ry={r * 0.8}
-                fill={`url(#${gradientId})`}
-              />
-            );
-          })}
+        {/* Heat cells */}
+        <g filter="url(#miniCellBlur)">
+          {cells.map((cell, i) => (
+            <rect
+              key={i}
+              x={cell.x + 0.1}
+              y={cell.y + 0.1}
+              width={cellWidth - 0.2}
+              height={cellHeight - 0.2}
+              fill={cell.color}
+              rx="0.2"
+              ry="0.2"
+            />
+          ))}
         </g>
 
         {/* Field lines */}
-        <g stroke="white" strokeOpacity="0.3" fill="none" strokeWidth="0.3">
-          <rect x="0.5" y="0.5" width="104" height="67" />
-          <line x1="52.5" y1="0" x2="52.5" y2="68" />
+        <g stroke="white" strokeOpacity="0.45" fill="none" strokeWidth="0.3">
+          <rect x="1" y="1" width="103" height="66" rx="0.5" />
+          <line x1="52.5" y1="1" x2="52.5" y2="67" />
           <circle cx="52.5" cy="34" r="9.15" />
-          <rect x="0" y="13.84" width="16.5" height="40.32" strokeOpacity="0.2" />
-          <rect x="88.5" y="13.84" width="16.5" height="40.32" strokeOpacity="0.2" />
+          <circle cx="52.5" cy="34" r="0.5" fill="white" fillOpacity="0.4" stroke="none" />
+          <rect x="1" y="13.84" width="16.5" height="40.32" strokeOpacity="0.3" />
+          <rect x="87.5" y="13.84" width="16.5" height="40.32" strokeOpacity="0.3" />
         </g>
       </svg>
     </div>
