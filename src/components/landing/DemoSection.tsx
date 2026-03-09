@@ -320,11 +320,31 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
 
       {/* Main content with tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="bg-muted/30 border border-border/50">
-          <TabsTrigger value="overview" className="text-xs gap-1"><BarChart3 className="w-3 h-3" /> Übersicht</TabsTrigger>
-          <TabsTrigger value="players" className="text-xs gap-1"><Users className="w-3 h-3" /> Spieler</TabsTrigger>
-          <TabsTrigger value="advanced" className="text-xs gap-1"><Gauge className="w-3 h-3" /> Advanced</TabsTrigger>
-          <TabsTrigger value="report" className="text-xs gap-1"><FileText className="w-3 h-3" /> KI-Bericht</TabsTrigger>
+        <TabsList className="bg-card/80 border-2 border-primary/30 shadow-lg shadow-primary/10 p-1.5 rounded-xl backdrop-blur-sm">
+          <TabsTrigger 
+            value="overview" 
+            className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
+          >
+            <BarChart3 className="w-4 h-4" /> Übersicht
+          </TabsTrigger>
+          <TabsTrigger 
+            value="players" 
+            className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
+          >
+            <Users className="w-4 h-4" /> Spieler
+          </TabsTrigger>
+          <TabsTrigger 
+            value="advanced" 
+            className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
+          >
+            <Gauge className="w-4 h-4" /> Advanced
+          </TabsTrigger>
+          <TabsTrigger 
+            value="report" 
+            className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
+          >
+            <FileText className="w-4 h-4" /> KI-Bericht
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
