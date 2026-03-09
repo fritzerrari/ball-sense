@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, RotateCcw, AlertTriangle, TrendingUp, Zap, Route, Users, Activity, Timer,
@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HEATMAP_COLS, HEATMAP_ROWS } from "@/lib/constants";
 import { MiniHeatmap } from "@/components/HeatmapField";
+import useEmblaCarousel from "embla-carousel-react";
 
 type DemoState = "notification" | "loading" | "analyzing" | "dashboard";
 
