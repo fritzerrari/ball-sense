@@ -407,8 +407,8 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               <div className="flex items-center justify-between mt-2 text-[9px] text-muted-foreground">
                 <span>Wenig Aktivität</span>
                 <div className="flex gap-0.5">
-                  {["hsla(200,80%,50%,0.5)", "hsla(120,80%,50%,0.5)", "hsla(40,80%,50%,0.5)", "hsla(0,80%,50%,0.5)"].map((c, i) => (
-                    <div key={i} className="w-4 h-1.5 rounded-sm" style={{ backgroundColor: c }} />
+                  {["hsl(160,50%,42%)", "hsl(120,55%,48%)", "hsl(55,85%,52%)", "hsl(25,90%,52%)", "hsl(0,85%,50%)"].map((c, i) => (
+                    <div key={i} className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: c }} />
                   ))}
                 </div>
                 <span>Viel Aktivität</span>
