@@ -216,9 +216,9 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
             <div className="flex items-center justify-between mt-2 text-[8px] text-muted-foreground">
               <span>Wenig Aktivität</span>
               <div className="flex gap-0.5">
-                <div className="w-4 h-2 rounded-sm bg-gradient-to-r from-cyan-500/70 to-cyan-400/50" />
-                <div className="w-4 h-2 rounded-sm bg-gradient-to-r from-yellow-500/80 to-orange-400/60" />
-                <div className="w-4 h-2 rounded-sm bg-gradient-to-r from-orange-500/90 to-red-500/80" />
+                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(180 70% 50% / 0.7), hsl(160 60% 45% / 0.5))' }} />
+                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(50 90% 55% / 0.8), hsl(35 80% 50% / 0.6))' }} />
+                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(25 90% 55% / 0.9), hsl(5 85% 50% / 0.8))' }} />
               </div>
               <span>Viel Aktivität</span>
             </div>
