@@ -304,6 +304,47 @@ export type Database = {
         }
         Relationships: []
       }
+      changelog: {
+        Row: {
+          change_type: string
+          created_at: string
+          description: string
+          documentation_id: string | null
+          id: string
+          release_date: string
+          title: string
+          version: string
+        }
+        Insert: {
+          change_type?: string
+          created_at?: string
+          description?: string
+          documentation_id?: string | null
+          id?: string
+          release_date?: string
+          title: string
+          version: string
+        }
+        Update: {
+          change_type?: string
+          created_at?: string
+          description?: string
+          documentation_id?: string | null
+          id?: string
+          release_date?: string
+          title?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "changelog_documentation_id_fkey"
+            columns: ["documentation_id"]
+            isOneToOne: false
+            referencedRelation: "documentation"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clubs: {
         Row: {
           city: string | null
@@ -364,6 +405,48 @@ export type Database = {
           model?: string
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      documentation: {
+        Row: {
+          active: boolean
+          category: string
+          content: string
+          created_at: string
+          id: string
+          slug: string
+          sort_order: number
+          title: string
+          updated_at: string
+          updated_by: string | null
+          version: string | null
+        }
+        Insert: {
+          active?: boolean
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          slug: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: string | null
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          slug?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: string | null
         }
         Relationships: []
       }
