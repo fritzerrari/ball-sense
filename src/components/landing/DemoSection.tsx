@@ -324,6 +324,7 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
           <TabsTrigger value="overview" className="text-xs gap-1"><BarChart3 className="w-3 h-3" /> Übersicht</TabsTrigger>
           <TabsTrigger value="players" className="text-xs gap-1"><Users className="w-3 h-3" /> Spieler</TabsTrigger>
           <TabsTrigger value="advanced" className="text-xs gap-1"><Gauge className="w-3 h-3" /> Advanced</TabsTrigger>
+          <TabsTrigger value="report" className="text-xs gap-1"><FileText className="w-3 h-3" /> KI-Bericht</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
