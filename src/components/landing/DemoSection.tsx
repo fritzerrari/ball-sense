@@ -1017,16 +1017,15 @@ function getRadarPoints(cx: number, cy: number, r: number, sides: number, values
   return points.join(" ");
 }
 
-/* ─── Reusable Heatmap on Football Field (SVG-based, filigree) ─── */
+/* ─── Reusable Heatmap on Football Field (smooth gradient style) ─── */
 function HeatmapField({ grid, maxVal }: { grid: number[][]; maxVal: number; small?: boolean }) {
-  // Convert grid to heat spots for SVG rendering
   const cellWidth = 105 / HEATMAP_COLS;
   const cellHeight = 68 / HEATMAP_ROWS;
   
   const heatSpots: { x: number; y: number; intensity: number }[] = [];
   grid.forEach((row, rowIdx) => {
     row.forEach((val, colIdx) => {
-      if (val > maxVal * 0.08) {
+      if (val > maxVal * 0.05) {
         heatSpots.push({
           x: colIdx * cellWidth + cellWidth / 2,
           y: rowIdx * cellHeight + cellHeight / 2,
@@ -1038,107 +1037,65 @@ function HeatmapField({ grid, maxVal }: { grid: number[][]; maxVal: number; smal
 
   return (
     <div className="relative rounded-xl overflow-hidden aspect-[105/68]">
-      <svg 
-        className="absolute inset-0 w-full h-full" 
-        viewBox="0 0 105 68" 
-        preserveAspectRatio="xMidYMid slice"
-      >
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid slice">
         <defs>
-          {/* Pitch gradient */}
-          <linearGradient id="playerPitchGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="hsl(var(--pitch))" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="hsl(var(--pitch-dark))" stopOpacity="1" />
+          <linearGradient id="demoGrass" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="hsl(160, 45%, 38%)" />
+            <stop offset="50%" stopColor="hsl(155, 42%, 35%)" />
+            <stop offset="100%" stopColor="hsl(150, 40%, 32%)" />
           </linearGradient>
-          
-          {/* Heat gradients - cool to hot */}
-          <radialGradient id="pHeatCool">
-            <stop offset="0%" stopColor="hsl(195, 75%, 55%)" stopOpacity="0.65" />
-            <stop offset="50%" stopColor="hsl(180, 65%, 50%)" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-          <radialGradient id="pHeatMedLow">
-            <stop offset="0%" stopColor="hsl(150, 70%, 50%)" stopOpacity="0.7" />
-            <stop offset="45%" stopColor="hsl(140, 60%, 45%)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-          <radialGradient id="pHeatMed">
-            <stop offset="0%" stopColor="hsl(55, 90%, 55%)" stopOpacity="0.8" />
-            <stop offset="40%" stopColor="hsl(45, 85%, 50%)" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-          <radialGradient id="pHeatHigh">
-            <stop offset="0%" stopColor="hsl(25, 95%, 55%)" stopOpacity="0.85" />
-            <stop offset="35%" stopColor="hsl(15, 90%, 50%)" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-          <radialGradient id="pHeatMax">
-            <stop offset="0%" stopColor="hsl(5, 100%, 58%)" stopOpacity="0.95" />
-            <stop offset="25%" stopColor="hsl(0, 95%, 52%)" stopOpacity="0.7" />
-            <stop offset="55%" stopColor="hsl(15, 85%, 48%)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-          
-          {/* Blur filter for organic blending */}
-          <filter id="playerHeatBlur" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" />
-          </filter>
+          <pattern id="demoStripes" patternUnits="userSpaceOnUse" width="10" height="68">
+            <rect x="0" y="0" width="5" height="68" fill="hsl(158, 44%, 36%)" />
+            <rect x="5" y="0" width="5" height="68" fill="hsl(155, 40%, 34%)" />
+          </pattern>
+          <radialGradient id="dHeatLow"><stop offset="0%" stopColor="hsl(160,60%,48%)" stopOpacity="0.5" /><stop offset="60%" stopColor="hsl(160,50%,42%)" stopOpacity="0.2" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+          <radialGradient id="dHeatMedLow"><stop offset="0%" stopColor="hsl(120,55%,48%)" stopOpacity="0.65" /><stop offset="50%" stopColor="hsl(140,50%,42%)" stopOpacity="0.3" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+          <radialGradient id="dHeatMed"><stop offset="0%" stopColor="hsl(55,85%,52%)" stopOpacity="0.8" /><stop offset="40%" stopColor="hsl(70,70%,48%)" stopOpacity="0.4" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+          <radialGradient id="dHeatHigh"><stop offset="0%" stopColor="hsl(25,90%,52%)" stopOpacity="0.85" /><stop offset="35%" stopColor="hsl(40,80%,48%)" stopOpacity="0.45" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+          <radialGradient id="dHeatMax"><stop offset="0%" stopColor="hsl(0,85%,50%)" stopOpacity="0.95" /><stop offset="25%" stopColor="hsl(10,90%,48%)" stopOpacity="0.7" /><stop offset="55%" stopColor="hsl(25,80%,45%)" stopOpacity="0.3" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+          <filter id="dHeatBlur1" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur in="SourceGraphic" stdDeviation="5" /></filter>
+          <filter id="dHeatBlur2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur in="SourceGraphic" stdDeviation="2.5" /></filter>
         </defs>
 
-        {/* Pitch background */}
-        <rect x="0" y="0" width="105" height="68" fill="url(#playerPitchGrad)" />
+        <rect x="0" y="0" width="105" height="68" fill="url(#demoGrass)" />
+        <rect x="0" y="0" width="105" height="68" fill="url(#demoStripes)" opacity="0.25" />
 
-        {/* Heat spots layer with blur */}
-        <g filter="url(#playerHeatBlur)">
-          {heatSpots.map((spot, i) => {
-            const gradientId = 
-              spot.intensity > 0.85 ? "pHeatMax" :
-              spot.intensity > 0.65 ? "pHeatHigh" :
-              spot.intensity > 0.45 ? "pHeatMed" :
-              spot.intensity > 0.25 ? "pHeatMedLow" : "pHeatCool";
-            
-            const radius = 5 + spot.intensity * 9;
-            
-            return (
-              <ellipse
-                key={i}
-                cx={spot.x}
-                cy={spot.y}
-                rx={radius}
-                ry={radius * 0.85}
-                fill={`url(#${gradientId})`}
-                opacity={0.75 + spot.intensity * 0.25}
-              />
-            );
+        {/* Ambient base heat layer */}
+        <g filter="url(#dHeatBlur1)" opacity="0.55">
+          {heatSpots.filter(s => s.intensity > 0.15).map((spot, i) => {
+            const gid = spot.intensity > 0.8 ? "dHeatMax" : spot.intensity > 0.6 ? "dHeatHigh" : spot.intensity > 0.4 ? "dHeatMed" : spot.intensity > 0.2 ? "dHeatMedLow" : "dHeatLow";
+            const r = 6 + spot.intensity * 12;
+            return <ellipse key={`b${i}`} cx={spot.x} cy={spot.y} rx={r * 1.3} ry={r} fill={`url(#${gid})`} />;
           })}
         </g>
 
-        {/* Field markings on top */}
-        <g stroke="hsl(var(--pitch-line))" strokeOpacity="0.35" fill="none">
-          {/* Outline */}
+        {/* Detail heat layer */}
+        <g filter="url(#dHeatBlur2)" opacity="0.8">
+          {heatSpots.map((spot, i) => {
+            const gid = spot.intensity > 0.8 ? "dHeatMax" : spot.intensity > 0.6 ? "dHeatHigh" : spot.intensity > 0.4 ? "dHeatMed" : spot.intensity > 0.2 ? "dHeatMedLow" : "dHeatLow";
+            const r = 4 + spot.intensity * 8;
+            return <ellipse key={`d${i}`} cx={spot.x} cy={spot.y} rx={r} ry={r * 0.85} fill={`url(#${gid})`} opacity={0.6 + spot.intensity * 0.4} />;
+          })}
+        </g>
+
+        {/* Field lines */}
+        <g stroke="white" strokeOpacity="0.4" fill="none">
           <rect x="0.5" y="0.5" width="104" height="67" strokeWidth="0.4" />
-          {/* Center line */}
           <line x1="52.5" y1="0" x2="52.5" y2="68" strokeWidth="0.3" />
-          {/* Center circle */}
           <circle cx="52.5" cy="34" r="9.15" strokeWidth="0.3" />
-          {/* Center spot */}
-          <circle cx="52.5" cy="34" r="0.6" fill="hsl(var(--pitch-line))" fillOpacity="0.35" />
-          {/* Penalty areas */}
-          <rect x="0" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" strokeOpacity="0.28" />
-          <rect x="88.5" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" strokeOpacity="0.28" />
-          {/* Goal areas */}
-          <rect x="0" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" strokeOpacity="0.22" />
-          <rect x="99.5" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" strokeOpacity="0.22" />
-          {/* Penalty spots */}
-          <circle cx="11" cy="34" r="0.45" fill="hsl(var(--pitch-line))" fillOpacity="0.28" />
-          <circle cx="94" cy="34" r="0.45" fill="hsl(var(--pitch-line))" fillOpacity="0.28" />
-          {/* Penalty arcs */}
-          <path d="M 16.5 27.5 A 9.15 9.15 0 0 1 16.5 40.5" strokeWidth="0.2" strokeOpacity="0.2" />
-          <path d="M 88.5 27.5 A 9.15 9.15 0 0 0 88.5 40.5" strokeWidth="0.2" strokeOpacity="0.2" />
-          {/* Corner arcs */}
-          <path d="M 0 1 A 1 1 0 0 0 1 0" strokeWidth="0.15" strokeOpacity="0.18" />
-          <path d="M 104 0 A 1 1 0 0 0 105 1" strokeWidth="0.15" strokeOpacity="0.18" />
-          <path d="M 0 67 A 1 1 0 0 1 1 68" strokeWidth="0.15" strokeOpacity="0.18" />
-          <path d="M 105 67 A 1 1 0 0 0 104 68" strokeWidth="0.15" strokeOpacity="0.18" />
+          <circle cx="52.5" cy="34" r="0.6" fill="white" fillOpacity="0.35" stroke="none" />
+          <rect x="0" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" strokeOpacity="0.3" />
+          <rect x="88.5" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" strokeOpacity="0.3" />
+          <rect x="0" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" strokeOpacity="0.25" />
+          <rect x="99.5" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" strokeOpacity="0.25" />
+          <circle cx="11" cy="34" r="0.45" fill="white" fillOpacity="0.3" stroke="none" />
+          <circle cx="94" cy="34" r="0.45" fill="white" fillOpacity="0.3" stroke="none" />
+          <path d="M 16.5 27.5 A 9.15 9.15 0 0 1 16.5 40.5" strokeWidth="0.2" strokeOpacity="0.25" />
+          <path d="M 88.5 27.5 A 9.15 9.15 0 0 0 88.5 40.5" strokeWidth="0.2" strokeOpacity="0.25" />
+          <path d="M 0 1 A 1 1 0 0 0 1 0" strokeWidth="0.15" strokeOpacity="0.2" />
+          <path d="M 104 0 A 1 1 0 0 0 105 1" strokeWidth="0.15" strokeOpacity="0.2" />
+          <path d="M 0 67 A 1 1 0 0 1 1 68" strokeWidth="0.15" strokeOpacity="0.2" />
+          <path d="M 105 67 A 1 1 0 0 0 104 68" strokeWidth="0.15" strokeOpacity="0.2" />
         </g>
       </svg>
     </div>
