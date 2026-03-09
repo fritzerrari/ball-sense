@@ -16,52 +16,7 @@ import { getRandomDemoData, type DemoData, type DemoPlayer } from "@/lib/demo-da
 
 type DemoState = "notification" | "loading" | "analyzing" | "dashboard";
 
-interface DemoPlayer {
-  name: string;
-  num: number;
-  pos: string;
-  // FieldIQ Tracking Data
-  km: number;
-  topSpeed: number;
-  sprints: number;
-  sprintDistanceM: number;
-  avgSpeed: number;
-  minutesPlayed: number;
-  heatmap: number[][];
-  // API-Football Data
-  passAccuracy: number;
-  passesTotal: number;
-  duelsWon: number;
-  duelsTotal: number;
-  tackles: number;
-  dribblesSuccess: number;
-  shotsTotal: number;
-  shotsOnGoal: number;
-  goals: number;
-  assists: number;
-  foulsCommitted: number;
-  foulsDrawn: number;
-  yellowCards: number;
-  redCards: number;
-  rating: number;
-  trend: "up" | "down" | "stable";
-}
-
-interface DemoData {
-  players: DemoPlayer[];
-  teamStats: {
-    possession: number; totalKm: number; avgSpeed: number; topSpeed: number;
-    sprints: number; passes: number; passAccuracy: number; shotsOnTarget: number;
-    shotsTotal: number; corners: number; fouls: number; yellowCards: number; redCards: number;
-    offsides: number;
-  };
-  heatmapGrid: number[][];
-  apiStats: { 
-    xG: number; xGA: number; ppda: number; fieldTilt: number; shotConversion: number; 
-    duelWinRate: number; aerialWinRate: number; crossAccuracy: number;
-    counterAttacks: number; setPlayGoals: number;
-  };
-}
+// Types are imported from demo-data.ts
 
 export function DemoSection() {
   const [state, setState] = useState<DemoState>("notification");
