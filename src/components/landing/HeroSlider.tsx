@@ -95,6 +95,18 @@ export function HeroSlider() {
 function TrackingSlide() {
   const grid = generateMockHeatmap();
   const maxVal = Math.max(...grid.flat(), 0.01);
+  const cw = 105 / HEATMAP_COLS;
+  const ch = 68 / HEATMAP_ROWS;
+
+  // Convert grid to heat spots
+  const heatSpots: { x: number; y: number; intensity: number }[] = [];
+  grid.forEach((row, rowIdx) => {
+    row.forEach((val, colIdx) => {
+      if (val > maxVal * 0.05) {
+        heatSpots.push({ x: colIdx * cw + cw / 2, y: rowIdx * ch + ch / 2, intensity: val / maxVal });
+      }
+    });
+  });
 
   return (
     <motion.div
