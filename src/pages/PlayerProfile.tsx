@@ -64,20 +64,20 @@ export default function PlayerProfile() {
         </Link>
 
         {/* Header */}
-        <div className="glass-card p-6 flex items-center gap-6">
-          <div className="w-20 h-20 rounded-xl bg-primary/10 flex items-center justify-center text-3xl font-bold font-display text-primary shrink-0">
-            {player.number ?? <User className="h-8 w-8" />}
+        <div className="glass-card p-4 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-primary/10 flex items-center justify-center text-2xl sm:text-3xl font-bold font-display text-primary shrink-0">
+            {player.number ?? <User className="h-6 w-6 sm:h-8 sm:w-8" />}
           </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold font-display truncate">{player.name}</h1>
-            <p className="text-muted-foreground">
+          <div className="flex-1 min-w-0 text-center sm:text-left">
+            <h1 className="text-xl sm:text-2xl font-bold font-display truncate">{player.name}</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               {player.position ? (POSITION_LABELS[player.position] || player.position) : "Keine Position"} {player.number ? `· #${player.number}` : ""}
             </p>
             <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${player.active ? "bg-emerald-500/20 text-emerald-400" : "bg-muted text-muted-foreground"}`}>
               {player.active ? "Aktiv" : "Inaktiv"}
             </span>
           </div>
-          <Button variant="heroOutline" size="sm" onClick={openEdit}>
+          <Button variant="heroOutline" size="sm" onClick={openEdit} className="w-full sm:w-auto">
             <Pencil className="h-4 w-4 mr-1" /> Bearbeiten
           </Button>
         </div>

@@ -79,16 +79,16 @@ export default function MatchReport() {
       );
     }
     return (
-      <div className="glass-card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="glass-card overflow-x-auto">
+        <table className="w-full text-sm min-w-[500px]">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Spieler</th>
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">#</th>
+              <th className="text-left py-3 px-3 sm:px-4 text-muted-foreground font-medium text-xs">Spieler</th>
+              <th className="text-left py-3 px-2 text-muted-foreground font-medium text-xs">#</th>
               <SortHeader label="km" field="distance_km" />
-              <SortHeader label="Top km/h" field="top_speed_kmh" />
-              <SortHeader label="Sprints" field="sprint_count" />
-              <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden md:table-cell">Min</th>
+              <SortHeader label="Top" field="top_speed_kmh" />
+              <SortHeader label="Spr." field="sprint_count" />
+              <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs hidden sm:table-cell">Min</th>
               <th className="w-8" />
             </tr>
           </thead>
@@ -96,13 +96,13 @@ export default function MatchReport() {
             {sortPlayers(stats).map((p: any) => (
               <Fragment key={p.id}>
                 <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
-                  <td className="py-3 px-4 font-medium">{p.players?.name ?? "—"}</td>
-                  <td className="py-3 px-4 text-muted-foreground">{p.players?.number ?? "—"}</td>
-                  <td className="py-3 px-4 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
-                  <td className="py-3 px-4">{p.top_speed_kmh?.toFixed(1) ?? "—"}</td>
-                  <td className="py-3 px-4">{p.sprint_count ?? 0}</td>
-                  <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{p.minutes_played ?? "—"}</td>
-                  <td className="py-3 px-4">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
+                  <td className="py-3 px-3 sm:px-4 font-medium truncate max-w-[120px]">{p.players?.name ?? "—"}</td>
+                  <td className="py-3 px-2 text-muted-foreground">{p.players?.number ?? "—"}</td>
+                  <td className="py-3 px-3 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
+                  <td className="py-3 px-3">{p.top_speed_kmh?.toFixed(1) ?? "—"}</td>
+                  <td className="py-3 px-3">{p.sprint_count ?? 0}</td>
+                  <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">{p.minutes_played ?? "—"}</td>
+                  <td className="py-3 px-2">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
                 </tr>
                 {expandedPlayer === p.id && (
                   <tr>

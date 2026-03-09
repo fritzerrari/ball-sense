@@ -70,24 +70,26 @@ export default function Players() {
           </Button>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-3">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input type="text" placeholder={t("players.search")} value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground" />
           </div>
-          <select value={filterActive} onChange={(e) => setFilterActive(e.target.value as any)} className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
-            <option value="all">{t("players.allStatus")}</option>
-            <option value="active">{t("common.active")}</option>
-            <option value="inactive">{t("common.inactive")}</option>
-          </select>
-          <select value={filterPosition} onChange={(e) => setFilterPosition(e.target.value)} className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
-            <option value="all">{t("players.allPositions")}</option>
-            {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
-            <option value="name">{t("players.byName")}</option>
-            <option value="number">{t("players.byNumber")}</option>
-          </select>
+          <div className="grid grid-cols-3 gap-2">
+            <select value={filterActive} onChange={(e) => setFilterActive(e.target.value as any)} className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm truncate">
+              <option value="all">{t("players.allStatus")}</option>
+              <option value="active">{t("common.active")}</option>
+              <option value="inactive">{t("common.inactive")}</option>
+            </select>
+            <select value={filterPosition} onChange={(e) => setFilterPosition(e.target.value)} className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm truncate">
+              <option value="all">{t("players.allPositions")}</option>
+              {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm truncate">
+              <option value="name">{t("players.byName")}</option>
+              <option value="number">{t("players.byNumber")}</option>
+            </select>
+          </div>
         </div>
 
         {isLoading ? (
