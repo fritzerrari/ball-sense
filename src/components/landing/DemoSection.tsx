@@ -710,12 +710,12 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
             </div>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
               {[
-                { label: "Distanz", value: `${player.km.toFixed(2)} km`, icon: Route },
-                { label: "Topspeed", value: `${player.topSpeed.toFixed(1)} km/h`, icon: Zap },
-                { label: "Ø Tempo", value: `${player.avgSpeed.toFixed(1)} km/h`, icon: Gauge },
-                { label: "Sprints", value: `${player.sprints}`, icon: Footprints },
-                { label: "Sprint-Distanz", value: `${player.sprintDistanceM} m`, icon: TrendingUp },
-                { label: "Spielzeit", value: `${player.minutesPlayed}'`, icon: Timer },
+                { label: "Distanz", value: `${safeNum(player.km).toFixed(2)} km`, icon: Route },
+                { label: "Topspeed", value: `${safeNum(player.topSpeed).toFixed(1)} km/h`, icon: Zap },
+                { label: "Ø Tempo", value: `${safeNum(player.avgSpeed).toFixed(1)} km/h`, icon: Gauge },
+                { label: "Sprints", value: `${safeNum(player.sprints)}`, icon: Footprints },
+                { label: "Sprint-Distanz", value: `${safeNum(player.sprintDistanceM)} m`, icon: TrendingUp },
+                { label: "Spielzeit", value: `${safeNum(player.minutesPlayed)}'`, icon: Timer },
               ].map((stat) => (
                 <div key={stat.label} className="text-center p-2 rounded-lg bg-card/50 border border-border/30">
                   <stat.icon className="w-3.5 h-3.5 text-primary mx-auto mb-1" />
