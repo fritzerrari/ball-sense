@@ -44,7 +44,7 @@ export function DemoSection() {
             j++;
           } else {
             clearInterval(analyzeInterval);
-            setData(generateDemoData());
+            setData(getRandomDemoData());
             setState("dashboard");
           }
         }, 300);
