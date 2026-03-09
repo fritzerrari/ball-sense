@@ -839,9 +839,9 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
             <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Leistungsindikatoren</div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-3">
-                <PerformanceBar label="Laufleistung" value={player.km} max={13} unit="km" />
-                <PerformanceBar label="Topspeed" value={player.topSpeed} max={35} unit="km/h" />
-                <PerformanceBar label="Sprint-Anteil" value={(player.sprintDistanceM / (player.km * 1000)) * 100} max={20} unit="%" />
+                <PerformanceBar label="Laufleistung" value={safeNum(player.km)} max={13} unit="km" />
+                <PerformanceBar label="Topspeed" value={safeNum(player.topSpeed)} max={35} unit="km/h" />
+                <PerformanceBar label="Sprint-Anteil" value={(safeNum(player.sprintDistanceM) / (safeNum(player.km, 1) * 1000)) * 100} max={20} unit="%" />
               </div>
               <div className="space-y-3">
                 <PerformanceBar label="Passgenauigkeit" value={player.passAccuracy} max={100} unit="%" />
