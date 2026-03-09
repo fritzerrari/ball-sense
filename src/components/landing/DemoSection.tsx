@@ -303,8 +303,8 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
       <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="text-lg font-bold font-display">FC Musterstadt 2 : 1 SV Beispielburg</div>
-            <div className="text-xs text-muted-foreground">Sonntag, 2. März 2026 · Sportplatz Am Wald · 90 Min.</div>
+            <div className="text-lg font-bold font-display">{data.matchInfo.homeTeam} {data.matchInfo.homeScore} : {data.matchInfo.awayScore} {data.matchInfo.awayTeam}</div>
+            <div className="text-xs text-muted-foreground">{data.matchInfo.date} · {data.matchInfo.venue} · 90 Min.</div>
           </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Ballbesitz</div>
