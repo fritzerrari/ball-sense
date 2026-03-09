@@ -9,38 +9,60 @@ function HeatmapPreview() {
   const grid = generateMockHeatmap();
   const maxVal = Math.max(...grid.flat(), 0.01);
 
-  return (
-    <div className="aspect-[105/68] bg-muted/20 rounded-lg border border-border/50 relative overflow-hidden">
-      {/* Field lines SVG — same as real component */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 105 68" preserveAspectRatio="none">
-        <rect x="0" y="0" width="105" height="68" fill="none" stroke="hsl(var(--primary) / 0.12)" strokeWidth="0.5" />
-        <line x1="52.5" y1="0" x2="52.5" y2="68" stroke="hsl(var(--primary) / 0.1)" strokeWidth="0.3" />
-        <circle cx="52.5" cy="34" r="9.15" fill="none" stroke="hsl(var(--primary) / 0.1)" strokeWidth="0.3" />
-        <rect x="0" y="13.84" width="16.5" height="40.32" fill="none" stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.3" />
-        <rect x="88.5" y="13.84" width="16.5" height="40.32" fill="none" stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.3" />
-        <rect x="0" y="24.84" width="5.5" height="18.32" fill="none" stroke="hsl(var(--primary) / 0.06)" strokeWidth="0.3" />
-        <rect x="99.5" y="24.84" width="5.5" height="18.32" fill="none" stroke="hsl(var(--primary) / 0.06)" strokeWidth="0.3" />
-      </svg>
+  const cellWidth = 105 / HEATMAP_COLS;
+  const cellHeight = 68 / HEATMAP_ROWS;
 
-      {/* Grid cells — exact same rendering as real HeatmapField */}
-      <div className="absolute inset-1 grid gap-px" style={{ gridTemplateColumns: `repeat(${HEATMAP_COLS}, 1fr)`, gridTemplateRows: `repeat(${HEATMAP_ROWS}, 1fr)` }}>
-        {grid.flat().map((val, i) => {
-          const norm = val / maxVal;
-          const hue = norm > 0.7 ? 0 : norm > 0.4 ? 40 : norm > 0.2 ? 120 : 200;
-          const alpha = Math.max(norm * 0.7, 0.02);
-          return (
-            <motion.div
-              key={i}
-              className="rounded-[1px]"
-              style={{ backgroundColor: `hsla(${hue}, 80%, 50%, ${alpha})` }}
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.001, duration: 0.2 }}
-            />
-          );
-        })}
-      </div>
+  const cells = grid.flatMap((row, rowIdx) =>
+    row.map((val, colIdx) => {
+      const intensity = val / maxVal;
+      if (intensity < 0.08) return null;
+      return { x: colIdx * cellWidth, y: rowIdx * cellHeight, intensity };
+    }).filter(Boolean)
+  ) as { x: number; y: number; intensity: number }[];
+
+  function getColor(intensity: number): string {
+    if (intensity < 0.15) return "hsla(142, 70%, 35%, 0.3)";
+    if (intensity < 0.3) return "hsla(142, 65%, 40%, 0.55)";
+    if (intensity < 0.45) return "hsla(85, 60%, 45%, 0.65)";
+    if (intensity < 0.55) return "hsla(55, 75%, 50%, 0.75)";
+    if (intensity < 0.65) return "hsla(45, 85%, 50%, 0.8)";
+    if (intensity < 0.75) return "hsla(30, 90%, 50%, 0.85)";
+    if (intensity < 0.85) return "hsla(15, 95%, 50%, 0.9)";
+    return "hsla(0, 90%, 50%, 0.95)";
+  }
+
+  return (
+    <div className="aspect-[105/68] rounded-lg border border-border/50 relative overflow-hidden">
+      <svg className="w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="analyticGrass" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="hsl(145, 55%, 28%)" />
+            <stop offset="100%" stopColor="hsl(145, 45%, 22%)" />
+          </linearGradient>
+          <pattern id="analyticStripes" patternUnits="userSpaceOnUse" width="8" height="68">
+            <rect x="0" y="0" width="4" height="68" fill="hsl(145, 50%, 26%)" />
+            <rect x="4" y="0" width="4" height="68" fill="hsl(145, 46%, 24%)" />
+          </pattern>
+          <filter id="analyticBlur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.25" />
+          </filter>
+        </defs>
+        <rect x="0" y="0" width="105" height="68" fill="url(#analyticGrass)" />
+        <rect x="0" y="0" width="105" height="68" fill="url(#analyticStripes)" opacity="0.35" />
+        <g filter="url(#analyticBlur)">
+          {cells.map((cell, i) => (
+            <rect key={i} x={cell.x + 0.1} y={cell.y + 0.1} width={cellWidth - 0.2} height={cellHeight - 0.2} fill={getColor(cell.intensity)} rx="0.2" ry="0.2" />
+          ))}
+        </g>
+        <g stroke="white" strokeOpacity="0.45" fill="none" strokeWidth="0.3">
+          <rect x="1" y="1" width="103" height="66" rx="0.5" />
+          <line x1="52.5" y1="1" x2="52.5" y2="67" />
+          <circle cx="52.5" cy="34" r="9.15" />
+          <circle cx="52.5" cy="34" r="0.5" fill="white" fillOpacity="0.4" stroke="none" />
+          <rect x="1" y="13.84" width="16.5" height="40.32" strokeOpacity="0.3" />
+          <rect x="87.5" y="13.84" width="16.5" height="40.32" strokeOpacity="0.3" />
+        </g>
+      </svg>
     </div>
   );
 }

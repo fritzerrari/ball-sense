@@ -68,35 +68,43 @@ export function HeroDashboardMockup() {
               animate={{ opacity: 1 }}
               transition={{ delay: 1, duration: 0.6 }}
             >
-              {/* Field lines (SVG like real component) */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 105 68" preserveAspectRatio="none">
-                <rect x="0" y="0" width="105" height="68" fill="none" stroke="hsl(var(--primary) / 0.12)" strokeWidth="0.5" />
-                <line x1="52.5" y1="0" x2="52.5" y2="68" stroke="hsl(var(--primary) / 0.1)" strokeWidth="0.3" />
-                <circle cx="52.5" cy="34" r="9.15" fill="none" stroke="hsl(var(--primary) / 0.1)" strokeWidth="0.3" />
-                <rect x="0" y="13.84" width="16.5" height="40.32" fill="none" stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.3" />
-                <rect x="88.5" y="13.84" width="16.5" height="40.32" fill="none" stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.3" />
+              <svg className="w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                  <linearGradient id="mockupGrass" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="hsl(145, 55%, 28%)" />
+                    <stop offset="100%" stopColor="hsl(145, 45%, 22%)" />
+                  </linearGradient>
+                  <pattern id="mockupStripes" patternUnits="userSpaceOnUse" width="8" height="68">
+                    <rect x="0" y="0" width="4" height="68" fill="hsl(145, 50%, 26%)" />
+                    <rect x="4" y="0" width="4" height="68" fill="hsl(145, 46%, 24%)" />
+                  </pattern>
+                  <filter id="mockupBlur" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="0.25" />
+                  </filter>
+                </defs>
+                <rect x="0" y="0" width="105" height="68" fill="url(#mockupGrass)" />
+                <rect x="0" y="0" width="105" height="68" fill="url(#mockupStripes)" opacity="0.35" />
+                <g filter="url(#mockupBlur)">
+                  {heatmapGrid.flat().map((val, i) => {
+                    const colIdx = i % HEATMAP_COLS;
+                    const rowIdx = Math.floor(i / HEATMAP_COLS);
+                    const intensity = val / maxVal;
+                    if (intensity < 0.08) return null;
+                    const cw = 105 / HEATMAP_COLS;
+                    const ch = 68 / HEATMAP_ROWS;
+                    const color = intensity < 0.15 ? "hsla(142,70%,35%,0.3)" : intensity < 0.3 ? "hsla(142,65%,40%,0.55)" : intensity < 0.45 ? "hsla(85,60%,45%,0.65)" : intensity < 0.55 ? "hsla(55,75%,50%,0.75)" : intensity < 0.65 ? "hsla(45,85%,50%,0.8)" : intensity < 0.75 ? "hsla(30,90%,50%,0.85)" : intensity < 0.85 ? "hsla(15,95%,50%,0.9)" : "hsla(0,90%,50%,0.95)";
+                    return <rect key={i} x={colIdx * cw + 0.1} y={rowIdx * ch + 0.1} width={cw - 0.2} height={ch - 0.2} fill={color} rx="0.2" ry="0.2" />;
+                  })}
+                </g>
+                <g stroke="white" strokeOpacity="0.45" fill="none" strokeWidth="0.3">
+                  <rect x="1" y="1" width="103" height="66" rx="0.5" />
+                  <line x1="52.5" y1="1" x2="52.5" y2="67" />
+                  <circle cx="52.5" cy="34" r="9.15" />
+                  <rect x="1" y="13.84" width="16.5" height="40.32" strokeOpacity="0.3" />
+                  <rect x="87.5" y="13.84" width="16.5" height="40.32" strokeOpacity="0.3" />
+                </g>
+                <text x="3" y="65" fill="white" fillOpacity="0.3" fontSize="3" fontFamily="sans-serif">HEATMAP</text>
               </svg>
-              
-              {/* Grid cells — same algorithm as real HeatmapField */}
-              <div className="absolute inset-1 grid gap-px" style={{ gridTemplateColumns: `repeat(${HEATMAP_COLS}, 1fr)`, gridTemplateRows: `repeat(${HEATMAP_ROWS}, 1fr)` }}>
-                {heatmapGrid.flat().map((val, i) => {
-                  const norm = val / maxVal;
-                  const hue = norm > 0.7 ? 0 : norm > 0.4 ? 40 : norm > 0.2 ? 120 : 200;
-                  const alpha = Math.max(norm * 0.7, 0.02);
-                  return (
-                    <motion.div
-                      key={i}
-                      className="rounded-[1px]"
-                      style={{ backgroundColor: `hsla(${hue}, 80%, 50%, ${alpha})` }}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 1.2 + (i * 0.002), duration: 0.3 }}
-                    />
-                  );
-                })}
-              </div>
-
-              <div className="absolute bottom-1 left-2 text-[7px] text-muted-foreground/50 font-display">HEATMAP</div>
             </motion.div>
 
             {/* Player list — fictional names */}
