@@ -96,13 +96,13 @@ export default function MatchReport() {
             {sortPlayers(stats).map((p: any) => (
               <Fragment key={p.id}>
                 <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
-                  <td className="py-3 px-4 font-medium">{p.players?.name ?? "—"}</td>
-                  <td className="py-3 px-4 text-muted-foreground">{p.players?.number ?? "—"}</td>
-                  <td className="py-3 px-4 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
-                  <td className="py-3 px-4">{p.top_speed_kmh?.toFixed(1) ?? "—"}</td>
-                  <td className="py-3 px-4">{p.sprint_count ?? 0}</td>
-                  <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{p.minutes_played ?? "—"}</td>
-                  <td className="py-3 px-4">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
+                  <td className="py-3 px-3 sm:px-4 font-medium truncate max-w-[120px]">{p.players?.name ?? "—"}</td>
+                  <td className="py-3 px-2 text-muted-foreground">{p.players?.number ?? "—"}</td>
+                  <td className="py-3 px-3 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
+                  <td className="py-3 px-3">{p.top_speed_kmh?.toFixed(1) ?? "—"}</td>
+                  <td className="py-3 px-3">{p.sprint_count ?? 0}</td>
+                  <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">{p.minutes_played ?? "—"}</td>
+                  <td className="py-3 px-2">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
                 </tr>
                 {expandedPlayer === p.id && (
                   <tr>
