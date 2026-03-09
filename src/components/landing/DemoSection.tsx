@@ -844,9 +844,9 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
                 <PerformanceBar label="Sprint-Anteil" value={(safeNum(player.sprintDistanceM) / (safeNum(player.km, 1) * 1000)) * 100} max={20} unit="%" />
               </div>
               <div className="space-y-3">
-                <PerformanceBar label="Passgenauigkeit" value={player.passAccuracy} max={100} unit="%" />
-                <PerformanceBar label="Zweikampfquote" value={player.duelsWon} max={100} unit="%" />
-                <PerformanceBar label="Bewertung" value={player.rating} max={10} unit="/10" />
+                <PerformanceBar label="Passgenauigkeit" value={safeNum(player.passAccuracy)} max={100} unit="%" />
+                <PerformanceBar label="Zweikampfquote" value={safeNum(player.duelsWon)} max={100} unit="%" />
+                <PerformanceBar label="Bewertung" value={safeNum(player.rating)} max={10} unit="/10" />
               </div>
             </div>
           </div>
