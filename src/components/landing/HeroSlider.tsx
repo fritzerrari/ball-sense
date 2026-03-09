@@ -105,34 +105,29 @@ function TrackingSlide() {
       transition={{ duration: 0.4 }}
     >
       {/* Football field with heatmap */}
-      <div className="flex-1 relative rounded-xl overflow-hidden bg-[hsl(var(--primary)/0.05)] border border-border/30">
-        {/* Green pitch background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(140,40%,28%)] to-[hsl(140,35%,22%)]" />
-
-        {/* Field lines */}
-        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid meet">
-          <rect x="2" y="2" width="101" height="64" fill="none" stroke="white" strokeWidth="0.4" opacity="0.5" />
-          <line x1="52.5" y1="2" x2="52.5" y2="66" stroke="white" strokeWidth="0.3" opacity="0.4" />
-          <circle cx="52.5" cy="34" r="9.15" fill="none" stroke="white" strokeWidth="0.3" opacity="0.4" />
-          <circle cx="52.5" cy="34" r="0.5" fill="white" opacity="0.5" />
-          <rect x="2" y="13.84" width="16.5" height="40.32" fill="none" stroke="white" strokeWidth="0.3" opacity="0.35" />
-          <rect x="86.5" y="13.84" width="16.5" height="40.32" fill="none" stroke="white" strokeWidth="0.3" opacity="0.35" />
-          <rect x="2" y="24.84" width="5.5" height="18.32" fill="none" stroke="white" strokeWidth="0.25" opacity="0.3" />
-          <rect x="97" y="24.84" width="5.5" height="18.32" fill="none" stroke="white" strokeWidth="0.25" opacity="0.3" />
-          {/* Corner arcs */}
-          <path d="M2,5 A3,3 0 0,1 5,2" fill="none" stroke="white" strokeWidth="0.25" opacity="0.3" />
-          <path d="M100,2 A3,3 0 0,1 103,5" fill="none" stroke="white" strokeWidth="0.25" opacity="0.3" />
-          <path d="M103,63 A3,3 0 0,1 100,66" fill="none" stroke="white" strokeWidth="0.25" opacity="0.3" />
-          <path d="M5,66 A3,3 0 0,1 2,63" fill="none" stroke="white" strokeWidth="0.25" opacity="0.3" />
-        </svg>
-
-        {/* Heatmap overlay — SVG-based smooth rendering */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid slice">
+      <div className="flex-1 relative rounded-xl overflow-hidden border border-border/30">
+        {/* Unified grass pitch via SVG */}
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid slice">
           <defs>
+            <linearGradient id="sliderGrassBase" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="hsl(145, 55%, 28%)" />
+              <stop offset="50%" stopColor="hsl(145, 50%, 25%)" />
+              <stop offset="100%" stopColor="hsl(145, 45%, 22%)" />
+            </linearGradient>
+            <pattern id="sliderGrassStripes" patternUnits="userSpaceOnUse" width="10" height="68">
+              <rect x="0" y="0" width="5" height="68" fill="hsl(145, 52%, 26%)" />
+              <rect x="5" y="0" width="5" height="68" fill="hsl(145, 48%, 24%)" />
+            </pattern>
             <filter id="sliderHeatBlur" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur in="SourceGraphic" stdDeviation="0.3" />
             </filter>
           </defs>
+
+          {/* Pitch background with grass stripes */}
+          <rect x="0" y="0" width="105" height="68" fill="url(#sliderGrassBase)" />
+          <rect x="0" y="0" width="105" height="68" fill="url(#sliderGrassStripes)" opacity="0.4" />
+
+          {/* Heat cells */}
           <g filter="url(#sliderHeatBlur)" opacity="0.85">
             {grid.flat().map((val, i) => {
               const colIdx = i % HEATMAP_COLS;
@@ -144,6 +139,26 @@ function TrackingSlide() {
               const color = intensity < 0.15 ? "hsla(142,70%,35%,0.3)" : intensity < 0.3 ? "hsla(142,65%,40%,0.55)" : intensity < 0.45 ? "hsla(85,60%,45%,0.65)" : intensity < 0.55 ? "hsla(55,75%,50%,0.75)" : intensity < 0.65 ? "hsla(45,85%,50%,0.8)" : intensity < 0.75 ? "hsla(30,90%,50%,0.85)" : intensity < 0.85 ? "hsla(15,95%,50%,0.9)" : "hsla(0,90%,50%,0.95)";
               return <rect key={i} x={colIdx * cw + 0.1} y={rowIdx * ch + 0.1} width={cw - 0.2} height={ch - 0.2} fill={color} rx="0.2" ry="0.2" />;
             })}
+          </g>
+
+          {/* Field lines */}
+          <g stroke="white" strokeOpacity="0.5" fill="none">
+            <rect x="1" y="1" width="103" height="66" strokeWidth="0.35" rx="0.5" />
+            <line x1="52.5" y1="1" x2="52.5" y2="67" strokeWidth="0.3" />
+            <circle cx="52.5" cy="34" r="9.15" strokeWidth="0.3" />
+            <circle cx="52.5" cy="34" r="0.6" fill="white" fillOpacity="0.5" stroke="none" />
+            <rect x="1" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
+            <rect x="87.5" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
+            <rect x="1" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
+            <rect x="98.5" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
+            <circle cx="12" cy="34" r="0.4" fill="white" fillOpacity="0.4" stroke="none" />
+            <circle cx="93" cy="34" r="0.4" fill="white" fillOpacity="0.4" stroke="none" />
+            <path d="M 17.5 27.5 A 9.15 9.15 0 0 1 17.5 40.5" strokeWidth="0.25" />
+            <path d="M 87.5 27.5 A 9.15 9.15 0 0 0 87.5 40.5" strokeWidth="0.25" />
+            <path d="M 1 2 A 1 1 0 0 0 2 1" strokeWidth="0.2" />
+            <path d="M 103 1 A 1 1 0 0 0 104 2" strokeWidth="0.2" />
+            <path d="M 1 66 A 1 1 0 0 1 2 67" strokeWidth="0.2" />
+            <path d="M 104 66 A 1 1 0 0 0 103 67" strokeWidth="0.2" />
           </g>
         </svg>
 

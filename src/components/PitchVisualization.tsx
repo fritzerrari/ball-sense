@@ -133,12 +133,13 @@ export default function PitchVisualization({ players = [], className = "", mode 
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" style={{ filter: "drop-shadow(0 4px 20px hsl(142 55% 30% / 0.15))" }}>
         <defs>
           <linearGradient id="pitchGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(142, 55%, 38%)" />
-            <stop offset="50%" stopColor="hsl(142, 55%, 42%)" />
-            <stop offset="100%" stopColor="hsl(142, 55%, 36%)" />
+            <stop offset="0%" stopColor="hsl(145, 55%, 28%)" />
+            <stop offset="50%" stopColor="hsl(145, 50%, 25%)" />
+            <stop offset="100%" stopColor="hsl(145, 45%, 22%)" />
           </linearGradient>
           <pattern id="pitchStripes" width={PW / 10} height={PH} patternUnits="userSpaceOnUse" x={PAD} y={PAD}>
-            <rect width={PW / 20} height={PH} fill="hsl(142, 55%, 42%)" opacity="0.15" />
+            <rect width={PW / 20} height={PH} fill="hsl(145, 52%, 26%)" />
+            <rect x={PW / 20} width={PW / 20} height={PH} fill="hsl(145, 48%, 24%)" />
           </pattern>
           <filter id="trailGlow">
             <feGaussianBlur stdDeviation="2" result="blur" />
@@ -153,9 +154,9 @@ export default function PitchVisualization({ players = [], className = "", mode 
           </filter>
         </defs>
 
-        {/* Pitch background */}
+        {/* Pitch background with grass stripes */}
         <rect x={PAD} y={PAD} width={PW} height={PH} rx="4" fill="url(#pitchGrad)" />
-        <rect x={PAD} y={PAD} width={PW} height={PH} rx="4" fill="url(#pitchStripes)" />
+        <rect x={PAD} y={PAD} width={PW} height={PH} rx="4" fill="url(#pitchStripes)" opacity="0.4" />
 
         {/* Heatmap layer (behind markings for a blended look) */}
         {mode === "heatmap" && heatmapGrid && (
