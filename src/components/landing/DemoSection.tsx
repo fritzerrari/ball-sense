@@ -653,8 +653,10 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
 
 /* ─── Player Detail Modal ─── */
 function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: () => void }) {
-  const playerMaxHeat = Math.max(...player.heatmap.flat(), 0.01);
-  const duelsPct = player.duelsTotal > 0 ? Math.round((player.duelsWon / 100) * player.duelsTotal) : 0;
+  const playerMaxHeat = Math.max(...(player.heatmap?.flat() || [0]), 0.01);
+  
+  // Safe number helper
+  const safeNum = (val: number | undefined | null, fallback = 0) => val ?? fallback;
 
   return (
     <motion.div
