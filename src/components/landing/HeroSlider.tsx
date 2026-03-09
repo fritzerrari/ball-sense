@@ -126,24 +126,26 @@ function TrackingSlide() {
           <path d="M5,66 A3,3 0 0,1 2,63" fill="none" stroke="white" strokeWidth="0.25" opacity="0.3" />
         </svg>
 
-        {/* Heatmap overlay */}
-        <div className="absolute inset-2 grid gap-px" style={{ gridTemplateColumns: `repeat(${HEATMAP_COLS}, 1fr)`, gridTemplateRows: `repeat(${HEATMAP_ROWS}, 1fr)` }}>
-          {grid.flat().map((val, i) => {
-            const norm = val / maxVal;
-            const hue = norm > 0.7 ? 0 : norm > 0.4 ? 40 : norm > 0.2 ? 120 : 200;
-            const alpha = Math.max(norm * 0.55, 0.01);
-            return (
-              <motion.div
-                key={i}
-                className="rounded-[2px]"
-                style={{ backgroundColor: `hsla(${hue}, 85%, 50%, ${alpha})` }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 + i * 0.002, duration: 0.3 }}
-              />
-            );
-          })}
-        </div>
+        {/* Heatmap overlay — SVG-based smooth rendering */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <filter id="sliderHeatBlur" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="0.3" />
+            </filter>
+          </defs>
+          <g filter="url(#sliderHeatBlur)" opacity="0.85">
+            {grid.flat().map((val, i) => {
+              const colIdx = i % HEATMAP_COLS;
+              const rowIdx = Math.floor(i / HEATMAP_COLS);
+              const intensity = val / maxVal;
+              if (intensity < 0.08) return null;
+              const cw = 105 / HEATMAP_COLS;
+              const ch = 68 / HEATMAP_ROWS;
+              const color = intensity < 0.15 ? "hsla(142,70%,35%,0.3)" : intensity < 0.3 ? "hsla(142,65%,40%,0.55)" : intensity < 0.45 ? "hsla(85,60%,45%,0.65)" : intensity < 0.55 ? "hsla(55,75%,50%,0.75)" : intensity < 0.65 ? "hsla(45,85%,50%,0.8)" : intensity < 0.75 ? "hsla(30,90%,50%,0.85)" : intensity < 0.85 ? "hsla(15,95%,50%,0.9)" : "hsla(0,90%,50%,0.95)";
+              return <rect key={i} x={colIdx * cw + 0.1} y={rowIdx * ch + 0.1} width={cw - 0.2} height={ch - 0.2} fill={color} rx="0.2" ry="0.2" />;
+            })}
+          </g>
+        </svg>
 
         {/* Player dots */}
         {mockPlayers.map((p, i) => (
