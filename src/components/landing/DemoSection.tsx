@@ -653,8 +653,10 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
 
 /* ─── Player Detail Modal ─── */
 function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: () => void }) {
-  const playerMaxHeat = Math.max(...player.heatmap.flat(), 0.01);
-  const duelsPct = player.duelsTotal > 0 ? Math.round((player.duelsWon / 100) * player.duelsTotal) : 0;
+  const playerMaxHeat = Math.max(...(player.heatmap?.flat() || [0]), 0.01);
+  
+  // Safe number helper
+  const safeNum = (val: number | undefined | null, fallback = 0) => val ?? fallback;
 
   return (
     <motion.div
@@ -689,8 +691,8 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
           <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Gesamtbewertung</div>
-              <div className={`text-xl font-bold font-display ${player.rating >= 7.5 ? "text-primary" : player.rating >= 6.5 ? "text-foreground" : "text-warning"}`}>
-                {player.rating.toFixed(1)}
+              <div className={`text-xl font-bold font-display ${safeNum(player.rating) >= 7.5 ? "text-primary" : safeNum(player.rating) >= 6.5 ? "text-foreground" : "text-warning"}`}>
+                {safeNum(player.rating).toFixed(1)}
               </div>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
@@ -708,12 +710,12 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
             </div>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
               {[
-                { label: "Distanz", value: `${player.km.toFixed(2)} km`, icon: Route },
-                { label: "Topspeed", value: `${player.topSpeed.toFixed(1)} km/h`, icon: Zap },
-                { label: "Ø Tempo", value: `${player.avgSpeed.toFixed(1)} km/h`, icon: Gauge },
-                { label: "Sprints", value: `${player.sprints}`, icon: Footprints },
-                { label: "Sprint-Distanz", value: `${player.sprintDistanceM} m`, icon: TrendingUp },
-                { label: "Spielzeit", value: `${player.minutesPlayed}'`, icon: Timer },
+                { label: "Distanz", value: `${safeNum(player.km).toFixed(2)} km`, icon: Route },
+                { label: "Topspeed", value: `${safeNum(player.topSpeed).toFixed(1)} km/h`, icon: Zap },
+                { label: "Ø Tempo", value: `${safeNum(player.avgSpeed).toFixed(1)} km/h`, icon: Gauge },
+                { label: "Sprints", value: `${safeNum(player.sprints)}`, icon: Footprints },
+                { label: "Sprint-Distanz", value: `${safeNum(player.sprintDistanceM)} m`, icon: TrendingUp },
+                { label: "Spielzeit", value: `${safeNum(player.minutesPlayed)}'`, icon: Timer },
               ].map((stat) => (
                 <div key={stat.label} className="text-center p-2 rounded-lg bg-card/50 border border-border/30">
                   <stat.icon className="w-3.5 h-3.5 text-primary mx-auto mb-1" />
@@ -767,7 +769,7 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-xl font-bold font-display text-primary">{player.rating.toFixed(1)}</div>
+                    <div className="text-xl font-bold font-display text-primary">{safeNum(player.rating).toFixed(1)}</div>
                     <div className="text-[8px] text-muted-foreground">Rating</div>
                   </div>
                 </div>
@@ -837,14 +839,14 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
             <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Leistungsindikatoren</div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-3">
-                <PerformanceBar label="Laufleistung" value={player.km} max={13} unit="km" />
-                <PerformanceBar label="Topspeed" value={player.topSpeed} max={35} unit="km/h" />
-                <PerformanceBar label="Sprint-Anteil" value={(player.sprintDistanceM / (player.km * 1000)) * 100} max={20} unit="%" />
+                <PerformanceBar label="Laufleistung" value={safeNum(player.km)} max={13} unit="km" />
+                <PerformanceBar label="Topspeed" value={safeNum(player.topSpeed)} max={35} unit="km/h" />
+                <PerformanceBar label="Sprint-Anteil" value={(safeNum(player.sprintDistanceM) / (safeNum(player.km, 1) * 1000)) * 100} max={20} unit="%" />
               </div>
               <div className="space-y-3">
-                <PerformanceBar label="Passgenauigkeit" value={player.passAccuracy} max={100} unit="%" />
-                <PerformanceBar label="Zweikampfquote" value={player.duelsWon} max={100} unit="%" />
-                <PerformanceBar label="Bewertung" value={player.rating} max={10} unit="/10" />
+                <PerformanceBar label="Passgenauigkeit" value={safeNum(player.passAccuracy)} max={100} unit="%" />
+                <PerformanceBar label="Zweikampfquote" value={safeNum(player.duelsWon)} max={100} unit="%" />
+                <PerformanceBar label="Bewertung" value={safeNum(player.rating)} max={10} unit="/10" />
               </div>
             </div>
           </div>
