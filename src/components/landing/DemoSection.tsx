@@ -524,70 +524,8 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
 
         {/* Players Tab */}
         <TabsContent value="players" className="space-y-4">
-          {/* Player spotlight cards */}
-          <div className="grid md:grid-cols-2 gap-4">
-            {topPlayers.map((p, i) => {
-              const playerMaxHeat = Math.max(...p.heatmap.flat(), 0.01);
-              return (
-                <motion.div
-                  key={p.name}
-                  className="rounded-xl border border-border/50 bg-card/50 p-4 hover:border-primary/50 transition-all cursor-pointer"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  onClick={() => setSelectedPlayer(p)}
-                >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold font-display text-primary">{p.num}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold font-display text-foreground truncate">{p.name}</span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{p.pos}</span>
-                      </div>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground">Bewertung:</span>
-                        <span className={`text-xs font-bold ${p.rating >= 7.5 ? "text-primary" : p.rating >= 6.5 ? "text-foreground" : "text-warning"}`}>
-                          {p.rating.toFixed(1)}
-                        </span>
-                        {p.trend === "up" && <ArrowUpRight className="w-3 h-3 text-primary" />}
-                        {p.trend === "down" && <ArrowDownRight className="w-3 h-3 text-destructive" />}
-                        {p.trend === "stable" && <Minus className="w-3 h-3 text-muted-foreground" />}
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-[10px] h-7 gap-1 shrink-0"
-                      onClick={(e) => { e.stopPropagation(); setSelectedPlayer(p); }}
-                    >
-                      <Eye className="w-3 h-3" />
-                      Analysieren
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    {[
-                      { label: "km", value: p.km.toFixed(1) },
-                      { label: "Top km/h", value: p.topSpeed.toFixed(1) },
-                      { label: "Sprints", value: p.sprints.toString() },
-                      { label: "Passquote", value: `${p.passAccuracy}%` },
-                    ].map((s) => (
-                      <div key={s.label} className="text-center">
-                        <div className="text-xs font-bold font-display text-foreground">{s.value}</div>
-                        <div className="text-[8px] text-muted-foreground">{s.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Individual heatmap */}
-                  <div className="text-[9px] text-muted-foreground mb-1 font-display">Individuelle Heatmap</div>
-                  <HeatmapField grid={p.heatmap} maxVal={playerMaxHeat} small />
-                </motion.div>
-              );
-            })}
-          </div>
+          {/* Player spotlight carousel */}
+          <PlayerHeatmapCarousel players={data.players} onSelectPlayer={setSelectedPlayer} />
 
           {/* Full roster table */}
           <div className="rounded-xl border border-border/50 bg-card/50 p-4 overflow-x-auto">
