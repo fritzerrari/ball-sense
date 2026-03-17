@@ -968,43 +968,74 @@ function ReportTabContent() {
             Der FC Musterstadt erwischte einen konzentrierten Start und übernahm früh die Spielkontrolle. 
             Bereits in der 23. Minute belohnte sich das Heimteam: Nach einer schnellen Ballstafette über die 
             rechte Seite kam <span className="text-foreground font-medium">A. Vogt (#10)</span> im Strafraum zum Abschluss — 1:0.
+            Nach der Pause erhöhte der Gegner den Druck, doch <span className="text-foreground font-medium">F. König (#7)</span> bediente 
+            <span className="text-foreground font-medium"> T. Hartmann (#9)</span> in der 67. Minute zum 2:0.
           </p>
+          
           <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Taktische Analyse</h3>
-          <p className="text-muted-foreground mb-3">
-            4-3-3 mit hohem Pressing. Zweikampfquote <span className="text-foreground font-medium">58%</span>, 
-            Passquote <span className="text-foreground font-medium">84%</span>. 
-            <span className="text-foreground font-medium"> 62%</span> der Angriffe über rechts.
-            xG: <span className="text-foreground font-medium">1.82</span> vs. xGA: <span className="text-foreground font-medium">0.94</span>.
-          </p>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5">
+              <div className="text-[10px] font-semibold text-primary mb-1">Offensiv-Kennzahlen</div>
+              <div className="space-y-1 text-[10px] text-muted-foreground">
+                <div className="flex justify-between"><span>xG</span><span className="text-foreground font-medium">1.82</span></div>
+                <div className="flex justify-between"><span>Schusseffizienz</span><span className="text-foreground font-medium">29% (2/7)</span></div>
+                <div className="flex justify-between"><span>Passquote</span><span className="text-foreground font-medium">84%</span></div>
+                <div className="flex justify-between"><span>Angriffe rechts</span><span className="text-foreground font-medium">62%</span></div>
+              </div>
+            </div>
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5">
+              <div className="text-[10px] font-semibold text-primary mb-1">Defensiv-Kennzahlen</div>
+              <div className="space-y-1 text-[10px] text-muted-foreground">
+                <div className="flex justify-between"><span>xGA</span><span className="text-foreground font-medium">0.94</span></div>
+                <div className="flex justify-between"><span>PPDA</span><span className="text-foreground font-medium">8.2</span></div>
+                <div className="flex justify-between"><span>Zweikampfquote</span><span className="text-foreground font-medium">58%</span></div>
+                <div className="flex justify-between"><span>Ballverluste eig. Hälfte</span><span className="text-foreground font-medium">12</span></div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 mb-4">
             <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
               <Award className="w-5 h-5 text-primary" />
             </div>
             <div>
               <div className="font-semibold text-foreground">Spieler des Spiels: A. Vogt (#10) — 8.2</div>
-              <p className="text-xs text-muted-foreground mt-1">1 Tor, 1 Assist, 89% Passquote, 7/9 Zweikämpfe, 11.4 km, 18 Sprints.</p>
+              <p className="text-xs text-muted-foreground mt-1">1 Tor, 1 Assist, 89% Passquote, 7/9 Zweikämpfe, 11.4 km, 18 Sprints, 32 Ballkontakte im letzten Drittel.</p>
             </div>
+          </div>
+
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">🔍 KI-Erkenntnisse</h3>
+          <div className="space-y-2 mb-3">
+            {[
+              { insight: "Überladung rechts: 62% der Angriffe über die rechte Seite — Gegner konnte links nicht absichern.", icon: "💡" },
+              { insight: "Pressing-Effizienz: PPDA von 8.2 erzwang 14 Ballverluste im Mittelfeld — deutlich über Liga-Schnitt (11.4).", icon: "📊" },
+              { insight: "Konter-Anfälligkeit: 3 der 4 gegnerischen Chancen entstanden nach Ballverlusten im Spielaufbau.", icon: "⚠️" },
+              { insight: "Laufleistung 2. Hälfte: 12% Rückgang ab der 65. Minute — Belastungssteuerung überprüfen.", icon: "🏃" },
+            ].map((item) => (
+              <div key={item.insight} className="flex items-start gap-2 text-xs text-muted-foreground rounded-lg bg-muted/20 p-2 border border-border/30">
+                <span className="text-sm shrink-0">{item.icon}</span>
+                <span>{item.insight}</span>
+              </div>
+            ))}
           </div>
         </>
       ),
       social: (
-        <>
-          <div className="bg-muted/30 rounded-xl p-5 border border-border/50 font-mono text-sm leading-relaxed text-foreground">
-            <p className="mb-3">⚽ <strong>SIEG!</strong> 🎉</p>
-            <p className="mb-3">FC Musterstadt 🟢 2:1 🔴 SV Beispielburg</p>
-            <p className="mb-3">
-              ⚡ A. Vogt mit Tor + Assist — MoTM! 🏆<br/>
-              🏃 117 km Gesamtlaufleistung<br/>
-              🎯 84% Passquote | 58% Zweikampfquote<br/>
-              📊 xG 1.82 vs 0.94 xGA
-            </p>
-            <p className="mb-3">
-              💪 Top-Sprinter: N. Roth (22 Sprints, 32.8 km/h)<br/>
-              🧤 Defensive steht — nur 4 Schüsse aufs Tor zugelassen!
-            </p>
-            <p className="text-primary">#FCMusterstadt #Sieg #FieldIQ #Tracking #Fußball</p>
-          </div>
-        </>
+        <div className="bg-muted/30 rounded-xl p-5 border border-border/50 font-mono text-sm leading-relaxed text-foreground">
+          <p className="mb-3">⚽ <strong>SIEG!</strong> 🎉</p>
+          <p className="mb-3">FC Musterstadt 🟢 2:1 🔴 SV Beispielburg</p>
+          <p className="mb-3">
+            ⚡ A. Vogt mit Tor + Assist — MoTM! 🏆<br/>
+            🏃 117 km Gesamtlaufleistung<br/>
+            🎯 84% Passquote | 58% Zweikampfquote<br/>
+            📊 xG 1.82 vs 0.94 xGA
+          </p>
+          <p className="mb-3">
+            💪 Top-Sprinter: N. Roth (22 Sprints, 32.8 km/h)<br/>
+            🧤 Defensive steht — nur 4 Schüsse aufs Tor zugelassen!
+          </p>
+          <p className="text-primary">#FCMusterstadt #Sieg #FieldIQ #Tracking #Fußball</p>
+        </div>
       ),
       newspaper: (
         <>
@@ -1027,17 +1058,83 @@ function ReportTabContent() {
       analytic: (
         <>
           <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4">⏱️ Halbzeitanalyse — 1:0 (23' Vogt)</h2>
+          
+          {/* Quick stats grid */}
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {[
+              { label: "Ballbesitz", value: "57%", good: true },
+              { label: "Passquote", value: "84%", good: true },
+              { label: "xG", value: "0.92", good: true },
+              { label: "PPDA", value: "8.2", good: true },
+            ].map((s) => (
+              <div key={s.label} className="rounded-lg bg-muted/20 border border-border/30 p-2 text-center">
+                <div className={`text-sm font-bold font-display ${s.good ? "text-primary" : "text-warning"}`}>{s.value}</div>
+                <div className="text-[8px] text-muted-foreground">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
           <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Erste Hälfte — Überblick</h3>
           <p className="text-muted-foreground mb-3">
-            Klare Dominanz des Heimteams. Ballbesitz <span className="text-foreground font-medium">57%</span>, 
-            4 Torschüsse (2 aufs Tor). Pressing-Intensität hoch (PPDA <span className="text-foreground font-medium">8.2</span>).
+            Klare Dominanz des Heimteams. 4 Torschüsse (2 aufs Tor), Pressing-Intensität hoch. 
+            Gegner kam nur zu <span className="text-foreground font-medium">2 Abschlüssen</span> (0 aufs Tor).
           </p>
-          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Taktische Empfehlungen 2. Hälfte</h3>
-          <div className="space-y-2">
-            {["Linke Seite stärker einbeziehen (nur 28% der Angriffe)", "Vogt (#10) weiter als Zielspieler nutzen", "Gegnerische Konter über Roth (#2) absichern"].map((rec) => (
-              <div key={rec} className="flex items-start gap-2 text-xs text-muted-foreground">
-                <ChevronRight className="w-3 h-3 text-primary mt-0.5 shrink-0" />
-                <span>{rec}</span>
+
+          {/* Verbesserungsvorschläge — das Herzstück */}
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-3 flex items-center gap-2">
+            <Lightbulb className="w-4 h-4 text-warning" />
+            Verbesserungsvorschläge für die 2. Hälfte
+          </h3>
+          <div className="space-y-3 mb-4">
+            {[
+              {
+                priority: "HOCH",
+                priorityColor: "bg-destructive/10 text-destructive border-destructive/30",
+                title: "Linke Seite aktivieren",
+                reason: "Nur 28% der Angriffe über links — Gegner überladen unsere rechte Seite. König (#7) hat erst 14 Ballkontakte.",
+                action: "König (#7) höher schieben, Diagonalbälle von Berger (#4) auf die linke Seite fordern.",
+              },
+              {
+                priority: "HOCH",
+                priorityColor: "bg-destructive/10 text-destructive border-destructive/30",
+                title: "Konterabsicherung verbessern",
+                reason: "2 Kontersituationen des Gegners entstanden nach Ballverlusten von Roth (#2) im Spielaufbau. Beide Male fehlte die Doppelsicherung.",
+                action: "Müller (#6) soll bei Spielaufbau tiefer stehen. Roth (#2) kürzere Pässe spielen statt lange Diagonalen.",
+              },
+              {
+                priority: "MITTEL",
+                priorityColor: "bg-warning/10 text-warning border-warning/30",
+                title: "Pressing-Timing anpassen",
+                reason: "Ab der 35. Minute sank die Pressing-Intensität (PPDA stieg von 7.4 auf 11.2). Laufdistanz der Stürmer bereits bei 4.8 km.",
+                action: "Pressing in der 2. Hälfte situativer einsetzen. Vogt (#10) entlasten, Hartmann (#9) soll Pressing auslösen.",
+              },
+              {
+                priority: "MITTEL",
+                priorityColor: "bg-warning/10 text-warning border-warning/30",
+                title: "Standards besser nutzen",
+                reason: "3 Ecken in der 1. Hälfte — 0 Abschlüsse daraus. Gegnerische Lufthoheit bei 58%.",
+                action: "Flache, kurze Ecken spielen statt hohe Flanken. Fischer (#8) als Abnehmer am kurzen Pfosten.",
+              },
+              {
+                priority: "TIPP",
+                priorityColor: "bg-primary/10 text-primary border-primary/30",
+                title: "Wechsel-Empfehlung",
+                reason: "Schmidt (#11) hat die niedrigste Passquote (68%) und 0 erfolgreiche Dribblings. Intensität nimmt ab.",
+                action: "Ab 60. Minute durch Weber einwechseln — bringt frische Beine und bessere 1-gegen-1-Qualität über links.",
+              },
+            ].map((tip) => (
+              <div key={tip.title} className="rounded-lg border border-border/40 bg-card/80 p-3">
+                <div className="flex items-start gap-2 mb-1.5">
+                  <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${tip.priorityColor}`}>{tip.priority}</span>
+                  <span className="text-xs font-semibold text-foreground">{tip.title}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground mb-1.5">
+                  <span className="font-medium text-foreground/80">Warum:</span> {tip.reason}
+                </p>
+                <div className="flex items-start gap-1.5 text-[10px] text-primary">
+                  <ArrowRight className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span className="font-medium">{tip.action}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -1047,8 +1144,9 @@ function ReportTabContent() {
         <div className="bg-muted/30 rounded-xl p-5 border border-border/50 font-mono text-sm leading-relaxed text-foreground">
           <p className="mb-2">⏱️ <strong>HALBZEIT!</strong></p>
           <p className="mb-2">FC Musterstadt 1:0 SV Beispielburg</p>
-          <p>⚽ 23' Vogt | 57% Ballbesitz | 84% Pässe ✅</p>
-          <p className="text-primary mt-2">#HalbzeitUpdate #FCM</p>
+          <p className="mb-2">⚽ 23' Vogt | 57% Ballbesitz | 84% Pässe ✅</p>
+          <p className="mb-2">📊 xG 0.92 – wir hätten sogar mehr Tore verdient!</p>
+          <p className="text-primary mt-2">#HalbzeitUpdate #FCM #Führung</p>
         </div>
       ),
       newspaper: (
@@ -1056,7 +1154,8 @@ function ReportTabContent() {
           <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4 italic">Vogt bringt Musterstadt in Front</h2>
           <p className="text-muted-foreground mb-3">
             <strong className="text-foreground">Halbzeit.</strong> Nach einer kontrollierten ersten Hälfte führt der FC Musterstadt 
-            dank eines Treffers von Alexander Vogt (23.) mit 1:0. Die Gastgeber bestimmten das Spiel und ließen wenig zu.
+            dank eines Treffers von Alexander Vogt (23.) mit 1:0. Die Gastgeber bestimmten das Spiel bei 57% Ballbesitz
+            und ließen den Gästen kaum Raum für eigene Aktionen.
           </p>
         </>
       ),
@@ -1066,38 +1165,86 @@ function ReportTabContent() {
         <>
           <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4">📋 Vorbericht: FC Musterstadt vs. SV Beispielburg</h2>
           <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Formkurve</h3>
-          <p className="text-muted-foreground mb-3">
-            FC Musterstadt: <span className="text-primary font-medium">S-S-U-S-N</span> (10 Punkte aus 5 Spielen)<br/>
-            SV Beispielburg: <span className="text-destructive font-medium">N-U-S-N-U</span> (5 Punkte aus 5 Spielen)
-          </p>
+          <div className="flex gap-4 mb-3">
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold text-foreground mb-1">FC Musterstadt</div>
+              <div className="flex gap-1">
+                {["S","S","U","S","N"].map((r, i) => (
+                  <span key={i} className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center ${
+                    r === "S" ? "bg-primary/20 text-primary" : r === "N" ? "bg-destructive/20 text-destructive" : "bg-muted text-muted-foreground"
+                  }`}>{r}</span>
+                ))}
+              </div>
+              <div className="text-[9px] text-muted-foreground mt-1">10 Punkte aus 5 Spielen</div>
+            </div>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold text-foreground mb-1">SV Beispielburg</div>
+              <div className="flex gap-1">
+                {["N","U","S","N","U"].map((r, i) => (
+                  <span key={i} className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center ${
+                    r === "S" ? "bg-primary/20 text-primary" : r === "N" ? "bg-destructive/20 text-destructive" : "bg-muted text-muted-foreground"
+                  }`}>{r}</span>
+                ))}
+              </div>
+              <div className="text-[9px] text-muted-foreground mt-1">5 Punkte aus 5 Spielen</div>
+            </div>
+          </div>
           <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Schlüsseldaten (letzte 5 Spiele)</h3>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-lg bg-muted/20 p-2 border border-border/30">
-              <div className="font-semibold text-foreground mb-1">FC Musterstadt</div>
-              <div className="text-muted-foreground">Ø Distanz: 10.4 km · Ø xG: 1.6 · Passquote: 82%</div>
+          <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+            <div className="rounded-lg bg-primary/5 p-2.5 border border-primary/20">
+              <div className="font-semibold text-primary mb-1">FC Musterstadt</div>
+              <div className="space-y-0.5 text-[10px] text-muted-foreground">
+                <div className="flex justify-between"><span>Ø Distanz</span><span className="text-foreground">10.4 km</span></div>
+                <div className="flex justify-between"><span>Ø xG</span><span className="text-foreground">1.6</span></div>
+                <div className="flex justify-between"><span>Passquote</span><span className="text-foreground">82%</span></div>
+                <div className="flex justify-between"><span>Zweikampfquote</span><span className="text-foreground">56%</span></div>
+              </div>
             </div>
-            <div className="rounded-lg bg-muted/20 p-2 border border-border/30">
-              <div className="font-semibold text-foreground mb-1">SV Beispielburg</div>
-              <div className="text-muted-foreground">Ø Distanz: 9.8 km · Ø xG: 1.1 · Passquote: 76%</div>
+            <div className="rounded-lg bg-destructive/5 p-2.5 border border-destructive/20">
+              <div className="font-semibold text-destructive mb-1">SV Beispielburg</div>
+              <div className="space-y-0.5 text-[10px] text-muted-foreground">
+                <div className="flex justify-between"><span>Ø Distanz</span><span className="text-foreground">9.8 km</span></div>
+                <div className="flex justify-between"><span>Ø xG</span><span className="text-foreground">1.1</span></div>
+                <div className="flex justify-between"><span>Passquote</span><span className="text-foreground">76%</span></div>
+                <div className="flex justify-between"><span>Zweikampfquote</span><span className="text-foreground">52%</span></div>
+              </div>
             </div>
+          </div>
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2 flex items-center gap-2">
+            <Lightbulb className="w-4 h-4 text-warning" />
+            Taktische Empfehlungen
+          </h3>
+          <div className="space-y-1.5">
+            {[
+              "Gegner schwach bei hohem Pressing (PPDA 14.2) — aggressives Anlaufen empfohlen",
+              "Beispielburg anfällig über rechte Seite — Roth (#2) und Vogt (#10) als Tandem nutzen",
+              "Standards nutzen: Gegner hat 3 Tore aus Standards kassiert in letzten 5 Spielen",
+            ].map((rec) => (
+              <div key={rec} className="flex items-start gap-2 text-[10px] text-muted-foreground">
+                <CheckCircle2 className="w-3 h-3 text-primary mt-0.5 shrink-0" />
+                <span>{rec}</span>
+              </div>
+            ))}
           </div>
         </>
       ),
       social: (
         <div className="bg-muted/30 rounded-xl p-5 border border-border/50 font-mono text-sm leading-relaxed text-foreground">
-          <p className="mb-2">🔜 <strong>MATCHDAY!</strong></p>
+          <p className="mb-2">🔜 <strong>MATCHDAY!</strong> ⚽</p>
           <p className="mb-2">FC Musterstadt 🆚 SV Beispielburg</p>
-          <p className="mb-2">📅 Sonntag, 15:30 Uhr</p>
-          <p>📊 Formkurve: SSUSU vs NUSNU</p>
-          <p className="text-primary mt-2">#Spieltag #FCM #Vorschau</p>
+          <p className="mb-2">📅 Sonntag, 15:30 Uhr | 🏟️ Vereinsstadion</p>
+          <p className="mb-2">📊 Formkurve: S-S-U-S-N vs N-U-S-N-U</p>
+          <p>🔥 Wir sind bereit! Kommt zahlreich!</p>
+          <p className="text-primary mt-2">#Spieltag #FCM #Vorschau #Matchday</p>
         </div>
       ),
       newspaper: (
         <>
           <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4 italic">Musterstadt empfängt angeschlagene Beispielburger</h2>
           <p className="text-muted-foreground mb-3">
-            <strong className="text-foreground">Vorschau.</strong> Am Sonntagnachmittag empfängt der formstarke FC Musterstadt den 
-            kriselnden SV Beispielburg. Die Gastgeber gehen als klarer Favorit in die Partie.
+            <strong className="text-foreground">Vorschau.</strong> Am Sonntagnachmittag empfängt der formstarke FC Musterstadt (3 Siege in Folge) 
+            den kriselnden SV Beispielburg. Die Gastgeber gehen als klarer Favorit in die Partie am 18. Spieltag der Kreisliga A.
+            Besonderes Augenmerk liegt auf Alexander Vogt, der in den letzten drei Spielen an 5 Toren direkt beteiligt war.
           </p>
         </>
       ),
@@ -1185,7 +1332,7 @@ function ReportTabContent() {
             <Sparkles className="w-3.5 h-3.5 text-primary" />
             <span>Generiert in 4.2 Sekunden</span>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 flex-wrap">
             <Button variant="outline" size="sm" className="text-xs h-7 gap-1"><Clipboard className="w-3 h-3" /> Kopieren</Button>
             <Button variant="outline" size="sm" className="text-xs h-7 gap-1"><Download className="w-3 h-3" /> PDF</Button>
             <Button variant="outline" size="sm" className="text-xs h-7 gap-1"><Mail className="w-3 h-3" /> E-Mail</Button>
@@ -1195,25 +1342,68 @@ function ReportTabContent() {
         </div>
       </div>
 
-      {/* Training Plan Preview */}
-      <div className="rounded-xl border border-border/50 bg-gradient-to-br from-primary/5 to-transparent p-6">
-        <div className="flex items-center gap-3 mb-4">
+      {/* Training Plan — expanded with player focus */}
+      <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-6">
+        <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <Dumbbell className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <div className="text-sm font-bold font-display">KI-Trainingsplan</div>
-            <div className="text-[10px] text-muted-foreground">Individuelle Empfehlungen basierend auf Spieldaten</div>
+            <div className="text-sm font-bold font-display">KI-Trainingsplan — Woche nach dem Spiel</div>
+            <div className="text-[10px] text-muted-foreground">Basierend auf Analyse: FC Musterstadt 2:1 SV Beispielburg</div>
           </div>
         </div>
-        <div className="grid md:grid-cols-3 gap-3">
+
+        {/* Erkannte Schwächen als Basis */}
+        <div className="rounded-lg bg-warning/5 border border-warning/20 p-3 mb-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Lightbulb className="w-3.5 h-3.5 text-warning" />
+            <span className="text-[10px] font-semibold text-warning">Erkannte Trainingsbedarfe aus dem Spiel</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {[
+              { area: "Linke Seite", issue: "Nur 28% Angriffe", severity: "hoch" },
+              { area: "Luftkämpfe", issue: "42% Kopfballquote", severity: "mittel" },
+              { area: "Standards", issue: "0 Chancen aus 3 Ecken", severity: "mittel" },
+              { area: "Ausdauer 2. HZ", issue: "12% Leistungsabfall", severity: "hoch" },
+            ].map((need) => (
+              <div key={need.area} className="rounded bg-card/80 border border-border/30 p-2">
+                <div className="text-[10px] font-semibold text-foreground">{need.area}</div>
+                <div className="text-[9px] text-muted-foreground">{need.issue}</div>
+                <span className={`text-[8px] font-bold ${need.severity === "hoch" ? "text-destructive" : "text-warning"}`}>
+                  Priorität: {need.severity}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-4 gap-3">
           {[
-            { day: "Montag", focus: "Regeneration", items: ["Lockeres Auslaufen 20'", "Mobilität & Stretching", "Video-Analyse der Halbräume"] },
-            { day: "Mittwoch", focus: "Taktik & Passspiel", items: ["Rondo 4v2 (Passquote steigern)", "Spielaufbau über links trainieren", "Pressing-Timing 2. Hälfte"] },
-            { day: "Freitag", focus: "Intensität & Abschluss", items: ["Sprint-Intervalle (Topspeed)", "Abschluss-Übungen im 16er", "Standards üben"] },
+            { day: "Montag", focus: "Regeneration & Analyse", color: "text-blue-500", items: [
+              "Lockeres Auslaufen 20'",
+              "Mobilität & Stretching",
+              "Video-Analyse: Spielaufbau über links, Konterabsicherung",
+            ]},
+            { day: "Mittwoch", focus: "Taktik & Passspiel", color: "text-primary", items: [
+              "Rondo 4v2 — Passquote unter Druck steigern",
+              "Spielaufbau über links trainieren (König #7 + LV)",
+              "Pressing-Staffelung 2. Hälfte simulieren",
+              "Standards: Kurze Ecken einstudieren",
+            ]},
+            { day: "Donnerstag", focus: "Zweikampf & Lufthoheit", color: "text-warning", items: [
+              "Kopfball-Training (Offensiv + Defensiv)",
+              "1-gegen-1-Übungen in Strafraumzonen",
+              "Gegenpressing nach Ballverlust trainieren",
+            ]},
+            { day: "Freitag", focus: "Intensität & Abschluss", color: "text-destructive", items: [
+              "Sprint-Intervalle (Top-Speed halten bis 80. Min)",
+              "Abschluss im 16er nach Flanken von links",
+              "Kontersituationen 3v2 üben",
+            ]},
           ].map((session) => (
             <div key={session.day} className="rounded-lg bg-card/80 border border-border/30 p-3">
-              <div className="text-xs font-semibold text-primary mb-0.5">{session.day}</div>
+              <div className={`text-xs font-semibold ${session.color} mb-0.5`}>{session.day}</div>
               <div className="text-[10px] font-medium text-foreground mb-2">{session.focus}</div>
               <div className="space-y-1">
                 {session.items.map((item) => (
@@ -1230,7 +1420,6 @@ function ReportTabContent() {
     </>
   );
 }
-
 /* ─── Helper Components ─── */
 function StatRow({ label, value, highlight, warning }: { label: string; value: string | number; highlight?: boolean; warning?: boolean }) {
   return (
