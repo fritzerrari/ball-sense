@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Shield, Users, Building2, BarChart3, Activity, Crown,
-  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload, BookOpen, Globe,
+  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload, BookOpen, Globe, Trash2, MapPin,
 } from "lucide-react";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
