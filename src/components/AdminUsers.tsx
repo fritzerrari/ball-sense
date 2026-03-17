@@ -498,3 +498,81 @@ function UserEditForm({
     </div>
   );
 }
+
+function CreateUserForm({
+  clubs,
+  onSubmit,
+  isLoading,
+}: {
+  clubs: { id: string; name: string }[];
+  onSubmit: (data: { email: string; password: string; clubId?: string; role?: string }) => void;
+  isLoading: boolean;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [clubId, setClubId] = useState("none");
+  const [role, setRole] = useState("none");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    onSubmit({
+      email,
+      password,
+      clubId: clubId !== "none" ? clubId : undefined,
+      role: role !== "none" ? role : undefined,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">E-Mail *</label>
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nutzer@example.com" required />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">Passwort *</label>
+        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min. 6 Zeichen" minLength={6} required />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">Verein (optional)</label>
+        <Select value={clubId} onValueChange={setClubId}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Kein Verein —</SelectItem>
+            {clubs.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-3 w-3 text-primary" />
+                  {c.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">Rolle (optional)</label>
+        <Select value={role} onValueChange={setRole}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Keine Rolle —</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="moderator">Moderator</SelectItem>
+            <SelectItem value="user">User</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isLoading || !email || !password} size="sm">
+          {isLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <UserPlus className="h-3 w-3 mr-1" />}
+          Nutzer erstellen
+        </Button>
+      </div>
+    </form>
+  );
+}
