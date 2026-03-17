@@ -2,12 +2,39 @@ import AppLayout from "@/components/AppLayout";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Crosshair, Save, ArrowLeft, RotateCcw, Move, Undo2, Sparkles, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Camera,
+  Upload,
+  Crosshair,
+  Save,
+  ArrowLeft,
+  RotateCcw,
+  Move,
+  Undo2,
+  Sparkles,
+  Loader2,
+  Ruler,
+  Goal,
+  CircleDot,
+  CornerDownRight,
+  LineChart,
+} from "lucide-react";
 import { useField, useSaveCalibration } from "@/hooks/use-fields";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type CornerPoint = { x: number; y: number };
+type DetectionConfidence = "high" | "medium" | "low" | null;
+
+type LayoutSuggestion = {
+  fieldType: string | null;
+  confidence: DetectionConfidence;
+  detectedFeatures: string[];
+  suggestedDimensions: { width: number; height: number } | null;
+};
 
 const FIELD_PRESETS = [
   { label: "Großfeld 105×68m", width: "105", height: "68" },
@@ -15,6 +42,39 @@ const FIELD_PRESETS = [
   { label: "Jugend 80×55m", width: "80", height: "55" },
   { label: "Futsal 40×20m", width: "40", height: "20" },
 ];
+
+const EMPTY_LAYOUT_SUGGESTION: LayoutSuggestion = {
+  fieldType: null,
+  confidence: null,
+  detectedFeatures: [],
+  suggestedDimensions: null,
+};
+
+const confidenceCopy: Record<Exclude<DetectionConfidence, null>, { label: string; className: string }> = {
+  high: {
+    label: "Hohe Sicherheit",
+    className: "border-primary/30 bg-primary/10 text-primary",
+  },
+  medium: {
+    label: "Mittlere Sicherheit",
+    className: "border-accent/30 bg-accent/10 text-accent-foreground",
+  },
+  low: {
+    label: "Niedrige Sicherheit",
+    className: "border-muted-foreground/20 bg-muted text-muted-foreground",
+  },
+};
+
+const featureLabels: Record<string, { label: string; icon: typeof Goal }> = {
+  goal: { label: "Tor", icon: Goal },
+  penalty_area: { label: "Strafraum", icon: Ruler },
+  goal_area: { label: "Torraum", icon: CornerDownRight },
+  center_circle: { label: "Mittelkreis", icon: CircleDot },
+  halfway_line: { label: "Mittellinie", icon: LineChart },
+  corner_flag: { label: "Eckfahne", icon: Crosshair },
+  touchline: { label: "Seitenlinie", icon: Move },
+  goal_line: { label: "Grundlinie", icon: Move },
+};
 
 export default function FieldCalibration() {
   const { id } = useParams();
@@ -24,13 +84,14 @@ export default function FieldCalibration() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [points, setPoints] = useState<{ x: number; y: number }[]>([]);
+  const [points, setPoints] = useState<CornerPoint[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [width, setWidth] = useState("105");
   const [height, setHeight] = useState("68");
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const [layoutSuggestion, setLayoutSuggestion] = useState<LayoutSuggestion>(EMPTY_LAYOUT_SUGGESTION);
 
   const cornerLabels = ["Links-Oben", "Rechts-Oben", "Rechts-Unten", "Links-Unten"];
   const canSave = points.length === 4;
@@ -42,13 +103,29 @@ export default function FieldCalibration() {
     }
   }, [field]);
 
+  const resetLayoutSuggestion = useCallback(() => {
+    setLayoutSuggestion(EMPTY_LAYOUT_SUGGESTION);
+  }, []);
+
+  const applySuggestedDimensions = useCallback((suggestedDimensions: LayoutSuggestion["suggestedDimensions"]) => {
+    if (!suggestedDimensions) return;
+    setWidth(String(suggestedDimensions.width));
+    setHeight(String(suggestedDimensions.height));
+  }, []);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (imageUrl) {
+      URL.revokeObjectURL(imageUrl);
+    }
+
     const url = URL.createObjectURL(file);
     setImageUrl(url);
     setImageFile(file);
     setPoints([]);
+    resetLayoutSuggestion();
   };
 
   const getRelativePos = useCallback((clientX: number, clientY: number) => {
@@ -67,11 +144,9 @@ export default function FieldCalibration() {
     if (navigator.vibrate) navigator.vibrate(30);
   }, []);
 
-  // Unified pointer events (works on iOS, Android, Desktop)
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (draggingIndex !== null) return;
-    // Only respond to primary pointer (not from drag handles)
-    if ((e.target as HTMLElement).closest('[data-drag-handle]')) return;
+    if ((e.target as HTMLElement).closest("[data-drag-handle]")) return;
     const pos = getRelativePos(e.clientX, e.clientY);
     if (!pos) return;
     addPoint(pos.x, pos.y);
@@ -110,6 +185,14 @@ export default function FieldCalibration() {
     };
   }, [draggingIndex, getRelativePos]);
 
+  useEffect(() => {
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, [imageUrl]);
+
   const undoLastPoint = () => {
     setPoints((prev) => prev.slice(0, -1));
   };
@@ -119,9 +202,9 @@ export default function FieldCalibration() {
       toast.error("Bitte lade zuerst ein Bild hoch");
       return;
     }
+
     setDetecting(true);
     try {
-      // Convert image to base64
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve((reader.result as string).split(",")[1]);
@@ -134,22 +217,43 @@ export default function FieldCalibration() {
       });
 
       if (error) throw error;
+
+      const nextSuggestion: LayoutSuggestion = {
+        fieldType: data?.fieldType ?? null,
+        confidence: data?.confidence ?? null,
+        detectedFeatures: Array.isArray(data?.detectedFeatures) ? data.detectedFeatures : [],
+        suggestedDimensions: data?.suggestedDimensions
+          ? {
+              width: Number(data.suggestedDimensions.width),
+              height: Number(data.suggestedDimensions.height),
+            }
+          : null,
+      };
+
+      setLayoutSuggestion(nextSuggestion);
+
       if (data?.corners && data.corners.length === 4) {
         setPoints(data.corners);
         toast.success("4 Ecken automatisch erkannt! Passe sie bei Bedarf per Drag an.");
       } else {
         toast.error("Ecken konnten nicht erkannt werden. Bitte manuell setzen.");
       }
+
+      if (nextSuggestion.suggestedDimensions) {
+        applySuggestedDimensions(nextSuggestion.suggestedDimensions);
+        toast.success(`Feldtyp erkannt: ${nextSuggestion.fieldType ?? "Standardfeld"}`);
+      }
     } catch (err) {
       console.error("Auto-detect error:", err);
       toast.error("Automatische Erkennung fehlgeschlagen. Bitte manuell setzen.");
+      resetLayoutSuggestion();
     } finally {
       setDetecting(false);
     }
   };
 
   const handlePresetChange = (value: string) => {
-    const preset = FIELD_PRESETS.find(p => p.label === value);
+    const preset = FIELD_PRESETS.find((p) => p.label === value);
     if (preset) {
       setWidth(preset.width);
       setHeight(preset.height);
@@ -168,10 +272,12 @@ export default function FieldCalibration() {
     navigate("/fields");
   };
 
+  const confidenceMeta = layoutSuggestion.confidence ? confidenceCopy[layoutSuggestion.confidence] : null;
+
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="max-w-3xl mx-auto">
+        <div className="mx-auto max-w-3xl">
           <SkeletonCard count={2} />
         </div>
       </AppLayout>
@@ -181,44 +287,42 @@ export default function FieldCalibration() {
   if (!field) {
     return (
       <AppLayout>
-        <div className="max-w-3xl mx-auto text-muted-foreground text-center py-20">Platz nicht gefunden</div>
+        <div className="mx-auto max-w-3xl py-20 text-center text-muted-foreground">Platz nicht gefunden</div>
       </AppLayout>
     );
   }
 
   return (
     <AppLayout>
-      <div className="max-w-3xl mx-auto space-y-6">
-        <Link to="/fields" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <div className="mx-auto max-w-3xl space-y-6">
+        <Link to="/fields" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Zurück zu Plätze
         </Link>
 
-        <h1 className="text-2xl font-bold font-display flex items-center gap-2">
+        <h1 className="font-display flex items-center gap-2 text-2xl font-bold">
           <Crosshair className="h-6 w-6 text-primary" /> Kalibrierung — {field.name}
         </h1>
 
-        <div className="glass-card p-6 space-y-4">
+        <div className="glass-card space-y-4 p-6">
           <div>
-            <p className="text-sm text-muted-foreground">
-              Lade ein Foto hoch und setze exakt 4 Ecken des Spielfelds.
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground">Lade ein Foto hoch und setze exakt 4 Ecken des Spielfelds.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               Reihenfolge: {cornerLabels.map((label, i) => (
-                <span key={label} className={i < points.length ? "text-primary font-medium" : ""}>
+                <span key={label} className={i < points.length ? "font-medium text-primary" : ""}>
                   {i > 0 ? " → " : ""}
                   {label}
                 </span>
               ))}
             </p>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <Move className="h-3 w-3" /> Punkte können per Drag verschoben werden
             </p>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
             <Button variant="heroOutline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-1" /> Foto hochladen
+              <Upload className="mr-1 h-4 w-4" /> Foto hochladen
             </Button>
             <Button
               variant="heroOutline"
@@ -230,48 +334,94 @@ export default function FieldCalibration() {
                 }
               }}
             >
-              <Camera className="h-4 w-4 mr-1" /> Kamera
+              <Camera className="mr-1 h-4 w-4" /> Kamera
             </Button>
             {imageFile && (
-              <Button
-                variant="hero"
-                size="sm"
-                onClick={handleAutoDetect}
-                disabled={detecting}
-              >
+              <Button variant="hero" size="sm" onClick={handleAutoDetect} disabled={detecting}>
                 {detecting ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Erkennung läuft...</>
+                  <>
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Erkennung läuft...
+                  </>
                 ) : (
-                  <><Sparkles className="h-4 w-4 mr-1" /> Automatisch erkennen</>
+                  <>
+                    <Sparkles className="mr-1 h-4 w-4" /> Feld erkennen
+                  </>
                 )}
               </Button>
             )}
           </div>
 
-          {/* Calibration image area — NO touch-none to fix iOS */}
+          {layoutSuggestion.suggestedDimensions && (
+            <div className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Ruler className="h-4 w-4 text-primary" />
+                  Automatisch erkannt: {layoutSuggestion.fieldType ?? "Standardfeld"}
+                </div>
+                {confidenceMeta && (
+                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${confidenceMeta.className}`}>
+                    {confidenceMeta.label}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-border bg-background/70 p-3">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Vorgeschlagene Maße</div>
+                  <div className="mt-1 text-sm font-medium text-foreground">
+                    {layoutSuggestion.suggestedDimensions.width} × {layoutSuggestion.suggestedDimensions.height} m
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-background/70 p-3">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Erkannte Merkmale</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {layoutSuggestion.detectedFeatures.length > 0 ? (
+                      layoutSuggestion.detectedFeatures.map((feature) => {
+                        const meta = featureLabels[feature];
+                        const Icon = meta?.icon ?? Crosshair;
+                        return (
+                          <span key={feature} className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-foreground">
+                            <Icon className="h-3 w-3 text-primary" />
+                            {meta?.label ?? feature}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Keine sicheren Referenzmerkmale erkannt</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Die Maße wurden als Vorschlag eingetragen — bitte vor dem Speichern kurz prüfen.
+              </p>
+            </div>
+          )}
+
           <div
             ref={containerRef}
-            className="aspect-video bg-muted/30 rounded-lg border-2 border-dashed border-border relative cursor-crosshair overflow-hidden select-none"
+            className="relative aspect-video cursor-crosshair overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/30 select-none"
             style={{ touchAction: "none" }}
             onPointerDown={handlePointerDown}
           >
-            {imageUrl && <img src={imageUrl} alt="Spielfeld" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} />}
+            {imageUrl && <img src={imageUrl} alt="Spielfeld" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable={false} />}
 
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               {!imageUrl && (
-                <span className="text-muted-foreground/50 text-sm text-center px-4">
+                <span className="px-4 text-center text-sm text-muted-foreground/50">
                   Lade ein Bild hoch und klicke Ecke {Math.min(points.length + 1, 4)} von 4
                 </span>
               )}
               {imageUrl && points.length < 4 && (
-                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-card/80 backdrop-blur-sm rounded-full text-xs text-foreground border border-border">
+                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border bg-card/80 px-3 py-1 text-xs text-foreground backdrop-blur-sm">
                   Klicke: {cornerLabels[points.length]} (Ecke {points.length + 1}/4)
                 </span>
               )}
             </div>
 
             {points.length >= 2 && (
-              <svg className="absolute inset-0 w-full h-full pointer-events-none">
+              <svg className="pointer-events-none absolute inset-0 h-full w-full">
                 {points.map((p, i) => {
                   if (i === 0) return null;
                   const prev = points[i - 1];
@@ -308,7 +458,7 @@ export default function FieldCalibration() {
               <div
                 key={`corner-${i}`}
                 data-drag-handle
-                className="absolute w-11 h-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary border-2 border-primary-foreground flex items-center justify-center text-xs font-bold text-primary-foreground shadow-lg cursor-grab active:cursor-grabbing z-10"
+                className="absolute z-10 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full border-2 border-primary-foreground bg-primary text-xs font-bold text-primary-foreground shadow-lg active:cursor-grabbing"
                 style={{ left: `${p.x}%`, top: `${p.y}%` }}
                 onPointerDown={(e) => startDrag(i, e)}
               >
@@ -318,49 +468,57 @@ export default function FieldCalibration() {
           </div>
 
           {canSave && (
-            <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm text-primary flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm text-primary">
               <Crosshair className="h-4 w-4" /> Kalibrierung bereit — alle 4 Ecken gesetzt.
             </div>
           )}
 
-          {/* Field dimensions with presets */}
           <div className="space-y-3">
             <div>
-              <label className="text-sm text-muted-foreground block mb-1">Spielfeld-Vorlage</label>
+              <label className="mb-1 block text-sm text-muted-foreground">Spielfeld-Vorlage</label>
               <Select onValueChange={handlePresetChange}>
                 <SelectTrigger className="w-64">
                   <SelectValue placeholder="Vorlage wählen..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {FIELD_PRESETS.map(p => (
-                    <SelectItem key={p.label} value={p.label}>{p.label}</SelectItem>
+                  {FIELD_PRESETS.map((p) => (
+                    <SelectItem key={p.label} value={p.label}>
+                      {p.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex gap-4">
               <div>
-                <label className="text-sm text-muted-foreground block mb-1">Breite (m)</label>
-                <input type="number" value={width} onChange={(e) => setWidth(e.target.value)} className="w-24 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm" />
+                <label className="mb-1 block text-sm text-muted-foreground">Breite (m)</label>
+                <Input type="number" value={width} onChange={(e) => setWidth(e.target.value)} className="w-24" />
               </div>
               <div>
-                <label className="text-sm text-muted-foreground block mb-1">Länge (m)</label>
-                <input type="number" value={height} onChange={(e) => setHeight(e.target.value)} className="w-24 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm" />
+                <label className="mb-1 block text-sm text-muted-foreground">Länge (m)</label>
+                <Input type="number" value={height} onChange={(e) => setHeight(e.target.value)} className="w-24" />
               </div>
             </div>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             {points.length > 0 && (
               <Button variant="ghost" size="sm" onClick={undoLastPoint} className="flex items-center gap-1">
                 <Undo2 className="h-4 w-4" /> Letzte Ecke entfernen
               </Button>
             )}
-            <Button variant="ghost" onClick={() => setPoints([])} className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPoints([]);
+                resetLayoutSuggestion();
+              }}
+              className="flex items-center gap-1"
+            >
               <RotateCcw className="h-4 w-4" /> Zurücksetzen
             </Button>
             <Button variant="hero" disabled={!canSave || saveCalibration.isPending} onClick={handleSave}>
-              <Save className="h-4 w-4 mr-1" /> Kalibrierung speichern
+              <Save className="mr-1 h-4 w-4" /> Kalibrierung speichern
             </Button>
           </div>
         </div>
