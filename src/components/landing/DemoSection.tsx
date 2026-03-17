@@ -447,7 +447,33 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
             </div>
           </div>
 
-          {/* Sprint & Speed comparison */}
+          {/* KI-Erkenntnisse */}
+          <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Lightbulb className="w-4 h-4 text-warning" />
+              <span className="text-xs font-semibold font-display text-foreground/80">KI-Erkenntnisse aus diesem Spiel</span>
+              <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">Auto-generiert</span>
+            </div>
+            <div className="grid md:grid-cols-2 gap-2">
+              {[
+                { icon: "🎯", text: "Überladung rechts war Schlüssel: 62% der Angriffe über die rechte Seite führten zu beiden Toren." },
+                { icon: "📉", text: "Leistungsabfall ab 65. Minute: Laufdistanz sank um 12%, Pressing-PPDA stieg von 8.2 auf 13.4." },
+                { icon: "⚔️", text: "Zweikampf-Dominanz im Mittelfeld (64%) ermöglichte kontrollierten Spielaufbau." },
+                { icon: "🔄", text: "Konter-Anfälligkeit: 3 von 4 Gegnerchancen entstanden nach eigenem Ballverlust im Aufbau." },
+              ].map((insight) => (
+                <motion.div
+                  key={insight.text}
+                  className="flex items-start gap-2 text-[10px] text-muted-foreground rounded-lg bg-card/50 p-2.5 border border-border/30"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <span className="text-sm shrink-0">{insight.icon}</span>
+                  <span>{insight.text}</span>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-3 gap-4">
             <div className="rounded-xl border border-border/50 bg-card/50 p-4">
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Speed-Ranking</div>
