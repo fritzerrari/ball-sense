@@ -104,11 +104,14 @@ export default function Onboarding() {
   };
 
   const uploadLogo = async (): Promise<string | null> => {
-    if (!logoFile || !clubId) return null;
+    if (!logoFile) return null;
+    // Use clubId from auth or wait — saveClubDetails ensures it's set before calling
+    const cId = clubId;
+    if (!cId) return null;
     setUploadingLogo(true);
     try {
       const ext = logoFile.name.split(".").pop() || "png";
-      const path = `${clubId}/logo.${ext}`;
+      const path = `${cId}/logo.${ext}`;
       const { error } = await supabase.storage
         .from("club-logos")
         .upload(path, logoFile, { upsert: true });
