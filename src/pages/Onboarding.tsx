@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import {
   Building2, Users, Map, Download, CheckCircle2,
   Plus, Trash2, ChevronRight, ChevronLeft, Loader2, Smartphone,
-  Camera, X, ImageIcon,
+  Camera, X, ImageIcon, BrainCircuit, Wifi, HardDrive,
 } from "lucide-react";
 
 const POSITIONS = ["TW", "IV", "LV", "RV", "ZM", "ZDM", "ZOM", "LA", "RA", "ST"];
