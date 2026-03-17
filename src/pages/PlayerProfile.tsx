@@ -4,6 +4,8 @@ import { BarChart3, Zap, Route, Trophy, Pencil, ArrowLeft, User } from "lucide-r
 import { usePlayer, useUpdatePlayer } from "@/hooks/use-players";
 import { usePlayerAllStats } from "@/hooks/use-match-stats";
 import { HeatmapField } from "@/components/HeatmapField";
+import { PlayerCharts } from "@/components/PlayerCharts";
+import { PerformanceAnalysis } from "@/components/PerformanceAnalysis";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { POSITION_LABELS } from "@/lib/constants";
 import { mergeHeatmaps } from "@/lib/stats";
@@ -140,6 +142,12 @@ export default function PlayerProfile() {
             </div>
           )}
         </div>
+
+        {/* Trend Charts */}
+        <PlayerCharts stats={stats} />
+
+        {/* KI Analysis */}
+        <PerformanceAnalysis type="player" playerId={id} playerName={player.name} />
 
         {/* Average Heatmap */}
         <div>

@@ -4,6 +4,8 @@ import { useState, Fragment } from "react";
 import { BarChart3, Zap, Route, Users, ArrowUpDown, ArrowLeft, FileText, Download, Share2, ChevronDown, ChevronUp, Camera, Loader2 } from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
 import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
+import { MatchRadarChart, TopPlayersChart, ComparisonBarChart } from "@/components/MatchCharts";
+import { PerformanceAnalysis } from "@/components/PerformanceAnalysis";
 import { useMatch, useMatchLineups, useTrackingUploads } from "@/hooks/use-matches";
 import { usePlayerMatchStats, useTeamMatchStats, useApiFootballStats } from "@/hooks/use-match-stats";
 import { useAuth } from "@/components/AuthProvider";
@@ -247,7 +249,6 @@ export default function MatchReport() {
 
         {activeTab === "Übersicht" && (
           <div className="space-y-6">
-            {/* API-Football Stats */}
             {apiStats && (
               <ApiFootballStatsCard
                 stats={apiStats}
@@ -260,12 +261,29 @@ export default function MatchReport() {
               {renderTeamCard(clubName ?? "Heim", homeTeamStats)}
               {renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats)}
             </div>
-            {hasStats ? (
-              <div className="grid sm:grid-cols-2 gap-4">
-                <HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} />
-                <HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} />
-              </div>
-            ) : (
+
+            {hasStats && (
+              <>
+                <MatchRadarChart
+                  homeTeamStats={homeTeamStats}
+                  awayTeamStats={awayTeamStats}
+                  homeName={clubName ?? "Heim"}
+                  awayName={match.away_club_name ?? "Auswärts"}
+                />
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Laufdistanz" metric="distance_km" unit="km" />
+                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Speed" metric="top_speed_kmh" unit="km/h" />
+                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Sprints" metric="sprint_count" unit="" />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} />
+                  <HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} />
+                </div>
+                <PerformanceAnalysis type="team" matchId={match.id} />
+              </>
+            )}
+
+            {!hasStats && (
               <div className="glass-card p-8 text-center">
                 <BarChart3 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-muted-foreground">Statistiken werden nach dem Tracking verfügbar.</p>
@@ -289,25 +307,20 @@ export default function MatchReport() {
         {activeTab === "Vergleich" && (
           <div className="space-y-6">
             {hasStats ? (
-              <div className="grid sm:grid-cols-3 gap-4">
-                {[
-                  { label: "Distanz", home: homeTeamStats?.total_distance_km?.toFixed(1), away: awayTeamStats?.total_distance_km?.toFixed(1), unit: "km" },
-                  { label: "Top Speed", home: homeTeamStats?.top_speed_kmh?.toFixed(1), away: awayTeamStats?.top_speed_kmh?.toFixed(1), unit: "km/h" },
-                  { label: "Ø Distanz", home: homeTeamStats?.avg_distance_km?.toFixed(1), away: awayTeamStats?.avg_distance_km?.toFixed(1), unit: "km" },
-                ].map(c => (
-                  <div key={c.label} className="glass-card p-5 text-center">
-                    <div className="text-xs text-muted-foreground mb-3">{c.label}</div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-xl font-bold font-display text-primary">{c.home ?? "—"}</div>
-                      <div className="text-xs text-muted-foreground">{c.unit}</div>
-                      <div className="text-xl font-bold font-display">{c.away ?? "—"}</div>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-                      <span>Heim</span><span>Auswärts</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <>
+                <ComparisonBarChart
+                  homeTeamStats={homeTeamStats}
+                  awayTeamStats={awayTeamStats}
+                  homeName={clubName ?? "Heim"}
+                  awayName={match.away_club_name ?? "Auswärts"}
+                />
+                <MatchRadarChart
+                  homeTeamStats={homeTeamStats}
+                  awayTeamStats={awayTeamStats}
+                  homeName={clubName ?? "Heim"}
+                  awayName={match.away_club_name ?? "Auswärts"}
+                />
+              </>
             ) : (
               <div className="glass-card p-8 text-center">
                 <BarChart3 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
