@@ -223,6 +223,7 @@ export default function Onboarding() {
   };
 
   const canProceed = () => {
+    if (step === 0) return !!(newClubName.trim() || clubName);
     if (step === 1) return players.some((p) => p.name.trim());
     if (step === 2) return fieldName.trim().length > 0;
     return true;
