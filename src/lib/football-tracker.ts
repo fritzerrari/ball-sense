@@ -153,6 +153,7 @@ export class FootballTracker {
   /**
    * Upload tracking session data to Supabase storage.
    * Uses XMLHttpRequest for real upload progress reporting.
+   * Includes retry logic (up to 3 attempts) and timeout (60s per attempt).
    */
   async uploadMatch(
     matchId: string,
@@ -161,7 +162,7 @@ export class FootballTracker {
     supabaseAnonKey: string,
     onProgress?: (stage: string, pct: number) => void,
   ): Promise<{ filePath: string; framesCount: number; durationSec: number }> {
-    // Stage 1: Prepare data
+    // Stage 1: Prepare & compress data
     onProgress?.("compress", 0);
     const sessionData = {
       matchId,
@@ -174,45 +175,85 @@ export class FootballTracker {
 
     const jsonString = JSON.stringify(sessionData);
     const blob = new Blob([jsonString], { type: "application/json" });
+    const sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
+    console.log(`[Tracker] Upload vorbereitet: ${this.frames.length} Frames, ${sizeMB} MB`);
     onProgress?.("compress", 100);
 
     const filePath = `tracking/${matchId}/cam_${cameraIndex}.json`;
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/tracking/${filePath}`;
 
-    // Stage 2: Upload with progress
+    // Stage 2: Upload with retry
     onProgress?.("upload", 0);
+    const MAX_RETRIES = 3;
+    const TIMEOUT_MS = 60_000;
+    let lastError: Error | null = null;
+    let uploaded = false;
 
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${supabaseUrl}/storage/v1/object/tracking/${filePath}`);
-      xhr.setRequestHeader("Authorization", `Bearer ${supabaseAnonKey}`);
-      xhr.setRequestHeader("Content-Type", "application/json");
-      xhr.setRequestHeader("x-upsert", "true");
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", uploadUrl);
+          xhr.setRequestHeader("Authorization", `Bearer ${supabaseAnonKey}`);
+          xhr.setRequestHeader("Content-Type", "application/json");
+          xhr.setRequestHeader("x-upsert", "true");
+          xhr.timeout = TIMEOUT_MS;
 
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          onProgress?.("upload", Math.round((e.loaded / e.total) * 100));
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              onProgress?.("upload", Math.round((e.loaded / e.total) * 100));
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              onProgress?.("upload", 100);
+              resolve();
+            } else {
+              reject(new Error(`Upload HTTP ${xhr.status}: ${xhr.statusText}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error("Netzwerkfehler beim Upload"));
+          xhr.ontimeout = () => reject(new Error("Upload-Timeout (60s)"));
+
+          xhr.send(blob);
+        });
+        uploaded = true;
+        console.log(`[Tracker] Upload erfolgreich (Versuch ${attempt})`);
+        break;
+      } catch (err) {
+        lastError = err as Error;
+        console.warn(`[Tracker] Upload Versuch ${attempt}/${MAX_RETRIES} fehlgeschlagen:`, lastError.message);
+        if (attempt < MAX_RETRIES) {
+          // Exponential backoff: 1s, 2s
+          await new Promise(r => setTimeout(r, attempt * 1000));
+          onProgress?.("upload", 0); // Reset progress for retry
         }
-      };
+      }
+    }
 
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          onProgress?.("upload", 100);
-          resolve();
-        } else {
-          console.warn("Upload to storage failed, saving locally instead");
-          localStorage.setItem(`tracking_${matchId}_cam${cameraIndex}`, jsonString);
-          resolve(); // Don't reject — local fallback is fine
-        }
-      };
-
-      xhr.onerror = () => {
-        console.warn("Upload network error, saving locally");
+    if (!uploaded) {
+      // Fallback: Save locally for later retry
+      console.warn("[Tracker] Alle Upload-Versuche fehlgeschlagen, lokaler Fallback");
+      try {
         localStorage.setItem(`tracking_${matchId}_cam${cameraIndex}`, jsonString);
-        resolve();
-      };
-
-      xhr.send(blob);
-    });
+        // Also save metadata for retry UI
+        const pendingUploads = JSON.parse(localStorage.getItem("pending_uploads") ?? "[]");
+        pendingUploads.push({
+          matchId,
+          cameraIndex,
+          filePath,
+          framesCount: this.frames.length,
+          durationSec: this.getElapsedSeconds(),
+          savedAt: new Date().toISOString(),
+          error: lastError?.message,
+        });
+        localStorage.setItem("pending_uploads", JSON.stringify(pendingUploads));
+      } catch {
+        console.error("[Tracker] localStorage voll — Daten gehen verloren!");
+      }
+    }
 
     onProgress?.("register", 0);
 
