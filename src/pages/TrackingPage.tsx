@@ -328,6 +328,16 @@ export default function TrackingPage() {
         </div>
       </div>
 
+      {/* Persistent video element — stays in DOM across all phases */}
+      <video
+        ref={videoRef}
+        className={`${phase === "tracking" ? "hidden" : "hidden"}`}
+        playsInline
+        muted
+        autoPlay
+        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+      />
+
       <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
         {/* Stepper */}
         {(phase === "loading" || phase === "camera" || phase === "calibration") && (
