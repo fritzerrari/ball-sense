@@ -89,13 +89,27 @@ export function useSeasonStats() {
         .eq("home_club_id", clubId)
         .eq("status", "done");
 
-      // Get aggregated team stats
-      const { data: teamStats } = await supabase
-        .from("team_match_stats")
-        .select("total_distance_km, top_speed_kmh");
-
-      const totalKm = teamStats?.reduce((s, t) => s + (t.total_distance_km || 0), 0) ?? 0;
-      const topSpeed = teamStats?.reduce((s, t) => Math.max(s, t.top_speed_kmh || 0), 0) ?? 0;
+      // Get aggregated team stats — filter by club's matches only
+      const { data: clubMatches } = await supabase
+        .from("matches")
+        .select("id")
+        .eq("home_club_id", clubId)
+        .eq("status", "done");
+      
+      const matchIds = clubMatches?.map(m => m.id) ?? [];
+      let totalKm = 0;
+      let topSpeed = 0;
+      
+      if (matchIds.length > 0) {
+        const { data: teamStats } = await supabase
+          .from("team_match_stats")
+          .select("total_distance_km, top_speed_kmh")
+          .in("match_id", matchIds)
+          .eq("team", "home");
+        
+        totalKm = teamStats?.reduce((s, t) => s + (t.total_distance_km || 0), 0) ?? 0;
+        topSpeed = teamStats?.reduce((s, t) => Math.max(s, t.top_speed_kmh || 0), 0) ?? 0;
+      }
 
       // Get player count
       const { count: playerCount } = await supabase
@@ -104,19 +118,24 @@ export function useSeasonStats() {
         .eq("club_id", clubId)
         .eq("active", true);
 
-      // Most distance player
-      const { data: topPlayer } = await supabase
-        .from("player_match_stats")
-        .select("player_id, distance_km, players(name)")
-        .order("distance_km", { ascending: false })
-        .limit(1);
+      // Most distance player — filter by club matches
+      let topPlayerName: string | null = null;
+      if (matchIds.length > 0) {
+        const { data: topPlayer } = await supabase
+          .from("player_match_stats")
+          .select("player_id, distance_km, players(name)")
+          .in("match_id", matchIds)
+          .order("distance_km", { ascending: false })
+          .limit(1);
+        topPlayerName = topPlayer?.[0]?.players?.name ?? null;
+      }
 
       return {
         matchesTracked: matchCount ?? 0,
         totalKm: Math.round(totalKm * 10) / 10,
         topSpeed: Math.round(topSpeed * 10) / 10,
         playerCount: playerCount ?? 0,
-        topPlayerName: topPlayer?.[0]?.players?.name ?? null,
+        topPlayerName,
       };
     },
     enabled: !!clubId,

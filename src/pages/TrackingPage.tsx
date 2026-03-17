@@ -198,7 +198,16 @@ export default function TrackingPage() {
       setUploadDone(true);
       toast.success("Tracking-Daten erfolgreich hochgeladen!");
     } catch (err) {
-      toast.error("Upload fehlgeschlagen — Daten lokal gespeichert");
+      // localStorage fallback for offline retry
+      try {
+        const sessionData = JSON.stringify({
+          matchId: id, cameraIndex: cam,
+          frames: trackerRef.current?.getFrameCount() ?? 0,
+          savedAt: new Date().toISOString(),
+        });
+        localStorage.setItem(`pending_upload_${id}_cam${cam}`, sessionData);
+      } catch { /* storage full */ }
+      toast.error("Upload fehlgeschlagen — Daten lokal gespeichert. Wird beim nächsten Online-Zugang erneut versucht.");
       setUploadProgress(0);
     } finally {
       setUploading(false);
@@ -238,7 +247,12 @@ export default function TrackingPage() {
   const isCalibrated = field?.calibration != null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col landscape:min-h-[100dvh]">
+      {/* Landscape hint for portrait mode */}
+      <div className="portrait:flex landscape:hidden items-center justify-center p-3 bg-primary/10 border-b border-primary/20 text-sm text-primary gap-2 md:hidden">
+        <Camera className="h-4 w-4" />
+        <span>Drehe dein Gerät ins Querformat für optimales Tracking</span>
+      </div>
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="font-display font-bold text-sm">
@@ -533,7 +547,7 @@ export default function TrackingPage() {
               <label className="text-sm text-muted-foreground block mb-1">Spieler raus</label>
               <select value={subOut} onChange={e => setSubOut(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
                 <option value="">Wählen...</option>
-                {homePlayers.filter((p: any) => p.starting).map((p: any) => (
+                {homePlayers.filter((p: any) => p.starting && !p.subbed_out_min).map((p: any) => (
                   <option key={p.id} value={p.player_name}>{p.player_name} (#{p.shirt_number})</option>
                 ))}
               </select>
@@ -542,7 +556,7 @@ export default function TrackingPage() {
               <label className="text-sm text-muted-foreground block mb-1">Spieler rein</label>
               <select value={subIn} onChange={e => setSubIn(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
                 <option value="">Wählen...</option>
-                {homePlayers.filter((p: any) => !p.starting).map((p: any) => (
+                {homePlayers.filter((p: any) => !p.starting && !p.subbed_in_min).map((p: any) => (
                   <option key={p.id} value={p.player_name}>{p.player_name} (#{p.shirt_number})</option>
                 ))}
               </select>

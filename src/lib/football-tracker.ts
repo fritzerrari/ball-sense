@@ -26,7 +26,7 @@ export class FootballTracker {
   private tracking = false;
   private paused = false;
   private frames: TrackingFrame[] = [];
-  private animationFrame: number | null = null;
+  private intervalId: number | null = null;
   private startTime = 0;
   private videoElement: HTMLVideoElement | null = null;
 
@@ -90,7 +90,6 @@ export class FootballTracker {
       if (!this.tracking) return;
       if (!this.paused) {
         const now = Date.now();
-        // Generate mock detections (simulating player detection)
         const numPlayers = 10 + Math.floor(Math.random() * 12);
         const detections: Detection[] = Array.from({ length: numPlayers }, (_, i) => ({
           id: i,
@@ -106,15 +105,9 @@ export class FootballTracker {
         this.frames.push(frame);
         onDetections?.(frame);
       }
-      this.animationFrame = requestAnimationFrame(loop);
     };
-    // Run at ~2fps for stub
-    const intervalLoop = () => {
-      if (!this.tracking) return;
-      loop();
-      setTimeout(intervalLoop, 500);
-    };
-    intervalLoop();
+    // Run at ~2fps for stub — use only setInterval, no rAF to avoid memory leak
+    this.intervalId = window.setInterval(loop, 500);
   }
 
   pauseTracking(): void {
@@ -128,9 +121,9 @@ export class FootballTracker {
   stopTracking(): TrackingFrame[] {
     this.tracking = false;
     this.paused = false;
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-      this.animationFrame = null;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
     }
     // Stop camera
     if (this.videoElement?.srcObject) {

@@ -35,22 +35,23 @@ export default function FieldCalibration() {
     setPoints([]);
   };
 
-  const handleImageClick = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (points.length >= 4) return;
-    e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    let clientX: number, clientY: number;
-    if ("touches" in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-    const x = ((clientX - rect.left) / rect.width) * 100;
-    const y = ((clientY - rect.top) / rect.height) * 100;
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
     setPoints([...points, { x, y }]);
-    // Haptic feedback
+    if (navigator.vibrate) navigator.vibrate(30);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (points.length >= 4) return;
+    e.preventDefault(); // Prevent the subsequent click event
+    const rect = e.currentTarget.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = ((touch.clientX - rect.left) / rect.width) * 100;
+    const y = ((touch.clientY - rect.top) / rect.height) * 100;
+    setPoints([...points, { x, y }]);
     if (navigator.vibrate) navigator.vibrate(30);
   };
 
@@ -115,7 +116,7 @@ export default function FieldCalibration() {
           <div
             className="aspect-video bg-muted/30 rounded-lg border-2 border-dashed border-border relative cursor-crosshair overflow-hidden touch-none"
             onClick={handleImageClick}
-            onTouchStart={handleImageClick}
+            onTouchStart={handleTouchStart}
           >
             {imageUrl && (
               <img src={imageUrl} alt="Spielfeld" className="absolute inset-0 w-full h-full object-cover" />
