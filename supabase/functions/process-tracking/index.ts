@@ -30,6 +30,28 @@ interface TrackingSession {
   createdAt: string;
 }
 
+interface LineupEntry {
+  id: string;
+  player_id: string | null;
+  player_name: string | null;
+  team: "home" | "away";
+  shirt_number: number | null;
+  starting: boolean;
+  subbed_in_min: number | null;
+  subbed_out_min: number | null;
+}
+
+interface MatchEvent {
+  match_id: string;
+  team: string;
+  minute: number;
+  event_type: string;
+  player_id: string | null;
+  related_player_id: string | null;
+  player_name: string | null;
+  related_player_name: string | null;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 function euclidean(a: { x: number; y: number }, b: { x: number; y: number }) {
@@ -191,6 +213,50 @@ function emptyHeatmap(): number[][] {
   return Array.from({ length: 7 }, () => Array(10).fill(0));
 }
 
+function getTrackTimeRange(positions: { t: number; x: number; y: number }[]) {
+  const startMin = (positions[0]?.t ?? 0) / 60000;
+  const endMin = (positions[positions.length - 1]?.t ?? 0) / 60000;
+  return { startMin, endMin };
+}
+
+function getPlayerWindow(
+  player: LineupEntry,
+  events: MatchEvent[],
+  fallbackEndMin: number,
+) {
+  const startMin = player.subbed_in_min ?? (player.starting ? 0 : null);
+  const playerEventMinute = events
+    .filter(
+      (event) =>
+        event.player_id &&
+        player.player_id &&
+        event.player_id === player.player_id &&
+        ["red_card", "yellow_red_card", "player_deactivated"].includes(event.event_type),
+    )
+    .map((event) => event.minute)
+    .sort((a, b) => a - b)[0];
+
+  const endCandidates = [player.subbed_out_min, playerEventMinute, fallbackEndMin].filter(
+    (value): value is number => typeof value === "number",
+  );
+
+  return {
+    startMin,
+    endMin: endCandidates.length > 0 ? Math.min(...endCandidates) : fallbackEndMin,
+  };
+}
+
+function getOverlapMinutes(
+  window: { startMin: number | null; endMin: number },
+  trackRange: { startMin: number; endMin: number },
+) {
+  if (window.startMin === null) return 0;
+  return Math.max(
+    0,
+    Math.min(window.endMin, trackRange.endMin) - Math.max(window.startMin, trackRange.startMin),
+  );
+}
+
 // ── Main Handler ──────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -293,20 +359,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4) Get lineups with player positions
+    // 4) Get lineups, events and player positions
     const { data: lineups } = await supabase
       .from("match_lineups")
-      .select("id, player_id, player_name, team, shirt_number, starting")
+      .select("id, player_id, player_name, team, shirt_number, starting, subbed_in_min, subbed_out_min")
       .eq("match_id", matchId);
 
+    const { data: matchEvents } = await supabase
+      .from("match_events")
+      .select("match_id, team, minute, event_type, player_id, related_player_id, player_name, related_player_name")
+      .eq("match_id", matchId)
+      .order("minute", { ascending: true });
+
+    const typedLineups = (lineups || []) as LineupEntry[];
+    const typedEvents = (matchEvents || []) as MatchEvent[];
+
     // Fetch player positions for position-based assignment
-    const playerIds = (lineups || []).map((l: any) => l.player_id).filter(Boolean);
+    const playerIds = typedLineups.map((l) => l.player_id).filter(Boolean);
+    const uniquePlayerIds = [...new Set(playerIds)] as string[];
     let playerPositions: Record<string, string> = {};
-    if (playerIds.length > 0) {
+    if (uniquePlayerIds.length > 0) {
       const { data: players } = await supabase
         .from("players")
         .select("id, position")
-        .in("id", playerIds);
+        .in("id", uniquePlayerIds);
       if (players) {
         for (const p of players) {
           if (p.position) playerPositions[p.id] = p.position;
@@ -314,10 +390,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    const homePlayers = (lineups || []).filter((l: any) => l.team === "home");
-    const awayPlayers = (lineups || []).filter((l: any) => l.team === "away");
+    const homePlayers = typedLineups.filter((l) => l.team === "home");
+    const awayPlayers = typedLineups.filter((l) => l.team === "away");
     console.log(
-      `[process-tracking] Lineups: ${homePlayers.length} home, ${awayPlayers.length} away`,
+      `[process-tracking] Lineups: ${homePlayers.length} home, ${awayPlayers.length} away, ${typedEvents.length} events`,
     );
 
     // 5) Build tracks from detections
@@ -355,9 +431,10 @@ Deno.serve(async (req) => {
       return { tid, cx, cy, positions };
     });
 
-    // Use greedy matching: for each player, find the closest unassigned track
+    // Use greedy matching with time-window aware candidate filtering
     const allPlayers = [...homePlayers, ...awayPlayers];
     const usedTrackIndices = new Set<number>();
+    const fallbackEndMin = Math.max(1, Math.ceil(session.durationSec / 60));
     const playerStats: Array<{
       player_id: string | null;
       player_name: string | null;
@@ -366,33 +443,35 @@ Deno.serve(async (req) => {
       confidence: number;
     }> = [];
 
-    // Build cost matrix and do greedy assignment
     for (const player of allPlayers) {
       const position = player.player_id ? playerPositions[player.player_id] : null;
       const expectedZone = position ? POSITION_ZONES[position] : null;
+      const playerWindow = getPlayerWindow(player, typedEvents, fallbackEndMin);
+
+      if (playerWindow.startMin === null || playerWindow.endMin <= playerWindow.startMin) {
+        console.log(`[process-tracking] Skipping inactive player ${player.player_name}`);
+        continue;
+      }
 
       let bestIdx = -1;
-      let bestDist = Infinity;
+      let bestScore = Infinity;
 
       for (let ti = 0; ti < trackCentroids.length; ti++) {
         if (usedTrackIndices.has(ti)) continue;
         const tc = trackCentroids[ti];
+        const trackRange = getTrackTimeRange(tc.positions);
+        const overlapMinutes = getOverlapMinutes(playerWindow, trackRange);
+        if (overlapMinutes <= 0) continue;
 
-        if (expectedZone) {
-          // Distance from track centroid to expected zone
-          const dist = Math.sqrt(
-            (tc.cx - expectedZone.x) ** 2 + (tc.cy - expectedZone.y) ** 2
-          );
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestIdx = ti;
-          }
-        } else {
-          // No position info — fall back to longest remaining track
-          if (bestIdx === -1) {
-            bestIdx = ti;
-            bestDist = 0.5; // neutral confidence
-          }
+        const zoneDist = expectedZone
+          ? Math.sqrt((tc.cx - expectedZone.x) ** 2 + (tc.cy - expectedZone.y) ** 2)
+          : 0.5;
+        const overlapPenalty = 1 / (overlapMinutes + 0.25);
+        const score = zoneDist + overlapPenalty;
+
+        if (score < bestScore) {
+          bestScore = score;
+          bestIdx = ti;
         }
       }
 
@@ -400,10 +479,12 @@ Deno.serve(async (req) => {
         usedTrackIndices.add(bestIdx);
         const tc = trackCentroids[bestIdx];
         const stats = computeTrackStats(tc.positions, fieldW, fieldH);
-        // Confidence: 1.0 = perfect match, 0.0 = worst
+        const trackRange = getTrackTimeRange(tc.positions);
+        const overlapMinutes = getOverlapMinutes(playerWindow, trackRange);
         const confidence = expectedZone
-          ? Math.max(0, 1 - bestDist * 2) // dist of 0.5 = confidence 0
-          : 0.3; // no position = low confidence
+          ? Math.max(0, 1 - bestScore * 0.8)
+          : Math.min(0.75, 0.35 + overlapMinutes / Math.max(1, fallbackEndMin));
+
         playerStats.push({
           player_id: player.player_id || null,
           player_name: player.player_name,
@@ -412,7 +493,7 @@ Deno.serve(async (req) => {
           confidence: Math.round(confidence * 100) / 100,
         });
         console.log(
-          `[process-tracking] Assigned ${player.player_name} (${position || "?"}) → track ${tc.tid} (centroid ${tc.cx.toFixed(2)},${tc.cy.toFixed(2)}) confidence=${confidence.toFixed(2)}`
+          `[process-tracking] Assigned ${player.player_name} (${position || "?"}) → track ${tc.tid} overlap=${overlapMinutes.toFixed(1)}m confidence=${confidence.toFixed(2)}`,
         );
       }
     }

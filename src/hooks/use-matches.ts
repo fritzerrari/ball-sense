@@ -55,6 +55,23 @@ export function useMatchLineups(matchId: string | undefined) {
   });
 }
 
+export function useMatchEvents(matchId: string | undefined) {
+  return useQuery({
+    queryKey: ["match_events", matchId],
+    queryFn: async () => {
+      if (!matchId) return [];
+      const { data, error } = await supabase
+        .from("match_events")
+        .select("*")
+        .eq("match_id", matchId)
+        .order("minute", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!matchId,
+  });
+}
+
 export function useCreateMatch() {
   const qc = useQueryClient();
   const { clubId } = useAuth();
