@@ -26,7 +26,7 @@ export class FootballTracker {
   private tracking = false;
   private paused = false;
   private frames: TrackingFrame[] = [];
-  private animationFrame: number | null = null;
+  private intervalId: number | null = null;
   private startTime = 0;
   private videoElement: HTMLVideoElement | null = null;
 
