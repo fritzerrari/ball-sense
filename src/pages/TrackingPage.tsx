@@ -270,6 +270,39 @@ export default function TrackingPage() {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
+        {/* Stepper */}
+        {(phase === "loading" || phase === "camera" || phase === "calibration") && (
+          <div className="w-full max-w-sm mb-6">
+            <div className="flex items-center gap-2">
+              {[
+                { key: "loading", label: "KI laden" },
+                { key: "camera", label: "Kamera" },
+                { key: "calibration", label: "Kalibrierung" },
+              ].map((step, i, arr) => {
+                const steps = arr.map(s => s.key);
+                const currentIdx = steps.indexOf(phase);
+                const stepIdx = i;
+                const isDone = stepIdx < currentIdx;
+                const isActive = stepIdx === currentIdx;
+                return (
+                  <div key={step.key} className="flex items-center gap-2 flex-1">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
+                      isDone ? "bg-primary text-primary-foreground" : isActive ? "bg-primary/20 text-primary border-2 border-primary" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                    </div>
+                    <span className={`text-xs font-medium hidden sm:inline ${isActive ? "text-foreground" : "text-muted-foreground"}`}>{step.label}</span>
+                    {i < arr.length - 1 && <div className={`flex-1 h-0.5 rounded ${isDone ? "bg-primary" : "bg-muted"}`} />}
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              Schritt {["loading", "camera", "calibration"].indexOf(phase) + 1} von 3
+            </p>
+          </div>
+        )}
+
         {/* Phase: Loading */}
         {phase === "loading" && (
           <div className="w-full max-w-sm space-y-6 text-center">
@@ -277,7 +310,7 @@ export default function TrackingPage() {
               <Camera className="h-10 w-10 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold font-display mb-2">KI wird geladen...</h2>
+              <h2 className="text-xl font-bold font-display mb-2">KI-Modell wird geladen...</h2>
               <p className="text-sm text-muted-foreground">Einmalig ~20 MB. Danach offline verfügbar.</p>
             </div>
             <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
@@ -291,11 +324,11 @@ export default function TrackingPage() {
         {phase === "camera" && (
           <div className="w-full max-w-sm space-y-6 text-center">
             <Camera className="h-16 w-16 text-primary mx-auto" />
-            <h2 className="text-xl font-bold font-display">Kamera starten</h2>
-            <p className="text-sm text-muted-foreground">Bitte erlaube den Kamerazugriff.</p>
+            <h2 className="text-xl font-bold font-display">Kamera aktivieren</h2>
+            <p className="text-sm text-muted-foreground">Erlaube den Kamerazugriff, um mit dem Tracking zu beginnen.</p>
             <video ref={videoRef} className="w-full aspect-video rounded-xl bg-muted/30 border border-border" playsInline muted />
             <Button variant="hero" size="xl" onClick={handleStartCamera} className="w-full min-h-[56px]">
-              Kamera aktivieren
+              Kamera starten
             </Button>
           </div>
         )}

@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
 import { useState, Fragment } from "react";
-import { BarChart3, Zap, Route, Users, ArrowUpDown, ArrowLeft, FileText, Download, Share2, ChevronDown, ChevronUp } from "lucide-react";
+import { BarChart3, Zap, Route, Users, ArrowUpDown, ArrowLeft, FileText, Download, Share2, ChevronDown, ChevronUp, Camera } from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
 import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
 import { useMatch, useMatchLineups, useTrackingUploads } from "@/hooks/use-matches";
