@@ -135,7 +135,7 @@ export function useSeasonStats() {
         totalKm: Math.round(totalKm * 10) / 10,
         topSpeed: Math.round(topSpeed * 10) / 10,
         playerCount: playerCount ?? 0,
-        topPlayerName: topPlayer?.[0]?.players?.name ?? null,
+        topPlayerName,
       };
     },
     enabled: !!clubId,
