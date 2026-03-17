@@ -427,6 +427,23 @@ export default function AdminUsers() {
         onConfirm={() => banUserId && banUser.mutate({ userId: banUserId.id, ban: banUserId.ban })}
         destructive={banUserId?.ban}
       />
+
+      {/* Create User Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" /> Nutzer manuell anlegen
+            </DialogTitle>
+            <DialogDescription>E-Mail wird automatisch bestätigt.</DialogDescription>
+          </DialogHeader>
+          <CreateUserForm
+            clubs={allClubs}
+            onSubmit={(data) => createUser.mutate(data)}
+            isLoading={createUser.isPending}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
