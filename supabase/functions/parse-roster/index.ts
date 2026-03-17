@@ -105,12 +105,40 @@ Antworte NUR mit dem JSON-Array, keine weiteren Erklärungen.`;
     }
 
     const result = await response.json();
-    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
+    const message = result.choices?.[0]?.message;
+    const toolCall = message?.tool_calls?.[0];
     
     let players = [];
+
+    // Primary: extract from tool call
     if (toolCall?.function?.arguments) {
-      const parsed = JSON.parse(toolCall.function.arguments);
-      players = parsed.players || [];
+      try {
+        const parsed = JSON.parse(toolCall.function.arguments);
+        players = parsed.players || [];
+      } catch (e) {
+        console.error("Failed to parse tool call arguments:", e);
+      }
+    }
+
+    // Fallback: try parsing message content as JSON
+    if (players.length === 0 && message?.content) {
+      try {
+        const content = message.content.trim();
+        // Try to extract JSON array from content
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (Array.isArray(parsed)) {
+            players = parsed.map((p: any) => ({
+              name: p.name || "",
+              number: typeof p.number === "number" ? p.number : null,
+              position: p.position || null,
+            }));
+          }
+        }
+      } catch (e) {
+        console.error("Fallback JSON parse failed:", e);
+      }
     }
 
     return new Response(JSON.stringify({ players }), {
