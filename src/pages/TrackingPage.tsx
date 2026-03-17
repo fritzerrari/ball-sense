@@ -220,7 +220,6 @@ export default function TrackingPage() {
     if (!subOut || !subIn || !id) return;
     const minute = parseInt(subMinute) || Math.floor(elapsedSec / 60);
 
-    // Find lineup entries to update
     const outPlayer = homePlayers.find((p: any) => p.player_name === subOut);
     const inPlayer = homePlayers.find((p: any) => p.player_name === subIn);
 
@@ -232,9 +231,8 @@ export default function TrackingPage() {
         await supabase.from("match_lineups").update({ subbed_in_min: minute }).eq("id", inPlayer.id);
       }
       toast.success(`Wechsel: ${subOut} raus, ${subIn} rein (${minute}. Minute)`);
-      // Refresh lineup data so the sub modal filters update
-      const qc = (await import("@tanstack/react-query")).useQueryClient;
-      // Can't use hook here — refetch via supabase re-query
+      // Refresh lineup data so sub filters update
+      queryClient.invalidateQueries({ queryKey: ["match_lineups", id] });
     } catch {
       toast.error("Wechsel konnte nicht gespeichert werden");
     }
