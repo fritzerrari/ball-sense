@@ -1,20 +1,23 @@
 import AppLayout from "@/components/AppLayout";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, Swords, Calendar, MapPin } from "lucide-react";
-import { useMatches } from "@/hooks/use-matches";
+import { Plus, Swords, Calendar, MapPin, Trash2 } from "lucide-react";
+import { useMatches, useDeleteMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonTable } from "@/components/SkeletonCard";
 import { useState } from "react";
 import { useTranslation, useLocale } from "@/lib/i18n";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export default function Matches() {
   const { clubName } = useAuth();
   const { data: matches, isLoading } = useMatches();
+  const deleteMatch = useDeleteMatch();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortAsc, setSortAsc] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
   const { t } = useTranslation();
   const locale = useLocale();
 
@@ -100,9 +103,25 @@ export default function Matches() {
                     </td>
                     <td className="py-3 px-4"><StatusBadge status={match.status} /></td>
                     <td className="py-3 px-4 text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/matches/${match.id}`}>{t("common.details")}</Link>
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link to={`/matches/${match.id}`}>{t("common.details")}</Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget({
+                              id: match.id,
+                              label: `${clubName} vs ${match.away_club_name || "TBD"} (${new Date(match.date).toLocaleDateString(locale)})`,
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -110,6 +129,20 @@ export default function Matches() {
             </table>
           </div>
         )}
+
+        <ConfirmDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          title="Spiel löschen?"
+          description={`Möchtest du „${deleteTarget?.label}" wirklich unwiderruflich löschen? Alle zugehörigen Daten (Lineups, Tracking, Statistiken) gehen verloren.`}
+          onConfirm={() => {
+            if (deleteTarget) {
+              deleteMatch.mutate(deleteTarget.id);
+              setDeleteTarget(null);
+            }
+          }}
+          destructive
+        />
       </div>
     </AppLayout>
   );
