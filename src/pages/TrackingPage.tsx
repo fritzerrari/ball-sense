@@ -47,6 +47,7 @@ export default function TrackingPage() {
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const trackingVideoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
