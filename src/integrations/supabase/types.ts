@@ -584,6 +584,7 @@ export type Database = {
           home_formation: string | null
           id: string
           kickoff: string | null
+          match_type: string
           status: string
         }
         Insert: {
@@ -597,6 +598,7 @@ export type Database = {
           home_formation?: string | null
           id?: string
           kickoff?: string | null
+          match_type?: string
           status?: string
         }
         Update: {
@@ -610,6 +612,7 @@ export type Database = {
           home_formation?: string | null
           id?: string
           kickoff?: string | null
+          match_type?: string
           status?: string
         }
         Relationships: [

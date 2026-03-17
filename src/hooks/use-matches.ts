@@ -67,6 +67,7 @@ export function useCreateMatch() {
       away_club_id?: string;
       home_formation?: string;
       away_formation?: string;
+      match_type?: string;
       lineups: Omit<MatchLineup, "id" | "match_id" | "players">[];
     }) => {
       if (!clubId) throw new Error("Kein Verein");
