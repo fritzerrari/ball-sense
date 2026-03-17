@@ -2,13 +2,14 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Camera, Pause, Play, Users, RefreshCw, Flag, Timer, Loader2, Upload, AlertTriangle, Check, ArrowLeft, Wifi, WifiOff } from "lucide-react";
+import { Camera, Pause, Play, Users, RefreshCw, Flag, Timer, Loader2, Upload, AlertTriangle, Check, ArrowLeft, Wifi, WifiOff, Sparkles } from "lucide-react";
 import { useMatch, useMatchLineups, useUpdateMatch } from "@/hooks/use-matches";
 import { useField } from "@/hooks/use-fields";
 import { FootballTracker } from "@/lib/football-tracker";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { usePlayers } from "@/hooks/use-players";
 
 type Phase = "loading" | "camera" | "calibration" | "tracking" | "ended";
 
