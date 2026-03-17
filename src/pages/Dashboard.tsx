@@ -13,6 +13,7 @@ import { PlanBadge } from "@/components/PlanBadge";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import { DashboardCharts } from "@/components/DashboardCharts";
+import { MatchFlowGuide } from "@/components/MatchFlowGuide";
 import { useTranslation, useLocale } from "@/lib/i18n";
 
 export default function Dashboard() {
@@ -54,6 +55,7 @@ export default function Dashboard() {
         </div>
 
         <PwaInstallPrompt />
+        <MatchFlowGuide />
         <SetupChecklist hasPlayers={!!hasPlayers} hasFields={!!hasFields} />
 
         {!hasMatches && (

@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Crosshair, Save, ArrowLeft, RotateCcw } from "lucide-react";
 import { useField, useSaveCalibration } from "@/hooks/use-fields";
@@ -20,12 +20,12 @@ export default function FieldCalibration() {
   const [height, setHeight] = useState("68");
 
   // Load existing calibration
-  useState(() => {
+  useEffect(() => {
     if (field) {
       setWidth(String(field.width_m));
       setHeight(String(field.height_m));
     }
-  });
+  }, [field]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,12 +35,23 @@ export default function FieldCalibration() {
     setPoints([]);
   };
 
-  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     if (points.length >= 4) return;
+    e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    let clientX: number, clientY: number;
+    if ("touches" in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
     setPoints([...points, { x, y }]);
+    // Haptic feedback
+    if (navigator.vibrate) navigator.vibrate(30);
   };
 
   const handleSave = async () => {
@@ -102,8 +113,9 @@ export default function FieldCalibration() {
 
           {/* Calibration area */}
           <div
-            className="aspect-video bg-muted/30 rounded-lg border-2 border-dashed border-border relative cursor-crosshair overflow-hidden"
+            className="aspect-video bg-muted/30 rounded-lg border-2 border-dashed border-border relative cursor-crosshair overflow-hidden touch-none"
             onClick={handleImageClick}
+            onTouchStart={handleImageClick}
           >
             {imageUrl && (
               <img src={imageUrl} alt="Spielfeld" className="absolute inset-0 w-full h-full object-cover" />

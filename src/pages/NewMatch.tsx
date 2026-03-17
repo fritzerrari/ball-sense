@@ -97,10 +97,7 @@ export default function NewMatch() {
   const canProceed = () => {
     if (step === 1) return date && fieldId;
     if (step === 2) return true; // optional
-    if (step === 3) {
-      const filled = guestPlayers.filter(p => p.name.trim());
-      return filled.length >= 11;
-    }
+    if (step === 3) return true; // guest lineup is optional
     return true;
   };
 
@@ -174,15 +171,21 @@ export default function NewMatch() {
         </div>
 
         {/* Stepper */}
-        <div className="flex items-center gap-2">
-          {["Details", "Heim-Aufstellung", "Gast-Aufstellung", "Kameras"].map((label, i) => (
-            <div key={label} className="flex items-center gap-2 flex-1">
+        <div className="flex items-center gap-1 sm:gap-2">
+          {[
+            { label: "Details", icon: Calendar },
+            { label: "Heim", icon: Users },
+            { label: "Gast", icon: Users },
+            { label: "Kameras", icon: Camera },
+          ].map((s, i) => (
+            <div key={s.label} className="flex items-center gap-1 sm:gap-2 flex-1">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold font-display shrink-0 transition-colors ${
                 i + 1 === step ? "bg-primary text-primary-foreground" :
                 i + 1 < step ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
               }`}>
-                {i + 1 < step ? <Check className="h-4 w-4" /> : i + 1}
+                {i + 1 < step ? <Check className="h-4 w-4" /> : <s.icon className="h-4 w-4 sm:hidden" />}
               </div>
+              <span className="text-xs text-muted-foreground hidden sm:block">{s.label}</span>
               {i < 3 && <div className={`h-px flex-1 ${i + 1 < step ? "bg-primary/30" : "bg-border"}`} />}
             </div>
           ))}
@@ -305,7 +308,7 @@ export default function NewMatch() {
               <h2 className="text-lg font-semibold font-display flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" /> Aufstellung Gast {awayName && `— ${awayName}`}
               </h2>
-              <p className="text-sm text-muted-foreground">Mindestens 11 Spieler eingeben.</p>
+              <p className="text-sm text-muted-foreground">Optional — Gast-Aufstellung eingeben oder überspringen.</p>
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
                 {guestPlayers.map((gp, i) => (
                   <div key={i} className="flex gap-2">

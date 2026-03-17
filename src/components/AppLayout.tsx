@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu, BrainCircuit, Shield,
+  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu, BrainCircuit, Shield, Download,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
@@ -10,6 +10,7 @@ import { LanguageToggle } from "./LanguageToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n";
+import { MobileInstallFab } from "./MobileInstallFab";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -42,6 +43,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.fields"), icon: Map, href: "/fields" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
     { label: t("nav.settings"), icon: Settings, href: "/settings" },
+    { label: "Installation", icon: Download, href: "/install" },
   ];
 
   const allNavItems = [
@@ -160,6 +162,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <div className="p-4 md:p-6 lg:p-8">
           {children}
         </div>
+        <MobileInstallFab />
       </main>
     </div>
   );

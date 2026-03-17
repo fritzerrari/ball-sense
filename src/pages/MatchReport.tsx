@@ -186,9 +186,9 @@ export default function MatchReport() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-muted/30 rounded-lg p-1">
+        <div className="flex gap-1 bg-muted/30 rounded-lg p-1 overflow-x-auto scrollbar-none">
           {tabs.map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`whitespace-nowrap flex-shrink-0 sm:flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
               activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}>
               {tab}
