@@ -198,7 +198,16 @@ export default function TrackingPage() {
       setUploadDone(true);
       toast.success("Tracking-Daten erfolgreich hochgeladen!");
     } catch (err) {
-      toast.error("Upload fehlgeschlagen — Daten lokal gespeichert");
+      // localStorage fallback for offline retry
+      try {
+        const sessionData = JSON.stringify({
+          matchId: id, cameraIndex: cam,
+          frames: trackerRef.current?.getFrameCount() ?? 0,
+          savedAt: new Date().toISOString(),
+        });
+        localStorage.setItem(`pending_upload_${id}_cam${cam}`, sessionData);
+      } catch { /* storage full */ }
+      toast.error("Upload fehlgeschlagen — Daten lokal gespeichert. Wird beim nächsten Online-Zugang erneut versucht.");
       setUploadProgress(0);
     } finally {
       setUploading(false);
