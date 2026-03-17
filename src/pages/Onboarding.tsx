@@ -31,7 +31,7 @@ const STEPS = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { clubId, clubName } = useAuth();
+  const { user, clubId, clubName, refreshClubData } = useAuth();
   const createPlayer = useCreatePlayer();
   const createField = useCreateField();
 
@@ -39,6 +39,7 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
 
   // Step 0 — club
+  const [newClubName, setNewClubName] = useState("");
   const [city, setCity] = useState("");
   const [league, setLeague] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
