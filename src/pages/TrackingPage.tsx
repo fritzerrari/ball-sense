@@ -170,21 +170,44 @@ export default function TrackingPage() {
     setPaused(false);
   };
 
+  const uploadStages = [
+    { key: "compress", label: "Daten komprimieren", weight: 10 },
+    { key: "upload", label: "Upload zum Server", weight: 50 },
+    { key: "register", label: "Daten registrieren", weight: 20 },
+    { key: "status", label: "Verarbeitung starten", weight: 20 },
+  ];
+
+  const getOverallProgress = (stage: string, stagePct: number) => {
+    let total = 0;
+    for (const s of uploadStages) {
+      if (s.key === stage) {
+        total += (stagePct / 100) * s.weight;
+        break;
+      }
+      total += s.weight;
+    }
+    return Math.round(total);
+  };
+
   const handleUpload = async () => {
     if (!trackerRef.current || !id) return;
     setUploading(true);
     setUploadProgress(0);
+    setUploadStage("compress");
     try {
-      // Simulate progress stages
-      setUploadProgress(10);
       const result = await trackerRef.current.uploadMatch(
         id, cam,
         import.meta.env.VITE_SUPABASE_URL,
         import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        (stage, pct) => {
+          setUploadStage(stage);
+          setUploadProgress(getOverallProgress(stage, pct));
+        },
       );
-      setUploadProgress(60);
 
-      // Create tracking_uploads entry
+      // Register in DB
+      setUploadStage("register");
+      setUploadProgress(getOverallProgress("register", 50));
       await supabase.from("tracking_uploads").insert({
         match_id: id,
         camera_index: cam,
@@ -193,15 +216,16 @@ export default function TrackingPage() {
         frames_count: result.framesCount,
         duration_sec: result.durationSec,
       });
-      setUploadProgress(90);
+      setUploadProgress(getOverallProgress("register", 100));
 
       // Update match status
+      setUploadStage("status");
+      setUploadProgress(getOverallProgress("status", 50));
       await updateMatch.mutateAsync({ id, status: "processing" });
       setUploadProgress(100);
       setUploadDone(true);
       toast.success("Tracking-Daten erfolgreich hochgeladen!");
     } catch (err) {
-      // localStorage fallback for offline retry
       try {
         const sessionData = JSON.stringify({
           matchId: id, cameraIndex: cam,
