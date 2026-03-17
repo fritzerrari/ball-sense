@@ -307,25 +307,20 @@ export default function MatchReport() {
         {activeTab === "Vergleich" && (
           <div className="space-y-6">
             {hasStats ? (
-              <div className="grid sm:grid-cols-3 gap-4">
-                {[
-                  { label: "Distanz", home: homeTeamStats?.total_distance_km?.toFixed(1), away: awayTeamStats?.total_distance_km?.toFixed(1), unit: "km" },
-                  { label: "Top Speed", home: homeTeamStats?.top_speed_kmh?.toFixed(1), away: awayTeamStats?.top_speed_kmh?.toFixed(1), unit: "km/h" },
-                  { label: "Ø Distanz", home: homeTeamStats?.avg_distance_km?.toFixed(1), away: awayTeamStats?.avg_distance_km?.toFixed(1), unit: "km" },
-                ].map(c => (
-                  <div key={c.label} className="glass-card p-5 text-center">
-                    <div className="text-xs text-muted-foreground mb-3">{c.label}</div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-xl font-bold font-display text-primary">{c.home ?? "—"}</div>
-                      <div className="text-xs text-muted-foreground">{c.unit}</div>
-                      <div className="text-xl font-bold font-display">{c.away ?? "—"}</div>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-                      <span>Heim</span><span>Auswärts</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <>
+                <ComparisonBarChart
+                  homeTeamStats={homeTeamStats}
+                  awayTeamStats={awayTeamStats}
+                  homeName={clubName ?? "Heim"}
+                  awayName={match.away_club_name ?? "Auswärts"}
+                />
+                <MatchRadarChart
+                  homeTeamStats={homeTeamStats}
+                  awayTeamStats={awayTeamStats}
+                  homeName={clubName ?? "Heim"}
+                  awayName={match.away_club_name ?? "Auswärts"}
+                />
+              </>
             ) : (
               <div className="glass-card p-8 text-center">
                 <BarChart3 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />

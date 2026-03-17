@@ -157,6 +157,24 @@ export function DashboardCharts() {
             </ResponsiveContainer>
           </div>
         </div>
+
+        {/* Leaderboard */}
+        {leaderboard && leaderboard.length > 0 && (
+          <div className="glass-card p-5 md:col-span-2">
+            <h3 className="text-sm font-medium text-muted-foreground mb-4">🏆 Saison-Leaderboard (Gesamt-km)</h3>
+            <div className="space-y-2">
+              {leaderboard.map((p, i) => (
+                <Link key={p.id} to={`/players/${p.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 text-sm font-medium truncate">{p.name}</span>
+                  <span className="text-sm font-bold font-display">{p.totalKm} km</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

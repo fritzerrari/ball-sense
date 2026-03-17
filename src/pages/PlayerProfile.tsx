@@ -143,6 +143,12 @@ export default function PlayerProfile() {
           )}
         </div>
 
+        {/* Trend Charts */}
+        <PlayerCharts stats={stats} />
+
+        {/* KI Analysis */}
+        <PerformanceAnalysis type="player" playerId={id} playerName={player.name} />
+
         {/* Average Heatmap */}
         <div>
           <h2 className="text-lg font-semibold font-display mb-3">Durchschnitts-Heatmap</h2>
