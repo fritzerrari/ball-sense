@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu, BrainCircuit, Shield,
+  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu, BrainCircuit, Shield, Download,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
