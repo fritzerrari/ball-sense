@@ -301,6 +301,14 @@ export default function TrackingPage() {
     setSubMinute("");
   };
 
+  // Attach stream to tracking video when phase changes
+  useEffect(() => {
+    if (phase === "tracking" && trackingVideoRef.current && streamRef.current) {
+      trackingVideoRef.current.srcObject = streamRef.current;
+      trackingVideoRef.current.play().catch(() => {});
+    }
+  }, [phase]);
+
   // No longer needed — single persistent video element handles this
 
   useEffect(() => {
