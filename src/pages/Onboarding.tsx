@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import {
   Building2, Users, Map, Download, CheckCircle2,
   Plus, Trash2, ChevronRight, ChevronLeft, Loader2, Smartphone,
-  Camera, X, ImageIcon,
+  Camera, X, ImageIcon, BrainCircuit, Wifi, HardDrive,
 } from "lucide-react";
 
 const POSITIONS = ["TW", "IV", "LV", "RV", "ZM", "ZDM", "ZOM", "LA", "RA", "ST"];
@@ -450,16 +450,65 @@ export default function Onboarding() {
               <div>
                 <h2 className="text-xl font-bold font-display">App installieren</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Installiere FieldIQ auf deinem Homescreen für den schnellsten Zugang beim Tracking.
+                  FieldIQ enthält alles — inklusive KI-Tracking. Keine zusätzliche Software nötig.
                 </p>
               </div>
-              <div className="glass-card p-6 space-y-6">
+
+              {/* Info: Was ist in der App enthalten? */}
+              <div className="glass-card p-5 space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <BrainCircuit className="h-4 w-4 text-primary" />
+                  Was ist alles in FieldIQ enthalten?
+                </h3>
+                <div className="space-y-2.5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <Camera className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Kamera-Tracking</p>
+                      <p className="text-xs text-muted-foreground">Nutzt die Handy-Kamera direkt — keine externe Kamera-App nötig.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <BrainCircuit className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">KI-Spielererkennung (YOLOv8)</p>
+                      <p className="text-xs text-muted-foreground">Das KI-Modell läuft direkt auf deinem Smartphone im Browser — kein Server, kein Extra-Download.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <HardDrive className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Offline-fähig</p>
+                      <p className="text-xs text-muted-foreground">Das KI-Modell wird beim ersten Start gecacht und funktioniert danach auch ohne Internet.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <Wifi className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Cloud-Upload</p>
+                      <p className="text-xs text-muted-foreground">Tracking-Daten werden nach dem Spiel automatisch hochgeladen.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Installation */}
+              <div className="glass-card p-6 space-y-5">
+                <h3 className="text-sm font-semibold">So installierst du FieldIQ auf dem Handy:</h3>
                 {deferredPrompt ? (
                   <Button variant="hero" className="w-full text-lg py-6" onClick={handleInstall}>
                     <Download className="h-5 w-5 mr-2" /> Jetzt installieren
                   </Button>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div className="flex items-start gap-4 p-4 rounded-lg bg-muted">
                       <Smartphone className="h-6 w-6 text-primary mt-0.5 shrink-0" />
                       <div>
@@ -474,7 +523,7 @@ export default function Onboarding() {
                       <div>
                         <p className="text-sm font-medium">Android / Chrome</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Tippe auf das <strong>Menü</strong> (⋮) und wähle <strong>„App installieren"</strong> oder <strong>„Zum Startbildschirm hinzufügen"</strong>.
+                          Tippe auf das <strong>Menü</strong> (⋮) und wähle <strong>„App installieren"</strong>.
                         </p>
                       </div>
                     </div>
