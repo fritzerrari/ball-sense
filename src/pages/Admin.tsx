@@ -112,6 +112,7 @@ export default function Admin() {
   const { data: clubs = [], isLoading: clubsLoading } = useAdminClubs();
   const { data: matches = [] } = useAdminMatches();
   const { data: players = [] } = useAdminPlayers();
+  const { data: fields = [] } = useAdminFields();
   const { data: totalUsers = 0 } = useAdminProfiles();
 
   const [globalSearch, setGlobalSearch] = useState("");
