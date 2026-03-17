@@ -452,14 +452,7 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Speed-Ranking</div>
               <div className="space-y-2">
                 {[...data.players].sort((a, b) => b.topSpeed - a.topSpeed).slice(0, 5).map((p, i) => (
-                  <motion.div 
-                    key={p.name} 
-                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" 
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }} 
-                    transition={{ delay: 0.3 + i * 0.05 }}
-                    onClick={() => setSelectedPlayer(p)}
-                  >
+                  <motion.div key={p.name} className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }} onClick={() => setSelectedPlayer(p)}>
                     <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
                     <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
                     <span className="text-[10px] font-bold text-foreground">{p.topSpeed.toFixed(1)}</span>
@@ -469,21 +462,54 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               </div>
             </div>
             <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Passgenauigkeit</div>
+              <div className="space-y-2">
+                {[...data.players].sort((a, b) => b.passAccuracy - a.passAccuracy).slice(0, 5).map((p, i) => (
+                  <motion.div key={p.name} className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }} onClick={() => setSelectedPlayer(p)}>
+                    <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
+                    <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
+                    <span className="text-[10px] font-bold text-foreground">{p.passAccuracy}%</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Tore + Assists</div>
+              <div className="space-y-2">
+                {[...data.players].sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists)).slice(0, 5).map((p, i) => (
+                  <motion.div key={p.name} className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }} onClick={() => setSelectedPlayer(p)}>
+                    <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
+                    <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
+                    <span className="text-[10px] font-bold text-foreground">{p.goals}T / {p.assists}A</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Additional rankings row */}
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Sprint-Ranking</div>
               <div className="space-y-2">
                 {[...data.players].sort((a, b) => b.sprints - a.sprints).slice(0, 5).map((p, i) => (
-                  <motion.div 
-                    key={p.name} 
-                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" 
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }} 
-                    transition={{ delay: 0.3 + i * 0.05 }}
-                    onClick={() => setSelectedPlayer(p)}
-                  >
+                  <motion.div key={p.name} className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }} onClick={() => setSelectedPlayer(p)}>
                     <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
                     <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
                     <span className="text-[10px] font-bold text-foreground">{p.sprints}</span>
                     <span className="text-[8px] text-muted-foreground">Sprints</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Zweikampfquote</div>
+              <div className="space-y-2">
+                {[...data.players].sort((a, b) => b.duelsWon - a.duelsWon).slice(0, 5).map((p, i) => (
+                  <motion.div key={p.name} className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }} onClick={() => setSelectedPlayer(p)}>
+                    <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
+                    <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
+                    <span className="text-[10px] font-bold text-foreground">{p.duelsWon}%</span>
                   </motion.div>
                 ))}
               </div>
