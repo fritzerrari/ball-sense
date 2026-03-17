@@ -28,6 +28,7 @@ export default function Players() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [formName, setFormName] = useState("");
   const [formNumber, setFormNumber] = useState("");
