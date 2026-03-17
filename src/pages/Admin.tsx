@@ -242,6 +242,9 @@ export default function Admin() {
             <TabsTrigger value="matches" className="rounded-lg text-xs">
               <BarChart3 className="h-4 w-4 mr-1.5" /> Spiele
             </TabsTrigger>
+            <TabsTrigger value="fields" className="rounded-lg text-xs">
+              <MapPin className="h-4 w-4 mr-1.5" /> Felder
+            </TabsTrigger>
             <TabsTrigger value="uploads" className="rounded-lg text-xs">
               <Upload className="h-4 w-4 mr-1.5" /> Uploads
             </TabsTrigger>
