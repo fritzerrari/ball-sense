@@ -80,6 +80,19 @@ function useAdminPlayers() {
   });
 }
 
+function useAdminFields() {
+  return useQuery({
+    queryKey: ["admin_fields"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("fields")
+        .select("id, name, width_m, height_m, calibration, created_at, club_id, clubs(name)")
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+}
+
 function useAdminProfiles() {
   return useQuery({
     queryKey: ["admin_profiles_count"],
