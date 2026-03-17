@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import {
   Search, Crown, Trash2, Lock, Unlock, KeyRound, Loader2, ChevronLeft, ChevronRight,
-  Filter, UserX, ShieldCheck, ShieldAlert, Building2, Pencil, X, Check,
+  Filter, UserX, ShieldCheck, ShieldAlert, Building2, Pencil, X, Check, UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -37,6 +37,7 @@ export default function AdminUsers() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [banUserId, setBanUserId] = useState<{ id: string; ban: boolean } | null>(null);
   const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Fetch auth users via edge function
   const { data: authData, isLoading: usersLoading } = useQuery({
@@ -176,6 +177,30 @@ export default function AdminUsers() {
     onError: () => toast.error("Fehler"),
   });
 
+  const createUser = useMutation({
+    mutationFn: async (params: { email: string; password: string; clubId?: string; role?: string }) => {
+      const { data, error } = await supabase.functions.invoke("admin-users", {
+        body: { action: "createUser", ...params },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await supabase.from("audit_logs").insert({
+        user_id: user?.id, user_email: user?.email,
+        action: "user_created", entity_type: "user", entity_id: data.userId,
+        details: { email: params.email, role: params.role },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_auth_users"] });
+      qc.invalidateQueries({ queryKey: ["admin_profiles"] });
+      qc.invalidateQueries({ queryKey: ["admin_roles"] });
+      toast.success("Nutzer erstellt");
+      setCreateOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message || "Fehler beim Erstellen"),
+  });
+
   const getUserRoles = (userId: string) => roles.filter((r: any) => r.user_id === userId);
   const getProfile = (userId: string) => profiles.find((p: any) => p.user_id === userId);
 
@@ -222,6 +247,9 @@ export default function AdminUsers() {
           </Select>
         </div>
         <div className="text-xs text-muted-foreground">{totalUsers} Nutzer gesamt</div>
+        <Button size="sm" className="ml-auto" onClick={() => setCreateOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-1" /> Nutzer anlegen
+        </Button>
       </div>
 
       {usersLoading ? (
@@ -399,6 +427,23 @@ export default function AdminUsers() {
         onConfirm={() => banUserId && banUser.mutate({ userId: banUserId.id, ban: banUserId.ban })}
         destructive={banUserId?.ban}
       />
+
+      {/* Create User Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" /> Nutzer manuell anlegen
+            </DialogTitle>
+            <DialogDescription>E-Mail wird automatisch bestätigt.</DialogDescription>
+          </DialogHeader>
+          <CreateUserForm
+            clubs={allClubs}
+            onSubmit={(data) => createUser.mutate(data)}
+            isLoading={createUser.isPending}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -451,5 +496,83 @@ function UserEditForm({
         </Button>
       </div>
     </div>
+  );
+}
+
+function CreateUserForm({
+  clubs,
+  onSubmit,
+  isLoading,
+}: {
+  clubs: { id: string; name: string }[];
+  onSubmit: (data: { email: string; password: string; clubId?: string; role?: string }) => void;
+  isLoading: boolean;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [clubId, setClubId] = useState("none");
+  const [role, setRole] = useState("none");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    onSubmit({
+      email,
+      password,
+      clubId: clubId !== "none" ? clubId : undefined,
+      role: role !== "none" ? role : undefined,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">E-Mail *</label>
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nutzer@example.com" required />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">Passwort *</label>
+        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min. 6 Zeichen" minLength={6} required />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">Verein (optional)</label>
+        <Select value={clubId} onValueChange={setClubId}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Kein Verein —</SelectItem>
+            {clubs.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-3 w-3 text-primary" />
+                  {c.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground block mb-1.5">Rolle (optional)</label>
+        <Select value={role} onValueChange={setRole}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Keine Rolle —</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="moderator">Moderator</SelectItem>
+            <SelectItem value="user">User</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isLoading || !email || !password} size="sm">
+          {isLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <UserPlus className="h-3 w-3 mr-1" />}
+          Nutzer erstellen
+        </Button>
+      </div>
+    </form>
   );
 }

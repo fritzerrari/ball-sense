@@ -121,6 +121,36 @@ Deno.serve(async (req) => {
         });
       }
 
+      case "createUser": {
+        const { email, password, clubId: newClubId, role: newRole } = params;
+        if (!email || !password) throw new Error("email and password required");
+        if (password.length < 6) throw new Error("password must be at least 6 characters");
+
+        const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+        });
+        if (createError) throw createError;
+
+        if (newClubId) {
+          await adminClient
+            .from("profiles")
+            .update({ club_id: newClubId })
+            .eq("user_id", newUser.user.id);
+        }
+
+        if (newRole && newRole !== "none") {
+          await adminClient
+            .from("user_roles")
+            .insert({ user_id: newUser.user.id, role: newRole });
+        }
+
+        return new Response(JSON.stringify({ success: true, userId: newUser.user.id }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       case "assignClub": {
         const { userId, clubId } = params;
         if (!userId) throw new Error("userId required");
