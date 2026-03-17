@@ -1,14 +1,17 @@
 import { motion } from "framer-motion";
-import { Smartphone, Brain, BarChart3, Shield, Users, Zap } from "lucide-react";
+import { Smartphone, Brain, BarChart3, Shield, Users, Zap, FileText, Dumbbell, Share2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 const features = [
   { icon: Smartphone, titleKey: "landing.feat1Title", descKey: "landing.feat1Desc", span: "sm:col-span-2", accent: "from-primary/20 to-primary/5" },
   { icon: Brain, titleKey: "landing.feat2Title", descKey: "landing.feat2Desc", span: "", accent: "from-accent/20 to-accent/5" },
   { icon: BarChart3, titleKey: "landing.feat3Title", descKey: "landing.feat3Desc", span: "", accent: "from-primary/15 to-transparent" },
-  { icon: Shield, titleKey: "landing.feat4Title", descKey: "landing.feat4Desc", span: "sm:col-span-2", accent: "from-accent/15 to-transparent" },
-  { icon: Users, titleKey: "landing.feat5Title", descKey: "landing.feat5Desc", span: "", accent: "from-primary/20 to-primary/5" },
-  { icon: Zap, titleKey: "landing.feat6Title", descKey: "landing.feat6Desc", span: "sm:col-span-2 lg:col-span-1", accent: "from-accent/20 to-accent/5" },
+  { icon: FileText, titleKey: "landing.feat7Title", descKey: "landing.feat7Desc", span: "sm:col-span-2", accent: "from-accent/15 to-transparent" },
+  { icon: Dumbbell, titleKey: "landing.feat8Title", descKey: "landing.feat8Desc", span: "", accent: "from-primary/20 to-primary/5" },
+  { icon: Share2, titleKey: "landing.feat9Title", descKey: "landing.feat9Desc", span: "", accent: "from-accent/20 to-accent/5" },
+  { icon: Shield, titleKey: "landing.feat4Title", descKey: "landing.feat4Desc", span: "", accent: "from-primary/15 to-transparent" },
+  { icon: Users, titleKey: "landing.feat5Title", descKey: "landing.feat5Desc", span: "", accent: "from-accent/15 to-transparent" },
+  { icon: Zap, titleKey: "landing.feat6Title", descKey: "landing.feat6Desc", span: "sm:col-span-2 lg:col-span-1", accent: "from-primary/20 to-primary/5" },
 ];
 
 export function FeatureCards() {
