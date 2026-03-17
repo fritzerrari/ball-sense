@@ -23,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   clubPlan: null,
   clubLogoUrl: null,
   signOut: async () => {},
+  refreshClubData: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
