@@ -57,7 +57,7 @@ const steps: WorkflowStep[] = [
     id: "during-match",
     icon: <Timer className="h-5 w-5" />,
     title: "6. Während des Spiels",
-    text: "• Pause/Weiter: Bei Unterbrechungen (Verletzung, Trinkpause) tippe „Pause", danach „Weiter".\n• Halbzeit: Am Ende der 1. Halbzeit tippe „Halbzeit" – die Daten werden zwischengespeichert.\n• Wechsel melden: Tippe auf „Wechsel" → wähle den Spieler, der rausgeht → wähle den Einwechselspieler → gib die Minute ein → Bestätigen. Der Wechsel wird sofort in der Aufstellung übernommen.",
+    text: '- Pause/Weiter: Bei Unterbrechungen (Verletzung, Trinkpause) tippe "Pause", danach "Weiter".\n- Halbzeit: Am Ende der 1. Halbzeit tippe "Halbzeit" - die Daten werden zwischengespeichert.\n- Wechsel melden: Tippe auf "Wechsel", waehle den Spieler der rausgeht, waehle den Einwechselspieler, gib die Minute ein und bestaetige. Der Wechsel wird sofort in der Aufstellung uebernommen.',
   },
   {
     id: "end-upload",
