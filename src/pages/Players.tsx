@@ -201,6 +201,13 @@ export default function Players() {
         onConfirm={handleDelete}
         destructive
       />
+
+      <RosterImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        existingNumbers={existingNumbers}
+        onImport={handleBulkImport}
+      />
     </AppLayout>
   );
 }
