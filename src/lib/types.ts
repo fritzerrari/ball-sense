@@ -93,6 +93,28 @@ export interface PlayerMatchStats {
   minutes_played: number | null;
   heatmap_grid: number[][] | null;
   positions_raw: PositionEntry[] | null;
+  // Extended stats
+  ball_contacts: number | null;
+  passes_total: number | null;
+  passes_completed: number | null;
+  pass_accuracy: number | null;
+  duels_total: number | null;
+  duels_won: number | null;
+  tackles: number | null;
+  interceptions: number | null;
+  ball_recoveries: number | null;
+  shots_total: number | null;
+  shots_on_target: number | null;
+  goals: number | null;
+  assists: number | null;
+  crosses: number | null;
+  fouls_committed: number | null;
+  fouls_drawn: number | null;
+  yellow_cards: number | null;
+  red_cards: number | null;
+  dribbles_success: number | null;
+  aerial_won: number | null;
+  rating: number | null;
   // Joined
   players?: Player;
 }

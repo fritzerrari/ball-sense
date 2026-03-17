@@ -1,0 +1,23 @@
+
+ALTER TABLE public.player_match_stats
+  ADD COLUMN IF NOT EXISTS ball_contacts integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS passes_total integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS passes_completed integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pass_accuracy numeric DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS duels_total integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS duels_won integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tackles integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS interceptions integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS ball_recoveries integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS shots_total integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS shots_on_target integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS goals integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS assists integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS crosses integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS fouls_committed integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS fouls_drawn integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS yellow_cards integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS red_cards integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS dribbles_success integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS aerial_won integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS rating numeric DEFAULT NULL;

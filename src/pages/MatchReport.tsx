@@ -82,51 +82,73 @@ export default function MatchReport() {
     }
     return (
       <div className="glass-card overflow-x-auto">
-        <table className="w-full text-sm min-w-[500px]">
+        <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left py-3 px-3 sm:px-4 text-muted-foreground font-medium text-xs">Spieler</th>
+              <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Spieler</th>
               <th className="text-left py-3 px-2 text-muted-foreground font-medium text-xs">#</th>
               <SortHeader label="km" field="distance_km" />
               <SortHeader label="Top" field="top_speed_kmh" />
               <SortHeader label="Spr." field="sprint_count" />
+              <SortHeader label="Tore" field="goals" />
+              <SortHeader label="Ass." field="assists" />
+              <SortHeader label="Pass%" field="pass_accuracy" />
+              <SortHeader label="Zwk%" field="duels_won" />
               <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs hidden sm:table-cell">Min</th>
               <th className="w-8" />
             </tr>
           </thead>
           <tbody>
-            {sortPlayers(stats).map((p: any) => (
-              <Fragment key={p.id}>
-                <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
-                  <td className="py-3 px-3 sm:px-4 font-medium truncate max-w-[120px]">{p.players?.name ?? "—"}</td>
-                  <td className="py-3 px-2 text-muted-foreground">{p.players?.number ?? "—"}</td>
-                  <td className="py-3 px-3 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
-                  <td className="py-3 px-3">{p.top_speed_kmh?.toFixed(1) ?? "—"}</td>
-                  <td className="py-3 px-3">{p.sprint_count ?? 0}</td>
-                  <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">{p.minutes_played ?? "—"}</td>
-                  <td className="py-3 px-2">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
-                </tr>
-                {expandedPlayer === p.id && (
-                  <tr>
-                    <td colSpan={7} className="p-4 bg-muted/10">
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <HeatmapField label="Heatmap" grid={p.heatmap_grid as number[][] | null} compact />
-                        <div className="space-y-3">
-                          <div className="glass-card p-3">
-                            <div className="text-xs text-muted-foreground">Ø Geschwindigkeit</div>
-                            <div className="text-lg font-bold font-display">{p.avg_speed_kmh?.toFixed(1) ?? "—"} km/h</div>
+            {sortPlayers(stats).map((p: any) => {
+              const duelPct = p.duels_total > 0 ? Math.round((p.duels_won / p.duels_total) * 100) : null;
+              return (
+                <Fragment key={p.id}>
+                  <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
+                    <td className="py-3 px-3 font-medium truncate max-w-[120px]">{p.players?.name ?? "—"}</td>
+                    <td className="py-3 px-2 text-muted-foreground">{p.players?.number ?? "—"}</td>
+                    <td className="py-3 px-3 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
+                    <td className="py-3 px-3">{p.top_speed_kmh?.toFixed(1) ?? "—"}</td>
+                    <td className="py-3 px-3">{p.sprint_count ?? 0}</td>
+                    <td className="py-3 px-3 font-semibold">{p.goals ?? 0}</td>
+                    <td className="py-3 px-3">{p.assists ?? 0}</td>
+                    <td className="py-3 px-3">{p.pass_accuracy ? `${Math.round(p.pass_accuracy)}%` : "—"}</td>
+                    <td className="py-3 px-3">{duelPct !== null ? `${duelPct}%` : "—"}</td>
+                    <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">{p.minutes_played ?? "—"}</td>
+                    <td className="py-3 px-2">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
+                  </tr>
+                  {expandedPlayer === p.id && (
+                    <tr>
+                      <td colSpan={11} className="p-4 bg-muted/10">
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <HeatmapField label="Heatmap" grid={p.heatmap_grid as number[][] | null} compact />
+                          <div className="space-y-2">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Physisch</div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="glass-card p-2"><div className="text-[10px] text-muted-foreground">Ø Speed</div><div className="text-sm font-bold font-display">{p.avg_speed_kmh?.toFixed(1) ?? "—"} km/h</div></div>
+                              <div className="glass-card p-2"><div className="text-[10px] text-muted-foreground">Sprint-Dist.</div><div className="text-sm font-bold font-display">{p.sprint_distance_m ? `${Math.round(p.sprint_distance_m)}m` : "—"}</div></div>
+                              <div className="glass-card p-2"><div className="text-[10px] text-muted-foreground">Ballkontakte</div><div className="text-sm font-bold font-display">{p.ball_contacts ?? "—"}</div></div>
+                              <div className="glass-card p-2"><div className="text-[10px] text-muted-foreground">Rating</div><div className="text-sm font-bold font-display">{p.rating ? p.rating.toFixed(1) : "—"}</div></div>
+                            </div>
                           </div>
-                          <div className="glass-card p-3">
-                            <div className="text-xs text-muted-foreground">Sprint-Distanz</div>
-                            <div className="text-lg font-bold font-display">{p.sprint_distance_m ? `${Math.round(p.sprint_distance_m)} m` : "—"}</div>
+                          <div className="space-y-2">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Taktisch</div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="glass-card p-2"><div className="text-[10px] text-muted-foreground">Pässe</div><div className="text-sm font-bold font-display">{p.passes_completed ?? 0}/{p.passes_total ?? 0}</div></div>
+                              <div className="glass-card p-2"><div className="text-[10px] text-muted-foreground">Tackles</div><div className="text-sm font-bold font-display">{p.tackles ?? 0}</div></div>
+                              <div className="glass-card p-2"><div className="text-[10px] text-muted-foreground">Schüsse</div><div className="text-sm font-bold font-display">{p.shots_on_target ?? 0}/{p.shots_total ?? 0}</div></div>
+                              <div className="glass-card p-2"><div className="text-[10px] text-muted-foreground">Fouls</div><div className="text-sm font-bold font-display">{p.fouls_committed ?? 0} / {p.yellow_cards ?? 0}🟨</div></div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
+                        <div className="mt-3">
+                          <PerformanceAnalysis type="player" playerId={p.player_id} playerName={p.players?.name} />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

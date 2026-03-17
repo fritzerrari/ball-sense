@@ -638,49 +638,112 @@ export type Database = {
       }
       player_match_stats: {
         Row: {
+          aerial_won: number | null
+          assists: number | null
           avg_speed_kmh: number | null
+          ball_contacts: number | null
+          ball_recoveries: number | null
+          crosses: number | null
           data_source: string
           distance_km: number | null
+          dribbles_success: number | null
+          duels_total: number | null
+          duels_won: number | null
+          fouls_committed: number | null
+          fouls_drawn: number | null
+          goals: number | null
           heatmap_grid: Json | null
           id: string
+          interceptions: number | null
           match_id: string
           minutes_played: number | null
+          pass_accuracy: number | null
+          passes_completed: number | null
+          passes_total: number | null
           player_id: string | null
           positions_raw: Json | null
+          rating: number | null
+          red_cards: number | null
+          shots_on_target: number | null
+          shots_total: number | null
           sprint_count: number | null
           sprint_distance_m: number | null
+          tackles: number | null
           team: string
           top_speed_kmh: number | null
+          yellow_cards: number | null
         }
         Insert: {
+          aerial_won?: number | null
+          assists?: number | null
           avg_speed_kmh?: number | null
+          ball_contacts?: number | null
+          ball_recoveries?: number | null
+          crosses?: number | null
           data_source?: string
           distance_km?: number | null
+          dribbles_success?: number | null
+          duels_total?: number | null
+          duels_won?: number | null
+          fouls_committed?: number | null
+          fouls_drawn?: number | null
+          goals?: number | null
           heatmap_grid?: Json | null
           id?: string
+          interceptions?: number | null
           match_id: string
           minutes_played?: number | null
+          pass_accuracy?: number | null
+          passes_completed?: number | null
+          passes_total?: number | null
           player_id?: string | null
           positions_raw?: Json | null
+          rating?: number | null
+          red_cards?: number | null
+          shots_on_target?: number | null
+          shots_total?: number | null
           sprint_count?: number | null
           sprint_distance_m?: number | null
+          tackles?: number | null
           team: string
           top_speed_kmh?: number | null
+          yellow_cards?: number | null
         }
         Update: {
+          aerial_won?: number | null
+          assists?: number | null
           avg_speed_kmh?: number | null
+          ball_contacts?: number | null
+          ball_recoveries?: number | null
+          crosses?: number | null
           data_source?: string
           distance_km?: number | null
+          dribbles_success?: number | null
+          duels_total?: number | null
+          duels_won?: number | null
+          fouls_committed?: number | null
+          fouls_drawn?: number | null
+          goals?: number | null
           heatmap_grid?: Json | null
           id?: string
+          interceptions?: number | null
           match_id?: string
           minutes_played?: number | null
+          pass_accuracy?: number | null
+          passes_completed?: number | null
+          passes_total?: number | null
           player_id?: string | null
           positions_raw?: Json | null
+          rating?: number | null
+          red_cards?: number | null
+          shots_on_target?: number | null
+          shots_total?: number | null
           sprint_count?: number | null
           sprint_distance_m?: number | null
+          tackles?: number | null
           team?: string
           top_speed_kmh?: number | null
+          yellow_cards?: number | null
         }
         Relationships: [
           {

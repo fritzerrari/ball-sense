@@ -33,6 +33,10 @@ export default function PlayerProfile() {
   const avgTopSpeed = totalGames > 0 ? (stats.reduce((s, st) => Math.max(s, st.top_speed_kmh ?? 0), 0)) : 0;
   const totalKm = stats.reduce((s, st) => s + (st.distance_km ?? 0), 0);
   const totalSprints = stats.reduce((s, st) => s + (st.sprint_count ?? 0), 0);
+  const totalGoals = stats.reduce((s, st) => s + (st.goals ?? 0), 0);
+  const totalAssists = stats.reduce((s, st) => s + (st.assists ?? 0), 0);
+  const avgPassAcc = totalGames > 0 ? stats.filter(st => st.pass_accuracy).reduce((s, st) => s + (st.pass_accuracy ?? 0), 0) / (stats.filter(st => st.pass_accuracy).length || 1) : 0;
+  const avgRating = totalGames > 0 ? stats.filter(st => st.rating).reduce((s, st) => s + (st.rating ?? 0), 0) / (stats.filter(st => st.rating).length || 1) : 0;
 
   const heatmapGrids = stats
     .filter(s => s.heatmap_grid)
@@ -87,17 +91,21 @@ export default function PlayerProfile() {
         {/* Season stats */}
         <div>
           <h2 className="text-lg font-semibold font-display mb-3">Saisonübersicht</h2>
-          <div className="grid sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             {[
               { label: "Spiele", value: String(totalGames), icon: Trophy },
               { label: "Ø km/Spiel", value: avgKm > 0 ? avgKm.toFixed(1) : "—", icon: Route },
-              { label: "Top Speed", value: avgTopSpeed > 0 ? `${avgTopSpeed.toFixed(1)} km/h` : "—", icon: Zap },
-              { label: "Gesamt-Sprints", value: String(totalSprints), icon: BarChart3 },
+              { label: "Top Speed", value: avgTopSpeed > 0 ? `${avgTopSpeed.toFixed(1)}` : "—", icon: Zap },
+              { label: "Sprints", value: String(totalSprints), icon: BarChart3 },
+              { label: "Tore", value: String(totalGoals), icon: Trophy },
+              { label: "Assists", value: String(totalAssists), icon: Route },
+              { label: "Ø Passquote", value: avgPassAcc > 0 ? `${avgPassAcc.toFixed(0)}%` : "—", icon: BarChart3 },
+              { label: "Ø Rating", value: avgRating > 0 ? avgRating.toFixed(1) : "—", icon: Zap },
             ].map((s) => (
-              <div key={s.label} className="glass-card p-4">
-                <s.icon className="h-4 w-4 text-primary mb-2" />
-                <div className="text-xs text-muted-foreground">{s.label}</div>
-                <div className="text-xl font-bold font-display">{s.value}</div>
+              <div key={s.label} className="glass-card p-3">
+                <s.icon className="h-3.5 w-3.5 text-primary mb-1.5" />
+                <div className="text-[10px] text-muted-foreground">{s.label}</div>
+                <div className="text-lg font-bold font-display">{s.value}</div>
               </div>
             ))}
           </div>
@@ -111,25 +119,33 @@ export default function PlayerProfile() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Datum</th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Gegner</th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">km</th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Top km/h</th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Sprints</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Datum</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Gegner</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">km</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Top</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Spr.</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Tore</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Ass.</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Pass%</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Rating</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentStats.map((st: any) => (
+                   {recentStats.map((st: any) => (
                     <tr key={st.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3">
                         <Link to={`/matches/${st.match_id}`} className="hover:text-primary transition-colors">
                           {st.matches?.date ? new Date(st.matches.date).toLocaleDateString("de-DE") : "—"}
                         </Link>
                       </td>
-                      <td className="py-3 px-4 text-muted-foreground">{st.matches?.away_club_name ?? "—"}</td>
-                      <td className="py-3 px-4 font-semibold">{st.distance_km?.toFixed(1) ?? "—"}</td>
-                      <td className="py-3 px-4">{st.top_speed_kmh?.toFixed(1) ?? "—"}</td>
-                      <td className="py-3 px-4">{st.sprint_count ?? 0}</td>
+                      <td className="py-3 px-3 text-muted-foreground">{st.matches?.away_club_name ?? "—"}</td>
+                      <td className="py-3 px-3 font-semibold">{st.distance_km?.toFixed(1) ?? "—"}</td>
+                      <td className="py-3 px-3">{st.top_speed_kmh?.toFixed(1) ?? "—"}</td>
+                      <td className="py-3 px-3">{st.sprint_count ?? 0}</td>
+                      <td className="py-3 px-3 font-semibold">{st.goals ?? 0}</td>
+                      <td className="py-3 px-3">{st.assists ?? 0}</td>
+                      <td className="py-3 px-3">{st.pass_accuracy ? `${Math.round(st.pass_accuracy)}%` : "—"}</td>
+                      <td className="py-3 px-3">{st.rating ? st.rating.toFixed(1) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
