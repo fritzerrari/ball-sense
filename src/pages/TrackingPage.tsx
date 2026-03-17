@@ -625,8 +625,14 @@ export default function TrackingPage() {
                 <RefreshCw className="h-6 w-6 mr-2" /> WECHSEL
               </Button>
               <Button
+                onClick={() => setCardModalOpen(true)}
+                className="min-h-[60px] text-base font-bold bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-xl"
+              >
+                <ShieldAlert className="h-6 w-6 mr-2" /> ROTE KARTE
+              </Button>
+              <Button
                 onClick={handleEnd}
-                className="min-h-[60px] text-base font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl"
+                className="min-h-[60px] text-base font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl col-span-2"
               >
                 <Flag className="h-6 w-6 mr-2" /> ENDE
               </Button>
