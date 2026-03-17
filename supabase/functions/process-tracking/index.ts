@@ -256,12 +256,15 @@ Deno.serve(async (req) => {
 
     // 2) Download tracking JSON from storage
     const upload = uploads[0];
-    const filePath = upload.file_path;
-    console.log(`[process-tracking] Downloading ${filePath}`);
+    // file_path may be stored as "tracking/matchId/cam_0.json" or "matchId/cam_0.json"
+    // The storage client already targets bucket "tracking", so strip the prefix if present
+    const rawPath = upload.file_path as string;
+    const storagePath = rawPath.startsWith("tracking/") ? rawPath.slice("tracking/".length) : rawPath;
+    console.log(`[process-tracking] Downloading from bucket 'tracking', path: ${storagePath}`);
 
     const { data: fileData, error: dlErr } = await supabase.storage
       .from("tracking")
-      .download(filePath);
+      .download(storagePath);
 
     if (dlErr) throw dlErr;
     const sessionJson = await fileData.text();
