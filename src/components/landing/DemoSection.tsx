@@ -914,6 +914,296 @@ function PlayerDetailModal({ player, onClose }: { player: DemoPlayer; onClose: (
   );
 }
 
+/* ─── Report Tab Content ─── */
+function ReportTabContent() {
+  const [reportType, setReportType] = useState<"pre" | "halftime" | "full">("full");
+  const [reportStyle, setReportStyle] = useState<"analytic" | "social" | "newspaper">("analytic");
+
+  const reportTypes = [
+    { key: "pre" as const, label: "Vorbericht", icon: FileText },
+    { key: "halftime" as const, label: "Halbzeitanalyse", icon: Timer },
+    { key: "full" as const, label: "Spielbericht", icon: Award },
+  ];
+
+  const reportStyles = [
+    { key: "analytic" as const, label: "Analytisch", icon: BarChart3 },
+    { key: "social" as const, label: "Social Media", icon: Hash },
+    { key: "newspaper" as const, label: "Zeitung", icon: Newspaper },
+  ];
+
+  const reportContent: Record<string, Record<string, React.ReactNode>> = {
+    full: {
+      analytic: (
+        <>
+          <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4">FC Musterstadt – SV Beispielburg 2:1 (1:0)</h2>
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Spielverlauf</h3>
+          <p className="text-muted-foreground mb-3">
+            Der FC Musterstadt erwischte einen konzentrierten Start und übernahm früh die Spielkontrolle. 
+            Bereits in der 23. Minute belohnte sich das Heimteam: Nach einer schnellen Ballstafette über die 
+            rechte Seite kam <span className="text-foreground font-medium">A. Vogt (#10)</span> im Strafraum zum Abschluss — 1:0.
+          </p>
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Taktische Analyse</h3>
+          <p className="text-muted-foreground mb-3">
+            4-3-3 mit hohem Pressing. Zweikampfquote <span className="text-foreground font-medium">58%</span>, 
+            Passquote <span className="text-foreground font-medium">84%</span>. 
+            <span className="text-foreground font-medium"> 62%</span> der Angriffe über rechts.
+            xG: <span className="text-foreground font-medium">1.82</span> vs. xGA: <span className="text-foreground font-medium">0.94</span>.
+          </p>
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+              <Award className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <div className="font-semibold text-foreground">Spieler des Spiels: A. Vogt (#10) — 8.2</div>
+              <p className="text-xs text-muted-foreground mt-1">1 Tor, 1 Assist, 89% Passquote, 7/9 Zweikämpfe, 11.4 km, 18 Sprints.</p>
+            </div>
+          </div>
+        </>
+      ),
+      social: (
+        <>
+          <div className="bg-muted/30 rounded-xl p-5 border border-border/50 font-mono text-sm leading-relaxed text-foreground">
+            <p className="mb-3">⚽ <strong>SIEG!</strong> 🎉</p>
+            <p className="mb-3">FC Musterstadt 🟢 2:1 🔴 SV Beispielburg</p>
+            <p className="mb-3">
+              ⚡ A. Vogt mit Tor + Assist — MoTM! 🏆<br/>
+              🏃 117 km Gesamtlaufleistung<br/>
+              🎯 84% Passquote | 58% Zweikampfquote<br/>
+              📊 xG 1.82 vs 0.94 xGA
+            </p>
+            <p className="mb-3">
+              💪 Top-Sprinter: N. Roth (22 Sprints, 32.8 km/h)<br/>
+              🧤 Defensive steht — nur 4 Schüsse aufs Tor zugelassen!
+            </p>
+            <p className="text-primary">#FCMusterstadt #Sieg #FieldIQ #Tracking #Fußball</p>
+          </div>
+        </>
+      ),
+      newspaper: (
+        <>
+          <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-1 italic">Musterstadt siegt dank starkem Vogt</h2>
+          <p className="text-[10px] text-muted-foreground mb-4 italic">Kreisliga A · Spieltag 18 · Von der Sportredaktion</p>
+          <p className="text-muted-foreground mb-3">
+            <strong className="text-foreground">Musterstadt.</strong> Der FC Musterstadt hat sein Heimspiel gegen den SV Beispielburg 
+            mit 2:1 (1:0) gewonnen und sich damit auf den dritten Tabellenplatz vorgeschoben. Vor 280 Zuschauern 
+            im Vereinsstadion zeigte das Team von Trainer Mustermann eine reife Leistung.
+          </p>
+          <p className="text-muted-foreground mb-3">
+            Alexander Vogt, der überragende Akteur auf dem Platz, erzielte in der 23. Minute die Führung und 
+            bereitete in der 67. Minute das 2:0 durch Tim Hartmann vor. Der Anschlusstreffer der Gäste in der 
+            Schlussphase (82.) kam zu spät. „Wir haben heute sehr diszipliniert gespielt", lobte Mustermann nach dem Abpfiff.
+          </p>
+        </>
+      ),
+    },
+    halftime: {
+      analytic: (
+        <>
+          <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4">⏱️ Halbzeitanalyse — 1:0 (23' Vogt)</h2>
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Erste Hälfte — Überblick</h3>
+          <p className="text-muted-foreground mb-3">
+            Klare Dominanz des Heimteams. Ballbesitz <span className="text-foreground font-medium">57%</span>, 
+            4 Torschüsse (2 aufs Tor). Pressing-Intensität hoch (PPDA <span className="text-foreground font-medium">8.2</span>).
+          </p>
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Taktische Empfehlungen 2. Hälfte</h3>
+          <div className="space-y-2">
+            {["Linke Seite stärker einbeziehen (nur 28% der Angriffe)", "Vogt (#10) weiter als Zielspieler nutzen", "Gegnerische Konter über Roth (#2) absichern"].map((rec) => (
+              <div key={rec} className="flex items-start gap-2 text-xs text-muted-foreground">
+                <ChevronRight className="w-3 h-3 text-primary mt-0.5 shrink-0" />
+                <span>{rec}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ),
+      social: (
+        <div className="bg-muted/30 rounded-xl p-5 border border-border/50 font-mono text-sm leading-relaxed text-foreground">
+          <p className="mb-2">⏱️ <strong>HALBZEIT!</strong></p>
+          <p className="mb-2">FC Musterstadt 1:0 SV Beispielburg</p>
+          <p>⚽ 23' Vogt | 57% Ballbesitz | 84% Pässe ✅</p>
+          <p className="text-primary mt-2">#HalbzeitUpdate #FCM</p>
+        </div>
+      ),
+      newspaper: (
+        <>
+          <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4 italic">Vogt bringt Musterstadt in Front</h2>
+          <p className="text-muted-foreground mb-3">
+            <strong className="text-foreground">Halbzeit.</strong> Nach einer kontrollierten ersten Hälfte führt der FC Musterstadt 
+            dank eines Treffers von Alexander Vogt (23.) mit 1:0. Die Gastgeber bestimmten das Spiel und ließen wenig zu.
+          </p>
+        </>
+      ),
+    },
+    pre: {
+      analytic: (
+        <>
+          <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4">📋 Vorbericht: FC Musterstadt vs. SV Beispielburg</h2>
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Formkurve</h3>
+          <p className="text-muted-foreground mb-3">
+            FC Musterstadt: <span className="text-primary font-medium">S-S-U-S-N</span> (10 Punkte aus 5 Spielen)<br/>
+            SV Beispielburg: <span className="text-destructive font-medium">N-U-S-N-U</span> (5 Punkte aus 5 Spielen)
+          </p>
+          <h3 className="text-sm font-semibold text-foreground mt-4 mb-2">Schlüsseldaten (letzte 5 Spiele)</h3>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-lg bg-muted/20 p-2 border border-border/30">
+              <div className="font-semibold text-foreground mb-1">FC Musterstadt</div>
+              <div className="text-muted-foreground">Ø Distanz: 10.4 km · Ø xG: 1.6 · Passquote: 82%</div>
+            </div>
+            <div className="rounded-lg bg-muted/20 p-2 border border-border/30">
+              <div className="font-semibold text-foreground mb-1">SV Beispielburg</div>
+              <div className="text-muted-foreground">Ø Distanz: 9.8 km · Ø xG: 1.1 · Passquote: 76%</div>
+            </div>
+          </div>
+        </>
+      ),
+      social: (
+        <div className="bg-muted/30 rounded-xl p-5 border border-border/50 font-mono text-sm leading-relaxed text-foreground">
+          <p className="mb-2">🔜 <strong>MATCHDAY!</strong></p>
+          <p className="mb-2">FC Musterstadt 🆚 SV Beispielburg</p>
+          <p className="mb-2">📅 Sonntag, 15:30 Uhr</p>
+          <p>📊 Formkurve: SSUSU vs NUSNU</p>
+          <p className="text-primary mt-2">#Spieltag #FCM #Vorschau</p>
+        </div>
+      ),
+      newspaper: (
+        <>
+          <h2 className="text-lg font-bold font-display text-foreground mt-0 mb-4 italic">Musterstadt empfängt angeschlagene Beispielburger</h2>
+          <p className="text-muted-foreground mb-3">
+            <strong className="text-foreground">Vorschau.</strong> Am Sonntagnachmittag empfängt der formstarke FC Musterstadt den 
+            kriselnden SV Beispielburg. Die Gastgeber gehen als klarer Favorit in die Partie.
+          </p>
+        </>
+      ),
+    },
+  };
+
+  return (
+    <>
+      {/* Report Type & Style Switchers */}
+      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <div className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Berichtstyp</div>
+            <div className="flex gap-2">
+              {reportTypes.map((rt) => (
+                <button
+                  key={rt.key}
+                  onClick={() => setReportType(rt.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    reportType === rt.key
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <rt.icon className="w-3.5 h-3.5" />
+                  {rt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1">
+            <div className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Schreibstil</div>
+            <div className="flex gap-2">
+              {reportStyles.map((rs) => (
+                <button
+                  key={rs.key}
+                  onClick={() => setReportStyle(rs.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    reportStyle === rs.key
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <rs.icon className="w-3.5 h-3.5" />
+                  {rs.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Report Content */}
+      <div className="rounded-xl border border-primary/20 bg-card/50 p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <div className="text-sm font-bold font-display">
+              {reportTypes.find(r => r.key === reportType)?.label}
+            </div>
+            <div className="text-[10px] text-muted-foreground">
+              FieldIQ AI · Stil: {reportStyles.find(r => r.key === reportStyle)?.label} · Länge: Mittel
+            </div>
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${reportType}-${reportStyle}`}
+            className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+          >
+            {reportContent[reportType]?.[reportStyle]}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Share & Export */}
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/50">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            <span>Generiert in 4.2 Sekunden</span>
+          </div>
+          <div className="flex gap-1.5">
+            <Button variant="outline" size="sm" className="text-xs h-7 gap-1"><Clipboard className="w-3 h-3" /> Kopieren</Button>
+            <Button variant="outline" size="sm" className="text-xs h-7 gap-1"><Download className="w-3 h-3" /> PDF</Button>
+            <Button variant="outline" size="sm" className="text-xs h-7 gap-1"><Mail className="w-3 h-3" /> E-Mail</Button>
+            <Button variant="outline" size="sm" className="text-xs h-7 gap-1"><MessageCircle className="w-3 h-3" /> WhatsApp</Button>
+            <Button variant="outline" size="sm" className="text-xs h-7 gap-1"><Share2 className="w-3 h-3" /> X</Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Training Plan Preview */}
+      <div className="rounded-xl border border-border/50 bg-gradient-to-br from-primary/5 to-transparent p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Dumbbell className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <div className="text-sm font-bold font-display">KI-Trainingsplan</div>
+            <div className="text-[10px] text-muted-foreground">Individuelle Empfehlungen basierend auf Spieldaten</div>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-3 gap-3">
+          {[
+            { day: "Montag", focus: "Regeneration", items: ["Lockeres Auslaufen 20'", "Mobilität & Stretching", "Video-Analyse der Halbräume"] },
+            { day: "Mittwoch", focus: "Taktik & Passspiel", items: ["Rondo 4v2 (Passquote steigern)", "Spielaufbau über links trainieren", "Pressing-Timing 2. Hälfte"] },
+            { day: "Freitag", focus: "Intensität & Abschluss", items: ["Sprint-Intervalle (Topspeed)", "Abschluss-Übungen im 16er", "Standards üben"] },
+          ].map((session) => (
+            <div key={session.day} className="rounded-lg bg-card/80 border border-border/30 p-3">
+              <div className="text-xs font-semibold text-primary mb-0.5">{session.day}</div>
+              <div className="text-[10px] font-medium text-foreground mb-2">{session.focus}</div>
+              <div className="space-y-1">
+                {session.items.map((item) => (
+                  <div key={item} className="text-[9px] text-muted-foreground flex items-start gap-1">
+                    <ChevronRight className="w-2.5 h-2.5 text-primary mt-0.5 shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ─── Helper Components ─── */
 function StatRow({ label, value, highlight, warning }: { label: string; value: string | number; highlight?: boolean; warning?: boolean }) {
   return (
