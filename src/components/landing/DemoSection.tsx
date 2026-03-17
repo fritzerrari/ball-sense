@@ -5,7 +5,8 @@ import {
   Bell, ChevronRight, ArrowUpRight, ArrowDownRight, Minus, Target, Shield, Footprints,
   BarChart3, Eye, Gauge, X, ChevronLeft, Crosshair, Award, Goal, Siren,
   PersonStanding, CircleDot, Radar, TriangleAlert, TrendingDown, FileText, Sparkles,
-  Share2, Mail, Download, Clipboard, Dumbbell, Newspaper, MessageCircle, Hash
+  Share2, Mail, Download, Clipboard, Dumbbell, Newspaper, MessageCircle, Hash,
+  Lightbulb, ArrowRight, CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
