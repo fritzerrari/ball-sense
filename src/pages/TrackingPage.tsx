@@ -36,6 +36,7 @@ export default function TrackingPage() {
   const [subIn, setSubIn] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState<string>("compress");
   const [uploadDone, setUploadDone] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [half, setHalf] = useState(1);
@@ -169,21 +170,44 @@ export default function TrackingPage() {
     setPaused(false);
   };
 
+  const uploadStages = [
+    { key: "compress", label: "Daten komprimieren", weight: 10 },
+    { key: "upload", label: "Upload zum Server", weight: 50 },
+    { key: "register", label: "Daten registrieren", weight: 20 },
+    { key: "status", label: "Verarbeitung starten", weight: 20 },
+  ];
+
+  const getOverallProgress = (stage: string, stagePct: number) => {
+    let total = 0;
+    for (const s of uploadStages) {
+      if (s.key === stage) {
+        total += (stagePct / 100) * s.weight;
+        break;
+      }
+      total += s.weight;
+    }
+    return Math.round(total);
+  };
+
   const handleUpload = async () => {
     if (!trackerRef.current || !id) return;
     setUploading(true);
     setUploadProgress(0);
+    setUploadStage("compress");
     try {
-      // Simulate progress stages
-      setUploadProgress(10);
       const result = await trackerRef.current.uploadMatch(
         id, cam,
         import.meta.env.VITE_SUPABASE_URL,
         import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        (stage, pct) => {
+          setUploadStage(stage);
+          setUploadProgress(getOverallProgress(stage, pct));
+        },
       );
-      setUploadProgress(60);
 
-      // Create tracking_uploads entry
+      // Register in DB
+      setUploadStage("register");
+      setUploadProgress(getOverallProgress("register", 50));
       await supabase.from("tracking_uploads").insert({
         match_id: id,
         camera_index: cam,
@@ -192,15 +216,16 @@ export default function TrackingPage() {
         frames_count: result.framesCount,
         duration_sec: result.durationSec,
       });
-      setUploadProgress(90);
+      setUploadProgress(getOverallProgress("register", 100));
 
       // Update match status
+      setUploadStage("status");
+      setUploadProgress(getOverallProgress("status", 50));
       await updateMatch.mutateAsync({ id, status: "processing" });
       setUploadProgress(100);
       setUploadDone(true);
       toast.success("Tracking-Daten erfolgreich hochgeladen!");
     } catch (err) {
-      // localStorage fallback for offline retry
       try {
         const sessionData = JSON.stringify({
           matchId: id, cameraIndex: cam,
@@ -526,15 +551,34 @@ export default function TrackingPage() {
 
             {/* Upload Progress */}
             {(uploading || uploadDone) && (
-              <div className="space-y-2">
+              <div className="space-y-4">
+                {/* Stage steps */}
+                <div className="space-y-2">
+                  {uploadStages.map((s, i) => {
+                    const stageIdx = uploadStages.findIndex(st => st.key === uploadStage);
+                    const isDone = i < stageIdx || uploadDone;
+                    const isActive = i === stageIdx && !uploadDone;
+                    return (
+                      <div key={s.key} className="flex items-center gap-3 text-sm">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                          isDone ? "bg-primary text-primary-foreground" : isActive ? "bg-primary/20 border-2 border-primary" : "bg-muted"
+                        }`}>
+                          {isDone ? <Check className="h-3.5 w-3.5" /> : isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> : <span className="text-xs text-muted-foreground">{i + 1}</span>}
+                        </div>
+                        <span className={isDone ? "text-foreground" : isActive ? "text-foreground font-medium" : "text-muted-foreground"}>{s.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Overall progress bar */}
                 <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${uploadDone ? "bg-emerald-500" : "bg-primary"}`}
+                    className={`h-full rounded-full transition-all duration-500 ${uploadDone ? "bg-primary" : "bg-primary/80"}`}
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  {uploadDone ? "✓ Upload abgeschlossen" : `${uploadProgress}% — Daten werden hochgeladen...`}
+                  {uploadDone ? "✓ Alle Schritte abgeschlossen" : `${uploadProgress}%`}
                 </p>
               </div>
             )}

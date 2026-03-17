@@ -152,14 +152,17 @@ export class FootballTracker {
 
   /**
    * Upload tracking session data to Supabase storage.
-   * Currently prepares structured JSON upload.
+   * Uses XMLHttpRequest for real upload progress reporting.
    */
   async uploadMatch(
     matchId: string,
     cameraIndex: number,
     supabaseUrl: string,
     supabaseAnonKey: string,
+    onProgress?: (stage: string, pct: number) => void,
   ): Promise<{ filePath: string; framesCount: number; durationSec: number }> {
+    // Stage 1: Prepare data
+    onProgress?.("compress", 0);
     const sessionData = {
       matchId,
       cameraIndex,
@@ -169,24 +172,49 @@ export class FootballTracker {
       createdAt: new Date().toISOString(),
     };
 
-    const blob = new Blob([JSON.stringify(sessionData)], { type: "application/json" });
+    const jsonString = JSON.stringify(sessionData);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    onProgress?.("compress", 100);
+
     const filePath = `tracking/${matchId}/cam_${cameraIndex}.json`;
 
-    // Upload to Supabase Storage (tracking bucket)
-    const response = await fetch(`${supabaseUrl}/storage/v1/object/tracking/${filePath}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${supabaseAnonKey}`,
-        "Content-Type": "application/json",
-        "x-upsert": "true",
-      },
-      body: blob,
+    // Stage 2: Upload with progress
+    onProgress?.("upload", 0);
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${supabaseUrl}/storage/v1/object/tracking/${filePath}`);
+      xhr.setRequestHeader("Authorization", `Bearer ${supabaseAnonKey}`);
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.setRequestHeader("x-upsert", "true");
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onProgress?.("upload", Math.round((e.loaded / e.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress?.("upload", 100);
+          resolve();
+        } else {
+          console.warn("Upload to storage failed, saving locally instead");
+          localStorage.setItem(`tracking_${matchId}_cam${cameraIndex}`, jsonString);
+          resolve(); // Don't reject — local fallback is fine
+        }
+      };
+
+      xhr.onerror = () => {
+        console.warn("Upload network error, saving locally");
+        localStorage.setItem(`tracking_${matchId}_cam${cameraIndex}`, jsonString);
+        resolve();
+      };
+
+      xhr.send(blob);
     });
 
-    if (!response.ok) {
-      console.warn("Upload to storage failed, saving locally instead");
-      localStorage.setItem(`tracking_${matchId}_cam${cameraIndex}`, JSON.stringify(sessionData));
-    }
+    onProgress?.("register", 0);
 
     return {
       filePath,
