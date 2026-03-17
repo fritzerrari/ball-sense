@@ -247,7 +247,12 @@ export default function TrackingPage() {
   const isCalibrated = field?.calibration != null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col landscape:min-h-[100dvh]">
+      {/* Landscape hint for portrait mode */}
+      <div className="portrait:flex landscape:hidden items-center justify-center p-3 bg-primary/10 border-b border-primary/20 text-sm text-primary gap-2 md:hidden">
+        <Camera className="h-4 w-4" />
+        <span>Drehe dein Gerät ins Querformat für optimales Tracking</span>
+      </div>
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="font-display font-bold text-sm">
