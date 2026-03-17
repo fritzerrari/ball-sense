@@ -450,8 +450,8 @@ export default function TrackingPage() {
 
             {/* Camera preview */}
             <div className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden">
-              <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
-              {!videoRef.current?.srcObject && (
+              <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+              {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
                   <Camera className="h-12 w-12" />
                 </div>
