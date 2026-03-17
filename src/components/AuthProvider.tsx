@@ -11,6 +11,7 @@ interface AuthContextType {
   clubPlan: string | null;
   clubLogoUrl: string | null;
   signOut: () => Promise<void>;
+  refreshClubData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
