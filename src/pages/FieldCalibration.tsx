@@ -2,9 +2,19 @@ import AppLayout from "@/components/AppLayout";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Crosshair, Save, ArrowLeft, RotateCcw, Move, Undo2 } from "lucide-react";
+import { Camera, Upload, Crosshair, Save, ArrowLeft, RotateCcw, Move, Undo2, Sparkles, Loader2 } from "lucide-react";
 import { useField, useSaveCalibration } from "@/hooks/use-fields";
 import { SkeletonCard } from "@/components/SkeletonCard";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const FIELD_PRESETS = [
+  { label: "Großfeld 105×68m", width: "105", height: "68" },
+  { label: "Kleinfeld 68×50m", width: "68", height: "50" },
+  { label: "Jugend 80×55m", width: "80", height: "55" },
+  { label: "Futsal 40×20m", width: "40", height: "20" },
+];
 
 export default function FieldCalibration() {
   const { id } = useParams();
@@ -16,9 +26,11 @@ export default function FieldCalibration() {
 
   const [points, setPoints] = useState<{ x: number; y: number }[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [width, setWidth] = useState("105");
   const [height, setHeight] = useState("68");
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [detecting, setDetecting] = useState(false);
 
   const cornerLabels = ["Links-Oben", "Rechts-Oben", "Rechts-Unten", "Links-Unten"];
   const canSave = points.length === 4;
@@ -35,13 +47,13 @@ export default function FieldCalibration() {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setImageUrl(url);
+    setImageFile(file);
     setPoints([]);
   };
 
   const getRelativePos = useCallback((clientX: number, clientY: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return null;
-
     const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     const y = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
     return { x, y };
@@ -55,26 +67,21 @@ export default function FieldCalibration() {
     if (navigator.vibrate) navigator.vibrate(30);
   }, []);
 
-  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Unified pointer events (works on iOS, Android, Desktop)
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (draggingIndex !== null) return;
+    // Only respond to primary pointer (not from drag handles)
+    if ((e.target as HTMLElement).closest('[data-drag-handle]')) return;
     const pos = getRelativePos(e.clientX, e.clientY);
     if (!pos) return;
     addPoint(pos.x, pos.y);
   };
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (draggingIndex !== null) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    const pos = getRelativePos(touch.clientX, touch.clientY);
-    if (!pos) return;
-    addPoint(pos.x, pos.y);
-  };
-
-  const startDrag = (index: number, e: React.MouseEvent | React.TouchEvent) => {
+  const startDrag = (index: number, e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDraggingIndex(index);
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
   useEffect(() => {
@@ -86,23 +93,20 @@ export default function FieldCalibration() {
       setPoints((prev) => prev.map((p, i) => (i === draggingIndex ? pos : p)));
     };
 
-    const handleMouseMove = (e: MouseEvent) => movePoint(e.clientX, e.clientY);
-    const handleTouchMove = (e: TouchEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       e.preventDefault();
-      movePoint(e.touches[0].clientX, e.touches[0].clientY);
+      movePoint(e.clientX, e.clientY);
     };
-    const handleEnd = () => setDraggingIndex(null);
+    const handlePointerUp = () => setDraggingIndex(null);
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleEnd);
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
-    window.addEventListener("touchend", handleEnd);
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleEnd);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleEnd);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
     };
   }, [draggingIndex, getRelativePos]);
 
@@ -110,16 +114,56 @@ export default function FieldCalibration() {
     setPoints((prev) => prev.slice(0, -1));
   };
 
+  const handleAutoDetect = async () => {
+    if (!imageFile) {
+      toast.error("Bitte lade zuerst ein Bild hoch");
+      return;
+    }
+    setDetecting(true);
+    try {
+      // Convert image to base64
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(imageFile);
+      });
+
+      const { data, error } = await supabase.functions.invoke("detect-field-corners", {
+        body: { image: base64, mimeType: imageFile.type },
+      });
+
+      if (error) throw error;
+      if (data?.corners && data.corners.length === 4) {
+        setPoints(data.corners);
+        toast.success("4 Ecken automatisch erkannt! Passe sie bei Bedarf per Drag an.");
+      } else {
+        toast.error("Ecken konnten nicht erkannt werden. Bitte manuell setzen.");
+      }
+    } catch (err) {
+      console.error("Auto-detect error:", err);
+      toast.error("Automatische Erkennung fehlgeschlagen. Bitte manuell setzen.");
+    } finally {
+      setDetecting(false);
+    }
+  };
+
+  const handlePresetChange = (value: string) => {
+    const preset = FIELD_PRESETS.find(p => p.label === value);
+    if (preset) {
+      setWidth(preset.width);
+      setHeight(preset.height);
+    }
+  };
+
   const handleSave = async () => {
     if (!id || points.length !== 4) return;
-
     const calibration = {
       points,
       width_m: parseFloat(width) || 105,
       height_m: parseFloat(height) || 68,
       calibrated_at: new Date().toISOString(),
     };
-
     await saveCalibration.mutateAsync({ fieldId: id, calibration });
     navigate("/fields");
   };
@@ -171,7 +215,7 @@ export default function FieldCalibration() {
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
             <Button variant="heroOutline" size="sm" onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-4 w-4 mr-1" /> Foto hochladen
@@ -188,15 +232,30 @@ export default function FieldCalibration() {
             >
               <Camera className="h-4 w-4 mr-1" /> Kamera
             </Button>
+            {imageFile && (
+              <Button
+                variant="hero"
+                size="sm"
+                onClick={handleAutoDetect}
+                disabled={detecting}
+              >
+                {detecting ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Erkennung läuft...</>
+                ) : (
+                  <><Sparkles className="h-4 w-4 mr-1" /> Automatisch erkennen</>
+                )}
+              </Button>
+            )}
           </div>
 
+          {/* Calibration image area — NO touch-none to fix iOS */}
           <div
             ref={containerRef}
-            className="aspect-video bg-muted/30 rounded-lg border-2 border-dashed border-border relative cursor-crosshair overflow-hidden touch-none select-none"
-            onClick={handleImageClick}
-            onTouchStart={handleTouchStart}
+            className="aspect-video bg-muted/30 rounded-lg border-2 border-dashed border-border relative cursor-crosshair overflow-hidden select-none"
+            style={{ touchAction: "none" }}
+            onPointerDown={handlePointerDown}
           >
-            {imageUrl && <img src={imageUrl} alt="Spielfeld" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />}
+            {imageUrl && <img src={imageUrl} alt="Spielfeld" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} />}
 
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               {!imageUrl && (
@@ -248,10 +307,10 @@ export default function FieldCalibration() {
             {points.map((p, i) => (
               <div
                 key={`corner-${i}`}
-                className="absolute w-7 h-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary border-2 border-primary-foreground flex items-center justify-center text-[10px] font-bold text-primary-foreground shadow-lg cursor-grab active:cursor-grabbing z-10"
+                data-drag-handle
+                className="absolute w-11 h-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary border-2 border-primary-foreground flex items-center justify-center text-xs font-bold text-primary-foreground shadow-lg cursor-grab active:cursor-grabbing z-10"
                 style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                onMouseDown={(e) => startDrag(i, e)}
-                onTouchStart={(e) => startDrag(i, e)}
+                onPointerDown={(e) => startDrag(i, e)}
               >
                 {i + 1}
               </div>
@@ -264,14 +323,30 @@ export default function FieldCalibration() {
             </div>
           )}
 
-          <div className="flex gap-4">
+          {/* Field dimensions with presets */}
+          <div className="space-y-3">
             <div>
-              <label className="text-sm text-muted-foreground block mb-1">Breite (m)</label>
-              <input type="number" value={width} onChange={(e) => setWidth(e.target.value)} className="w-24 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm" />
+              <label className="text-sm text-muted-foreground block mb-1">Spielfeld-Vorlage</label>
+              <Select onValueChange={handlePresetChange}>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Vorlage wählen..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {FIELD_PRESETS.map(p => (
+                    <SelectItem key={p.label} value={p.label}>{p.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1">Länge (m)</label>
-              <input type="number" value={height} onChange={(e) => setHeight(e.target.value)} className="w-24 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm" />
+            <div className="flex gap-4">
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Breite (m)</label>
+                <input type="number" value={width} onChange={(e) => setWidth(e.target.value)} className="w-24 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm" />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Länge (m)</label>
+                <input type="number" value={height} onChange={(e) => setHeight(e.target.value)} className="w-24 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm" />
+              </div>
             </div>
           </div>
 
