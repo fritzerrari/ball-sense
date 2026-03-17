@@ -97,10 +97,7 @@ export default function NewMatch() {
   const canProceed = () => {
     if (step === 1) return date && fieldId;
     if (step === 2) return true; // optional
-    if (step === 3) {
-      const filled = guestPlayers.filter(p => p.name.trim());
-      return filled.length >= 11;
-    }
+    if (step === 3) return true; // guest lineup is optional
     return true;
   };
 
