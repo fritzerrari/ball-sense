@@ -37,6 +37,7 @@ export default function AdminUsers() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [banUserId, setBanUserId] = useState<{ id: string; ban: boolean } | null>(null);
   const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Fetch auth users via edge function
   const { data: authData, isLoading: usersLoading } = useQuery({
