@@ -385,9 +385,8 @@ export default function TrackingPage() {
             <Camera className="h-16 w-16 text-primary mx-auto" />
             <h2 className="text-xl font-bold font-display">Kamera aktivieren</h2>
             <p className="text-sm text-muted-foreground">Erlaube den Kamerazugriff, um mit dem Tracking zu beginnen.</p>
-            <div className="w-full aspect-video rounded-xl bg-muted/30 border border-border overflow-hidden">
-              <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-            </div>
+            {/* Camera preview shown inline */}
+            <div className="w-full aspect-video rounded-xl bg-muted/30 border border-border overflow-hidden" />
             <Button variant="hero" size="xl" onClick={handleStartCamera} className="w-full min-h-[56px]">
               Kamera starten
             </Button>
