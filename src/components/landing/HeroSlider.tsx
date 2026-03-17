@@ -435,14 +435,18 @@ const mockPlayers = [
   { x: 48, y: 48, num: 10, team: "home" },
   { x: 48, y: 78, num: 11, team: "home" },
   { x: 55, y: 48, num: 9, team: "home" },
-  // Away team
+  // Away team (4-3-3)
   { x: 92, y: 48, num: 1, team: "away" },
-  { x: 78, y: 28, num: 2, team: "away" },
-  { x: 80, y: 48, num: 4, team: "away" },
-  { x: 78, y: 68, num: 3, team: "away" },
-  { x: 68, y: 38, num: 6, team: "away" },
-  { x: 68, y: 58, num: 8, team: "away" },
-  { x: 60, y: 48, num: 9, team: "away" },
+  { x: 78, y: 20, num: 2, team: "away" },
+  { x: 80, y: 38, num: 4, team: "away" },
+  { x: 80, y: 58, num: 5, team: "away" },
+  { x: 78, y: 76, num: 3, team: "away" },
+  { x: 68, y: 30, num: 6, team: "away" },
+  { x: 66, y: 48, num: 8, team: "away" },
+  { x: 68, y: 66, num: 14, team: "away" },
+  { x: 56, y: 22, num: 7, team: "away" },
+  { x: 58, y: 48, num: 9, team: "away" },
+  { x: 56, y: 74, num: 11, team: "away" },
 ];
 
 function generateMockHeatmap(): number[][] {
