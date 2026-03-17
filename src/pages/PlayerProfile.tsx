@@ -119,11 +119,15 @@ export default function PlayerProfile() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Datum</th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Gegner</th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">km</th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Top km/h</th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Sprints</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Datum</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Gegner</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">km</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Top</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Spr.</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Tore</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Ass.</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Pass%</th>
+                    <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Rating</th>
                   </tr>
                 </thead>
                 <tbody>
