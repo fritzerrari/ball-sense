@@ -132,6 +132,29 @@ export default function Admin() {
     onError: () => toast.error("Fehler beim Aktualisieren"),
   });
 
+  const deleteEntity = useMutation({
+    mutationFn: async ({ type, id }: { type: string; id: string }) => {
+      if (type === "match") {
+        const { error } = await supabase.from("matches").delete().eq("id", id);
+        if (error) throw error;
+      } else if (type === "field") {
+        const { error } = await supabase.from("fields").delete().eq("id", id);
+        if (error) throw error;
+      }
+      await supabase.from("audit_logs").insert({
+        user_id: user?.id, user_email: user?.email,
+        action: `${type}_deleted`, entity_type: type, entity_id: id,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_matches"] });
+      qc.invalidateQueries({ queryKey: ["admin_fields"] });
+      toast.success("Erfolgreich gelöscht");
+      setDeleteTarget(null);
+    },
+    onError: () => toast.error("Fehler beim Löschen"),
+  });
+
   if (roleLoading) return <AppLayout><SkeletonCard count={3} /></AppLayout>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
