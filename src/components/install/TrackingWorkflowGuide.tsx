@@ -33,7 +33,7 @@ const steps: WorkflowStep[] = [
     id: "roster",
     icon: <Users className="h-5 w-5" />,
     title: "2. Mannschaft aufstellen",
-    text: "Wähle deine Startelf (11 Spieler) und trage bis zu 7 Wechselspieler ein. Ordne jedem Spieler eine Position und Trikotnummer zu. Du kannst die Aufstellung auch noch während des Spiels ändern.",
+    text: "Waehle deine Startelf (11 Spieler) und trage bis zu 7 Wechselspieler ein. Ordne jedem Spieler eine Position und Trikotnummer zu. Du kannst die Aufstellung auch noch waehrend des Spiels aendern.",
   },
   {
     id: "position-phones",
