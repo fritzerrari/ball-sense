@@ -293,11 +293,26 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4) Get lineups
+    // 4) Get lineups with player positions
     const { data: lineups } = await supabase
       .from("match_lineups")
       .select("id, player_id, player_name, team, shirt_number, starting")
       .eq("match_id", matchId);
+
+    // Fetch player positions for position-based assignment
+    const playerIds = (lineups || []).map((l: any) => l.player_id).filter(Boolean);
+    let playerPositions: Record<string, string> = {};
+    if (playerIds.length > 0) {
+      const { data: players } = await supabase
+        .from("players")
+        .select("id, position")
+        .in("id", playerIds);
+      if (players) {
+        for (const p of players) {
+          if (p.position) playerPositions[p.id] = p.position;
+        }
+      }
+    }
 
     const homePlayers = (lineups || []).filter((l: any) => l.team === "home");
     const awayPlayers = (lineups || []).filter((l: any) => l.team === "away");
@@ -313,26 +328,93 @@ Deno.serve(async (req) => {
     const sortedTracks = [...tracks.entries()]
       .sort((a, b) => b[1].length - a[1].length);
 
-    // 6) Assign tracks to players
-    // Heuristic: sort tracks by length, assign to home players first, then away
+    // 6) Position-based player-to-track assignment
+    // Map tactical positions to expected field zones (x: 0=left, 1=right; y: 0=top/own goal, 1=bottom/opponent goal)
+    const POSITION_ZONES: Record<string, { x: number; y: number }> = {
+      TW: { x: 0.5, y: 0.06 },    // Goalkeeper — deep in own half
+      IV: { x: 0.5, y: 0.20 },    // Centre-back
+      LV: { x: 0.15, y: 0.22 },   // Left-back
+      RV: { x: 0.85, y: 0.22 },   // Right-back
+      LIV: { x: 0.35, y: 0.20 },  // Left centre-back
+      RIV: { x: 0.65, y: 0.20 },  // Right centre-back
+      ZDM: { x: 0.5, y: 0.35 },   // Defensive midfielder
+      ZM: { x: 0.5, y: 0.45 },    // Central midfielder
+      LM: { x: 0.15, y: 0.45 },   // Left midfielder
+      RM: { x: 0.85, y: 0.45 },   // Right midfielder
+      ZOM: { x: 0.5, y: 0.55 },   // Attacking midfielder
+      LA: { x: 0.15, y: 0.65 },   // Left winger
+      RA: { x: 0.85, y: 0.65 },   // Right winger
+      ST: { x: 0.5, y: 0.75 },    // Striker
+      HS: { x: 0.5, y: 0.65 },    // Second striker
+    };
+
+    // Compute centroid for each track
+    const trackCentroids = sortedTracks.map(([tid, positions]) => {
+      const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+      const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+      return { tid, cx, cy, positions };
+    });
+
+    // Use greedy matching: for each player, find the closest unassigned track
     const allPlayers = [...homePlayers, ...awayPlayers];
+    const usedTrackIndices = new Set<number>();
     const playerStats: Array<{
       player_id: string | null;
       player_name: string | null;
       team: string;
       stats: ReturnType<typeof computeTrackStats>;
+      confidence: number;
     }> = [];
 
-    for (let i = 0; i < Math.min(sortedTracks.length, allPlayers.length); i++) {
-      const [, positions] = sortedTracks[i];
-      const player = allPlayers[i];
-      const stats = computeTrackStats(positions, fieldW, fieldH);
-      playerStats.push({
-        player_id: player.player_id || null,
-        player_name: player.player_name,
-        team: player.team,
-        stats,
-      });
+    // Build cost matrix and do greedy assignment
+    for (const player of allPlayers) {
+      const position = player.player_id ? playerPositions[player.player_id] : null;
+      const expectedZone = position ? POSITION_ZONES[position] : null;
+
+      let bestIdx = -1;
+      let bestDist = Infinity;
+
+      for (let ti = 0; ti < trackCentroids.length; ti++) {
+        if (usedTrackIndices.has(ti)) continue;
+        const tc = trackCentroids[ti];
+
+        if (expectedZone) {
+          // Distance from track centroid to expected zone
+          const dist = Math.sqrt(
+            (tc.cx - expectedZone.x) ** 2 + (tc.cy - expectedZone.y) ** 2
+          );
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIdx = ti;
+          }
+        } else {
+          // No position info — fall back to longest remaining track
+          if (bestIdx === -1) {
+            bestIdx = ti;
+            bestDist = 0.5; // neutral confidence
+          }
+        }
+      }
+
+      if (bestIdx >= 0) {
+        usedTrackIndices.add(bestIdx);
+        const tc = trackCentroids[bestIdx];
+        const stats = computeTrackStats(tc.positions, fieldW, fieldH);
+        // Confidence: 1.0 = perfect match, 0.0 = worst
+        const confidence = expectedZone
+          ? Math.max(0, 1 - bestDist * 2) // dist of 0.5 = confidence 0
+          : 0.3; // no position = low confidence
+        playerStats.push({
+          player_id: player.player_id || null,
+          player_name: player.player_name,
+          team: player.team,
+          stats,
+          confidence: Math.round(confidence * 100) / 100,
+        });
+        console.log(
+          `[process-tracking] Assigned ${player.player_name} (${position || "?"}) → track ${tc.tid} (centroid ${tc.cx.toFixed(2)},${tc.cy.toFixed(2)}) confidence=${confidence.toFixed(2)}`
+        );
+      }
     }
 
     console.log(`[process-tracking] Computed stats for ${playerStats.length} players`);

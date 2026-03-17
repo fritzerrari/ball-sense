@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.process-tracking]
 verify_jwt = false
+
+[functions.detect-field-corners]
+verify_jwt = false
