@@ -4,7 +4,8 @@ import {
   Play, RotateCcw, AlertTriangle, TrendingUp, Zap, Route, Users, Activity, Timer,
   Bell, ChevronRight, ArrowUpRight, ArrowDownRight, Minus, Target, Shield, Footprints,
   BarChart3, Eye, Gauge, X, ChevronLeft, Crosshair, Award, Goal, Siren,
-  PersonStanding, CircleDot, Radar, TriangleAlert, TrendingDown, FileText, Sparkles
+  PersonStanding, CircleDot, Radar, TriangleAlert, TrendingDown, FileText, Sparkles,
+  Share2, Mail, Download, Clipboard, Dumbbell, Newspaper, MessageCircle, Hash
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
