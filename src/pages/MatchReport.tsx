@@ -4,6 +4,8 @@ import { useState, Fragment } from "react";
 import { BarChart3, Zap, Route, Users, ArrowUpDown, ArrowLeft, FileText, Download, Share2, ChevronDown, ChevronUp, Camera, Loader2 } from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
 import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
+import { MatchRadarChart, TopPlayersChart, ComparisonBarChart } from "@/components/MatchCharts";
+import { PerformanceAnalysis } from "@/components/PerformanceAnalysis";
 import { useMatch, useMatchLineups, useTrackingUploads } from "@/hooks/use-matches";
 import { usePlayerMatchStats, useTeamMatchStats, useApiFootballStats } from "@/hooks/use-match-stats";
 import { useAuth } from "@/components/AuthProvider";
