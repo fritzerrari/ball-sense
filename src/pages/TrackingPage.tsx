@@ -551,15 +551,34 @@ export default function TrackingPage() {
 
             {/* Upload Progress */}
             {(uploading || uploadDone) && (
-              <div className="space-y-2">
+              <div className="space-y-4">
+                {/* Stage steps */}
+                <div className="space-y-2">
+                  {uploadStages.map((s, i) => {
+                    const stageIdx = uploadStages.findIndex(st => st.key === uploadStage);
+                    const isDone = i < stageIdx || uploadDone;
+                    const isActive = i === stageIdx && !uploadDone;
+                    return (
+                      <div key={s.key} className="flex items-center gap-3 text-sm">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                          isDone ? "bg-primary text-primary-foreground" : isActive ? "bg-primary/20 border-2 border-primary" : "bg-muted"
+                        }`}>
+                          {isDone ? <Check className="h-3.5 w-3.5" /> : isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> : <span className="text-xs text-muted-foreground">{i + 1}</span>}
+                        </div>
+                        <span className={isDone ? "text-foreground" : isActive ? "text-foreground font-medium" : "text-muted-foreground"}>{s.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Overall progress bar */}
                 <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${uploadDone ? "bg-emerald-500" : "bg-primary"}`}
+                    className={`h-full rounded-full transition-all duration-500 ${uploadDone ? "bg-primary" : "bg-primary/80"}`}
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  {uploadDone ? "✓ Upload abgeschlossen" : `${uploadProgress}% — Daten werden hochgeladen...`}
+                  {uploadDone ? "✓ Alle Schritte abgeschlossen" : `${uploadProgress}%`}
                 </p>
               </div>
             )}
