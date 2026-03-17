@@ -51,7 +51,7 @@ const steps: WorkflowStep[] = [
     id: "start-tracking",
     icon: <Play className="h-5 w-5" />,
     title: "5. Tracking starten",
-    text: "Tippe auf „Tracking starten". Das KI-Modell wird geladen (einmalig ~5 Sek.), dann aktiviert sich die Kamera. Du siehst einen grünen Indikator, sobald die Spielererkennung aktiv ist. Jetzt werden alle Bewegungen automatisch aufgezeichnet.",
+    text: 'Tippe auf "Tracking starten". Das KI-Modell wird geladen (einmalig ~5 Sek.), dann aktiviert sich die Kamera. Du siehst einen gruenen Indikator, sobald die Spielererkennung aktiv ist. Jetzt werden alle Bewegungen automatisch aufgezeichnet.',
   },
   {
     id: "during-match",
