@@ -60,14 +60,14 @@ export default function Onboarding() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // Listen for install prompt
-  useState(() => {
+  useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     window.addEventListener("beforeinstallprompt", handler as any);
     return () => window.removeEventListener("beforeinstallprompt", handler as any);
-  });
+  }, []);
 
   const progress = ((step + 1) / STEPS.length) * 100;
 
