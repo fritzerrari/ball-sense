@@ -845,7 +845,7 @@ export default function TrackingPage() {
               <label className="text-sm text-muted-foreground block mb-1">Spieler raus</label>
               <select value={subOut} onChange={e => setSubOut(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
                 <option value="">Wählen...</option>
-                {homePlayers.filter((p: any) => p.starting && !p.subbed_out_min).map((p: any) => (
+                {activeHomePlayers.map((p: any) => (
                   <option key={p.id} value={p.player_name}>{p.player_name} (#{p.shirt_number})</option>
                 ))}
               </select>
@@ -854,13 +854,39 @@ export default function TrackingPage() {
               <label className="text-sm text-muted-foreground block mb-1">Spieler rein</label>
               <select value={subIn} onChange={e => setSubIn(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
                 <option value="">Wählen...</option>
-                {homePlayers.filter((p: any) => !p.starting && !p.subbed_in_min).map((p: any) => (
+                {homePlayers.filter((p: any) => !activeHomePlayers.some((active: any) => active.id === p.id)).map((p: any) => (
                   <option key={p.id} value={p.player_name}>{p.player_name} (#{p.shirt_number})</option>
                 ))}
               </select>
             </div>
             <Button variant="hero" className="w-full" onClick={handleSub} disabled={!subOut || !subIn}>
               Bestätigen
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cardModalOpen} onOpenChange={setCardModalOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-display">Rote Karte</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1">Minute</label>
+              <input type="number" value={cardMinute} onChange={e => setCardMinute(e.target.value)} placeholder={String(Math.floor(elapsedSec / 60))} className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm" />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1">Spieler</label>
+              <select value={cardPlayer} onChange={e => setCardPlayer(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
+                <option value="">Wählen...</option>
+                {activeHomePlayers.map((p: any) => (
+                  <option key={p.id} value={p.player_name}>{p.player_name} (#{p.shirt_number})</option>
+                ))}
+              </select>
+            </div>
+            <Button variant="hero" className="w-full" onClick={handleRedCard} disabled={!cardPlayer}>
+              Speichern
             </Button>
           </div>
         </DialogContent>
