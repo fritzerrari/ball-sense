@@ -116,6 +116,7 @@ export default function Admin() {
   const { data: totalUsers = 0 } = useAdminProfiles();
 
   const [globalSearch, setGlobalSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: string; label: string } | null>(null);
 
   const updateClubPlan = useMutation({
     mutationFn: async ({ clubId, plan }: { clubId: string; plan: string }) => {
