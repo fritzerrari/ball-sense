@@ -521,6 +521,70 @@ export type Database = {
         }
         Relationships: []
       }
+      match_events: {
+        Row: {
+          created_at: string
+          event_type: Database["public"]["Enums"]["match_event_type"]
+          id: string
+          match_id: string
+          minute: number
+          notes: string | null
+          player_id: string | null
+          player_name: string | null
+          related_player_id: string | null
+          related_player_name: string | null
+          team: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: Database["public"]["Enums"]["match_event_type"]
+          id?: string
+          match_id: string
+          minute: number
+          notes?: string | null
+          player_id?: string | null
+          player_name?: string | null
+          related_player_id?: string | null
+          related_player_name?: string | null
+          team: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: Database["public"]["Enums"]["match_event_type"]
+          id?: string
+          match_id?: string
+          minute?: number
+          notes?: string | null
+          player_id?: string | null
+          player_name?: string | null
+          related_player_id?: string | null
+          related_player_name?: string | null
+          team?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_events_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_events_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_events_related_player_id_fkey"
+            columns: ["related_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_lineups: {
         Row: {
           id: string
@@ -993,6 +1057,11 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      match_event_type:
+        | "substitution"
+        | "red_card"
+        | "yellow_red_card"
+        | "player_deactivated"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1121,6 +1190,12 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      match_event_type: [
+        "substitution",
+        "red_card",
+        "yellow_red_card",
+        "player_deactivated",
+      ],
     },
   },
 } as const
