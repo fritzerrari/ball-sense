@@ -47,6 +47,7 @@ export default function TrackingPage() {
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const trackingVideoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -134,6 +135,10 @@ export default function TrackingPage() {
 
   const handleEnd = () => {
     trackerRef.current?.stopTracking();
+    // Also stop the stream from our ref
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+    }
     setPhase("ended");
   };
 
@@ -300,15 +305,15 @@ export default function TrackingPage() {
     setSubMinute("");
   };
 
-  // Re-attach camera stream when entering tracking phase
+  // Attach stream to tracking video when phase changes
   useEffect(() => {
-    if (phase === "tracking" && videoRef.current && streamRef.current) {
-      if (!videoRef.current.srcObject) {
-        videoRef.current.srcObject = streamRef.current;
-        videoRef.current.play().catch(() => {});
-      }
+    if (phase === "tracking" && trackingVideoRef.current && streamRef.current) {
+      trackingVideoRef.current.srcObject = streamRef.current;
+      trackingVideoRef.current.play().catch(() => {});
     }
   }, [phase]);
+
+  // No longer needed — single persistent video element handles this
 
   useEffect(() => {
     if (phase === "loading") handleLoadModel();
@@ -335,6 +340,16 @@ export default function TrackingPage() {
           </span>
         </div>
       </div>
+
+      {/* Persistent video element — stays in DOM across all phases */}
+      <video
+        ref={videoRef}
+        className={`${phase === "tracking" ? "hidden" : "hidden"}`}
+        playsInline
+        muted
+        autoPlay
+        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+      />
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
         {/* Stepper */}
@@ -393,7 +408,8 @@ export default function TrackingPage() {
             <Camera className="h-16 w-16 text-primary mx-auto" />
             <h2 className="text-xl font-bold font-display">Kamera aktivieren</h2>
             <p className="text-sm text-muted-foreground">Erlaube den Kamerazugriff, um mit dem Tracking zu beginnen.</p>
-            <video ref={videoRef} className="w-full aspect-video rounded-xl bg-muted/30 border border-border" playsInline muted />
+            {/* Camera preview shown inline */}
+            <div className="w-full aspect-video rounded-xl bg-muted/30 border border-border overflow-hidden" />
             <Button variant="hero" size="xl" onClick={handleStartCamera} className="w-full min-h-[56px]">
               Kamera starten
             </Button>
@@ -450,7 +466,7 @@ export default function TrackingPage() {
 
             {/* Camera preview */}
             <div className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden">
-              <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+              <video ref={trackingVideoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
               {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
                   <Camera className="h-12 w-12" />
