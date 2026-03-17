@@ -27,7 +27,7 @@ const steps: WorkflowStep[] = [
     id: "create-match",
     icon: <PlusCircle className="h-5 w-5" />,
     title: "1. Spiel anlegen",
-    text: "Gehe auf „Neues Spiel" und gib Gegner, Datum, Anstoßzeit und den Platz ein. Falls du noch keinen Platz angelegt hast, erstelle ihn zuerst unter „Felder".",
+    text: 'Gehe auf "Neues Spiel" und gib Gegner, Datum, Anstosszeit und den Platz ein. Falls du noch keinen Platz angelegt hast, erstelle ihn zuerst unter "Felder".',
   },
   {
     id: "roster",
