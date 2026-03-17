@@ -43,6 +43,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.fields"), icon: Map, href: "/fields" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
     { label: t("nav.settings"), icon: Settings, href: "/settings" },
+    { label: "Installation", icon: Download, href: "/install" },
   ];
 
   const allNavItems = [
