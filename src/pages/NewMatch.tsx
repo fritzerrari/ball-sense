@@ -171,15 +171,21 @@ export default function NewMatch() {
         </div>
 
         {/* Stepper */}
-        <div className="flex items-center gap-2">
-          {["Details", "Heim-Aufstellung", "Gast-Aufstellung", "Kameras"].map((label, i) => (
-            <div key={label} className="flex items-center gap-2 flex-1">
+        <div className="flex items-center gap-1 sm:gap-2">
+          {[
+            { label: "Details", icon: Calendar },
+            { label: "Heim", icon: Users },
+            { label: "Gast", icon: Users },
+            { label: "Kameras", icon: Camera },
+          ].map((s, i) => (
+            <div key={s.label} className="flex items-center gap-1 sm:gap-2 flex-1">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold font-display shrink-0 transition-colors ${
                 i + 1 === step ? "bg-primary text-primary-foreground" :
                 i + 1 < step ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
               }`}>
-                {i + 1 < step ? <Check className="h-4 w-4" /> : i + 1}
+                {i + 1 < step ? <Check className="h-4 w-4" /> : <s.icon className="h-4 w-4 sm:hidden" />}
               </div>
+              <span className="text-xs text-muted-foreground hidden sm:block">{s.label}</span>
               {i < 3 && <div className={`h-px flex-1 ${i + 1 < step ? "bg-primary/30" : "bg-border"}`} />}
             </div>
           ))}

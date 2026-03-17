@@ -205,9 +205,26 @@ export default function TrackingPage() {
     }
   };
 
-  const handleSub = () => {
-    if (!subOut || !subIn) return;
-    toast.success(`Wechsel: ${subOut} raus, ${subIn} rein (${subMinute}. Minute)`);
+  const handleSub = async () => {
+    if (!subOut || !subIn || !id) return;
+    const minute = parseInt(subMinute) || Math.floor(elapsedSec / 60);
+
+    // Find lineup entries to update
+    const outPlayer = homePlayers.find((p: any) => p.player_name === subOut);
+    const inPlayer = homePlayers.find((p: any) => p.player_name === subIn);
+
+    try {
+      if (outPlayer) {
+        await supabase.from("match_lineups").update({ subbed_out_min: minute }).eq("id", outPlayer.id);
+      }
+      if (inPlayer) {
+        await supabase.from("match_lineups").update({ subbed_in_min: minute }).eq("id", inPlayer.id);
+      }
+      toast.success(`Wechsel: ${subOut} raus, ${subIn} rein (${minute}. Minute)`);
+    } catch {
+      toast.error("Wechsel konnte nicht gespeichert werden");
+    }
+
     setSubModalOpen(false);
     setSubOut("");
     setSubIn("");
