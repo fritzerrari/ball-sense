@@ -48,6 +48,7 @@ export default function TrackingPage() {
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const homePlayers = (lineups ?? []).filter(l => l.team === "home");
 
@@ -91,6 +92,10 @@ export default function TrackingPage() {
     if (!trackerRef.current || !videoRef.current) return;
     try {
       await trackerRef.current.startCamera(videoRef.current, cam);
+      // Save stream reference for re-attachment after phase changes
+      if (videoRef.current.srcObject) {
+        streamRef.current = videoRef.current.srcObject as MediaStream;
+      }
       setPhase("calibration");
     } catch {
       toast.error("Kamera nicht verfügbar");
@@ -295,6 +300,16 @@ export default function TrackingPage() {
     setSubMinute("");
   };
 
+  // Re-attach camera stream when entering tracking phase
+  useEffect(() => {
+    if (phase === "tracking" && videoRef.current && streamRef.current) {
+      if (!videoRef.current.srcObject) {
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [phase]);
+
   useEffect(() => {
     if (phase === "loading") handleLoadModel();
   }, []);
@@ -435,8 +450,8 @@ export default function TrackingPage() {
 
             {/* Camera preview */}
             <div className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden">
-              <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
-              {!videoRef.current?.srcObject && (
+              <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+              {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
                   <Camera className="h-12 w-12" />
                 </div>
