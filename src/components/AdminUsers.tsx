@@ -177,6 +177,30 @@ export default function AdminUsers() {
     onError: () => toast.error("Fehler"),
   });
 
+  const createUser = useMutation({
+    mutationFn: async (params: { email: string; password: string; clubId?: string; role?: string }) => {
+      const { data, error } = await supabase.functions.invoke("admin-users", {
+        body: { action: "createUser", ...params },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await supabase.from("audit_logs").insert({
+        user_id: user?.id, user_email: user?.email,
+        action: "user_created", entity_type: "user", entity_id: data.userId,
+        details: { email: params.email, role: params.role },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_auth_users"] });
+      qc.invalidateQueries({ queryKey: ["admin_profiles"] });
+      qc.invalidateQueries({ queryKey: ["admin_roles"] });
+      toast.success("Nutzer erstellt");
+      setCreateOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message || "Fehler beim Erstellen"),
+  });
+
   const getUserRoles = (userId: string) => roles.filter((r: any) => r.user_id === userId);
   const getProfile = (userId: string) => profiles.find((p: any) => p.user_id === userId);
 
