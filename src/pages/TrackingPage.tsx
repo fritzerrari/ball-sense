@@ -533,7 +533,7 @@ export default function TrackingPage() {
               <label className="text-sm text-muted-foreground block mb-1">Spieler raus</label>
               <select value={subOut} onChange={e => setSubOut(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
                 <option value="">Wählen...</option>
-                {homePlayers.filter((p: any) => p.starting).map((p: any) => (
+                {homePlayers.filter((p: any) => p.starting && !p.subbed_out_min).map((p: any) => (
                   <option key={p.id} value={p.player_name}>{p.player_name} (#{p.shirt_number})</option>
                 ))}
               </select>
@@ -542,7 +542,7 @@ export default function TrackingPage() {
               <label className="text-sm text-muted-foreground block mb-1">Spieler rein</label>
               <select value={subIn} onChange={e => setSubIn(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
                 <option value="">Wählen...</option>
-                {homePlayers.filter((p: any) => !p.starting).map((p: any) => (
+                {homePlayers.filter((p: any) => !p.starting && !p.subbed_in_min).map((p: any) => (
                   <option key={p.id} value={p.player_name}>{p.player_name} (#{p.shirt_number})</option>
                 ))}
               </select>
