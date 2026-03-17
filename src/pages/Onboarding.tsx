@@ -31,7 +31,7 @@ const STEPS = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { clubId, clubName } = useAuth();
+  const { user, clubId, clubName, refreshClubData } = useAuth();
   const createPlayer = useCreatePlayer();
   const createField = useCreateField();
 
@@ -39,6 +39,7 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
 
   // Step 0 — club
+  const [newClubName, setNewClubName] = useState("");
   const [city, setCity] = useState("");
   const [league, setLeague] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -103,11 +104,14 @@ export default function Onboarding() {
   };
 
   const uploadLogo = async (): Promise<string | null> => {
-    if (!logoFile || !clubId) return null;
+    if (!logoFile) return null;
+    // Use clubId from auth or wait — saveClubDetails ensures it's set before calling
+    const cId = clubId;
+    if (!cId) return null;
     setUploadingLogo(true);
     try {
       const ext = logoFile.name.split(".").pop() || "png";
-      const path = `${clubId}/logo.${ext}`;
+      const path = `${cId}/logo.${ext}`;
       const { error } = await supabase.storage
         .from("club-logos")
         .upload(path, logoFile, { upsert: true });
@@ -125,10 +129,42 @@ export default function Onboarding() {
   };
 
   const saveClubDetails = async () => {
-    if (!clubId) return;
+    let currentClubId = clubId;
+
+    // If no club exists, create one
+    if (!currentClubId) {
+      const name = newClubName.trim() || "Mein Verein";
+      const { data: club, error: clubError } = await supabase
+        .from("clubs")
+        .insert({ name })
+        .select("id")
+        .single();
+      if (clubError || !club) {
+        toast.error("Verein konnte nicht erstellt werden.");
+        throw clubError;
+      }
+      currentClubId = club.id;
+
+      // Link profile to club
+      if (user) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ club_id: currentClubId })
+          .eq("user_id", user.id);
+        if (profileError) {
+          console.error("Profile update failed:", profileError);
+        }
+      }
+
+      // Refresh auth context so clubId is available for subsequent steps
+      await refreshClubData();
+    }
+
+    // Update club details
     const updates: Record<string, string> = {};
     if (city.trim()) updates.city = city.trim();
     if (league.trim()) updates.league = league.trim();
+    if (newClubName.trim() && newClubName.trim() !== clubName) updates.name = newClubName.trim();
 
     // Upload logo if selected
     if (logoFile) {
@@ -136,9 +172,12 @@ export default function Onboarding() {
       if (logoUrl) updates.logo_url = logoUrl;
     }
 
-    if (Object.keys(updates).length > 0) {
-      await supabase.from("clubs").update(updates).eq("id", clubId);
+    if (Object.keys(updates).length > 0 && currentClubId) {
+      await supabase.from("clubs").update(updates).eq("id", currentClubId);
     }
+
+    // Refresh again to pick up name/logo changes
+    await refreshClubData();
   };
 
   const savePlayers = async () => {
@@ -184,6 +223,7 @@ export default function Onboarding() {
   };
 
   const canProceed = () => {
+    if (step === 0) return !!(newClubName.trim() || clubName);
     if (step === 1) return players.some((p) => p.name.trim());
     if (step === 2) return fieldName.trim().length > 0;
     return true;
@@ -275,10 +315,13 @@ export default function Onboarding() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-muted-foreground block mb-1">Vereinsname</label>
-                  <div className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
-                    {clubName || "—"}
-                  </div>
+                  <label className="text-sm text-muted-foreground block mb-1">Vereinsname *</label>
+                  <input
+                    value={newClubName || clubName || ""}
+                    onChange={(e) => setNewClubName(e.target.value)}
+                    placeholder="z.B. FC Musterstadt"
+                    className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground"
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground block mb-1">Stadt</label>

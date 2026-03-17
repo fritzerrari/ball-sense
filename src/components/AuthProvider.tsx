@@ -11,6 +11,7 @@ interface AuthContextType {
   clubPlan: string | null;
   clubLogoUrl: string | null;
   signOut: () => Promise<void>;
+  refreshClubData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   clubPlan: null,
   clubLogoUrl: null,
   signOut: async () => {},
+  refreshClubData: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -106,8 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setClubLogoUrl(null);
   };
 
+  const refreshClubData = async () => {
+    if (user) await fetchClubData(user.id);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, signOut, refreshClubData }}>
       {children}
     </AuthContext.Provider>
   );
