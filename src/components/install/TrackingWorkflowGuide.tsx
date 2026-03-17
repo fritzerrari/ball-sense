@@ -39,7 +39,7 @@ const steps: WorkflowStep[] = [
     id: "position-phones",
     icon: <Smartphone className="h-5 w-5" />,
     title: "3. Smartphones positionieren",
-    text: "Platziere 2–3 Smartphones entlang der Seitenlinie, möglichst erhöht (1,5–2 m). Ideal: Ein Gerät in der Mitte, je eines an den 16-Meter-Linien. Befestige sie an Absperrzäunen, Stativen oder Handyhalterungen. Achte darauf, dass das gesamte Spielfeld abgedeckt ist.",
+    text: "Platziere 2-3 Smartphones entlang der Seitenlinie, moeglichst erhoeht (1,5-2 m). Ideal: Ein Geraet in der Mitte, je eines an den 16-Meter-Linien. Befestige sie an Absperrzaeunen, Stativen oder Handyhalterungen. Achte darauf, dass das gesamte Spielfeld abgedeckt ist.",
   },
   {
     id: "calibrate",
