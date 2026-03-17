@@ -45,7 +45,7 @@ const steps: WorkflowStep[] = [
     id: "calibrate",
     icon: <Crosshair className="h-5 w-5" />,
     title: "4. Feld kalibrieren",
-    text: "Öffne FieldIQ auf jedem Smartphone und navigiere zum Spiel. Tippe auf „Kalibrieren": Mache ein Foto des Spielfelds und tippe die 4 Eckpunkte des Feldes an. Die KI benötigt diese Referenzpunkte, um die Spielerpositionen korrekt auf das Feld zu projizieren. Speichere die Kalibrierung.",
+    text: 'Oeffne FieldIQ auf jedem Smartphone und navigiere zum Spiel. Tippe auf "Kalibrieren": Mache ein Foto des Spielfelds und tippe die 4 Eckpunkte des Feldes an. Die KI benoetigt diese Referenzpunkte, um die Spielerpositionen korrekt auf das Feld zu projizieren. Speichere die Kalibrierung.',
   },
   {
     id: "start-tracking",
