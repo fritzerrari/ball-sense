@@ -66,6 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let initialLoad = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
@@ -74,23 +76,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (newSession?.user) {
           // Use setTimeout to avoid deadlock with Supabase client
-          setTimeout(() => fetchClubData(newSession.user.id), 0);
+          setTimeout(async () => {
+            await fetchClubData(newSession.user.id);
+            if (!initialLoad) return; // getSession already handled loading
+            setLoading(false);
+          }, 0);
         } else {
           setClubId(null);
           setClubName(null);
           setClubPlan(null);
           setClubLogoUrl(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
     // THEN check existing session
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+      initialLoad = false;
       setSession(existingSession);
       setUser(existingSession?.user ?? null);
       if (existingSession?.user) {
-        fetchClubData(existingSession.user.id);
+        await fetchClubData(existingSession.user.id);
       }
       setLoading(false);
     });
