@@ -314,10 +314,13 @@ export default function Onboarding() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-muted-foreground block mb-1">Vereinsname</label>
-                  <div className="px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm">
-                    {clubName || "—"}
-                  </div>
+                  <label className="text-sm text-muted-foreground block mb-1">Vereinsname *</label>
+                  <input
+                    value={newClubName || clubName || ""}
+                    onChange={(e) => setNewClubName(e.target.value)}
+                    placeholder="z.B. FC Musterstadt"
+                    className="w-full px-3 py-2.5 rounded-lg bg-muted border border-border text-foreground text-sm placeholder:text-muted-foreground"
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground block mb-1">Stadt</label>
