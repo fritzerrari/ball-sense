@@ -121,9 +121,9 @@ export class FootballTracker {
   stopTracking(): TrackingFrame[] {
     this.tracking = false;
     this.paused = false;
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-      this.animationFrame = null;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
     }
     // Stop camera
     if (this.videoElement?.srcObject) {
