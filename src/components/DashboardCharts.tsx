@@ -50,6 +50,43 @@ export function DashboardCharts() {
     enabled: !!clubId,
   });
 
+  // Leaderboard: Top 5 players by total distance
+  const { data: leaderboard } = useQuery({
+    queryKey: ["dashboard_leaderboard", clubId],
+    queryFn: async () => {
+      if (!clubId) return [];
+      const { data: matches } = await supabase
+        .from("matches")
+        .select("id")
+        .eq("home_club_id", clubId)
+        .eq("status", "done");
+      if (!matches?.length) return [];
+      const matchIds = matches.map(m => m.id);
+      const { data: stats } = await supabase
+        .from("player_match_stats")
+        .select("player_id, distance_km, players(name, id)")
+        .in("match_id", matchIds)
+        .eq("team", "home");
+      if (!stats?.length) return [];
+
+      const playerMap = new Map<string, { name: string; id: string; totalKm: number }>();
+      for (const s of stats) {
+        if (!s.player_id || !s.players) continue;
+        const existing = playerMap.get(s.player_id);
+        if (existing) {
+          existing.totalKm += s.distance_km ?? 0;
+        } else {
+          playerMap.set(s.player_id, { name: s.players.name, id: s.players.id, totalKm: s.distance_km ?? 0 });
+        }
+      }
+      return [...playerMap.values()]
+        .sort((a, b) => b.totalKm - a.totalKm)
+        .slice(0, 5)
+        .map(p => ({ ...p, totalKm: Math.round(p.totalKm * 10) / 10 }));
+    },
+    enabled: !!clubId,
+  });
+
   if (!distanceData?.length) return null;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
