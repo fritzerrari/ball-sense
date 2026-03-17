@@ -179,8 +179,9 @@ export class FootballTracker {
     console.log(`[Tracker] Upload vorbereitet: ${this.frames.length} Frames, ${sizeMB} MB`);
     onProgress?.("compress", 100);
 
-    const filePath = `tracking/${matchId}/cam_${cameraIndex}.json`;
-    const uploadUrl = `${supabaseUrl}/storage/v1/object/tracking/${filePath}`;
+    const objectPath = `${matchId}/cam_${cameraIndex}.json`;
+    const filePath = `tracking/${objectPath}`;
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/tracking/${objectPath}`;
 
     // Stage 2: Upload with retry
     onProgress?.("upload", 0);
