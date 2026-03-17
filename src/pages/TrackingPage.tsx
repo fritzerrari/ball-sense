@@ -48,6 +48,7 @@ export default function TrackingPage() {
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const homePlayers = (lineups ?? []).filter(l => l.team === "home");
 
