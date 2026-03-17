@@ -349,6 +349,7 @@ export default function Admin() {
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Auswärts</th>
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden sm:table-cell">Formation</th>
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Status</th>
+                    <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
@@ -371,12 +372,58 @@ export default function Admin() {
                           {m.status}
                         </Badge>
                       </td>
+                      <td className="py-2 px-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteTarget({ type: "match", id: m.id, label: `${(m as any).clubs?.name ?? "?"} vs ${m.away_club_name ?? "?"}` })}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {filteredMatches.length === 0 && (
                 <div className="p-8 text-center text-muted-foreground text-sm">Keine Spiele gefunden</div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ---- Fields Tab ---- */}
+          <TabsContent value="fields" className="space-y-4">
+            <div className="glass-card overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Name</th>
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Verein</th>
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden sm:table-cell">Maße</th>
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden sm:table-cell">Kalibriert</th>
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {fields.map((f: any) => (
+                    <tr key={f.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                      <td className="py-3 px-4 font-medium">{f.name}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{f.clubs?.name ?? "—"}</td>
+                      <td className="py-3 px-4 text-muted-foreground text-xs hidden sm:table-cell">{f.width_m}×{f.height_m}m</td>
+                      <td className="py-3 px-4 hidden sm:table-cell">
+                        <Badge variant={f.calibration ? "default" : "secondary"} className="text-[10px]">
+                          {f.calibration ? "Ja" : "Nein"}
+                        </Badge>
+                      </td>
+                      <td className="py-2 px-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteTarget({ type: "field", id: f.id, label: f.name })}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {fields.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground text-sm">Keine Felder gefunden</div>
               )}
             </div>
           </TabsContent>
