@@ -1,9 +1,9 @@
 import { useParams, useSearchParams, Link } from "react-router-dom";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Camera, Pause, Play, Users, RefreshCw, Flag, Timer, Loader2, Upload, AlertTriangle, Check, ArrowLeft, Wifi, WifiOff, Sparkles } from "lucide-react";
-import { useMatch, useMatchLineups, useUpdateMatch } from "@/hooks/use-matches";
+import { Camera, Pause, Play, Users, RefreshCw, Flag, Timer, Loader2, Upload, AlertTriangle, Check, Wifi, WifiOff, Sparkles, ShieldAlert } from "lucide-react";
+import { useMatch, useMatchEvents, useMatchLineups, useUpdateMatch } from "@/hooks/use-matches";
 import { useField } from "@/hooks/use-fields";
 import { FootballTracker } from "@/lib/football-tracker";
 import { supabase } from "@/integrations/supabase/client";

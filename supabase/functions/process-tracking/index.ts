@@ -30,6 +30,28 @@ interface TrackingSession {
   createdAt: string;
 }
 
+interface LineupEntry {
+  id: string;
+  player_id: string | null;
+  player_name: string | null;
+  team: "home" | "away";
+  shirt_number: number | null;
+  starting: boolean;
+  subbed_in_min: number | null;
+  subbed_out_min: number | null;
+}
+
+interface MatchEvent {
+  match_id: string;
+  team: string;
+  minute: number;
+  event_type: string;
+  player_id: string | null;
+  related_player_id: string | null;
+  player_name: string | null;
+  related_player_name: string | null;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 function euclidean(a: { x: number; y: number }, b: { x: number; y: number }) {
