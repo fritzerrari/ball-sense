@@ -20,12 +20,12 @@ export default function FieldCalibration() {
   const [height, setHeight] = useState("68");
 
   // Load existing calibration
-  useState(() => {
+  useEffect(() => {
     if (field) {
       setWidth(String(field.width_m));
       setHeight(String(field.height_m));
     }
-  });
+  }, [field]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
