@@ -300,15 +300,7 @@ export default function TrackingPage() {
     setSubMinute("");
   };
 
-  // Re-attach camera stream when entering tracking phase
-  useEffect(() => {
-    if (phase === "tracking" && videoRef.current && streamRef.current) {
-      if (!videoRef.current.srcObject) {
-        videoRef.current.srcObject = streamRef.current;
-        videoRef.current.play().catch(() => {});
-      }
-    }
-  }, [phase]);
+  // No longer needed — single persistent video element handles this
 
   useEffect(() => {
     if (phase === "loading") handleLoadModel();
