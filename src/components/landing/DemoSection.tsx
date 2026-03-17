@@ -90,12 +90,15 @@ export function DemoSection() {
 
 /* ─── Notification State ─── */
 function NotificationState({ onLoad }: { onLoad: () => void }) {
-  // Previous match data (stale) to show something meaningful before new data loads
   const staleStats = [
     { label: "Ø Distanz", value: "9.8 km", trend: "stable" as const },
     { label: "Topspeed", value: "28.4 km/h", trend: "down" as const },
     { label: "Sprints", value: "142", trend: "up" as const },
     { label: "Ballbesitz", value: "48%", trend: "down" as const },
+    { label: "Passquote", value: "84%", trend: "up" as const },
+    { label: "Zweikampfquote", value: "58%", trend: "stable" as const },
+    { label: "Tore / Assists", value: "2 / 1", trend: "up" as const },
+    { label: "xG", value: "1.82", trend: "up" as const },
   ];
 
   const staleTopRunners = [
@@ -104,12 +107,19 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
     { name: "M. Fischer", km: 10.3 },
   ];
 
+  const analysisCategories = [
+    { icon: Route, label: "Laufdaten", items: ["Distanz", "Speed", "Sprints", "Heatmaps"] },
+    { icon: Target, label: "Spielstatistiken", items: ["Pässe", "Zweikämpfe", "Schüsse", "Ballkontakte"] },
+    { icon: Sparkles, label: "KI-Berichte", items: ["Spielbericht", "Halbzeitanalyse", "Social Media", "Trainingsplan"] },
+    { icon: Gauge, label: "Advanced Analytics", items: ["xG", "PPDA", "Field Tilt", "Konter"] },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="max-w-2xl mx-auto space-y-6"
+      className="max-w-3xl mx-auto space-y-6"
     >
       {/* Dashboard with stale data */}
       <div className="rounded-2xl border border-border bg-card shadow-lg p-6 space-y-4">
@@ -129,47 +139,40 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
           </div>
         </div>
 
-        {/* Stats cards with actual data */}
+        {/* Expanded stats cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {staleStats.map((stat) => (
-            <div key={stat.label} className="rounded-xl border border-border bg-muted/30 p-4 text-center">
+            <div key={stat.label} className="rounded-xl border border-border bg-muted/30 p-3 text-center">
               <div className="flex items-center justify-center gap-1">
-                <span className="text-xl font-bold font-display text-foreground">{stat.value}</span>
+                <span className="text-lg font-bold font-display text-foreground">{stat.value}</span>
                 {stat.trend === "up" && <ArrowUpRight className="w-3 h-3 text-success" />}
                 {stat.trend === "down" && <ArrowDownRight className="w-3 h-3 text-destructive/70" />}
                 {stat.trend === "stable" && <Minus className="w-3 h-3 text-muted-foreground" />}
               </div>
-              <div className="text-[10px] text-muted-foreground mt-1">{stat.label}</div>
+              <div className="text-[9px] text-muted-foreground mt-0.5">{stat.label}</div>
             </div>
           ))}
         </div>
 
         {/* Two columns: Top runners + Mini heatmap */}
         <div className="grid md:grid-cols-2 gap-3">
-          {/* Top runners list */}
           <div className="rounded-xl border border-border bg-muted/20 p-4">
             <div className="text-[10px] font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Top-Läufer (letztes Spiel)</div>
             <div className="space-y-2">
-              {staleTopRunners.map((p, i) => (
+              {staleTopRunners.map((p) => (
                 <div key={p.name} className="flex items-center gap-2">
                   <span className="text-[10px] font-medium text-foreground/80 w-16 truncate">{p.name}</span>
                   <div className="flex-1 h-2 rounded-full bg-muted/50 overflow-hidden">
-                    <div 
-                      className="h-full rounded-full bg-primary/50" 
-                      style={{ width: `${(p.km / 12) * 100}%` }} 
-                    />
+                    <div className="h-full rounded-full bg-primary/50" style={{ width: `${(p.km / 12) * 100}%` }} />
                   </div>
                   <span className="text-[10px] text-muted-foreground w-10 text-right">{p.km} km</span>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Mini Heatmap preview */}
           <div className="rounded-xl border border-border bg-muted/20 p-4">
             <div className="text-[10px] font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Team-Heatmap</div>
             <MiniHeatmap />
-            {/* Legend */}
             <div className="flex items-center justify-between mt-2 text-[8px] text-muted-foreground">
               <span>Wenig Aktivität</span>
               <div className="flex gap-0.5">
@@ -179,6 +182,32 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
               </div>
               <span>Viel Aktivität</span>
             </div>
+          </div>
+        </div>
+
+        {/* What gets analyzed — feature preview */}
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="text-[10px] font-semibold text-primary mb-3 uppercase tracking-wide flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" />
+            Was FieldIQ alles auswertet
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {analysisCategories.map((cat) => (
+              <div key={cat.label} className="rounded-lg bg-card/80 border border-border/30 p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <cat.icon className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-[10px] font-semibold text-foreground">{cat.label}</span>
+                </div>
+                <div className="space-y-0.5">
+                  {cat.items.map((item) => (
+                    <div key={item} className="text-[9px] text-muted-foreground flex items-center gap-1">
+                      <div className="w-1 h-1 rounded-full bg-primary/50" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
