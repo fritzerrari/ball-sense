@@ -450,7 +450,7 @@ export default function Onboarding() {
               <div>
                 <h2 className="text-xl font-bold font-display">App installieren</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Installiere FieldIQ auf deinem Homescreen für den schnellsten Zugang.
+                  Installiere FieldIQ auf deinem Homescreen für den schnellsten Zugang beim Tracking.
                 </p>
               </div>
               <div className="glass-card p-6 space-y-6">
@@ -480,8 +480,20 @@ export default function Onboarding() {
                     </div>
                   </div>
                 )}
+
+                <div className="border-t border-border pt-4">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => window.open("/install", "_blank")}
+                  >
+                    <Smartphone className="h-4 w-4 mr-2" />
+                    Ausführliche Installationsanleitung öffnen
+                  </Button>
+                </div>
+
                 <p className="text-xs text-center text-muted-foreground">
-                  Du kannst diesen Schritt auch später nachholen.
+                  Du kannst die App auch später jederzeit über <strong>Menü → Installation</strong> installieren.
                 </p>
               </div>
             </div>
