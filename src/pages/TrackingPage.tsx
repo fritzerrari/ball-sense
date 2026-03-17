@@ -92,6 +92,10 @@ export default function TrackingPage() {
     if (!trackerRef.current || !videoRef.current) return;
     try {
       await trackerRef.current.startCamera(videoRef.current, cam);
+      // Save stream reference for re-attachment after phase changes
+      if (videoRef.current.srcObject) {
+        streamRef.current = videoRef.current.srcObject as MediaStream;
+      }
       setPhase("calibration");
     } catch {
       toast.error("Kamera nicht verfügbar");
