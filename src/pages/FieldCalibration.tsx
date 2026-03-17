@@ -113,8 +113,9 @@ export default function FieldCalibration() {
 
           {/* Calibration area */}
           <div
-            className="aspect-video bg-muted/30 rounded-lg border-2 border-dashed border-border relative cursor-crosshair overflow-hidden"
+            className="aspect-video bg-muted/30 rounded-lg border-2 border-dashed border-border relative cursor-crosshair overflow-hidden touch-none"
             onClick={handleImageClick}
+            onTouchStart={handleImageClick}
           >
             {imageUrl && (
               <img src={imageUrl} alt="Spielfeld" className="absolute inset-0 w-full h-full object-cover" />
