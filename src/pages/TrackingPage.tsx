@@ -205,36 +205,46 @@ export default function TrackingPage() {
         },
       );
 
-      // Register in DB
+      // Register in DB (with retry)
       setUploadStage("register");
-      setUploadProgress(getOverallProgress("register", 50));
-      await supabase.from("tracking_uploads").insert({
-        match_id: id,
-        camera_index: cam,
-        file_path: result.filePath,
-        status: "uploaded",
-        frames_count: result.framesCount,
-        duration_sec: result.durationSec,
-      });
+      setUploadProgress(getOverallProgress("register", 20));
+      let registered = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { error } = await supabase.from("tracking_uploads").insert({
+          match_id: id,
+          camera_index: cam,
+          file_path: result.filePath,
+          status: "uploaded",
+          frames_count: result.framesCount,
+          duration_sec: result.durationSec,
+        });
+        if (!error) { registered = true; break; }
+        console.warn(`[Upload] DB-Registrierung Versuch ${attempt}/3:`, error.message);
+        if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
+      }
+      if (!registered) {
+        toast.error("Datei hochgeladen, aber Registrierung fehlgeschlagen. Bitte Support kontaktieren.");
+      }
       setUploadProgress(getOverallProgress("register", 100));
 
-      // Update match status
+      // Update match status (with retry)
       setUploadStage("status");
       setUploadProgress(getOverallProgress("status", 50));
-      await updateMatch.mutateAsync({ id, status: "processing" });
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await updateMatch.mutateAsync({ id, status: "processing" });
+          break;
+        } catch {
+          if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
+        }
+      }
       setUploadProgress(100);
       setUploadDone(true);
       toast.success("Tracking-Daten erfolgreich hochgeladen!");
     } catch (err) {
-      try {
-        const sessionData = JSON.stringify({
-          matchId: id, cameraIndex: cam,
-          frames: trackerRef.current?.getFrameCount() ?? 0,
-          savedAt: new Date().toISOString(),
-        });
-        localStorage.setItem(`pending_upload_${id}_cam${cam}`, sessionData);
-      } catch { /* storage full */ }
-      toast.error("Upload fehlgeschlagen — Daten lokal gespeichert. Wird beim nächsten Online-Zugang erneut versucht.");
+      const errorMsg = err instanceof Error ? err.message : "Unbekannter Fehler";
+      console.error("[Upload] Fehler:", errorMsg);
+      toast.error(`Upload fehlgeschlagen: ${errorMsg}. Daten wurden lokal gesichert.`);
       setUploadProgress(0);
     } finally {
       setUploading(false);
