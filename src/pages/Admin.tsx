@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Shield, Users, Building2, BarChart3, Activity, Crown,
-  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload, BookOpen, Globe,
+  Search, RefreshCw, Loader2, Calendar, FileText, ScrollText, Upload, BookOpen, Globe, Trash2, MapPin,
 } from "lucide-react";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useState } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -79,6 +80,19 @@ function useAdminPlayers() {
   });
 }
 
+function useAdminFields() {
+  return useQuery({
+    queryKey: ["admin_fields"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("fields")
+        .select("id, name, width_m, height_m, calibration, created_at, club_id, clubs(name)")
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+}
+
 function useAdminProfiles() {
   return useQuery({
     queryKey: ["admin_profiles_count"],
@@ -98,9 +112,11 @@ export default function Admin() {
   const { data: clubs = [], isLoading: clubsLoading } = useAdminClubs();
   const { data: matches = [] } = useAdminMatches();
   const { data: players = [] } = useAdminPlayers();
+  const { data: fields = [] } = useAdminFields();
   const { data: totalUsers = 0 } = useAdminProfiles();
 
   const [globalSearch, setGlobalSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: string; label: string } | null>(null);
 
   const updateClubPlan = useMutation({
     mutationFn: async ({ clubId, plan }: { clubId: string; plan: string }) => {
@@ -116,13 +132,36 @@ export default function Admin() {
     onError: () => toast.error("Fehler beim Aktualisieren"),
   });
 
+  const deleteEntity = useMutation({
+    mutationFn: async ({ type, id }: { type: string; id: string }) => {
+      if (type === "match") {
+        const { error } = await supabase.from("matches").delete().eq("id", id);
+        if (error) throw error;
+      } else if (type === "field") {
+        const { error } = await supabase.from("fields").delete().eq("id", id);
+        if (error) throw error;
+      }
+      await supabase.from("audit_logs").insert({
+        user_id: user?.id, user_email: user?.email,
+        action: `${type}_deleted`, entity_type: type, entity_id: id,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_matches"] });
+      qc.invalidateQueries({ queryKey: ["admin_fields"] });
+      toast.success("Erfolgreich gelöscht");
+      setDeleteTarget(null);
+    },
+    onError: () => toast.error("Fehler beim Löschen"),
+  });
+
   if (roleLoading) return <AppLayout><SkeletonCard count={3} /></AppLayout>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
   const liveMatches = matches.filter((m: any) => m.status === "live" || m.status === "tracking").length;
 
   const refreshAll = () => {
-    ["admin_clubs", "admin_matches", "admin_players", "admin_profiles_count", "admin_auth_users", "admin_roles", "admin_legal_docs", "admin_audit_logs", "admin_uploads"].forEach(k =>
+    ["admin_clubs", "admin_matches", "admin_players", "admin_profiles_count", "admin_auth_users", "admin_roles", "admin_legal_docs", "admin_audit_logs", "admin_uploads", "admin_fields"].forEach(k =>
       qc.invalidateQueries({ queryKey: [k] })
     );
     toast.success("Daten aktualisiert");
@@ -202,6 +241,9 @@ export default function Admin() {
             </TabsTrigger>
             <TabsTrigger value="matches" className="rounded-lg text-xs">
               <BarChart3 className="h-4 w-4 mr-1.5" /> Spiele
+            </TabsTrigger>
+            <TabsTrigger value="fields" className="rounded-lg text-xs">
+              <MapPin className="h-4 w-4 mr-1.5" /> Felder
             </TabsTrigger>
             <TabsTrigger value="uploads" className="rounded-lg text-xs">
               <Upload className="h-4 w-4 mr-1.5" /> Uploads
@@ -307,6 +349,7 @@ export default function Admin() {
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Auswärts</th>
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden sm:table-cell">Formation</th>
                     <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Status</th>
+                    <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
@@ -329,12 +372,58 @@ export default function Admin() {
                           {m.status}
                         </Badge>
                       </td>
+                      <td className="py-2 px-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteTarget({ type: "match", id: m.id, label: `${(m as any).clubs?.name ?? "?"} vs ${m.away_club_name ?? "?"}` })}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {filteredMatches.length === 0 && (
                 <div className="p-8 text-center text-muted-foreground text-sm">Keine Spiele gefunden</div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ---- Fields Tab ---- */}
+          <TabsContent value="fields" className="space-y-4">
+            <div className="glass-card overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Name</th>
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs">Verein</th>
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden sm:table-cell">Maße</th>
+                    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs hidden sm:table-cell">Kalibriert</th>
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {fields.map((f: any) => (
+                    <tr key={f.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                      <td className="py-3 px-4 font-medium">{f.name}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{f.clubs?.name ?? "—"}</td>
+                      <td className="py-3 px-4 text-muted-foreground text-xs hidden sm:table-cell">{f.width_m}×{f.height_m}m</td>
+                      <td className="py-3 px-4 hidden sm:table-cell">
+                        <Badge variant={f.calibration ? "default" : "secondary"} className="text-[10px]">
+                          {f.calibration ? "Ja" : "Nein"}
+                        </Badge>
+                      </td>
+                      <td className="py-2 px-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteTarget({ type: "field", id: f.id, label: f.name })}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {fields.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground text-sm">Keine Felder gefunden</div>
               )}
             </div>
           </TabsContent>
@@ -416,6 +505,15 @@ export default function Admin() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Delete confirmation */}
+        <ConfirmDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          title={`${deleteTarget?.type === "match" ? "Spiel" : "Feld"} löschen?`}
+          description={`„${deleteTarget?.label}" wird unwiderruflich gelöscht.`}
+          onConfirm={() => { if (deleteTarget) deleteEntity.mutate({ type: deleteTarget.type, id: deleteTarget.id }); }}
+        />
       </div>
     </AppLayout>
   );
