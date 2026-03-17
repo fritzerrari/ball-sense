@@ -91,17 +91,21 @@ export default function PlayerProfile() {
         {/* Season stats */}
         <div>
           <h2 className="text-lg font-semibold font-display mb-3">Saisonübersicht</h2>
-          <div className="grid sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             {[
               { label: "Spiele", value: String(totalGames), icon: Trophy },
               { label: "Ø km/Spiel", value: avgKm > 0 ? avgKm.toFixed(1) : "—", icon: Route },
-              { label: "Top Speed", value: avgTopSpeed > 0 ? `${avgTopSpeed.toFixed(1)} km/h` : "—", icon: Zap },
-              { label: "Gesamt-Sprints", value: String(totalSprints), icon: BarChart3 },
+              { label: "Top Speed", value: avgTopSpeed > 0 ? `${avgTopSpeed.toFixed(1)}` : "—", icon: Zap },
+              { label: "Sprints", value: String(totalSprints), icon: BarChart3 },
+              { label: "Tore", value: String(totalGoals), icon: Trophy },
+              { label: "Assists", value: String(totalAssists), icon: Route },
+              { label: "Ø Passquote", value: avgPassAcc > 0 ? `${avgPassAcc.toFixed(0)}%` : "—", icon: BarChart3 },
+              { label: "Ø Rating", value: avgRating > 0 ? avgRating.toFixed(1) : "—", icon: Zap },
             ].map((s) => (
-              <div key={s.label} className="glass-card p-4">
-                <s.icon className="h-4 w-4 text-primary mb-2" />
-                <div className="text-xs text-muted-foreground">{s.label}</div>
-                <div className="text-xl font-bold font-display">{s.value}</div>
+              <div key={s.label} className="glass-card p-3">
+                <s.icon className="h-3.5 w-3.5 text-primary mb-1.5" />
+                <div className="text-[10px] text-muted-foreground">{s.label}</div>
+                <div className="text-lg font-bold font-display">{s.value}</div>
               </div>
             ))}
           </div>
