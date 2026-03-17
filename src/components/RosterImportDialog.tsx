@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Camera, Upload, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
 import { POSITIONS, POSITION_LABELS } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useTranslation } from "@/lib/i18n";
@@ -13,6 +13,41 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   existingNumbers: number[];
   onImport: (players: ParsedPlayer[]) => Promise<void>;
+}
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+
+function compressImage(dataUrl: string, maxWidth = 1600, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas not supported"));
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => reject(new Error("Bild konnte nicht geladen werden"));
+    img.src = dataUrl;
+  });
+}
+
+function findInternalDuplicateNumbers(players: ParsedPlayer[]): number[] {
+  const seen = new Map<number, number>();
+  const dupes: number[] = [];
+  for (const p of players) {
+    if (p.number === null) continue;
+    seen.set(p.number, (seen.get(p.number) ?? 0) + 1);
+  }
+  for (const [num, count] of seen) {
+    if (count > 1) dupes.push(num);
+  }
+  return dupes;
 }
 
 export function RosterImportDialog({ open, onOpenChange, existingNumbers, onImport }: Props) {
@@ -33,7 +68,15 @@ export function RosterImportDialog({ open, onOpenChange, existingNumbers, onImpo
   };
 
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Bitte ein Bild auswählen (JPG, PNG, etc.)");
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setError("Datei zu groß (max. 20 MB). Bitte ein kleineres Bild verwenden.");
+      return;
+    }
+    setError(null);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(file);
@@ -44,13 +87,20 @@ export function RosterImportDialog({ open, onOpenChange, existingNumbers, onImpo
     setStep(2);
     setError(null);
     try {
-      const base64 = preview.split(",")[1];
+      const compressed = await compressImage(preview);
+      const base64 = compressed.split(",")[1];
       const { data, error: fnError } = await supabase.functions.invoke("parse-roster", {
         body: { image_base64: base64 },
       });
       if (fnError) throw new Error(fnError.message);
       if (data?.error) throw new Error(data.error);
-      setPlayers(data.players ?? []);
+      const parsed = data.players ?? [];
+      if (parsed.length === 0) {
+        setError("Keine Spieler erkannt — ist das Bild gut lesbar und zeigt eine Kaderliste?");
+        setStep(1);
+        return;
+      }
+      setPlayers(parsed);
       setStep(3);
     } catch (e: any) {
       setError(e.message || "Analyse fehlgeschlagen");
@@ -85,9 +135,13 @@ export function RosterImportDialog({ open, onOpenChange, existingNumbers, onImpo
     .map(p => p.number)
     .filter((n): n is number => n !== null && existingNumbers.includes(n));
 
+  const internalDupes = findInternalDuplicateNumbers(players);
+
+  const analyzing = step === 2;
+
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
-      <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(o) => { if (analyzing) return; if (!o) reset(); onOpenChange(o); }}>
+      <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto" onPointerDownOutside={analyzing ? (e) => e.preventDefault() : undefined} onEscapeKeyDown={analyzing ? (e) => e.preventDefault() : undefined}>
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <Camera className="h-5 w-5 text-primary" />
@@ -175,6 +229,13 @@ export function RosterImportDialog({ open, onOpenChange, existingNumbers, onImpo
               </div>
             )}
 
+            {internalDupes.length > 0 && (
+              <div className="flex items-center gap-2 text-sm text-warning bg-warning/10 rounded-lg p-3">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Doppelte Nummern im Import: {internalDupes.join(", ")}
+              </div>
+            )}
+
             <div className="text-sm text-muted-foreground">
               {players.length} Spieler erkannt — bitte überprüfen und korrigieren:
             </div>
@@ -195,7 +256,7 @@ export function RosterImportDialog({ open, onOpenChange, existingNumbers, onImpo
                     onChange={e => updatePlayer(idx, "number", e.target.value ? parseInt(e.target.value) : null)}
                     placeholder="#"
                     className={`px-3 py-2 rounded-lg bg-muted border text-foreground text-sm placeholder:text-muted-foreground ${
-                      p.number !== null && existingNumbers.includes(p.number) ? "border-warning" : "border-border"
+                      p.number !== null && (existingNumbers.includes(p.number) || internalDupes.includes(p.number)) ? "border-warning" : "border-border"
                     }`}
                   />
                   <select
@@ -205,7 +266,7 @@ export function RosterImportDialog({ open, onOpenChange, existingNumbers, onImpo
                   >
                     <option value="">—</option>
                     {POSITIONS.map(pos => (
-                      <option key={pos} value={pos}>{pos}</option>
+                      <option key={pos} value={pos}>{pos} — {POSITION_LABELS[pos]}</option>
                     ))}
                   </select>
                   <button onClick={() => removePlayer(idx)} className="p-2 rounded hover:bg-destructive/10 transition-colors">
@@ -220,8 +281,8 @@ export function RosterImportDialog({ open, onOpenChange, existingNumbers, onImpo
             </button>
 
             <div className="flex gap-2 pt-2">
-              <Button variant="heroOutline" size="sm" onClick={() => { reset(); }}>
-                Abbrechen
+              <Button variant="heroOutline" size="sm" onClick={reset}>
+                <RotateCcw className="h-4 w-4 mr-1" /> Neues Foto
               </Button>
               <Button
                 variant="hero"

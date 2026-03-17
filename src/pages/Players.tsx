@@ -62,13 +62,20 @@ export default function Players() {
 
   const handleBulkImport = async (importPlayers: { name: string; number: number | null; position: string | null }[]) => {
     let success = 0;
+    let failed = 0;
     for (const p of importPlayers) {
       try {
         await createPlayer.mutateAsync(p);
         success++;
-      } catch { /* skip duplicates */ }
+      } catch {
+        failed++;
+      }
     }
-    toast.success(`${success} Spieler importiert`);
+    if (failed > 0) {
+      toast.warning(`${success} von ${success + failed} Spielern importiert — ${failed} fehlgeschlagen`);
+    } else {
+      toast.success(`${success} Spieler importiert`);
+    }
   };
 
   const existingNumbers = (players ?? []).map(p => p.number).filter((n): n is number => n !== null);
