@@ -60,6 +60,19 @@ export default function Players() {
   const handleDelete = async () => { if (deleteId) { await deletePlayer.mutateAsync(deleteId); setDeleteId(null); } };
   const toggleActive = (player: any) => { updatePlayer.mutate({ id: player.id, active: !player.active }); };
 
+  const handleBulkImport = async (importPlayers: { name: string; number: number | null; position: string | null }[]) => {
+    let success = 0;
+    for (const p of importPlayers) {
+      try {
+        await createPlayer.mutateAsync(p);
+        success++;
+      } catch { /* skip duplicates */ }
+    }
+    toast.success(`${success} Spieler importiert`);
+  };
+
+  const existingNumbers = (players ?? []).map(p => p.number).filter((n): n is number => n !== null);
+
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto space-y-6">
