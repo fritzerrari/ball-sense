@@ -19,28 +19,56 @@ Struktur:
 
 Beziehe dich auf die bereitgestellten Daten. Wenn Daten fehlen, sage das.`,
 
+  halftime: `Du erstellst einen professionellen HALBZEITBERICHT.
+
+Struktur:
+1. **Erste Hälfte** – Zusammenfassung der ersten 45 Minuten
+2. **Taktische Analyse** – Was funktioniert, was nicht? Pressing, Ballbesitz, Raumkontrolle
+3. **Auffällige Spieler** – Wer sticht positiv/negativ hervor? Datenbelege
+4. **Laufleistung & Intensität** – Vergleich der Teams bei Distanz, Sprints, Speed
+5. **Taktische Empfehlungen** – Konkrete Anpassungen für die zweite Hälfte (Auswechslungen, Formationswechsel, taktische Änderungen)
+
+Sei konkret und handlungsorientiert — der Trainer liest das in der Kabine.`,
+
   match: `Du erstellst einen professionellen SPIELBERICHT nach einem Fußballspiel.
 
 Struktur:
-1. **Spielverlauf** – Chronologische Zusammenfassung
-2. **Taktische Analyse** – Formationen, Pressing, Umschaltspiel
-3. **Spieler des Spiels** – Top-Performer mit Datenbelegen
-4. **Laufleistung & Fitness** – Distanzen, Sprints, Intensitätszonen
-5. **Fazit & Ausblick** – Was bedeutet das für die nächsten Spiele?
+1. **Spielverlauf** – Chronologische Zusammenfassung mit Toren, Karten, Wechseln
+2. **Taktische Analyse** – Formationen, Pressing, Umschaltspiel, Ballbesitzphasen
+3. **Spieler des Spiels** – Top-Performer mit Datenbelegen (km, Sprints, Passquote, Zweikämpfe, Tore, Assists)
+4. **Laufleistung & Fitness** – Distanzen, Sprints, Intensitätszonen, Ermüdungszeichen
+5. **Detailstatistiken** – Passgenauigkeit, Zweikampfquoten, Schusseffizienz beider Teams
+6. **Fazit & Ausblick** – Was bedeutet das für die nächsten Spiele?
 
-Beziehe dich auf die bereitgestellten Tracking- und Statistikdaten.`,
+Beziehe dich auf ALLE bereitgestellten Tracking- und Statistikdaten.`,
+
+  training: `Du erstellst einen personalisierten TRAININGSPLAN basierend auf den Spieldaten.
+
+Struktur:
+1. **Leistungsanalyse** – Zusammenfassung der physischen und taktischen Leistungsdaten
+2. **Identifizierte Schwächen** – Bereiche mit Verbesserungspotential (basierend auf Daten)
+3. **Wochentrainingsplan** – 5 Trainingseinheiten (Mo-Fr) mit konkreten Übungen:
+   - Aufwärmen, Hauptteil, Auslaufen
+   - Dauer pro Einheit
+   - Intensitätslevel
+4. **Individuelle Empfehlungen** – Pro Spieler (Top 5) spezifische Trainingshinweise
+5. **Regenerationshinweise** – Belastungssteuerung, Ruhetage, Ernährungstipps
+
+Sei konkret, praxisorientiert und beziehe dich auf die tatsächlichen Spielerdaten.`,
 };
 
 const LENGTH_INSTRUCTIONS: Record<string, string> = {
   short: "Halte den Bericht kurz und prägnant: ca. 300-400 Wörter.",
   medium: "Erstelle einen ausführlichen Bericht: ca. 600-800 Wörter.",
-  long: "Erstelle einen sehr detaillierten Bericht: ca. 1000-1200 Wörter mit tiefgehender Analyse.",
+  long: "Erstelle einen sehr detaillierten Bericht: ca. 1000-1500 Wörter mit tiefgehender Analyse.",
 };
 
 const STYLE_INSTRUCTIONS: Record<string, string> = {
   professional: "Schreibe im sachlichen, professionellen Stil eines Analysten.",
   journalistic: "Schreibe im packenden, journalistischen Stil eines Sportreporters.",
   coaching: "Schreibe im direkten, handlungsorientierten Stil eines Trainers an sein Team.",
+  social: "Schreibe im Stil eines Social-Media-Posts: kurz, knackig, mit Emojis und Hashtags. Maximal 280 Zeichen pro Absatz. Nutze ⚽🔥💪📊 etc.",
+  newspaper: "Schreibe im klassischen Zeitungsstil: neutral, sachlich, in der dritten Person. Verwende einen Lead-Satz, dann den Bericht im umgekehrten Pyramidenstil.",
 };
 
 serve(async (req) => {
@@ -85,7 +113,7 @@ serve(async (req) => {
       });
     }
 
-    // Rate limiting: max 5 reports per day per user
+    // Rate limiting: max 10 reports per day per user
     const today = new Date().toISOString().slice(0, 10);
     const { count } = await supabase
       .from("report_generations")
@@ -93,14 +121,13 @@ serve(async (req) => {
       .eq("user_id", userId)
       .gte("created_at", `${today}T00:00:00Z`);
 
-    if ((count ?? 0) >= 5) {
-      return new Response(JSON.stringify({ error: "Tageslimit erreicht (max. 5 Berichte/Tag). Versuche es morgen erneut." }), {
+    if ((count ?? 0) >= 10) {
+      return new Response(JSON.stringify({ error: "Tageslimit erreicht (max. 10 Berichte/Tag)." }), {
         status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Get profile for club_id
     const { data: profile } = await supabase
       .from("profiles")
       .select("club_id")
@@ -109,7 +136,6 @@ serve(async (req) => {
 
     const clubId = profile?.club_id;
 
-    // Fetch match data
     const { data: match } = await supabase
       .from("matches")
       .select("*, fields(name)")
@@ -123,7 +149,6 @@ serve(async (req) => {
       });
     }
 
-    // Fetch all relevant data in parallel
     const [clubRes, lineupsRes, playerStatsRes, teamStatsRes, apiStatsRes] = await Promise.all([
       clubId ? supabase.from("clubs").select("name, league").eq("id", clubId).single() : Promise.resolve({ data: null }),
       supabase.from("match_lineups").select("*, players(name, number, position)").eq("match_id", matchId),
@@ -138,7 +163,6 @@ serve(async (req) => {
     const awayStats = (teamStatsRes.data || []).find((t: any) => t.team === "away");
     const apiStats = apiStatsRes.data?.[0];
 
-    // Build context
     let context = `--- SPIELDATEN ---
 Verein: ${clubRes.data?.name || "Unbekannt"}
 Liga: ${clubRes.data?.league || "Nicht angegeben"}
@@ -168,7 +192,7 @@ ${awayStats ? `Gast: ${awayStats.total_distance_km?.toFixed(1) ?? "?"}km gesamt,
     if (homePlayerStats.length > 0) {
       context += `
 SPIELER-STATISTIKEN (Heim):
-${homePlayerStats.map((s: any) => `- #${s.players?.number ?? "?"} ${s.players?.name ?? "?"} (${s.players?.position ?? "?"}): ${s.distance_km?.toFixed(1) ?? "?"}km, Top ${s.top_speed_kmh?.toFixed(1) ?? "?"}km/h, ${s.sprint_count ?? 0} Sprints, ${s.minutes_played ?? "?"}min`).join("\n")}
+${homePlayerStats.map((s: any) => `- #${s.players?.number ?? "?"} ${s.players?.name ?? "?"} (${s.players?.position ?? "?"}): ${s.distance_km?.toFixed(1) ?? "?"}km, Top ${s.top_speed_kmh?.toFixed(1) ?? "?"}km/h, ${s.sprint_count ?? 0} Sprints, ${s.minutes_played ?? "?"}min, Pässe ${s.passes_completed ?? "?"}/${s.passes_total ?? "?"} (${s.pass_accuracy ? s.pass_accuracy.toFixed(0) + "%" : "?"}), Zweikämpfe ${s.duels_won ?? "?"}/${s.duels_total ?? "?"}, Tackles ${s.tackles ?? 0}, Tore ${s.goals ?? 0}, Assists ${s.assists ?? 0}, Schüsse ${s.shots_on_target ?? 0}/${s.shots_total ?? 0}, Ballkontakte ${s.ball_contacts ?? "?"}, Fouls ${s.fouls_committed ?? 0}, Rating ${s.rating ?? "?"}`).join("\n")}
 `;
     }
 
@@ -188,14 +212,21 @@ Rote Karten: ${apiStats.red_cards_home ?? "?"} vs ${apiStats.red_cards_away ?? "
 
     context += "--- ENDE SPIELDATEN ---";
 
+    const promptKey = reportType in REPORT_PROMPTS ? reportType : "match";
     const systemPrompt = `Du bist der Taktik-Analyst von FieldIQ. Antworte immer auf Deutsch. Formatiere mit Markdown.
-${REPORT_PROMPTS[reportType] || REPORT_PROMPTS.match}
+${REPORT_PROMPTS[promptKey]}
 ${LENGTH_INSTRUCTIONS[length] || LENGTH_INSTRUCTIONS.medium}
 ${STYLE_INSTRUCTIONS[style] || STYLE_INSTRUCTIONS.professional}
 
 ${context}`;
 
-    // Log the report generation
+    const userMessages: Record<string, string> = {
+      prematch: "Erstelle einen Vorbericht für dieses Spiel.",
+      halftime: "Erstelle einen Halbzeitbericht basierend auf den bisherigen Daten der ersten Hälfte.",
+      match: "Erstelle einen Spielbericht basierend auf den vorliegenden Daten.",
+      training: "Erstelle einen detaillierten Trainingsplan für die kommende Woche basierend auf den Spieldaten und Spielerleistungen.",
+    };
+
     await supabase.from("report_generations").insert({
       user_id: userId,
       match_id: matchId,
@@ -203,7 +234,6 @@ ${context}`;
       report_type: reportType,
     });
 
-    // Call AI
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -214,10 +244,7 @@ ${context}`;
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: reportType === "prematch"
-            ? "Erstelle einen Vorbericht für dieses Spiel."
-            : "Erstelle einen Spielbericht basierend auf den vorliegenden Daten."
-          },
+          { role: "user", content: userMessages[promptKey] || userMessages.match },
         ],
         stream: true,
       }),
@@ -226,21 +253,18 @@ ${context}`;
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Zu viele Anfragen. Bitte warte kurz." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "KI-Credits aufgebraucht." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
       return new Response(JSON.stringify({ error: "KI-Dienst nicht verfügbar" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

@@ -20,36 +20,68 @@ serve(async (req) => {
 
     let prompt = "";
 
-    if (type === "player" && playerId) {
-      // Get player info
+    if ((type === "player" || type === "training") && playerId) {
       const { data: player } = await supabase.from("players").select("name, number, position").eq("id", playerId).single();
-      // Get last 15 matches stats
       const { data: stats } = await supabase
         .from("player_match_stats")
-        .select("distance_km, top_speed_kmh, avg_speed_kmh, sprint_count, sprint_distance_m, minutes_played, match_id, matches(date, away_club_name)")
+        .select("distance_km, top_speed_kmh, avg_speed_kmh, sprint_count, sprint_distance_m, minutes_played, match_id, passes_total, passes_completed, pass_accuracy, duels_total, duels_won, tackles, interceptions, ball_recoveries, shots_total, shots_on_target, goals, assists, ball_contacts, fouls_committed, fouls_drawn, yellow_cards, red_cards, dribbles_success, aerial_won, rating, crosses, matches(date, away_club_name)")
         .eq("player_id", playerId)
         .order("match_id", { ascending: false })
         .limit(15);
 
       if (!stats?.length) {
         return new Response(JSON.stringify({ error: "Keine Statistiken vorhanden" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const statsTable = stats.map((s: any) => ({
-        date: s.matches?.date,
-        opponent: s.matches?.away_club_name,
-        km: s.distance_km,
-        topSpeed: s.top_speed_kmh,
-        avgSpeed: s.avg_speed_kmh,
-        sprints: s.sprint_count,
-        sprintDistM: s.sprint_distance_m,
-        minutes: s.minutes_played,
+        date: s.matches?.date, opponent: s.matches?.away_club_name,
+        km: s.distance_km, topSpeed: s.top_speed_kmh, avgSpeed: s.avg_speed_kmh,
+        sprints: s.sprint_count, sprintDistM: s.sprint_distance_m, minutes: s.minutes_played,
+        passesTotal: s.passes_total, passesCompleted: s.passes_completed, passAccuracy: s.pass_accuracy,
+        duelsTotal: s.duels_total, duelsWon: s.duels_won, tackles: s.tackles,
+        interceptions: s.interceptions, ballRecoveries: s.ball_recoveries,
+        shotsTotal: s.shots_total, shotsOnTarget: s.shots_on_target,
+        goals: s.goals, assists: s.assists, ballContacts: s.ball_contacts,
+        fouls: s.fouls_committed, yellowCards: s.yellow_cards, dribbles: s.dribbles_success,
+        aerialWon: s.aerial_won, rating: s.rating, crosses: s.crosses,
       }));
 
-      prompt = `Du bist ein professioneller Fußball-Leistungsanalyst. Analysiere die folgenden GPS-Tracking-Daten des Spielers und erstelle eine detaillierte Leistungsanalyse auf Deutsch.
+      if (type === "training") {
+        prompt = `Du bist ein professioneller Fußball-Fitnesstrainer und Leistungsanalyst. Erstelle einen personalisierten Wochentrainingsplan auf Deutsch.
+
+Spieler: ${player?.name ?? "Unbekannt"} (#${player?.number ?? "—"}, Position: ${player?.position ?? "—"})
+
+Letzte ${stats.length} Spiele:
+${JSON.stringify(statsTable, null, 2)}
+
+Erstelle folgende Abschnitte:
+## 📊 Leistungsprofil
+Zusammenfassung der Stärken und Schwächen basierend auf den Daten.
+
+## 📅 Wochentrainingsplan
+Für jeden Tag (Mo-Fr) eine detaillierte Trainingseinheit:
+### Montag: [Schwerpunkt]
+- **Aufwärmen** (15 min): ...
+- **Hauptteil** (60 min): Konkrete Übungen mit Wiederholungen
+- **Auslaufen** (15 min): ...
+
+### Dienstag: [Schwerpunkt]
+... (analog für alle 5 Tage)
+
+## 💪 Individuelle Schwerpunkte
+3-5 positionsspezifische Trainingsempfehlungen.
+
+## 🔄 Regeneration
+Empfehlungen zu Ruhetagen, Ernährung, Schlaf.
+
+## 📈 Ziele für die nächsten 4 Wochen
+Messbare Leistungsziele basierend auf den aktuellen Daten.
+
+Sei konkret, datenbasiert und praxisorientiert.`;
+      } else {
+        prompt = `Du bist ein professioneller Fußball-Leistungsanalyst. Analysiere die folgenden GPS-Tracking- und Spielstatistik-Daten und erstelle eine detaillierte Leistungsanalyse auf Deutsch.
 
 Spieler: ${player?.name ?? "Unbekannt"} (#${player?.number ?? "—"}, Position: ${player?.position ?? "—"})
 
@@ -58,61 +90,58 @@ ${JSON.stringify(statsTable, null, 2)}
 
 Erstelle folgende Abschnitte mit Markdown-Überschriften:
 ## 📊 Leistungsübersicht
-Zusammenfassung der wichtigsten Kennzahlen mit Durchschnittswerten.
+Zusammenfassung der wichtigsten Kennzahlen mit Durchschnittswerten (Distanz, Speed, Sprints, Passquote, Zweikampfquote, Tore, Assists, Rating).
 
 ## 📈 Trend-Analyse
-Wie entwickeln sich Laufleistung, Geschwindigkeit und Sprints über die letzten Spiele? Gibt es positive oder negative Trends?
+Wie entwickeln sich alle Leistungsindikatoren über die letzten Spiele? Positive/negative Trends bei Laufleistung, Passgenauigkeit, Zweikampfquote, Torschusseffizienz?
 
 ## 💪 Stärken
-Was macht der Spieler besonders gut? Wo liegt er über dem Durchschnitt?
+Was macht der Spieler besonders gut? Wo liegt er über dem positionsspezifischen Durchschnitt?
 
 ## ⚠️ Verbesserungspotential
-Wo gibt es Schwächen oder Rückgänge? Was könnte verbessert werden?
+Wo gibt es Schwächen oder Rückgänge? Passgenauigkeit, Zweikampfverhalten, Laufbereitschaft?
 
 ## 🏋️ Trainingsempfehlungen
-3-5 konkrete, umsetzbare Trainingsempfehlungen basierend auf den Daten.
+5 konkrete, umsetzbare Trainingsempfehlungen basierend auf den identifizierten Schwächen.
 
 ## 🎯 Taktische Hinweise
-Wie kann der Trainer den Spieler optimal einsetzen?
+Wie kann der Trainer den Spieler optimal einsetzen? Positionsanpassungen, Spielsystem-Empfehlungen.
 
-Sei konkret, datenbasiert und praxisorientiert. Verwende die tatsächlichen Zahlen aus den Daten.`;
+## ⚠️ Belastungsmanagement
+Ermüdungszeichen, Verletzungsrisiko, empfohlene Einsatzzeiten.
 
+Sei konkret, datenbasiert und praxisorientiert. Verwende die tatsächlichen Zahlen.`;
+      }
     } else if (type === "team" && matchId) {
       const { data: match } = await supabase.from("matches").select("date, away_club_name, home_club_id").eq("id", matchId).single();
       const { data: teamStats } = await supabase.from("team_match_stats").select("*").eq("match_id", matchId);
       const { data: playerStats } = await supabase
         .from("player_match_stats")
-        .select("distance_km, top_speed_kmh, avg_speed_kmh, sprint_count, sprint_distance_m, minutes_played, team, players(name, number, position)")
+        .select("distance_km, top_speed_kmh, avg_speed_kmh, sprint_count, sprint_distance_m, minutes_played, team, passes_total, passes_completed, pass_accuracy, duels_total, duels_won, tackles, interceptions, goals, assists, shots_total, shots_on_target, ball_contacts, rating, players(name, number, position)")
         .eq("match_id", matchId);
 
-      // Get last 5 team stats for trend
       let recentTeamStats: any[] = [];
       if (match?.home_club_id) {
         const { data: recentMatches } = await supabase
-          .from("matches")
-          .select("id, date, away_club_name")
-          .eq("home_club_id", match.home_club_id)
-          .eq("status", "done")
-          .order("date", { ascending: false })
-          .limit(5);
+          .from("matches").select("id, date, away_club_name")
+          .eq("home_club_id", match.home_club_id).eq("status", "done")
+          .order("date", { ascending: false }).limit(5);
         if (recentMatches?.length) {
           const { data: rts } = await supabase
             .from("team_match_stats")
             .select("match_id, total_distance_km, top_speed_kmh, possession_pct")
-            .in("match_id", recentMatches.map(m => m.id))
-            .eq("team", "home");
+            .in("match_id", recentMatches.map(m => m.id)).eq("team", "home");
           recentTeamStats = rts ?? [];
         }
       }
 
       if (!playerStats?.length) {
         return new Response(JSON.stringify({ error: "Keine Spielstatistiken vorhanden" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      prompt = `Du bist ein professioneller Fußball-Leistungsanalyst. Analysiere die folgenden GPS-Tracking-Daten des Spiels und erstelle eine detaillierte Spielanalyse auf Deutsch.
+      prompt = `Du bist ein professioneller Fußball-Leistungsanalyst. Analysiere die GPS-Tracking- und Spielstatistik-Daten und erstelle eine detaillierte Spielanalyse auf Deutsch.
 
 Spiel: Heim vs ${match?.away_club_name ?? "Unbekannt"} am ${match?.date ?? "—"}
 
@@ -122,40 +151,43 @@ ${JSON.stringify(teamStats, null, 2)}
 Spieler-Statistiken:
 ${JSON.stringify(playerStats?.map((p: any) => ({
   name: p.players?.name, number: p.players?.number, position: p.players?.position, team: p.team,
-  km: p.distance_km, topSpeed: p.top_speed_kmh, avgSpeed: p.avg_speed_kmh, sprints: p.sprint_count, minutes: p.minutes_played,
+  km: p.distance_km, topSpeed: p.top_speed_kmh, avgSpeed: p.avg_speed_kmh,
+  sprints: p.sprint_count, minutes: p.minutes_played,
+  passesTotal: p.passes_total, passAccuracy: p.pass_accuracy,
+  duelsWon: p.duels_won, duelsTotal: p.duels_total, tackles: p.tackles,
+  goals: p.goals, assists: p.assists, shots: p.shots_total, shotsOnTarget: p.shots_on_target,
+  ballContacts: p.ball_contacts, rating: p.rating,
 })), null, 2)}
 
-Letzte 5 Heim-Spiele Team-Stats (für Trend):
+Letzte 5 Heim-Spiele Team-Stats:
 ${JSON.stringify(recentTeamStats, null, 2)}
 
-Erstelle folgende Abschnitte mit Markdown-Überschriften:
+Erstelle folgende Abschnitte:
 ## 📊 Spielübersicht
-Zusammenfassung des Spiels anhand der physischen Leistungsdaten.
+Zusammenfassung anhand der physischen und taktischen Leistungsdaten.
 
 ## 🏃 Top-Performer
-Welche Spieler haben herausragend performed? Wer war am laufstärksten, schnellsten, sprintstärksten?
+Welche Spieler haben herausragend performed? Belege mit Daten.
 
 ## ⚖️ Heim vs Auswärts
-Vergleich der Team-Leistungsdaten beider Mannschaften.
+Detailvergleich: Distanz, Speed, Passquote, Zweikampfquote, Schusseffizienz.
 
 ## 📈 Saisontrend
-Wie ordnet sich dieses Spiel im Vergleich zu den letzten Spielen ein?
+Einordnung im Vergleich zu den letzten Spielen.
 
 ## ⚠️ Auffälligkeiten
-Spieler mit auffällig niedrigen/hohen Werten, mögliche Ermüdungszeichen.
+Spieler mit auffälligen Werten, Ermüdungszeichen, Disziplinprobleme.
 
 ## 🏋️ Trainingsempfehlungen
 Konkrete Empfehlungen für die kommende Trainingswoche.
 
 ## 🎯 Taktische Anpassungen
-Vorschläge zur Aufstellungs- oder Taktikoptimierung basierend auf den Daten.
+Aufstellungs- oder Taktikoptimierung basierend auf den Daten.
 
 Sei konkret, datenbasiert und praxisorientiert.`;
-
     } else {
       return new Response(JSON.stringify({ error: "Ungültige Parameter" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -168,7 +200,7 @@ Sei konkret, datenbasiert und praxisorientiert.`;
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "Du bist ein erfahrener Fußball-Leistungsanalyst, spezialisiert auf GPS-Tracking-Daten. Antworte immer auf Deutsch." },
+          { role: "system", content: "Du bist ein erfahrener Fußball-Leistungsanalyst, spezialisiert auf GPS-Tracking-Daten und taktische Analyse. Antworte immer auf Deutsch." },
           { role: "user", content: prompt },
         ],
         stream: true,
@@ -196,7 +228,6 @@ Sei konkret, datenbasiert und praxisorientiert.`;
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
-
   } catch (e) {
     console.error("analyze-performance error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unbekannter Fehler" }), {

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Sparkles, Loader2, Copy, X } from "lucide-react";
+import { Sparkles, Loader2, Copy, X, Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
@@ -17,12 +17,14 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
   const [report, setReport] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [mode, setMode] = useState<"analysis" | "training">("analysis");
   const abortRef = useRef<AbortController | null>(null);
 
-  const generate = async () => {
+  const generate = async (genMode: "analysis" | "training" = "analysis") => {
     setIsGenerating(true);
     setReport("");
     setIsOpen(true);
+    setMode(genMode);
     abortRef.current = new AbortController();
     let soFar = "";
 
@@ -33,7 +35,7 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ type, playerId, matchId }),
+        body: JSON.stringify({ type: genMode === "training" ? "training" : type, playerId, matchId }),
         signal: abortRef.current.signal,
       });
 
@@ -88,16 +90,24 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
   return (
     <div>
       {!isOpen ? (
-        <Button variant="heroOutline" size="sm" onClick={generate} disabled={isGenerating}>
-          <Sparkles className="h-4 w-4 mr-1" />
-          KI-Analyse {playerName ? `für ${playerName}` : ""}
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="heroOutline" size="sm" onClick={() => generate("analysis")} disabled={isGenerating}>
+            <Sparkles className="h-4 w-4 mr-1" />
+            KI-Analyse {playerName ? `für ${playerName}` : ""}
+          </Button>
+          {type === "player" && (
+            <Button variant="heroOutline" size="sm" onClick={() => generate("training")} disabled={isGenerating}>
+              <Dumbbell className="h-4 w-4 mr-1" />
+              Trainingsplan generieren
+            </Button>
+          )}
+        </div>
       ) : (
         <div className="glass-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold font-display flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              KI-Leistungsanalyse {playerName && `— ${playerName}`}
+              {mode === "training" ? <Dumbbell className="h-4 w-4 text-primary" /> : <Sparkles className="h-4 w-4 text-primary" />}
+              {mode === "training" ? "KI-Trainingsplan" : "KI-Leistungsanalyse"} {playerName && `— ${playerName}`}
             </h3>
             <div className="flex gap-2">
               {isGenerating ? (
@@ -117,20 +127,32 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
 
           {isGenerating && !report && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Analysiere Leistungsdaten...
+              <Loader2 className="h-4 w-4 animate-spin" /> {mode === "training" ? "Generiere Trainingsplan..." : "Analysiere Leistungsdaten..."}
             </div>
           )}
 
           {report && (
-            <div className="prose prose-sm prose-invert max-w-none text-foreground">
+            <div className="prose prose-sm prose-invert max-w-none text-foreground max-h-[600px] overflow-y-auto">
               <ReactMarkdown>{report}</ReactMarkdown>
             </div>
           )}
 
           {!isGenerating && report && (
-            <Button variant="heroOutline" size="sm" onClick={generate}>
-              <Sparkles className="h-4 w-4 mr-1" /> Neu analysieren
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="heroOutline" size="sm" onClick={() => generate(mode)}>
+                <Sparkles className="h-4 w-4 mr-1" /> Neu generieren
+              </Button>
+              {type === "player" && mode === "analysis" && (
+                <Button variant="heroOutline" size="sm" onClick={() => generate("training")}>
+                  <Dumbbell className="h-4 w-4 mr-1" /> Trainingsplan
+                </Button>
+              )}
+              {type === "player" && mode === "training" && (
+                <Button variant="heroOutline" size="sm" onClick={() => generate("analysis")}>
+                  <Sparkles className="h-4 w-4 mr-1" /> Leistungsanalyse
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}
