@@ -9,7 +9,7 @@ import { FootballTracker } from "@/lib/football-tracker";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { POSITION_LABELS } from "@/lib/constants";
+
 
 type Phase = "loading" | "camera" | "calibration" | "tracking" | "ended";
 

@@ -431,9 +431,10 @@ Deno.serve(async (req) => {
       return { tid, cx, cy, positions };
     });
 
-    // Use greedy matching: for each player, find the closest unassigned track
+    // Use greedy matching with time-window aware candidate filtering
     const allPlayers = [...homePlayers, ...awayPlayers];
     const usedTrackIndices = new Set<number>();
+    const fallbackEndMin = Math.max(1, Math.ceil(session.durationSec / 60));
     const playerStats: Array<{
       player_id: string | null;
       player_name: string | null;
@@ -442,33 +443,35 @@ Deno.serve(async (req) => {
       confidence: number;
     }> = [];
 
-    // Build cost matrix and do greedy assignment
     for (const player of allPlayers) {
       const position = player.player_id ? playerPositions[player.player_id] : null;
       const expectedZone = position ? POSITION_ZONES[position] : null;
+      const playerWindow = getPlayerWindow(player, typedEvents, fallbackEndMin);
+
+      if (playerWindow.startMin === null || playerWindow.endMin <= playerWindow.startMin) {
+        console.log(`[process-tracking] Skipping inactive player ${player.player_name}`);
+        continue;
+      }
 
       let bestIdx = -1;
-      let bestDist = Infinity;
+      let bestScore = Infinity;
 
       for (let ti = 0; ti < trackCentroids.length; ti++) {
         if (usedTrackIndices.has(ti)) continue;
         const tc = trackCentroids[ti];
+        const trackRange = getTrackTimeRange(tc.positions);
+        const overlapMinutes = getOverlapMinutes(playerWindow, trackRange);
+        if (overlapMinutes <= 0) continue;
 
-        if (expectedZone) {
-          // Distance from track centroid to expected zone
-          const dist = Math.sqrt(
-            (tc.cx - expectedZone.x) ** 2 + (tc.cy - expectedZone.y) ** 2
-          );
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestIdx = ti;
-          }
-        } else {
-          // No position info — fall back to longest remaining track
-          if (bestIdx === -1) {
-            bestIdx = ti;
-            bestDist = 0.5; // neutral confidence
-          }
+        const zoneDist = expectedZone
+          ? Math.sqrt((tc.cx - expectedZone.x) ** 2 + (tc.cy - expectedZone.y) ** 2)
+          : 0.5;
+        const overlapPenalty = 1 / (overlapMinutes + 0.25);
+        const score = zoneDist + overlapPenalty;
+
+        if (score < bestScore) {
+          bestScore = score;
+          bestIdx = ti;
         }
       }
 
@@ -476,10 +479,12 @@ Deno.serve(async (req) => {
         usedTrackIndices.add(bestIdx);
         const tc = trackCentroids[bestIdx];
         const stats = computeTrackStats(tc.positions, fieldW, fieldH);
-        // Confidence: 1.0 = perfect match, 0.0 = worst
+        const trackRange = getTrackTimeRange(tc.positions);
+        const overlapMinutes = getOverlapMinutes(playerWindow, trackRange);
         const confidence = expectedZone
-          ? Math.max(0, 1 - bestDist * 2) // dist of 0.5 = confidence 0
-          : 0.3; // no position = low confidence
+          ? Math.max(0, 1 - bestScore * 0.8)
+          : Math.min(0.75, 0.35 + overlapMinutes / Math.max(1, fallbackEndMin));
+
         playerStats.push({
           player_id: player.player_id || null,
           player_name: player.player_name,
@@ -488,7 +493,7 @@ Deno.serve(async (req) => {
           confidence: Math.round(confidence * 100) / 100,
         });
         console.log(
-          `[process-tracking] Assigned ${player.player_name} (${position || "?"}) → track ${tc.tid} (centroid ${tc.cx.toFixed(2)},${tc.cy.toFixed(2)}) confidence=${confidence.toFixed(2)}`
+          `[process-tracking] Assigned ${player.player_name} (${position || "?"}) → track ${tc.tid} overlap=${overlapMinutes.toFixed(1)}m confidence=${confidence.toFixed(2)}`,
         );
       }
     }
