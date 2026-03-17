@@ -131,17 +131,21 @@ export default function PlayerProfile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentStats.map((st: any) => (
+                   {recentStats.map((st: any) => (
                     <tr key={st.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3">
                         <Link to={`/matches/${st.match_id}`} className="hover:text-primary transition-colors">
                           {st.matches?.date ? new Date(st.matches.date).toLocaleDateString("de-DE") : "—"}
                         </Link>
                       </td>
-                      <td className="py-3 px-4 text-muted-foreground">{st.matches?.away_club_name ?? "—"}</td>
-                      <td className="py-3 px-4 font-semibold">{st.distance_km?.toFixed(1) ?? "—"}</td>
-                      <td className="py-3 px-4">{st.top_speed_kmh?.toFixed(1) ?? "—"}</td>
-                      <td className="py-3 px-4">{st.sprint_count ?? 0}</td>
+                      <td className="py-3 px-3 text-muted-foreground">{st.matches?.away_club_name ?? "—"}</td>
+                      <td className="py-3 px-3 font-semibold">{st.distance_km?.toFixed(1) ?? "—"}</td>
+                      <td className="py-3 px-3">{st.top_speed_kmh?.toFixed(1) ?? "—"}</td>
+                      <td className="py-3 px-3">{st.sprint_count ?? 0}</td>
+                      <td className="py-3 px-3 font-semibold">{st.goals ?? 0}</td>
+                      <td className="py-3 px-3">{st.assists ?? 0}</td>
+                      <td className="py-3 px-3">{st.pass_accuracy ? `${Math.round(st.pass_accuracy)}%` : "—"}</td>
+                      <td className="py-3 px-3">{st.rating ? st.rating.toFixed(1) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
