@@ -213,6 +213,50 @@ function emptyHeatmap(): number[][] {
   return Array.from({ length: 7 }, () => Array(10).fill(0));
 }
 
+function getTrackTimeRange(positions: { t: number; x: number; y: number }[]) {
+  const startMin = (positions[0]?.t ?? 0) / 60000;
+  const endMin = (positions[positions.length - 1]?.t ?? 0) / 60000;
+  return { startMin, endMin };
+}
+
+function getPlayerWindow(
+  player: LineupEntry,
+  events: MatchEvent[],
+  fallbackEndMin: number,
+) {
+  const startMin = player.subbed_in_min ?? (player.starting ? 0 : null);
+  const playerEventMinute = events
+    .filter(
+      (event) =>
+        event.player_id &&
+        player.player_id &&
+        event.player_id === player.player_id &&
+        ["red_card", "yellow_red_card", "player_deactivated"].includes(event.event_type),
+    )
+    .map((event) => event.minute)
+    .sort((a, b) => a - b)[0];
+
+  const endCandidates = [player.subbed_out_min, playerEventMinute, fallbackEndMin].filter(
+    (value): value is number => typeof value === "number",
+  );
+
+  return {
+    startMin,
+    endMin: endCandidates.length > 0 ? Math.min(...endCandidates) : fallbackEndMin,
+  };
+}
+
+function getOverlapMinutes(
+  window: { startMin: number | null; endMin: number },
+  trackRange: { startMin: number; endMin: number },
+) {
+  if (window.startMin === null) return 0;
+  return Math.max(
+    0,
+    Math.min(window.endMin, trackRange.endMin) - Math.max(window.startMin, trackRange.startMin),
+  );
+}
+
 // ── Main Handler ──────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
