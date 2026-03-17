@@ -118,12 +118,17 @@ export function useSeasonStats() {
         .eq("club_id", clubId)
         .eq("active", true);
 
-      // Most distance player
-      const { data: topPlayer } = await supabase
-        .from("player_match_stats")
-        .select("player_id, distance_km, players(name)")
-        .order("distance_km", { ascending: false })
-        .limit(1);
+      // Most distance player — filter by club matches
+      let topPlayerName: string | null = null;
+      if (matchIds.length > 0) {
+        const { data: topPlayer } = await supabase
+          .from("player_match_stats")
+          .select("player_id, distance_km, players(name)")
+          .in("match_id", matchIds)
+          .order("distance_km", { ascending: false })
+          .limit(1);
+        topPlayerName = topPlayer?.[0]?.players?.name ?? null;
+      }
 
       return {
         matchesTracked: matchCount ?? 0,
