@@ -302,7 +302,7 @@ export default function NewMatch() {
               <h2 className="text-lg font-semibold font-display flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" /> Aufstellung Gast {awayName && `— ${awayName}`}
               </h2>
-              <p className="text-sm text-muted-foreground">Mindestens 11 Spieler eingeben.</p>
+              <p className="text-sm text-muted-foreground">Optional — Gast-Aufstellung eingeben oder überspringen.</p>
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
                 {guestPlayers.map((gp, i) => (
                   <div key={i} className="flex gap-2">
