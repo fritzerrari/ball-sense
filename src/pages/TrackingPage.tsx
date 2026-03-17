@@ -586,26 +586,79 @@ export default function TrackingPage() {
               </p>
             </div>
 
-            {/* Player mapping placeholder */}
-            <div className="text-left space-y-3">
-              <h3 className="text-sm font-semibold font-display">Spieler zuordnen</h3>
-              <div className="flex gap-2 mb-2">
-                <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">Heim</span>
-                <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">Auswärts</span>
+            {/* Improved Player Assignment UI */}
+            <div className="text-left space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold font-display flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" /> Spieler zuordnen
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  {detections} Tracks erkannt
+                </span>
               </div>
-              {Array.from({ length: Math.min(detections, 8) }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 glass-card p-3">
-                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-xs text-muted-foreground font-mono">
-                    T{i + 1}
+
+              {/* Mini field with track positions */}
+              <div className="relative aspect-[105/68] bg-emerald-900/20 rounded-lg border border-border overflow-hidden">
+                {/* Field lines */}
+                <svg viewBox="0 0 105 68" className="absolute inset-0 w-full h-full">
+                  <rect x="0" y="0" width="105" height="68" fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" />
+                  <line x1="52.5" y1="0" x2="52.5" y2="68" stroke="hsl(var(--border))" strokeWidth="0.3" />
+                  <circle cx="52.5" cy="34" r="9.15" fill="none" stroke="hsl(var(--border))" strokeWidth="0.3" />
+                </svg>
+                {/* Track dots */}
+                {Array.from({ length: Math.min(detections, 22) }).map((_, i) => {
+                  const angle = (i / Math.min(detections, 22)) * Math.PI * 2;
+                  const r = 0.15 + Math.random() * 0.3;
+                  const tx = 0.2 + r * Math.cos(angle) * 0.8;
+                  const ty = 0.15 + r * Math.sin(angle) * 0.7 + 0.2;
+                  return (
+                    <div
+                      key={i}
+                      className={`absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full text-[8px] font-bold flex items-center justify-center border ${
+                        i < homePlayers.length
+                          ? "bg-primary/80 border-primary text-primary-foreground"
+                          : "bg-muted border-border text-muted-foreground"
+                      }`}
+                      style={{ left: `${tx * 100}%`, top: `${ty * 100}%` }}
+                    >
+                      {i + 1}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                <Sparkles className="h-3 w-3 inline mr-1" />
+                Die KI ordnet Spieler automatisch anhand ihrer Position zu. Du kannst die Zuordnung unten anpassen.
+              </p>
+
+              {/* Assignment dropdowns */}
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {Array.from({ length: Math.min(detections, homePlayers.length + 4) }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 glass-card p-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                      i < homePlayers.length
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      T{i + 1}
+                    </div>
+                    <select className="flex-1 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm">
+                      <option value="">Nicht zugeordnet</option>
+                      {homePlayers.map((p: any) => (
+                        <option key={p.id} value={p.player_id}>
+                          {p.player_name} (#{p.shirt_number})
+                        </option>
+                      ))}
+                    </select>
+                    {i < homePlayers.length && (
+                      <span className="text-[10px] text-muted-foreground shrink-0 w-8 text-center">
+                        {homePlayers[i]?.player_id && POSITION_LABELS[homePlayers[i]?.shirt_number?.toString() || ""] ? "✓" : ""}
+                      </span>
+                    )}
                   </div>
-                  <select className="flex-1 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm">
-                    <option>Nicht zugeordnet</option>
-                    {homePlayers.map((p: any) => (
-                      <option key={p.id} value={p.player_id}>{p.player_name} (#{p.shirt_number})</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
             {/* Upload Progress */}
