@@ -378,9 +378,19 @@ export default function TrackingPage() {
       if (inPlayer) {
         await supabase.from("match_lineups").update({ subbed_in_min: minute }).eq("id", inPlayer.id);
       }
+      await supabase.from("match_events").insert({
+        match_id: id,
+        team: "home",
+        minute,
+        event_type: "substitution",
+        player_id: outPlayer?.player_id ?? null,
+        related_player_id: inPlayer?.player_id ?? null,
+        player_name: outPlayer?.player_name ?? null,
+        related_player_name: inPlayer?.player_name ?? null,
+      });
       toast.success(`Wechsel: ${subOut} raus, ${subIn} rein (${minute}. Minute)`);
-      // Refresh lineup data so sub filters update
       queryClient.invalidateQueries({ queryKey: ["match_lineups", id] });
+      queryClient.invalidateQueries({ queryKey: ["match_events", id] });
     } catch {
       toast.error("Wechsel konnte nicht gespeichert werden");
     }
@@ -389,6 +399,31 @@ export default function TrackingPage() {
     setSubOut("");
     setSubIn("");
     setSubMinute("");
+  };
+
+  const handleRedCard = async () => {
+    if (!cardPlayer || !id) return;
+    const minute = parseInt(cardMinute) || Math.floor(elapsedSec / 60);
+    const player = homePlayers.find((entry: any) => entry.player_name === cardPlayer);
+
+    try {
+      await supabase.from("match_events").insert({
+        match_id: id,
+        team: "home",
+        minute,
+        event_type: "red_card",
+        player_id: player?.player_id ?? null,
+        player_name: player?.player_name ?? cardPlayer,
+      });
+      toast.success(`Rote Karte für ${cardPlayer} (${minute}. Minute)`);
+      queryClient.invalidateQueries({ queryKey: ["match_events", id] });
+    } catch {
+      toast.error("Rote Karte konnte nicht gespeichert werden");
+    }
+
+    setCardModalOpen(false);
+    setCardPlayer("");
+    setCardMinute("");
   };
 
   // Attach stream to tracking video when phase changes
