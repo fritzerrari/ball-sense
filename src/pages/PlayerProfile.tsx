@@ -33,6 +33,10 @@ export default function PlayerProfile() {
   const avgTopSpeed = totalGames > 0 ? (stats.reduce((s, st) => Math.max(s, st.top_speed_kmh ?? 0), 0)) : 0;
   const totalKm = stats.reduce((s, st) => s + (st.distance_km ?? 0), 0);
   const totalSprints = stats.reduce((s, st) => s + (st.sprint_count ?? 0), 0);
+  const totalGoals = stats.reduce((s, st) => s + (st.goals ?? 0), 0);
+  const totalAssists = stats.reduce((s, st) => s + (st.assists ?? 0), 0);
+  const avgPassAcc = totalGames > 0 ? stats.filter(st => st.pass_accuracy).reduce((s, st) => s + (st.pass_accuracy ?? 0), 0) / (stats.filter(st => st.pass_accuracy).length || 1) : 0;
+  const avgRating = totalGames > 0 ? stats.filter(st => st.rating).reduce((s, st) => s + (st.rating ?? 0), 0) / (stats.filter(st => st.rating).length || 1) : 0;
 
   const heatmapGrids = stats
     .filter(s => s.heatmap_grid)
