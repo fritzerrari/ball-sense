@@ -161,7 +161,7 @@ export default function Admin() {
   const liveMatches = matches.filter((m: any) => m.status === "live" || m.status === "tracking").length;
 
   const refreshAll = () => {
-    ["admin_clubs", "admin_matches", "admin_players", "admin_profiles_count", "admin_auth_users", "admin_roles", "admin_legal_docs", "admin_audit_logs", "admin_uploads"].forEach(k =>
+    ["admin_clubs", "admin_matches", "admin_players", "admin_profiles_count", "admin_auth_users", "admin_roles", "admin_legal_docs", "admin_audit_logs", "admin_uploads", "admin_fields"].forEach(k =>
       qc.invalidateQueries({ queryKey: [k] })
     );
     toast.success("Daten aktualisiert");
