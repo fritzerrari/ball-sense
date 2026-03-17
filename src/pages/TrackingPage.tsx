@@ -135,6 +135,10 @@ export default function TrackingPage() {
 
   const handleEnd = () => {
     trackerRef.current?.stopTracking();
+    // Also stop the stream from our ref
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+    }
     setPhase("ended");
   };
 
