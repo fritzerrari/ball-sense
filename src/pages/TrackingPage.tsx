@@ -227,9 +227,9 @@ export default function TrackingPage() {
       }
       setUploadProgress(getOverallProgress("register", 100));
 
-      // Update match status (with retry)
+      // Update match status to processing
       setUploadStage("status");
-      setUploadProgress(getOverallProgress("status", 50));
+      setUploadProgress(getOverallProgress("status", 20));
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           await updateMatch.mutateAsync({ id, status: "processing" });
@@ -238,9 +238,26 @@ export default function TrackingPage() {
           if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
         }
       }
+      setUploadProgress(getOverallProgress("status", 50));
+
+      // Trigger backend processing
+      try {
+        const { error: procErr } = await supabase.functions.invoke("process-tracking", {
+          body: { matchId: id },
+        });
+        if (procErr) {
+          console.warn("[Upload] Verarbeitung fehlgeschlagen:", procErr);
+          toast.error("Upload erfolgreich, Verarbeitung wird im Hintergrund fortgesetzt.");
+        } else {
+          toast.success("Tracking-Daten verarbeitet! Statistiken sind bereit.");
+        }
+      } catch (procEx) {
+        console.warn("[Upload] Processing invocation error:", procEx);
+        toast.error("Upload erfolgreich, Verarbeitung wird im Hintergrund fortgesetzt.");
+      }
+
       setUploadProgress(100);
       setUploadDone(true);
-      toast.success("Tracking-Daten erfolgreich hochgeladen!");
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Unbekannter Fehler";
       console.error("[Upload] Fehler:", errorMsg);
