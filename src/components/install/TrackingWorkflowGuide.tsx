@@ -69,7 +69,7 @@ const steps: WorkflowStep[] = [
     id: "report",
     icon: <BarChart3 className="h-5 w-5" />,
     title: "8. Report ansehen",
-    text: "Nach dem Upload stehen sofort Heatmaps, Laufdistanzen, Sprintanalysen und Topspeed-Werte für jeden Spieler bereit. Gehe zu „Spiele" → wähle das Spiel → „Report". Du kannst den Report auch als PDF exportieren und mit deinem Team teilen.",
+    text: 'Nach dem Upload stehen sofort Heatmaps, Laufdistanzen, Sprintanalysen und Topspeed-Werte fuer jeden Spieler bereit. Gehe zu "Spiele", waehle das Spiel und oeffne den "Report". Du kannst den Report auch als PDF exportieren und mit deinem Team teilen.',
   },
 ];
 
