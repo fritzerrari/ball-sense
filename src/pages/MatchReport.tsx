@@ -185,8 +185,45 @@ export default function MatchReport() {
           )}
         </div>
 
+        {/* Processing banner */}
+        {match.status === "processing" && (
+          <div className="glass-card p-5 glow-border space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              </div>
+              <div>
+                <h3 className="font-semibold font-display text-sm">Daten werden verarbeitet</h3>
+                <p className="text-xs text-muted-foreground">Die KI analysiert die Tracking-Daten. Dies kann einige Minuten dauern.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: "Upload", done: true },
+                { label: "Spieler-Erkennung", done: false },
+                { label: "Statistiken", done: false },
+                { label: "Heatmaps", done: false },
+              ].map((step, i) => (
+                <div key={step.label} className="text-center">
+                  <div className={`h-1.5 rounded-full mb-1 ${step.done ? "bg-primary" : i === 1 ? "bg-primary/40 animate-pulse" : "bg-muted"}`} />
+                  <span className="text-[10px] text-muted-foreground">{step.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Live banner */}
+        {match.status === "live" && (
+          <div className="glass-card p-4 glow-border flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-sm font-medium font-display">Live-Tracking läuft</span>
+            <span className="text-xs text-muted-foreground ml-auto">Daten werden nach Spielende verfügbar</span>
+          </div>
+        )}
+
         {/* Upload status */}
-        {uploads && uploads.length > 0 && (
+        {uploads && uploads.length > 0 && match.status !== "processing" && (
           <div className="flex gap-3">
             {uploads.map((u: any) => (
               <div key={u.id} className="glass-card p-3 flex-1">
