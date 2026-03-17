@@ -55,6 +55,7 @@ export default function Dashboard() {
         </div>
 
         <PwaInstallPrompt />
+        <MatchFlowGuide />
         <SetupChecklist hasPlayers={!!hasPlayers} hasFields={!!hasFields} />
 
         {!hasMatches && (
