@@ -108,8 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setClubLogoUrl(null);
   };
 
+  const refreshClubData = async () => {
+    if (user) await fetchClubData(user.id);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, signOut, refreshClubData }}>
       {children}
     </AuthContext.Provider>
   );
