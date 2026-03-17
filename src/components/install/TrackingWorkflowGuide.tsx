@@ -63,7 +63,7 @@ const steps: WorkflowStep[] = [
     id: "end-upload",
     icon: <StopCircle className="h-5 w-5" />,
     title: "7. Spiel beenden & hochladen",
-    text: "Am Spielende tippe auf „Spiel beenden". Die Positionsdaten werden komprimiert und an FieldIQ übertragen. Stelle sicher, dass eine Internetverbindung besteht (WLAN oder Mobilfunk). Der Upload dauert je nach Datenmenge 10–30 Sekunden.",
+    text: 'Am Spielende tippe auf "Spiel beenden". Die Positionsdaten werden komprimiert und an FieldIQ uebertragen. Stelle sicher, dass eine Internetverbindung besteht (WLAN oder Mobilfunk). Der Upload dauert je nach Datenmenge 10-30 Sekunden.',
   },
   {
     id: "report",
