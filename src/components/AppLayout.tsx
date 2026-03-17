@@ -10,6 +10,7 @@ import { LanguageToggle } from "./LanguageToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n";
+import { MobileInstallFab } from "./MobileInstallFab";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
