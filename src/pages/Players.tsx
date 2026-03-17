@@ -84,6 +84,9 @@ export default function Players() {
           <Button variant="hero" size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" /> {t("players.add")}
           </Button>
+          <Button variant="heroOutline" size="sm" onClick={() => setImportOpen(true)}>
+            <Camera className="h-4 w-4 mr-1" /> Foto-Import
+          </Button>
         </div>
 
         <div className="flex flex-col gap-3">
