@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, Swords, Calendar, MapPin, Trash2 } from "lucide-react";
+import { Plus, Swords, Calendar, MapPin, Trash2, Dumbbell } from "lucide-react";
 import { useMatches, useDeleteMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { StatusBadge } from "@/components/StatusBadge";
