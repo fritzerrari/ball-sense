@@ -21,7 +21,7 @@ export default function TrackingPage() {
   const { data: lineups } = useMatchLineups(id);
   const fieldId = match?.field_id;
   const { data: field } = useField(fieldId);
-  const updateMatch = useUpdateMatch();
+  const queryClient = useQueryClient();
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [progress, setProgress] = useState(0);
