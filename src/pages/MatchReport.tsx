@@ -154,21 +154,33 @@ export default function MatchReport() {
             {match.kickoff && ` · ${match.kickoff}`}
             {match.fields && ` · ${(match.fields as any).name}`}
           </p>
-          {/* Tracking links for setup matches */}
+          {/* Tracking CTA for setup matches */}
           {match.status === "setup" && (
-            <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/20">
-              <p className="text-sm text-primary font-medium mb-2">Tracking-Links:</p>
-              <div className="space-y-1">
-                {[0, 1, 2].map(i => (
-                  <button
-                    key={i}
-                    onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/matches/${id}/track?cam=${i}`); toast.success(`Link Kamera ${i+1} kopiert!`); }}
-                    className="block text-xs font-mono text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    Kamera {i + 1}: /matches/{id}/track?cam={i}
-                  </button>
-                ))}
-              </div>
+            <div className="mt-4 space-y-3">
+              <Button variant="tracking" className="w-full" asChild>
+                <Link to={`/matches/${id}/track?cam=0`}>
+                  <Camera className="h-5 w-5 mr-2" /> Tracking starten
+                </Link>
+              </Button>
+              <details className="group">
+                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1">
+                  <ChevronDown className="h-3 w-3 group-open:rotate-180 transition-transform" />
+                  Weitere Kameras hinzufügen (Multi-Kamera)
+                </summary>
+                <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border space-y-2">
+                  <p className="text-xs text-muted-foreground mb-2">Kopiere diese Links auf weitere Smartphones für Multi-Kamera-Tracking:</p>
+                  {[1, 2].map(i => (
+                    <button
+                      key={i}
+                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/matches/${id}/track?cam=${i}`); toast.success(`Link Kamera ${i+1} kopiert!`); }}
+                      className="flex items-center gap-2 w-full text-left text-xs font-mono text-muted-foreground hover:text-primary transition-colors p-2 rounded-md hover:bg-muted/50"
+                    >
+                      <Camera className="h-3.5 w-3.5 shrink-0" />
+                      Kamera {i + 1} — Link kopieren
+                    </button>
+                  ))}
+                </div>
+              </details>
             </div>
           )}
         </div>
