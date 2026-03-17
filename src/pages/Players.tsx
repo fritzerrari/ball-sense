@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Plus, Users, Search, Pencil, Trash2, UserCheck, UserX } from "lucide-react";
+import { Plus, Users, Search, Pencil, Trash2, UserCheck, UserX, Camera } from "lucide-react";
 import { useState } from "react";
 import { usePlayers, useCreatePlayer, useUpdatePlayer, useDeletePlayer } from "@/hooks/use-players";
 import { POSITIONS, POSITION_LABELS } from "@/lib/constants";
@@ -9,7 +9,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonTable } from "@/components/SkeletonCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RosterImportDialog } from "@/components/RosterImportDialog";
 import { useTranslation } from "@/lib/i18n";
+import { toast } from "sonner";
 
 export default function Players() {
   const { data: players, isLoading } = usePlayers();
@@ -26,6 +28,7 @@ export default function Players() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [formName, setFormName] = useState("");
   const [formNumber, setFormNumber] = useState("");
@@ -57,17 +60,35 @@ export default function Players() {
   const handleDelete = async () => { if (deleteId) { await deletePlayer.mutateAsync(deleteId); setDeleteId(null); } };
   const toggleActive = (player: any) => { updatePlayer.mutate({ id: player.id, active: !player.active }); };
 
+  const handleBulkImport = async (importPlayers: { name: string; number: number | null; position: string | null }[]) => {
+    let success = 0;
+    for (const p of importPlayers) {
+      try {
+        await createPlayer.mutateAsync(p);
+        success++;
+      } catch { /* skip duplicates */ }
+    }
+    toast.success(`${success} Spieler importiert`);
+  };
+
+  const existingNumbers = (players ?? []).map(p => p.number).filter((n): n is number => n !== null);
+
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div>
             <h1 className="text-2xl font-bold font-display">{t("players.title")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("players.subtitle")}</p>
           </div>
-          <Button variant="hero" size="sm" onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1" /> {t("players.add")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="heroOutline" size="sm" onClick={() => setImportOpen(true)}>
+              <Camera className="h-4 w-4 mr-1" /> Foto-Import
+            </Button>
+            <Button variant="hero" size="sm" onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-1" /> {t("players.add")}
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -181,6 +202,13 @@ export default function Players() {
         confirmLabel={t("common.delete")}
         onConfirm={handleDelete}
         destructive
+      />
+
+      <RosterImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        existingNumbers={existingNumbers}
+        onImport={handleBulkImport}
       />
     </AppLayout>
   );
