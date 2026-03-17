@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import {
   Search, Crown, Trash2, Lock, Unlock, KeyRound, Loader2, ChevronLeft, ChevronRight,
-  Filter, UserX, ShieldCheck, ShieldAlert, Building2, Pencil, X, Check,
+  Filter, UserX, ShieldCheck, ShieldAlert, Building2, Pencil, X, Check, UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
