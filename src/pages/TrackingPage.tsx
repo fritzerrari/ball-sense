@@ -35,6 +35,9 @@ export default function TrackingPage() {
   const [subMinute, setSubMinute] = useState("");
   const [subOut, setSubOut] = useState("");
   const [subIn, setSubIn] = useState("");
+  const [cardModalOpen, setCardModalOpen] = useState(false);
+  const [cardMinute, setCardMinute] = useState("");
+  const [cardPlayer, setCardPlayer] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStage, setUploadStage] = useState<string>("compress");
@@ -52,7 +55,89 @@ export default function TrackingPage() {
   const timerRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const { data: matchEvents } = useMatchEvents(id);
   const homePlayers = (lineups ?? []).filter(l => l.team === "home");
+  const currentMinute = Math.floor(elapsedSec / 60);
+
+  const getPlayerStartMinute = useCallback((player: any) => {
+    return player.subbed_in_min ?? (player.starting ? 0 : null);
+  }, []);
+
+  const getPlayerExitMinute = useCallback((player: any, fallbackMinute: number) => {
+    const eventMinute = (matchEvents ?? [])
+      .filter((event: any) => event.player_id && player.player_id && event.player_id === player.player_id)
+      .filter((event: any) => ["red_card", "yellow_red_card", "player_deactivated"].includes(event.event_type))
+      .map((event: any) => event.minute)
+      .sort((a: number, b: number) => a - b)[0];
+
+    const candidates = [player.subbed_out_min, eventMinute, fallbackMinute].filter(
+      (value): value is number => typeof value === "number",
+    );
+
+    return candidates.length > 0 ? Math.min(...candidates) : fallbackMinute;
+  }, [matchEvents]);
+
+  const activeHomePlayers = useMemo(() => {
+    return homePlayers.filter((player: any) => {
+      const startMinute = getPlayerStartMinute(player);
+      if (startMinute === null) return false;
+      return startMinute <= currentMinute && getPlayerExitMinute(player, currentMinute + 1) > currentMinute;
+    });
+  }, [currentMinute, getPlayerExitMinute, getPlayerStartMinute, homePlayers]);
+
+  const reviewSummary = useMemo(() => {
+    const finishedMinute = Math.max(1, Math.floor(elapsedSec / 60));
+    const substitutions = (matchEvents ?? []).filter((event: any) => event.event_type === "substitution").length;
+    const dismissals = (matchEvents ?? []).filter((event: any) => ["red_card", "yellow_red_card", "player_deactivated"].includes(event.event_type)).length;
+
+    const players = homePlayers.map((player: any) => {
+      const startMinute = getPlayerStartMinute(player);
+      const endMinute = getPlayerExitMinute(player, finishedMinute);
+      const activeMinutes = startMinute === null ? 0 : Math.max(0, endMinute - startMinute);
+      const sentOff = (matchEvents ?? []).some(
+        (event: any) =>
+          event.player_id &&
+          player.player_id &&
+          event.player_id === player.player_id &&
+          ["red_card", "yellow_red_card", "player_deactivated"].includes(event.event_type),
+      );
+
+      const tags = [
+        player.starting ? "Startelf" : player.subbed_in_min != null ? `ab ${player.subbed_in_min}'` : "Bank",
+        player.subbed_out_min != null ? `bis ${player.subbed_out_min}'` : null,
+        sentOff ? "Karte / raus" : null,
+      ].filter(Boolean) as string[];
+
+      return {
+        ...player,
+        startMinute,
+        endMinute,
+        activeMinutes,
+        sentOff,
+        tags,
+      };
+    });
+
+    const autoAssigned = players.filter((player) => player.activeMinutes > 0);
+    const issues: string[] = [];
+
+    if (Math.abs(detections - autoAssigned.length) >= 3) {
+      issues.push(`Es wurden ${detections} Tracks erkannt, aber laut Aufstellung waren ${autoAssigned.length} Heimspieler aktiv.`);
+    }
+
+    players
+      .filter((player) => player.subbed_in_min != null || player.subbed_out_min != null || player.sentOff)
+      .slice(0, 3)
+      .forEach((player) => {
+        issues.push(`${player.player_name} hat ein Sonderereignis und sollte kurz geprüft werden.`);
+      });
+
+    if (issues.length === 0) {
+      issues.push("Keine Auffälligkeiten — die gespeicherte Aufstellung kann direkt übernommen werden.");
+    }
+
+    return { autoAssigned, dismissals, issues, players, substitutions };
+  }, [detections, elapsedSec, getPlayerExitMinute, getPlayerStartMinute, homePlayers, matchEvents]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

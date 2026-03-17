@@ -359,20 +359,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4) Get lineups with player positions
+    // 4) Get lineups, events and player positions
     const { data: lineups } = await supabase
       .from("match_lineups")
-      .select("id, player_id, player_name, team, shirt_number, starting")
+      .select("id, player_id, player_name, team, shirt_number, starting, subbed_in_min, subbed_out_min")
       .eq("match_id", matchId);
 
+    const { data: matchEvents } = await supabase
+      .from("match_events")
+      .select("match_id, team, minute, event_type, player_id, related_player_id, player_name, related_player_name")
+      .eq("match_id", matchId)
+      .order("minute", { ascending: true });
+
+    const typedLineups = (lineups || []) as LineupEntry[];
+    const typedEvents = (matchEvents || []) as MatchEvent[];
+
     // Fetch player positions for position-based assignment
-    const playerIds = (lineups || []).map((l: any) => l.player_id).filter(Boolean);
+    const playerIds = typedLineups.map((l) => l.player_id).filter(Boolean);
+    const uniquePlayerIds = [...new Set(playerIds)] as string[];
     let playerPositions: Record<string, string> = {};
-    if (playerIds.length > 0) {
+    if (uniquePlayerIds.length > 0) {
       const { data: players } = await supabase
         .from("players")
         .select("id, position")
-        .in("id", playerIds);
+        .in("id", uniquePlayerIds);
       if (players) {
         for (const p of players) {
           if (p.position) playerPositions[p.id] = p.position;
@@ -380,10 +390,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    const homePlayers = (lineups || []).filter((l: any) => l.team === "home");
-    const awayPlayers = (lineups || []).filter((l: any) => l.team === "away");
+    const homePlayers = typedLineups.filter((l) => l.team === "home");
+    const awayPlayers = typedLineups.filter((l) => l.team === "away");
     console.log(
-      `[process-tracking] Lineups: ${homePlayers.length} home, ${awayPlayers.length} away`,
+      `[process-tracking] Lineups: ${homePlayers.length} home, ${awayPlayers.length} away, ${typedEvents.length} events`,
     );
 
     // 5) Build tracks from detections
