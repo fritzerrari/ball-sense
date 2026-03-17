@@ -249,7 +249,6 @@ export default function MatchReport() {
 
         {activeTab === "Übersicht" && (
           <div className="space-y-6">
-            {/* API-Football Stats */}
             {apiStats && (
               <ApiFootballStatsCard
                 stats={apiStats}
@@ -262,12 +261,29 @@ export default function MatchReport() {
               {renderTeamCard(clubName ?? "Heim", homeTeamStats)}
               {renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats)}
             </div>
-            {hasStats ? (
-              <div className="grid sm:grid-cols-2 gap-4">
-                <HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} />
-                <HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} />
-              </div>
-            ) : (
+
+            {hasStats && (
+              <>
+                <MatchRadarChart
+                  homeTeamStats={homeTeamStats}
+                  awayTeamStats={awayTeamStats}
+                  homeName={clubName ?? "Heim"}
+                  awayName={match.away_club_name ?? "Auswärts"}
+                />
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Laufdistanz" metric="distance_km" unit="km" />
+                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Speed" metric="top_speed_kmh" unit="km/h" />
+                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Sprints" metric="sprint_count" unit="" />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} />
+                  <HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} />
+                </div>
+                <PerformanceAnalysis type="team" matchId={match.id} />
+              </>
+            )}
+
+            {!hasStats && (
               <div className="glass-card p-8 text-center">
                 <BarChart3 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-muted-foreground">Statistiken werden nach dem Tracking verfügbar.</p>
