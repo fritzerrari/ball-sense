@@ -93,7 +93,15 @@ export default function Matches() {
                       </span>
                     </td>
                     <td className="py-3 px-4 font-medium">
-                      {clubName} vs {match.away_club_name || "TBD"}
+                      <span className="flex items-center gap-1.5">
+                        {match.match_type === "training"
+                          ? <Dumbbell className="h-3.5 w-3.5 text-primary shrink-0" />
+                          : <Swords className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                        {match.match_type === "training"
+                          ? `Training`
+                          : `${clubName} vs ${match.away_club_name || "TBD"}`}
+                      </span>
+                    </td>
                     </td>
                     <td className="py-3 px-4 text-muted-foreground hidden sm:table-cell">
                       <span className="flex items-center gap-1">
