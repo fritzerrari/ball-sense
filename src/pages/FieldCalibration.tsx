@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Crosshair, Save, ArrowLeft, RotateCcw } from "lucide-react";
 import { useField, useSaveCalibration } from "@/hooks/use-fields";
