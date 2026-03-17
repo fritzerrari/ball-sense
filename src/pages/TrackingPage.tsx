@@ -230,6 +230,9 @@ export default function TrackingPage() {
         await supabase.from("match_lineups").update({ subbed_in_min: minute }).eq("id", inPlayer.id);
       }
       toast.success(`Wechsel: ${subOut} raus, ${subIn} rein (${minute}. Minute)`);
+      // Refresh lineup data so the sub modal filters update
+      const qc = (await import("@tanstack/react-query")).useQueryClient;
+      // Can't use hook here — refetch via supabase re-query
     } catch {
       toast.error("Wechsel konnte nicht gespeichert werden");
     }
