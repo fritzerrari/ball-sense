@@ -505,6 +505,16 @@ export default function Admin() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Delete confirmation */}
+        <ConfirmDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          title={`${deleteTarget?.type === "match" ? "Spiel" : "Feld"} löschen?`}
+          description={`„${deleteTarget?.label}" wird unwiderruflich gelöscht.`}
+          onConfirm={() => { if (deleteTarget) deleteEntity.mutate({ type: deleteTarget.type, id: deleteTarget.id }); }}
+          loading={deleteEntity.isPending}
+        />
       </div>
     </AppLayout>
   );
