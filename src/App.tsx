@@ -19,6 +19,7 @@ const Matches = lazy(() => import("./pages/Matches"));
 const NewMatch = lazy(() => import("./pages/NewMatch"));
 const MatchReport = lazy(() => import("./pages/MatchReport"));
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
+const CameraTrackingPage = lazy(() => import("./pages/CameraTrackingPage"));
 const Players = lazy(() => import("./pages/Players"));
 const PlayerProfile = lazy(() => import("./pages/PlayerProfile"));
 const Fields = lazy(() => import("./pages/Fields"));
@@ -66,6 +67,7 @@ const App = () => (
                 <Route path="/matches/new" element={<ProtectedRoute><NewMatch /></ProtectedRoute>} />
                 <Route path="/matches/:id" element={<ProtectedRoute><MatchReport /></ProtectedRoute>} />
                 <Route path="/matches/:id/track" element={<ProtectedRoute><TrackingPage /></ProtectedRoute>} />
+                <Route path="/camera/:id/track" element={<CameraTrackingPage />} />
                 <Route path="/players" element={<ProtectedRoute><Players /></ProtectedRoute>} />
                 <Route path="/players/:id" element={<ProtectedRoute><PlayerProfile /></ProtectedRoute>} />
                 <Route path="/fields" element={<ProtectedRoute><Fields /></ProtectedRoute>} />
