@@ -502,12 +502,12 @@ export function TopPlayersChart({
               </div>
             </div>
 
-            <div className={`min-w-[180px] rounded-3xl border px-4 py-3 backdrop-blur-sm ${signalClasses.badge}`}>
+            <div className={`w-full rounded-3xl border px-4 py-3 backdrop-blur-sm xl:min-w-[180px] xl:max-w-[220px] ${signalClasses.badge}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Peak</p>
                   <p className="mt-2 text-2xl font-bold font-display text-foreground">{formatMetricValue(chartData[0]?.value ?? 0, unit ? ` ${unit}` : undefined)}</p>
-                  <p className="mt-1 line-clamp-2 text-xs font-medium text-foreground/80">{leader?.players?.name ?? "—"}</p>
+                  <p className="mt-1 line-clamp-2 break-words text-xs font-medium text-foreground/80">{leader?.players?.name ?? "—"}</p>
                 </div>
                 {signal.tone === "warn" || signal.tone === "critical" ? <AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-foreground" /> : null}
               </div>
@@ -526,7 +526,7 @@ export function TopPlayersChart({
               <p className="text-xs text-muted-foreground">Ø Top 5: {formatMetricValue(average, unit ? ` ${unit}` : undefined)}</p>
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
                 { label: "Normal", active: signal.tone === "steady" },
                 { label: "Stark", active: signal.tone === "strong" },
@@ -541,10 +541,10 @@ export function TopPlayersChart({
             </div>
 
             <ChartContainer config={{ value: { label: title, color: "hsl(var(--primary))" } }} className="aspect-auto h-64 w-full sm:h-72">
-              <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 20, top: 4, bottom: 4 }} barCategoryGap={12}>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 12, top: 4, bottom: 4 }} barCategoryGap={12}>
                 <CartesianGrid strokeDasharray="2 6" stroke="hsl(var(--border))" horizontal={false} />
                 <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" width={88} tick={{ fill: "hsl(var(--foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={76} tick={{ fill: "hsl(var(--foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
@@ -562,7 +562,7 @@ export function TopPlayersChart({
                   <LabelList
                     dataKey="value"
                     position="right"
-                    offset={8}
+                    offset={6}
                     formatter={(value: number) => formatMetricValue(value, unit ? ` ${unit}` : undefined)}
                     className="fill-foreground"
                     fontSize={11}
@@ -575,7 +575,7 @@ export function TopPlayersChart({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-2xl border border-primary/20 bg-primary/10 p-3">
               <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{meta.summaryLabel}</p>
-              <p className="mt-2 line-clamp-2 text-sm font-semibold font-display text-foreground">{leader?.players?.name ?? "—"}</p>
+              <p className="mt-2 line-clamp-2 break-words text-sm font-semibold font-display text-foreground">{leader?.players?.name ?? "—"}</p>
               <p className="mt-1 text-xs text-primary">#{chartData[0]?.rank ?? 1}</p>
             </div>
             <div className="rounded-2xl border border-border/80 bg-background/60 p-3 backdrop-blur-sm">
@@ -585,7 +585,7 @@ export function TopPlayersChart({
             </div>
             <div className="rounded-2xl border border-border/80 bg-background/60 p-3 backdrop-blur-sm sm:col-span-2 xl:col-span-1">
               <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Indikator</p>
-              <p className="mt-2 text-sm font-semibold font-display">{signal.label}</p>
+              <p className="mt-2 break-words text-sm font-semibold font-display">{signal.label}</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">{signal.detail}</p>
             </div>
           </div>
