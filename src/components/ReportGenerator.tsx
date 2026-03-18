@@ -173,7 +173,7 @@ export default function ReportGenerator({ matchId, matchStatus, clubName, awayCl
               <SelectContent>
                 <SelectItem value="prematch"><span className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" /> Vorbericht</span></SelectItem>
                 <SelectItem value="halftime"><span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Halbzeitbericht</span></SelectItem>
-                <SelectItem value="match"><span className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Spielbericht</span></SelectItem>
+                <SelectItem value="match"><span className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Nachbericht</span></SelectItem>
                 <SelectItem value="training"><span className="flex items-center gap-1.5"><Dumbbell className="h-3.5 w-3.5" /> Trainingsplan</span></SelectItem>
               </SelectContent>
             </Select>
@@ -194,9 +194,11 @@ export default function ReportGenerator({ matchId, matchStatus, clubName, awayCl
             <Select value={style} onValueChange={setStyle}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="professional">{t("report.analytical")}</SelectItem>
-                <SelectItem value="journalistic">{t("report.journalistic")}</SelectItem>
-                <SelectItem value="coaching">{t("report.coaching")}</SelectItem>
+                <SelectItem value="professional">Analystisch</SelectItem>
+                <SelectItem value="journalistic">Journalistisch</SelectItem>
+                <SelectItem value="coaching">Trainerbriefing</SelectItem>
+                <SelectItem value="press">Presse</SelectItem>
+                <SelectItem value="club">Verein</SelectItem>
                 <SelectItem value="social">Social Media</SelectItem>
                 <SelectItem value="newspaper">Zeitungsbericht</SelectItem>
               </SelectContent>

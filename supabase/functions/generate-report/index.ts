@@ -8,68 +8,89 @@ const corsHeaders = {
 };
 
 const REPORT_PROMPTS: Record<string, string> = {
-  prematch: `Du erstellst einen professionellen VORBERICHT für ein Fußballspiel.
+  prematch: `Du erstellst einen professionellen Vorbericht für Trainerstab, Verein, Presse oder Social-Ausspielung.
 
-Struktur:
-1. **Ausgangslage** – Aktuelle Form beider Teams
-2. **Kaderanalyse** – Schlüsselspieler, Ausfälle, Formkurven
-3. **Taktische Vorschau** – Erwartete Formationen und Spielweise
-4. **Schlüsselduelle** – Entscheidende Einzelduelle
-5. **Prognose** – Erwarteter Spielverlauf
+Pflichtstruktur:
+1. **Ausgangslage** – Form, Tabellen-/Leistungskontext, Erwartung an das Spiel
+2. **Spielcharakteristik** – Was ist anhand der vorliegenden Daten über Stil, Rhythmus, Intensität und Schwerpunktzonen zu erwarten?
+3. **Schlüsselspieler & Schlüsselräume** – Wer oder welche Zonen werden spielentscheidend?
+4. **Taktischer Matchplan** – Wie sollte das Heimteam das Spiel anlegen?
+5. **Risiken & Hebel** – Wo liegen die größten Chancen und Gefahren?
+6. **Schlussbild** – saubere Prognose ohne Übertreibung`,
+  halftime: `Du erstellst einen Halbzeitbericht für den Trainerstab.
 
-Beziehe dich auf die bereitgestellten Daten. Wenn Daten fehlen, sage das.`,
+Pflichtstruktur:
+1. **Kurzfazit zur ersten Hälfte**
+2. **Was funktioniert** – mit Datenbelegen
+3. **Was nicht greift** – mit klarer Ursache-Wirkung
+4. **Datenqualität / Vorsichtspunkte**
+5. **3 konkrete Anpassungen für Halbzeit 2** – personell, taktisch, gegen den Ball / mit dem Ball`,
+  match: `Du erstellst einen professionellen Nachbericht nach dem Spiel.
 
-  halftime: `Du erstellst einen professionellen HALBZEITBERICHT.
+Pflichtstruktur:
+1. **Kurzfazit**
+2. **Spielverlauf & Wendepunkte**
+3. **Taktische Analyse** – Aufbau, Pressing, Restverteidigung, Umschalten, Chancenqualität
+4. **Belastbare Spielerbewertungen** – nur mit konkreten Werten begründen
+5. **Datenqualität / Ausreißer**
+6. **Konsequenzen für Training und nächstes Spiel**`,
+  training: `Du erstellst einen hochwertigen Trainings- und Maßnahmenbericht auf Basis der Spieldaten.
 
-Struktur:
-1. **Erste Hälfte** – Zusammenfassung der ersten 45 Minuten
-2. **Taktische Analyse** – Was funktioniert, was nicht? Pressing, Ballbesitz, Raumkontrolle
-3. **Auffällige Spieler** – Wer sticht positiv/negativ hervor? Datenbelege
-4. **Laufleistung & Intensität** – Vergleich der Teams bei Distanz, Sprints, Speed
-5. **Taktische Empfehlungen** – Konkrete Anpassungen für die zweite Hälfte (Auswechslungen, Formationswechsel, taktische Änderungen)
-
-Sei konkret und handlungsorientiert — der Trainer liest das in der Kabine.`,
-
-  match: `Du erstellst einen professionellen SPIELBERICHT nach einem Fußballspiel.
-
-Struktur:
-1. **Spielverlauf** – Chronologische Zusammenfassung mit Toren, Karten, Wechseln
-2. **Taktische Analyse** – Formationen, Pressing, Umschaltspiel, Ballbesitzphasen
-3. **Spieler des Spiels** – Top-Performer mit Datenbelegen (km, Sprints, Passquote, Zweikämpfe, Tore, Assists)
-4. **Laufleistung & Fitness** – Distanzen, Sprints, Intensitätszonen, Ermüdungszeichen
-5. **Detailstatistiken** – Passgenauigkeit, Zweikampfquoten, Schusseffizienz beider Teams
-6. **Fazit & Ausblick** – Was bedeutet das für die nächsten Spiele?
-
-Beziehe dich auf ALLE bereitgestellten Tracking- und Statistikdaten.`,
-
-  training: `Du erstellst einen personalisierten TRAININGSPLAN basierend auf den Spieldaten.
-
-Struktur:
-1. **Leistungsanalyse** – Zusammenfassung der physischen und taktischen Leistungsdaten
-2. **Identifizierte Schwächen** – Bereiche mit Verbesserungspotential (basierend auf Daten)
-3. **Wochentrainingsplan** – 5 Trainingseinheiten (Mo-Fr) mit konkreten Übungen:
-   - Aufwärmen, Hauptteil, Auslaufen
-   - Dauer pro Einheit
-   - Intensitätslevel
-4. **Individuelle Empfehlungen** – Pro Spieler (Top 5) spezifische Trainingshinweise
-5. **Regenerationshinweise** – Belastungssteuerung, Ruhetage, Ernährungstipps
-
-Sei konkret, praxisorientiert und beziehe dich auf die tatsächlichen Spielerdaten.`,
+Pflichtstruktur:
+1. **Leistungsdiagnose**
+2. **3 priorisierte Entwicklungsfelder**
+3. **Wochentrainingsplan (Mo-Fr)** – Ziel, Inhalt, Intensität, Coachingpunkte
+4. **Individuelle Maßnahmen für Schlüsselspieler**
+5. **Belastungssteuerung & Regeneration**`,
 };
 
 const LENGTH_INSTRUCTIONS: Record<string, string> = {
-  short: "Halte den Bericht kurz und prägnant: ca. 300-400 Wörter.",
-  medium: "Erstelle einen ausführlichen Bericht: ca. 600-800 Wörter.",
-  long: "Erstelle einen sehr detaillierten Bericht: ca. 1000-1500 Wörter mit tiefgehender Analyse.",
+  short: "Halte den Bericht kompakt und pointiert bei ca. 300–450 Wörtern.",
+  medium: "Erstelle einen substanziellen Bericht mit ca. 700–1000 Wörtern.",
+  long: "Erstelle eine tiefgehende Analyse mit ca. 1200–1600 Wörtern und klaren Ableitungen.",
 };
 
 const STYLE_INSTRUCTIONS: Record<string, string> = {
-  professional: "Schreibe im sachlichen, professionellen Stil eines Analysten.",
-  journalistic: "Schreibe im packenden, journalistischen Stil eines Sportreporters.",
-  coaching: "Schreibe im direkten, handlungsorientierten Stil eines Trainers an sein Team.",
-  social: "Schreibe im Stil eines Social-Media-Posts: kurz, knackig, mit Emojis und Hashtags. Maximal 280 Zeichen pro Absatz. Nutze ⚽🔥💪📊 etc.",
-  newspaper: "Schreibe im klassischen Zeitungsstil: neutral, sachlich, in der dritten Person. Verwende einen Lead-Satz, dann den Bericht im umgekehrten Pyramidenstil.",
+  professional: "Schreibe analytisch, nüchtern, fachlich präzise – wie ein Performance-Analyst für den Trainerstab.",
+  journalistic: "Schreibe im hochwertigen Sportjournalismus: klar, dramaturgisch sauber, aber ohne Pathos und ohne Übertreibung.",
+  coaching: "Schreibe trainernah, direkt und handlungsorientiert. Fokus auf Maßnahmen und Korrekturen.",
+  social: "Schreibe als Social-Media-Set mit 3 klar getrennten Modulen: 1) kurzer Hauptpost, 2) drei Bullet-Highlights, 3) passende Hashtags. Prägnant, professionell, nicht platt.",
+  newspaper: "Schreibe wie ein seriöser Zeitungsbericht mit starkem Lead, dann Einordnung und Datenbelegen in sauberer Nachrichtenlogik.",
+  press: "Schreibe als Pressetext für Medien und Vereinskommunikation: zitierfähig, professionell, reputationssicher, ohne interne Detailkritik zu entblößen.",
+  club: "Schreibe als Vereinsbericht für Website, Newsletter und Mitglieder: professionell, nahbar, informativ und mit klarer sportlicher Einordnung.",
 };
+
+const GENERAL_RULES = `Allgemeine Regeln:
+- Antworte immer auf Deutsch und formatiere mit Markdown.
+- Keine Begrüßung, kein Smalltalk, keine floskelhaften Sätze.
+- Erfinde keine Fakten.
+- Wenn Datenlage dünn oder inkonsistent ist, benenne das explizit.
+- Top-Speed-Werte deutlich über ca. 45 km/h im Fußball als wahrscheinlichen Tracking-Ausreißer markieren.
+- Aus sehr kleinen Stichproben keine großen taktischen Wahrheiten ableiten.
+- Nutze konkrete Zahlen, Vergleiche und Ursache-Wirkung statt generischer Aussagen.
+- Wenn Stil = social, press, newspaper oder club: passe Tonalität und Struktur exakt an diesen Kanal an.`;
+
+function fmt(value: number | null | undefined, digits = 1) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "?";
+  return value.toFixed(digits);
+}
+
+function buildQualityNotes(playerStats: any[], teamStats: any[]) {
+  const notes: string[] = [];
+  const implausiblePlayers = playerStats.filter((entry) => typeof entry.top_speed_kmh === "number" && entry.top_speed_kmh > 45);
+  if (implausiblePlayers.length > 0) {
+    notes.push(`Unplausible Top-Speed-Werte entdeckt (${implausiblePlayers.map((entry) => `${fmt(entry.top_speed_kmh)} km/h`).join(", ")}); diese Werte nur als möglichen Tracking-Ausreißer interpretieren.`);
+  }
+  const lowMinutes = playerStats.filter((entry) => typeof entry.minutes_played === "number" && entry.minutes_played <= 5).length;
+  if (lowMinutes > 0) {
+    notes.push(`${lowMinutes} Spieler-Datensätze basieren auf sehr geringer Einsatzzeit (≤ 5 Min.) und sind nur eingeschränkt vergleichbar.`);
+  }
+  const lowTeamDistance = teamStats.some((entry) => typeof entry.total_distance_km === "number" && entry.total_distance_km < 1);
+  if (lowTeamDistance) {
+    notes.push("Mindestens ein Teamwert weist eine extrem niedrige Gesamtdistanz auf; das spricht eher für unvollständiges Tracking als für eine belastbare Physis-Bewertung.");
+  }
+  return notes;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -116,7 +137,6 @@ serve(async (req) => {
       });
     }
 
-    // Rate limiting: max 10 reports per day per user
     const today = new Date().toISOString().slice(0, 10);
     const { count } = await supabase
       .from("report_generations")
@@ -131,20 +151,10 @@ serve(async (req) => {
       });
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("club_id")
-      .eq("user_id", userId)
-      .single();
-
+    const { data: profile } = await supabase.from("profiles").select("club_id").eq("user_id", userId).single();
     const clubId = profile?.club_id;
 
-    const { data: match } = await supabase
-      .from("matches")
-      .select("*, fields(name)")
-      .eq("id", matchId)
-      .single();
-
+    const { data: match } = await supabase.from("matches").select("*, fields(name)").eq("id", matchId).single();
     if (!match) {
       return new Response(JSON.stringify({ error: "Spiel nicht gefunden" }), {
         status: 404,
@@ -152,71 +162,110 @@ serve(async (req) => {
       });
     }
 
-    const [clubRes, lineupsRes, playerStatsRes, teamStatsRes, apiStatsRes] = await Promise.all([
-      clubId ? supabase.from("clubs").select("name, league").eq("id", clubId).single() : Promise.resolve({ data: null }),
-      supabase.from("match_lineups").select("*, players(name, number, position)").eq("match_id", matchId),
-      supabase.from("player_match_stats").select("*, players(name, number, position)").eq("match_id", matchId),
+    const recentMatchesPromise = clubId
+      ? supabase
+          .from("matches")
+          .select("id, date, away_club_name, status, home_formation, away_formation")
+          .eq("home_club_id", clubId)
+          .order("date", { ascending: false })
+          .limit(5)
+      : Promise.resolve({ data: [] as any[] });
+
+    const [clubRes, lineupsRes, playerStatsRes, teamStatsRes, apiStatsRes, apiPlayerStatsRes, eventsRes, recentMatchesRes] = await Promise.all([
+      clubId ? supabase.from("clubs").select("name, league, city").eq("id", clubId).single() : Promise.resolve({ data: null as any }),
+      supabase.from("match_lineups").select("team, starting, shirt_number, player_name, players(name, number, position)").eq("match_id", matchId),
+      supabase
+        .from("player_match_stats")
+        .select("*, players(name, number, position)")
+        .eq("match_id", matchId),
       supabase.from("team_match_stats").select("*").eq("match_id", matchId),
       supabase.from("api_football_match_stats").select("*").eq("match_id", matchId),
+      supabase.from("api_football_player_stats").select("player_name, minutes_played, rating, goals, assists, shots_total, shots_on_goal, passes_total, passes_accuracy, tackles, duels_won, duels_total").eq("club_id", clubId ?? "00000000-0000-0000-0000-000000000000"),
+      supabase.from("match_events").select("minute, event_type, team, player_name, related_player_name, notes").eq("match_id", matchId).order("minute"),
+      recentMatchesPromise,
     ]);
 
-    const homeLineups = (lineupsRes.data || []).filter((l: any) => l.team === "home");
-    const awayLineups = (lineupsRes.data || []).filter((l: any) => l.team === "away");
-    const homeStats = (teamStatsRes.data || []).find((t: any) => t.team === "home");
-    const awayStats = (teamStatsRes.data || []).find((t: any) => t.team === "away");
+    const homeLineups = (lineupsRes.data || []).filter((entry: any) => entry.team === "home");
+    const awayLineups = (lineupsRes.data || []).filter((entry: any) => entry.team === "away");
+    const playerStats = playerStatsRes.data || [];
+    const teamStats = teamStatsRes.data || [];
     const apiStats = apiStatsRes.data?.[0];
+    const events = eventsRes.data || [];
+    const qualityNotes = buildQualityNotes(playerStats, teamStats);
+    const homeStats = teamStats.find((entry: any) => entry.team === "home");
+    const awayStats = teamStats.find((entry: any) => entry.team === "away");
 
-    let context = `--- SPIELDATEN ---
+    const recentMatches = recentMatchesRes.data || [];
+    let recentTrendBlock = "Keine historischen Vergleichsdaten vorhanden.";
+    if (recentMatches.length > 0) {
+      const recentIds = recentMatches.map((entry: any) => entry.id);
+      const recentTeamStatsRes = await supabase
+        .from("team_match_stats")
+        .select("match_id, team, total_distance_km, top_speed_kmh, possession_pct, avg_distance_km")
+        .in("match_id", recentIds);
+
+      recentTrendBlock = recentMatches
+        .map((recent: any) => {
+          const current = (recentTeamStatsRes.data || []).filter((entry: any) => entry.match_id === recent.id);
+          return `- ${recent.date} vs ${recent.away_club_name || "Unbekannt"} [${recent.status}] ${current.map((entry: any) => `${entry.team}: ${fmt(entry.total_distance_km)} km / Ballbesitz ${fmt(entry.possession_pct, 0)}% / Top ${fmt(entry.top_speed_kmh)} km/h`).join(" | ")}`;
+        })
+        .join("\n");
+    }
+
+    const context = `--- SPIELKONTEXT ---
 Verein: ${clubRes.data?.name || "Unbekannt"}
+Ort / Stadt: ${clubRes.data?.city || "Nicht angegeben"}
 Liga: ${clubRes.data?.league || "Nicht angegeben"}
-Datum: ${match.date}${match.kickoff ? ` · Anstoß: ${match.kickoff}` : ""}
-Platz: ${(match.fields as any)?.name || "Unbekannt"}
+Datum: ${match.date}${match.kickoff ? ` · Anstoß ${match.kickoff}` : ""}
+Spielort: ${(match.fields as any)?.name || "Unbekannt"}
 Gegner: ${match.away_club_name || "Unbekannt"}
+Status: ${match.status}
 Heim-Formation: ${match.home_formation || "Nicht festgelegt"}
 Gast-Formation: ${match.away_formation || "Nicht festgelegt"}
-Status: ${match.status}
 
-HEIM-AUFSTELLUNG (${homeLineups.length}):
-${homeLineups.map((l: any) => `- #${l.shirt_number ?? l.players?.number ?? "?"} ${l.players?.name ?? l.player_name ?? "?"} (${l.players?.position ?? "?"}) ${l.starting ? "Startelf" : "Bank"}`).join("\n") || "Keine Aufstellung"}
+HEIMKADER:
+${homeLineups.map((entry: any) => `- #${entry.shirt_number ?? entry.players?.number ?? "?"} ${entry.players?.name ?? entry.player_name ?? "?"} (${entry.players?.position ?? "?"}) ${entry.starting ? "Startelf" : "Bank"}`).join("\n") || "Keine Heimkaderdaten"}
 
-GAST-AUFSTELLUNG (${awayLineups.length}):
-${awayLineups.map((l: any) => `- #${l.shirt_number ?? "?"} ${l.player_name ?? "?"} ${l.starting ? "Startelf" : "Bank"}`).join("\n") || "Keine Aufstellung"}
-`;
+GASTKADER:
+${awayLineups.map((entry: any) => `- #${entry.shirt_number ?? "?"} ${entry.player_name ?? "?"} ${entry.starting ? "Startelf" : "Bank"}`).join("\n") || "Keine Gastkaderdaten"}
 
-    if (homeStats || awayStats) {
-      context += `
-TEAM-STATISTIKEN:
-${homeStats ? `Heim: ${homeStats.total_distance_km?.toFixed(1) ?? "?"}km gesamt, Ø ${homeStats.avg_distance_km?.toFixed(1) ?? "?"}km, Top ${homeStats.top_speed_kmh?.toFixed(1) ?? "?"}km/h, Ballbesitz ${homeStats.possession_pct?.toFixed(0) ?? "?"}%` : ""}
-${awayStats ? `Gast: ${awayStats.total_distance_km?.toFixed(1) ?? "?"}km gesamt, Ø ${awayStats.avg_distance_km?.toFixed(1) ?? "?"}km, Top ${awayStats.top_speed_kmh?.toFixed(1) ?? "?"}km/h, Ballbesitz ${awayStats.possession_pct?.toFixed(0) ?? "?"}%` : ""}
-`;
-    }
+TEAMSTATISTIKEN:
+${homeStats ? `- Heim: ${fmt(homeStats.total_distance_km)} km gesamt, Ø ${fmt(homeStats.avg_distance_km)} km, Top ${fmt(homeStats.top_speed_kmh)} km/h, Ballbesitz ${fmt(homeStats.possession_pct, 0)}%` : "- Heim: keine Teamwerte"}
+${awayStats ? `- Gast: ${fmt(awayStats.total_distance_km)} km gesamt, Ø ${fmt(awayStats.avg_distance_km)} km, Top ${fmt(awayStats.top_speed_kmh)} km/h, Ballbesitz ${fmt(awayStats.possession_pct, 0)}%` : "- Gast: keine Teamwerte"}
 
-    const homePlayerStats = (playerStatsRes.data || []).filter((s: any) => s.team === "home");
-    if (homePlayerStats.length > 0) {
-      context += `
-SPIELER-STATISTIKEN (Heim):
-${homePlayerStats.map((s: any) => `- #${s.players?.number ?? "?"} ${s.players?.name ?? "?"} (${s.players?.position ?? "?"}): ${s.distance_km?.toFixed(1) ?? "?"}km, Top ${s.top_speed_kmh?.toFixed(1) ?? "?"}km/h, ${s.sprint_count ?? 0} Sprints, ${s.minutes_played ?? "?"}min, Pässe ${s.passes_completed ?? "?"}/${s.passes_total ?? "?"} (${s.pass_accuracy ? s.pass_accuracy.toFixed(0) + "%" : "?"}), Zweikämpfe ${s.duels_won ?? "?"}/${s.duels_total ?? "?"}, Tackles ${s.tackles ?? 0}, Tore ${s.goals ?? 0}, Assists ${s.assists ?? 0}, Schüsse ${s.shots_on_target ?? 0}/${s.shots_total ?? 0}, Ballkontakte ${s.ball_contacts ?? "?"}, Fouls ${s.fouls_committed ?? 0}, Rating ${s.rating ?? "?"}`).join("\n")}
-`;
-    }
+SPIELERSTATISTIKEN:
+${playerStats
+  .map((entry: any) => `- ${entry.team}: #${entry.players?.number ?? "?"} ${entry.players?.name ?? "?"} (${entry.players?.position ?? "?"}) · ${fmt(entry.distance_km)} km · Top ${fmt(entry.top_speed_kmh)} km/h · Ø ${fmt(entry.avg_speed_kmh)} km/h · ${entry.sprint_count ?? 0} Sprints · ${entry.minutes_played ?? "?"} Min · Pässe ${entry.passes_completed ?? 0}/${entry.passes_total ?? 0} · Passquote ${fmt(entry.pass_accuracy, 0)}% · Zweikämpfe ${entry.duels_won ?? 0}/${entry.duels_total ?? 0} · Tackles ${entry.tackles ?? 0} · Interceptions ${entry.interceptions ?? 0} · Tore ${entry.goals ?? 0} · Assists ${entry.assists ?? 0} · Rating ${entry.rating ?? "?"}`)
+  .join("\n") || "Keine Spielerstatistiken"}
 
-    if (apiStats) {
-      context += `
-API-FOOTBALL STATISTIKEN:
-Ergebnis: ${apiStats.home_goals ?? "?"} : ${apiStats.away_goals ?? "?"}
-Schüsse: ${apiStats.shots_home ?? "?"} (${apiStats.shots_on_target_home ?? "?"} aufs Tor) vs ${apiStats.shots_away ?? "?"} (${apiStats.shots_on_target_away ?? "?"} aufs Tor)
-Ballbesitz: ${apiStats.possession_home ?? "?"}% vs ${apiStats.possession_away ?? "?"}%
-Pässe: ${apiStats.passes_home ?? "?"} (${apiStats.pass_accuracy_home ?? "?"}% Genauigkeit) vs ${apiStats.passes_away ?? "?"} (${apiStats.pass_accuracy_away ?? "?"}%)
-Ecken: ${apiStats.corners_home ?? "?"} vs ${apiStats.corners_away ?? "?"}
-Fouls: ${apiStats.fouls_home ?? "?"} vs ${apiStats.fouls_away ?? "?"}
-Gelbe Karten: ${apiStats.yellow_cards_home ?? "?"} vs ${apiStats.yellow_cards_away ?? "?"}
-Rote Karten: ${apiStats.red_cards_home ?? "?"} vs ${apiStats.red_cards_away ?? "?"}
-`;
-    }
+EREIGNISSE:
+${events.map((event: any) => `- ${event.minute}'. ${event.team}: ${event.event_type}${event.player_name ? ` · ${event.player_name}` : ""}${event.related_player_name ? ` / ${event.related_player_name}` : ""}${event.notes ? ` · ${event.notes}` : ""}`).join("\n") || "Keine Ereignisse"}
 
-    context += "--- ENDE SPIELDATEN ---";
+${apiStats ? `API-FOOTBALL TEAMWERTE:
+- Ergebnis: ${apiStats.home_goals ?? "?"}:${apiStats.away_goals ?? "?"}
+- Schüsse: ${apiStats.shots_home ?? "?"} (${apiStats.shots_on_target_home ?? "?"} aufs Tor) vs ${apiStats.shots_away ?? "?"} (${apiStats.shots_on_target_away ?? "?"} aufs Tor)
+- Ballbesitz: ${apiStats.possession_home ?? "?"}% vs ${apiStats.possession_away ?? "?"}%
+- Pässe: ${apiStats.passes_home ?? "?"} (${apiStats.pass_accuracy_home ?? "?"}%) vs ${apiStats.passes_away ?? "?"} (${apiStats.pass_accuracy_away ?? "?"}%)
+- Ecken: ${apiStats.corners_home ?? "?"} vs ${apiStats.corners_away ?? "?"}
+- Fouls: ${apiStats.fouls_home ?? "?"} vs ${apiStats.fouls_away ?? "?"}
+- Karten: Gelb ${apiStats.yellow_cards_home ?? "?"}/${apiStats.yellow_cards_away ?? "?"}, Rot ${apiStats.red_cards_home ?? "?"}/${apiStats.red_cards_away ?? "?"}` : "API-FOOTBALL TEAMWERTE: nicht vorhanden"}
+
+API-FOOTBALL SPIELERWERTE (Fallback / Kontext):
+${(apiPlayerStatsRes.data || [])
+  .slice(0, 12)
+  .map((entry: any) => `- ${entry.player_name || "Unbekannt"}: ${entry.minutes_played ?? "?"} Min, Rating ${entry.rating ?? "?"}, Tore ${entry.goals ?? 0}, Assists ${entry.assists ?? 0}, Schüsse ${entry.shots_on_goal ?? 0}/${entry.shots_total ?? 0}, Pässe ${entry.passes_total ?? 0}, Passquote ${entry.passes_accuracy ?? "?"}%, Zweikämpfe ${entry.duels_won ?? 0}/${entry.duels_total ?? 0}, Tackles ${entry.tackles ?? 0}`)
+  .join("\n") || "Keine API-Spielerwerte geladen"}
+
+TREND LETZTE SPIELE:
+${recentTrendBlock}
+
+DATENQUALITÄT:
+${qualityNotes.length > 0 ? qualityNotes.map((note) => `- ${note}`).join("\n") : "- Keine offensichtlichen Datenwarnungen erkannt."}
+--- ENDE SPIELKONTEXT ---`;
 
     const promptKey = reportType in REPORT_PROMPTS ? reportType : "match";
-    const systemPrompt = `Du bist der Taktik-Analyst von FieldIQ. Antworte immer auf Deutsch. Formatiere mit Markdown.
+    const systemPrompt = `Du bist der leitende Match-Analyst und Kommunikationsredakteur von FieldIQ.
+${GENERAL_RULES}
 ${REPORT_PROMPTS[promptKey]}
 ${LENGTH_INSTRUCTIONS[length] || LENGTH_INSTRUCTIONS.medium}
 ${STYLE_INSTRUCTIONS[style] || STYLE_INSTRUCTIONS.professional}
@@ -224,17 +273,17 @@ ${STYLE_INSTRUCTIONS[style] || STYLE_INSTRUCTIONS.professional}
 ${context}`;
 
     const userMessages: Record<string, string> = {
-      prematch: "Erstelle einen Vorbericht für dieses Spiel.",
-      halftime: "Erstelle einen Halbzeitbericht basierend auf den bisherigen Daten der ersten Hälfte.",
-      match: "Erstelle einen Spielbericht basierend auf den vorliegenden Daten.",
-      training: "Erstelle einen detaillierten Trainingsplan für die kommende Woche basierend auf den Spieldaten und Spielerleistungen.",
+      prematch: "Erstelle jetzt einen hochwertigen Vorbericht auf Basis der vorliegenden Daten.",
+      halftime: "Erstelle jetzt einen hochwertigen Halbzeitbericht auf Basis der vorliegenden Daten.",
+      match: "Erstelle jetzt einen hochwertigen Nachbericht auf Basis der vorliegenden Daten.",
+      training: "Erstelle jetzt einen hochwertigen Trainings- und Maßnahmenbericht auf Basis der vorliegenden Daten.",
     };
 
     await supabase.from("report_generations").insert({
       user_id: userId,
       match_id: matchId,
       club_id: clubId,
-      report_type: reportType,
+      report_type: `${reportType}:${style || "professional"}`,
     });
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -244,7 +293,7 @@ ${context}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessages[promptKey] || userMessages.match },
@@ -256,18 +305,21 @@ ${context}`;
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Zu viele Anfragen. Bitte warte kurz." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "KI-Credits aufgebraucht." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
       return new Response(JSON.stringify({ error: "KI-Dienst nicht verfügbar" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -276,9 +328,9 @@ ${context}`;
     });
   } catch (e) {
     console.error("generate-report error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unbekannter Fehler" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unbekannter Fehler" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
