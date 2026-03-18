@@ -274,7 +274,7 @@ export default function FieldCalibration() {
       calibrated_at: new Date().toISOString(),
     };
     await saveCalibration.mutateAsync({ fieldId: id, calibration });
-    navigate("/fields");
+    navigate(backHref);
   };
 
   const confidenceMeta = layoutSuggestion.confidence ? confidenceCopy[layoutSuggestion.confidence] : null;
