@@ -304,6 +304,108 @@ export type Database = {
         }
         Relationships: []
       }
+      camera_access_codes: {
+        Row: {
+          active: boolean
+          club_id: string
+          code_hash: string
+          created_at: string
+          created_by_user_id: string
+          id: string
+          label: string
+          last_used_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          club_id: string
+          code_hash: string
+          created_at?: string
+          created_by_user_id: string
+          id?: string
+          label: string
+          last_used_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          club_id?: string
+          code_hash?: string
+          created_at?: string
+          created_by_user_id?: string
+          id?: string
+          label?: string
+          last_used_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camera_access_codes_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camera_access_sessions: {
+        Row: {
+          camera_index: number | null
+          club_id: string
+          code_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          last_used_at: string | null
+          match_id: string | null
+          session_token_hash: string
+        }
+        Insert: {
+          camera_index?: number | null
+          club_id: string
+          code_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          last_used_at?: string | null
+          match_id?: string | null
+          session_token_hash: string
+        }
+        Update: {
+          camera_index?: number | null
+          club_id?: string
+          code_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_used_at?: string | null
+          match_id?: string | null
+          session_token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camera_access_sessions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_access_sessions_code_id_fkey"
+            columns: ["code_id"]
+            isOneToOne: false
+            referencedRelation: "camera_access_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_access_sessions_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       changelog: {
         Row: {
           change_type: string
@@ -587,6 +689,7 @@ export type Database = {
       }
       match_lineups: {
         Row: {
+          excluded_from_tracking: boolean
           id: string
           match_id: string
           player_id: string | null
@@ -598,6 +701,7 @@ export type Database = {
           team: string
         }
         Insert: {
+          excluded_from_tracking?: boolean
           id?: string
           match_id: string
           player_id?: string | null
@@ -609,6 +713,7 @@ export type Database = {
           team: string
         }
         Update: {
+          excluded_from_tracking?: boolean
           id?: string
           match_id?: string
           player_id?: string | null
@@ -641,6 +746,8 @@ export type Database = {
           away_club_id: string | null
           away_club_name: string | null
           away_formation: string | null
+          consent_minors_confirmed: boolean
+          consent_players_confirmed: boolean
           created_at: string
           date: string
           field_id: string
@@ -649,12 +756,16 @@ export type Database = {
           id: string
           kickoff: string | null
           match_type: string
+          opponent_consent_confirmed: boolean
           status: string
+          track_opponent: boolean
         }
         Insert: {
           away_club_id?: string | null
           away_club_name?: string | null
           away_formation?: string | null
+          consent_minors_confirmed?: boolean
+          consent_players_confirmed?: boolean
           created_at?: string
           date: string
           field_id: string
@@ -663,12 +774,16 @@ export type Database = {
           id?: string
           kickoff?: string | null
           match_type?: string
+          opponent_consent_confirmed?: boolean
           status?: string
+          track_opponent?: boolean
         }
         Update: {
           away_club_id?: string | null
           away_club_name?: string | null
           away_formation?: string | null
+          consent_minors_confirmed?: boolean
+          consent_players_confirmed?: boolean
           created_at?: string
           date?: string
           field_id?: string
@@ -677,7 +792,9 @@ export type Database = {
           id?: string
           kickoff?: string | null
           match_type?: string
+          opponent_consent_confirmed?: boolean
           status?: string
+          track_opponent?: boolean
         }
         Relationships: [
           {
