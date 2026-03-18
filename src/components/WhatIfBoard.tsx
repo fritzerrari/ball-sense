@@ -70,8 +70,8 @@ export function WhatIfBoard({ players }: { players: Array<{ id?: string | null; 
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Formation</label>
-        <select value={formation} onChange={(event) => setFormation(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+        <label htmlFor="formation-select" className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Formation</label>
+        <select id="formation-select" value={formation} onChange={(event) => setFormation(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
           {FORMATIONS.map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
@@ -80,7 +80,7 @@ export function WhatIfBoard({ players }: { players: Array<{ id?: string | null; 
 
       <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <div className="relative overflow-x-auto rounded-3xl border border-border bg-pitch/15 p-4">
-          <div className="min-w-[640px]">
+          <div className="min-w-[560px] sm:min-w-[640px]">
             <div className="absolute inset-4 rounded-[1.25rem] border border-pitch-line/40" />
             <div className="absolute bottom-4 left-1/2 top-4 w-px -translate-x-1/2 bg-pitch-line/30" />
             <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pitch-line/30" />
@@ -89,10 +89,10 @@ export function WhatIfBoard({ players }: { players: Array<{ id?: string | null; 
                 const player = players[index];
                 return (
                   <div key={`${slot}-${index}`} className={`absolute ${SLOT_CLASSES[index] || SLOT_CLASSES[SLOT_CLASSES.length - 1]}`}>
-                    <div className="w-[82px] rounded-2xl border border-border bg-background/90 px-2.5 py-2 text-center shadow-sm sm:w-[96px]">
+                    <div className="w-[74px] rounded-2xl border border-border bg-background/90 px-2 py-2 text-center shadow-sm sm:w-[88px] lg:w-[96px]">
                       <p className="truncate text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{POSITION_LABELS[slot] || slot}</p>
-                      <p className="mt-1 line-clamp-2 text-xs font-semibold leading-4">{player?.players?.name || "Offen"}</p>
-                      <p className="mt-1 truncate text-[11px] text-muted-foreground">{player?.players?.position ? POSITION_LABELS[player.players.position] || player.players.position : "Noch kein Profil"}</p>
+                      <p className="mt-1 line-clamp-2 break-words text-[11px] font-semibold leading-4 sm:text-xs">{player?.players?.name || "Offen"}</p>
+                      <p className="mt-1 truncate text-[10px] text-muted-foreground sm:text-[11px]">{player?.players?.position ? POSITION_LABELS[player.players.position] || player.players.position : "Noch kein Profil"}</p>
                     </div>
                   </div>
                 );
