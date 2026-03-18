@@ -300,8 +300,8 @@ export default function FieldCalibration() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-3xl space-y-6">
-        <Link to="/fields" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Zurück zu Plätze
+        <Link to={backHref} className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> {backLabel}
         </Link>
 
         <h1 className="font-display flex items-center gap-2 text-2xl font-bold">
