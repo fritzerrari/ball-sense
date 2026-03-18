@@ -262,7 +262,7 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
 /* ─── Loading / Analyzing State ─── */
 function LoadingState({ progress, phase }: { progress: number; phase: "load" | "analyze" }) {
   const loadLabels = ["Kameradaten synchronisieren...", "Tracking-Punkte zusammenführen...", "Spielerpositionen extrahieren...", "Daten validieren..."];
-  const analyzeLabels = ["Laufwege berechnen...", "Sprint-Analyse...", "Heatmaps generieren...", "Advanced Analytics...", "Dashboard aufbauen..."];
+  const analyzeLabels = ["Coach Summary erstellen...", "Leaderboards berechnen...", "Datenwarnungen prüfen...", "Was-wäre-wenn vorbereiten...", "Cockpit aufbauen..."];
   const labels = phase === "load" ? loadLabels : analyzeLabels;
   const idx = Math.min(Math.floor(progress / (100 / labels.length)), labels.length - 1);
 
