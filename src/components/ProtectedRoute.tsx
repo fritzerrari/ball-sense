@@ -17,10 +17,10 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    const redirectTo = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(redirectTo)}`} replace />;
   }
 
-  // Redirect to onboarding if user has no club (except if already on onboarding)
   if (!clubId && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }
