@@ -111,7 +111,7 @@ export default function ReportGenerator({ matchId, matchStatus, clubName, awayCl
   };
 
   const getTitle = () => {
-    const typeLabel = reportType === "prematch" ? "Vorbericht" : reportType === "halftime" ? "Halbzeitbericht" : reportType === "training" ? "Trainingsplan" : "Spielbericht";
+    const typeLabel = reportType === "prematch" ? "Vorbericht" : reportType === "halftime" ? "Halbzeitbericht" : reportType === "training" ? "Trainingsplan" : "Nachbericht";
     return `${typeLabel}_${clubName}_vs_${awayClubName}_${matchDate}`;
   };
 
