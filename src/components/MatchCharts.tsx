@@ -20,7 +20,7 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Activity, Shield, Goal, Crosshair, Gauge, Trophy } from "lucide-react";
+import { Activity, AlertTriangle, Shield, Goal, Crosshair, Gauge, Trophy } from "lucide-react";
 import { MetricDetailDialog } from "@/components/MetricDetailDialog";
 
 interface TeamStats {
@@ -148,6 +148,76 @@ function formatMetricValue(value: number, unit?: string) {
   return unit ? `${rounded}${unit}` : String(rounded);
 }
 
+function getMetricSignal(
+  metric: TopMetric,
+  value: number,
+): { label: string; detail: string; tone: "steady" | "strong" | "warn" | "critical" } {
+  if (metric === "top_speed_kmh") {
+    if (value > 45) return { label: "Unrealistisch", detail: "Plausibilität prüfen – möglicher Tracking- oder Kalibrierfehler.", tone: "critical" };
+    if (value > 38) return { label: "Auffällig", detail: "Sehr hoher Peak – Wert mit Video und Spielfeldkalibrierung abgleichen.", tone: "warn" };
+    if (value > 33) return { label: "Stark", detail: "Explosiver Peak über dem üblichen Matchniveau.", tone: "strong" };
+    return { label: "Normal", detail: "Der Wert liegt im plausiblen Matchbereich.", tone: "steady" };
+  }
+
+  if (metric === "distance_km") {
+    if (value > 15) return { label: "Auffällig", detail: "Sehr hohe Distanz – Minuten und Tracking prüfen.", tone: "warn" };
+    if (value > 11.5) return { label: "Stark", detail: "Hoher Workload im aktuellen Match.", tone: "strong" };
+    return { label: "Normal", detail: "Belastung wirkt aktuell plausibel.", tone: "steady" };
+  }
+
+  if (metric === "sprint_count") {
+    if (value > 60) return { label: "Auffällig", detail: "Sprintanzahl fällt stark auf und sollte eingeordnet werden.", tone: "warn" };
+    if (value > 30) return { label: "Stark", detail: "Hohe wiederholte Intensität im Match.", tone: "strong" };
+    return { label: "Normal", detail: "Sprintprofil liegt im erwartbaren Bereich.", tone: "steady" };
+  }
+
+  if (metric === "passes_total") {
+    if (value > 75) return { label: "Stark", detail: "Der Spieler war zentraler Knoten im Ballbesitz.", tone: "strong" };
+    return { label: "Normal", detail: "Solider, aber nicht dominanter Einfluss im Aufbau.", tone: "steady" };
+  }
+
+  if (metric === "tackles") {
+    if (value > 10) return { label: "Stark", detail: "Sehr hoher defensiver Zugriff im direkten Zweikampf.", tone: "strong" };
+    return { label: "Normal", detail: "Defensiver Beitrag liegt im üblichen Rahmen.", tone: "steady" };
+  }
+
+  if (metric === "ball_recoveries") {
+    if (value > 14) return { label: "Stark", detail: "Hoher Gegenpressing- und Balleroberungswert.", tone: "strong" };
+    return { label: "Normal", detail: "Balleroberungen wirken aktuell plausibel.", tone: "steady" };
+  }
+
+  return { label: "Normal", detail: "Wert im erwartbaren Matchkontext.", tone: "steady" };
+}
+
+function getSignalClasses(tone: "steady" | "strong" | "warn" | "critical") {
+  switch (tone) {
+    case "critical":
+      return {
+        badge: "border-destructive/30 bg-destructive/10 text-foreground",
+        dot: "bg-destructive",
+        bar: "bg-destructive",
+      };
+    case "warn":
+      return {
+        badge: "border-warning/30 bg-warning/10 text-foreground",
+        dot: "bg-warning",
+        bar: "bg-warning",
+      };
+    case "strong":
+      return {
+        badge: "border-primary/30 bg-primary/10 text-foreground",
+        dot: "bg-primary",
+        bar: "bg-primary",
+      };
+    default:
+      return {
+        badge: "border-border bg-secondary/60 text-secondary-foreground",
+        dot: "bg-accent",
+        bar: "bg-accent",
+      };
+  };
+}
+
 export function MatchKpiStrip({
   homeTeamStats,
   awayTeamStats,
@@ -208,7 +278,7 @@ export function MatchKpiStrip({
   ];
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-6">
       {cards.map(({ label, unit, homeValue, awayValue, icon: Icon, detail }) => {
         const winner = leadingTeam(homeValue, awayValue, homeName, awayName);
         const maxValue = Math.max(homeValue, awayValue);
@@ -226,17 +296,19 @@ export function MatchKpiStrip({
               { label: "Momentum", value: winner, hint: "Team mit Vorteil in dieser Kategorie" },
             ]}
           >
-            <div className="relative h-full space-y-3 overflow-hidden p-4 game-panel">
-              <div className="relative flex items-center justify-between gap-3 pr-16">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Icon className="h-4 w-4" />
+            <div className="game-panel relative h-full overflow-hidden p-4">
+              <div className="relative space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Battle Pulse</span>
                 </div>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Battle Pulse</span>
-              </div>
-              <div className="relative space-y-1">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="text-2xl font-bold font-display">{formatMetricValue(maxValue, unit)}</p>
-                <p className="truncate text-xs font-medium text-primary">{winner}</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-2xl font-bold font-display">{formatMetricValue(maxValue, unit)}</p>
+                  <p className="truncate text-xs font-medium text-primary">{winner}</p>
+                </div>
               </div>
             </div>
           </MetricDetailDialog>
@@ -281,12 +353,12 @@ export function MatchRadarChart({ homeTeamStats, awayTeamStats, homePlayerStats,
       }))}
       contentClassName="sm:max-w-4xl"
     >
-      <div className="h-full p-5 space-y-4 sm:p-6 game-panel">
-        <div className="relative pr-16">
+      <div className="game-panel h-full space-y-4 p-5 sm:p-6">
+        <div className="space-y-1">
           <h3 className="text-base font-semibold font-display">Wirkungsprofil</h3>
           <p className="text-sm text-muted-foreground">Vergleich der Spielidentität über Intensität, Kontrolle, Duelle und Chance-Erzeugung.</p>
         </div>
-        <ChartContainer config={{ ...comparisonConfig, home: { ...comparisonConfig.home, label: homeName }, away: { ...comparisonConfig.away, label: awayName } }} className="aspect-auto h-72 w-full">
+        <ChartContainer config={{ ...comparisonConfig, home: { ...comparisonConfig.home, label: homeName }, away: { ...comparisonConfig.away, label: awayName } }} className="aspect-auto h-72 w-full sm:h-80">
           <RadarChart data={data}>
             <ChartTooltip content={<ChartTooltipContent />} />
             <PolarGrid stroke="hsl(var(--border))" />
@@ -356,6 +428,18 @@ function getTopChartMeta(title: string) {
   };
 }
 
+type TopMetric =
+  | "distance_km"
+  | "top_speed_kmh"
+  | "sprint_count"
+  | "passes_total"
+  | "tackles"
+  | "ball_recoveries"
+  | "goals"
+  | "assists"
+  | "shots_total"
+  | "aerial_won";
+
 export function TopPlayersChart({
   stats,
   title,
@@ -364,17 +448,7 @@ export function TopPlayersChart({
 }: {
   stats: PlayerStat[];
   title: string;
-  metric:
-    | "distance_km"
-    | "top_speed_kmh"
-    | "sprint_count"
-    | "passes_total"
-    | "tackles"
-    | "ball_recoveries"
-    | "goals"
-    | "assists"
-    | "shots_total"
-    | "aerial_won";
+  metric: TopMetric;
   unit: string;
 }) {
   if (!stats.length) return null;
@@ -387,7 +461,7 @@ export function TopPlayersChart({
   if (!sorted.length) return null;
 
   const chartData = sorted.map((s, index) => ({
-    name: s.players?.name?.substring(0, 16) ?? "—",
+    name: s.players?.name?.substring(0, 14) ?? "—",
     value: Math.round(((s[metric] as number) ?? 0) * 10) / 10,
     fullName: s.players?.name ?? "—",
     rank: index + 1,
@@ -396,8 +470,11 @@ export function TopPlayersChart({
 
   const leader = sorted[0];
   const average = chartData.reduce((sum, item) => sum + item.value, 0) / chartData.length;
+  const spread = (chartData[0]?.value ?? 0) - (chartData[chartData.length - 1]?.value ?? 0);
   const meta = getTopChartMeta(title);
   const Icon = meta.icon;
+  const signal = getMetricSignal(metric, chartData[0]?.value ?? 0);
+  const signalClasses = getSignalClasses(signal.tone);
 
   return (
     <MetricDetailDialog
@@ -412,88 +489,104 @@ export function TopPlayersChart({
       }))}
     >
       <div className="game-panel h-full p-5 sm:p-6">
-        <div className="relative flex h-full flex-col gap-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/70 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-muted-foreground backdrop-blur-sm">
-                <Icon className="h-3.5 w-3.5 text-primary" />
-                {meta.eyebrow}
+        <div className="flex h-full flex-col gap-4">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 space-y-3">
+              <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/80 bg-background/70 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-muted-foreground backdrop-blur-sm">
+                <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span className="truncate">{meta.eyebrow}</span>
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-semibold font-display">{title}</h3>
-                <p className="text-sm text-muted-foreground">Top 5 Spieler im aktuellen Match</p>
+                <h3 className="break-words text-base font-semibold font-display">{title}</h3>
+                <p className="text-sm text-muted-foreground">Top 5 Spieler im aktuellen Match mit Einordnung und Peak-Indikator.</p>
               </div>
             </div>
-            <div className="min-w-[120px] rounded-2xl border border-border/80 bg-background/70 px-3 py-2 text-right backdrop-blur-sm">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Peak</p>
-              <p className="text-xl font-bold font-display text-foreground">{formatMetricValue(chartData[0]?.value ?? 0, unit ? ` ${unit}` : undefined)}</p>
-              <p className="truncate text-xs font-medium text-primary">{leader?.players?.name ?? "—"}</p>
+
+            <div className={`min-w-[180px] rounded-3xl border px-4 py-3 backdrop-blur-sm ${signalClasses.badge}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Peak</p>
+                  <p className="mt-2 text-2xl font-bold font-display text-foreground">{formatMetricValue(chartData[0]?.value ?? 0, unit ? ` ${unit}` : undefined)}</p>
+                  <p className="mt-1 line-clamp-2 text-xs font-medium text-foreground/80">{leader?.players?.name ?? "—"}</p>
+                </div>
+                {signal.tone === "warn" || signal.tone === "critical" ? <AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-foreground" /> : null}
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="rounded-2xl border border-border/70 bg-muted/20 p-3">
-              <div className="mb-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span>{meta.highlight}</span>
-                <span>Ø Top 5: {formatMetricValue(average, unit ? ` ${unit}` : undefined)}</span>
+          <div className="space-y-3 rounded-3xl border border-border/70 bg-background/40 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{meta.highlight}</p>
+                <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] ${signalClasses.badge}`}>
+                  <span className={`h-2 w-2 rounded-full ${signalClasses.dot}`} />
+                  {signal.label}
+                </div>
               </div>
-              <ChartContainer config={{ value: { label: title, color: "hsl(var(--primary))" } }} className="aspect-auto h-60 w-full">
-                <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 26, top: 4, bottom: 4 }} barCategoryGap={12}>
-                  <CartesianGrid strokeDasharray="2 6" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={112}
-                    tick={{ fill: "hsl(var(--foreground))", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value, _name, item) => [
-                          `${value}${unit ? ` ${unit}` : ""}`,
-                          (item?.payload as { fullName?: string } | undefined)?.fullName ?? title,
-                        ]}
-                      />
-                    }
-                  />
-                  <Bar dataKey="value" name="value" radius={[999, 999, 999, 999]} barSize={18} background={{ fill: "hsl(var(--muted))", radius: 999 }}>
-                    {chartData.map((entry) => (
-                      <Cell key={entry.rank} fill={entry.fill} />
-                    ))}
-                    <LabelList
-                      dataKey="value"
-                      position="right"
-                      offset={10}
-                      formatter={(value: number) => formatMetricValue(value, unit ? ` ${unit}` : undefined)}
-                      className="fill-foreground"
-                      fontSize={11}
-                    />
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
+              <p className="text-xs text-muted-foreground">Ø Top 5: {formatMetricValue(average, unit ? ` ${unit}` : undefined)}</p>
             </div>
 
-            <div className="grid min-w-[132px] gap-3 sm:w-[148px]">
-              <div className="rounded-2xl border border-primary/20 bg-primary/10 p-3">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{meta.summaryLabel}</p>
-                <p className="mt-2 line-clamp-2 text-sm font-semibold font-display text-foreground">{leader?.players?.name ?? "—"}</p>
-                <p className="mt-1 text-xs text-primary">#{chartData[0]?.rank ?? 1}</p>
-              </div>
-              <div className="rounded-2xl border border-border/80 bg-background/60 p-3 backdrop-blur-sm">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Spread</p>
-                <p className="mt-2 text-lg font-bold font-display">
-                  {formatMetricValue((chartData[0]?.value ?? 0) - (chartData[chartData.length - 1]?.value ?? 0), unit ? ` ${unit}` : undefined)}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">Differenz zwischen Platz 1 und 5</p>
-              </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: "Normal", active: signal.tone === "steady" },
+                { label: "Stark", active: signal.tone === "strong" },
+                { label: "Auffällig", active: signal.tone === "warn" },
+                { label: "Unrealistisch", active: signal.tone === "critical" },
+              ].map((item) => (
+                <div key={item.label} className="space-y-1">
+                  <div className={`h-1.5 rounded-full ${item.active ? signalClasses.bar : "bg-muted"}`} />
+                  <p className="truncate text-[10px] text-muted-foreground">{item.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <ChartContainer config={{ value: { label: title, color: "hsl(var(--primary))" } }} className="aspect-auto h-64 w-full sm:h-72">
+              <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 20, top: 4, bottom: 4 }} barCategoryGap={12}>
+                <CartesianGrid strokeDasharray="2 6" stroke="hsl(var(--border))" horizontal={false} />
+                <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={88} tick={{ fill: "hsl(var(--foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, _name, item) => [
+                        `${value}${unit ? ` ${unit}` : ""}`,
+                        (item?.payload as { fullName?: string } | undefined)?.fullName ?? title,
+                      ]}
+                    />
+                  }
+                />
+                <Bar dataKey="value" name="value" radius={[999, 999, 999, 999]} barSize={18} background={{ fill: "hsl(var(--muted))", radius: 999 }}>
+                  {chartData.map((entry) => (
+                    <Cell key={entry.rank} fill={entry.fill} />
+                  ))}
+                  <LabelList
+                    dataKey="value"
+                    position="right"
+                    offset={8}
+                    formatter={(value: number) => formatMetricValue(value, unit ? ` ${unit}` : undefined)}
+                    className="fill-foreground"
+                    fontSize={11}
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-2xl border border-primary/20 bg-primary/10 p-3">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{meta.summaryLabel}</p>
+              <p className="mt-2 line-clamp-2 text-sm font-semibold font-display text-foreground">{leader?.players?.name ?? "—"}</p>
+              <p className="mt-1 text-xs text-primary">#{chartData[0]?.rank ?? 1}</p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-background/60 p-3 backdrop-blur-sm">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Spread</p>
+              <p className="mt-2 text-lg font-bold font-display">{formatMetricValue(spread, unit ? ` ${unit}` : undefined)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Differenz zwischen Platz 1 und 5</p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-background/60 p-3 backdrop-blur-sm sm:col-span-2 xl:col-span-1">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Indikator</p>
+              <p className="mt-2 text-sm font-semibold font-display">{signal.label}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{signal.detail}</p>
             </div>
           </div>
         </div>
@@ -530,12 +623,12 @@ export function ComparisonBarChart({ homeTeamStats, awayTeamStats, homePlayerSta
       }))}
       contentClassName="sm:max-w-4xl"
     >
-      <div className="h-full p-5 space-y-4 sm:p-6 game-panel">
-        <div className="relative pr-16">
+      <div className="game-panel h-full space-y-4 p-5 sm:p-6">
+        <div className="space-y-1">
           <h3 className="text-base font-semibold font-display">Statistik-Vergleich</h3>
           <p className="text-sm text-muted-foreground">Direkter Vergleich von Match-Kontrolle, Duellstärke und Offensivproduktion.</p>
         </div>
-        <ChartContainer config={{ home: { label: homeName, color: "hsl(var(--primary))" }, away: { label: awayName, color: "hsl(var(--accent))" } }} className="aspect-auto h-72 w-full">
+        <ChartContainer config={{ home: { label: homeName, color: "hsl(var(--primary))" }, away: { label: awayName, color: "hsl(var(--accent))" } }} className="aspect-auto h-72 w-full sm:h-80">
           <BarChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />

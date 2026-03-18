@@ -66,7 +66,7 @@ export function MatchInsightsPanel({
   const linkedZonePlayers = zones.flatMap((zone) => zone.players).filter((player) => player.id).slice(0, 4);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
+    <div className="grid gap-4 2xl:grid-cols-[1.15fr,0.85fr]">
       <MetricDetailDialog
         title="Schwachstellen-Heatmap"
         subtitle="Diese Ansicht markiert Problemzonen aus Raumkontrolle, gegnerischer Präsenz und Drucksignalen aus dem Spiel."
@@ -78,22 +78,24 @@ export function MatchInsightsPanel({
           hint: zone.description,
         }))}
         footer={
-          <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Direkt zu betroffenen Spielern</p>
-            <div className="flex flex-wrap gap-2">
-              {linkedZonePlayers.map((player) => (
-                <Button key={`${player.id}-${player.name}`} variant="heroOutline" size="sm" asChild>
-                  <Link to={`/players/${player.id}`}>{player.name}</Link>
-                </Button>
-              ))}
+          linkedZonePlayers.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Direkt zu betroffenen Spielern</p>
+              <div className="flex flex-wrap gap-2">
+                {linkedZonePlayers.map((player) => (
+                  <Button key={`${player.id}-${player.name}`} variant="heroOutline" size="sm" asChild>
+                    <Link to={`/players/${player.id}`}>{player.name}</Link>
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null
         }
         contentClassName="sm:max-w-5xl"
       >
         <div className="game-panel h-full space-y-4 p-5 sm:p-6">
-          <div className="flex items-start justify-between gap-3 pr-16">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <h3 className="text-base font-semibold font-display">Schwachstellen-Heatmap</h3>
               <p className="text-sm text-muted-foreground">Problemzonen der Mannschaft mit direkter Trainer-Priorisierung.</p>
             </div>
@@ -102,12 +104,12 @@ export function MatchInsightsPanel({
             </div>
           </div>
           <HeatmapField label="Risikozonen" grid={weaknessGrid} />
-          <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid gap-2 lg:grid-cols-3">
             {zones.map((zone) => (
               <div key={zone.id} className="rounded-2xl border border-border bg-background/60 p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold font-display break-words">{zone.label}</p>
-                  <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-secondary-foreground">
+                  <p className="min-w-0 break-words text-sm font-semibold font-display">{zone.label}</p>
+                  <span className="shrink-0 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-secondary-foreground">
                     {severityLabel(zone.severity)}
                   </span>
                 </div>
@@ -118,11 +120,11 @@ export function MatchInsightsPanel({
         </div>
       </MetricDetailDialog>
 
-      <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-1">
         <div className="glass-card relative space-y-4 overflow-hidden p-5 sm:p-6">
-          <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-r from-primary/10 via-accent/10 to-transparent pointer-events-none" />
-          <div className="relative flex items-start justify-between gap-3">
-            <div>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-r from-primary/10 via-accent/10 to-transparent" />
+          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <h3 className="text-base font-semibold font-display">Gegentor-Analyse</h3>
               <p className="text-sm text-muted-foreground">Wann, wie und warum das Team unter Druck geraten ist.</p>
             </div>
@@ -134,7 +136,7 @@ export function MatchInsightsPanel({
           <div className="relative rounded-2xl border border-border bg-background/60 p-4">
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Datenlage</p>
             <p className="mt-2 text-lg font-bold font-display">{conceded.concededGoals} Gegentore</p>
-            <p className="mt-1 text-xs text-muted-foreground">{conceded.dataQuality}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{conceded.dataQuality}</p>
           </div>
 
           <div className="space-y-3">
@@ -143,8 +145,8 @@ export function MatchInsightsPanel({
                 <div key={factor.title} className="rounded-2xl border border-border bg-background/60 p-4">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <div>
-                      <p className="text-sm font-semibold">{factor.title}</p>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold">{factor.title}</p>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">{factor.detail}</p>
                     </div>
                   </div>
@@ -184,37 +186,37 @@ export function MatchInsightsPanel({
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <ShieldAlert className="h-4 w-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-base font-semibold font-display">Coach-Navigation</h3>
               <p className="text-sm text-muted-foreground">Schnelle Wege von der Teamanalyse in die passenden Spielerprofile.</p>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Defensive Fokusspieler</p>
-            {defensiveLeaders.map((player) => (
-              <Link key={player.id} to={`/players/${player.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 transition-colors hover:border-primary/40">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{player.name}</span>
-                <span className="text-xs text-muted-foreground">{player.value} Ballgewinne</span>
-                <ArrowRight className="h-4 w-4 text-primary" />
-              </Link>
-            ))}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Defensive Fokusspieler</p>
+              {defensiveLeaders.map((player) => (
+                <Link key={player.id} to={`/players/${player.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 transition-colors hover:border-primary/40">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{player.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{player.value} Ballgewinne</span>
+                  <ArrowRight className="h-4 w-4 text-primary" />
+                </Link>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Aufbauspiel prüfen</p>
+              {buildUpLeaders.map((player) => (
+                <Link key={player.id} to={`/players/${player.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 transition-colors hover:border-primary/40">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{player.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{player.value} Pässe</span>
+                  <ArrowRight className="h-4 w-4 text-primary" />
+                </Link>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Aufbauspiel prüfen</p>
-            {buildUpLeaders.map((player) => (
-              <Link key={player.id} to={`/players/${player.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 transition-colors hover:border-primary/40">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{player.name}</span>
-                <span className="text-xs text-muted-foreground">{player.value} Pässe</span>
-                <ArrowRight className="h-4 w-4 text-primary" />
-              </Link>
-            ))}
-          </div>
-
-          <Button variant="heroOutline" size="sm" asChild>
-            <Link to={`/matches/${matchId}`}>Zum Coaching-Cockpit</Link>
-          </Button>
+          <p className="text-xs leading-5 text-muted-foreground">Match-ID: {matchId}</p>
         </div>
       </div>
     </div>
