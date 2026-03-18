@@ -33,11 +33,17 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
       const { data } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
 
+      if (!accessToken) {
+        toast.error("Bitte erneut anmelden.");
+        setIsGenerating(false);
+        return;
+      }
+
       const resp = await fetch(ANALYZE_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ type: genMode === "training" ? "training" : type, playerId, matchId }),
         signal: abortRef.current.signal,
