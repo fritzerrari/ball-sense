@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
+import { supabase } from "@/integrations/supabase/client";
 
 const REPORT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-report`;
 
@@ -35,9 +36,22 @@ export default function ReportGenerator({ matchId, matchStatus, clubName, awayCl
     let soFar = "";
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        toast.error("Bitte melde dich erneut an.");
+        setIsGenerating(false);
+        return;
+      }
+
       const resp = await fetch(REPORT_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ matchId, reportType, length, style }),
         signal: abortRef.current.signal,
       });
@@ -68,18 +82,33 @@ export default function ReportGenerator({ matchId, matchStatus, clubName, awayCl
           if (json === "[DONE]") break;
           try {
             const c = JSON.parse(json).choices?.[0]?.delta?.content;
-            if (c) { soFar += c; setReport(soFar); }
-          } catch { buf = line + "\n" + buf; break; }
+            if (c) {
+              soFar += c;
+              setReport(soFar);
+            }
+          } catch {
+            buf = line + "\n" + buf;
+            break;
+          }
         }
       }
     } catch (e: any) {
-      if (e.name !== "AbortError") { console.error(e); toast.error(t("report.connectionError")); }
+      if (e.name !== "AbortError") {
+        console.error(e);
+        toast.error(t("report.connectionError"));
+      }
     }
     setIsGenerating(false);
   };
 
-  const cancel = () => { abortRef.current?.abort(); setIsGenerating(false); };
-  const copyToClipboard = () => { navigator.clipboard.writeText(report); toast.success(t("report.copied")); };
+  const cancel = () => {
+    abortRef.current?.abort();
+    setIsGenerating(false);
+  };
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(report);
+    toast.success(t("report.copied"));
+  };
 
   const getTitle = () => {
     const typeLabel = reportType === "prematch" ? "Vorbericht" : reportType === "halftime" ? "Halbzeitbericht" : reportType === "training" ? "Trainingsplan" : "Spielbericht";
@@ -99,10 +128,15 @@ export default function ReportGenerator({ matchId, matchStatus, clubName, awayCl
 
   const downloadPDF = () => {
     const printWindow = window.open("", "_blank");
-    if (!printWindow) { toast.error("Popup blockiert"); return; }
+    if (!printWindow) {
+      toast.error("Popup blockiert");
+      return;
+    }
     printWindow.document.write(`<!DOCTYPE html><html><head><title>${getTitle()}</title><style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;line-height:1.6;color:#1a1a1a}h1,h2,h3{margin-top:1.5em}h1{font-size:1.5em;border-bottom:2px solid #10b981;padding-bottom:8px}h2{font-size:1.2em;color:#059669}h3{font-size:1em}@media print{body{margin:0}}</style></head><body>${report.replace(/\n/g, "<br>")}</body></html>`);
     printWindow.document.close();
-    setTimeout(() => { printWindow.print(); }, 500);
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
   };
 
   const shareEmail = () => {
