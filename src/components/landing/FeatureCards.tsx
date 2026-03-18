@@ -73,13 +73,16 @@ export function FeatureCards() {
       span: "sm:col-span-2",
       accent: "from-primary/20 to-primary/5",
     },
-    {
-      icon: FileText,
-      title: t("landing.feat7Title"),
-      desc: t("landing.feat7Desc"),
-      span: "sm:col-span-2",
-      accent: "from-accent/15 to-transparent",
-    },
+      {
+        icon: FileText,
+        title: language === "de" ? "Vor-, Halbzeit- & Nachberichte" : "Pre-, halftime & post-match reports",
+        desc:
+          language === "de"
+            ? "Erstelle Vorbericht, Halbzeitanalyse und Nachbericht direkt aus Tracking-, KI- und Matchdaten inklusive Export in mehrere Stilrichtungen."
+            : "Create pre-match, halftime and post-match reports directly from tracking, AI and match data with export in multiple styles.",
+        span: "sm:col-span-2",
+        accent: "from-accent/15 to-transparent",
+      },
     {
       icon: Dumbbell,
       title: t("landing.feat8Title"),
