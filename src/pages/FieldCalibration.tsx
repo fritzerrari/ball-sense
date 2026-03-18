@@ -79,6 +79,7 @@ const featureLabels: Record<string, { label: string; icon: typeof Goal }> = {
 export default function FieldCalibration() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: field, isLoading } = useField(id);
   const saveCalibration = useSaveCalibration();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +96,10 @@ export default function FieldCalibration() {
 
   const cornerLabels = ["Links-Oben", "Rechts-Oben", "Rechts-Unten", "Links-Unten"];
   const canSave = points.length === 4;
+  const returnTo = searchParams.get("returnTo");
+  const backHref = returnTo || "/fields";
+  const backLabel = returnTo ? "Zurück zum Tracking" : "Zurück zu Plätze";
+  const saveLabel = returnTo ? "Speichern & weiter" : "Kalibrierung speichern";
 
   useEffect(() => {
     if (field) {
