@@ -71,9 +71,9 @@ export function DemoSection() {
           viewport={{ once: true }}
         >
           <span className="text-xs font-semibold text-primary font-display tracking-wider uppercase mb-3 block">Interaktive Demo</span>
-          <h2 className="text-3xl md:text-4xl font-bold font-display mb-3">Erlebe FieldIQ — ohne Anmeldung</h2>
-          <p className="text-muted-foreground max-w-lg mx-auto text-sm">
-            So sieht es aus, wenn nach einem Spiel neue Tracking-Daten für dein Team bereitstehen.
+          <h2 className="text-3xl md:text-4xl font-bold font-display mb-3">Erlebe das neue Coaching-Cockpit — ohne Anmeldung</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto text-sm leading-relaxed">
+            Coach Summary, Datenwarnungen, Leaderboards und Was-wäre-wenn-Analyse erscheinen in einem klaren Flow direkt nach dem Spiel.
           </p>
         </motion.div>
 
@@ -110,10 +110,10 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
   ];
 
   const analysisCategories = [
-    { icon: Route, label: "Laufdaten", items: ["Distanz", "Speed", "Sprints", "Heatmaps"] },
-    { icon: Target, label: "Spielstatistiken", items: ["Pässe", "Zweikämpfe", "Schüsse", "Ballkontakte"] },
-    { icon: Sparkles, label: "KI-Berichte", items: ["Spielbericht", "Halbzeitanalyse", "Social Media", "Trainingsplan"] },
-    { icon: Gauge, label: "Advanced Analytics", items: ["xG", "PPDA", "Field Tilt", "Konter"] },
+    { icon: Clipboard, label: "Coach Summary", items: ["Spielkontrolle", "Fokusspieler", "Warnsignal", "Nächste Aktion"] },
+    { icon: BarChart3, label: "Leaderboards", items: ["Top-Speed", "Passquote", "Sprints", "Zweikämpfe"] },
+    { icon: TriangleAlert, label: "Datenqualität", items: ["Ausreißer", "Plausibilität", "Warnstatus", "Kalibrier-Hinweise"] },
+    { icon: Sparkles, label: "Taktik-Tools", items: ["Heatmaps", "KI-Erkenntnisse", "Formationen", "Was-wäre-wenn"] },
   ];
 
   return (
@@ -178,9 +178,9 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
             <div className="flex items-center justify-between mt-2 text-[8px] text-muted-foreground">
               <span>Wenig Aktivität</span>
               <div className="flex gap-0.5">
-                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(180 70% 50% / 0.7), hsl(160 60% 45% / 0.5))' }} />
-                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(50 90% 55% / 0.8), hsl(35 80% 50% / 0.6))' }} />
-                <div className="w-4 h-2 rounded-sm" style={{ background: 'linear-gradient(to right, hsl(25 90% 55% / 0.9), hsl(5 85% 50% / 0.8))' }} />
+                <div className="w-4 h-2 rounded-sm bg-primary/30" />
+                <div className="w-4 h-2 rounded-sm bg-accent/40" />
+                <div className="w-4 h-2 rounded-sm bg-warning/60" />
               </div>
               <span>Viel Aktivität</span>
             </div>
@@ -239,17 +239,17 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
           </div>
           <div className="flex-1">
             <div className="text-sm font-bold font-display text-foreground mb-1">
-              🎉 Neue Spieldaten verfügbar!
+              🎉 Neues Coaching-Cockpit verfügbar!
             </div>
             <div className="text-xs text-foreground/80 mb-2">
               FC Musterstadt vs. SV Beispielburg · Sonntag, 2. März 2026 · 15:30 Uhr
             </div>
             <div className="text-xs text-muted-foreground mb-4">
-              3 Kameras haben 90 Minuten Tracking-Daten aufgezeichnet. Bereit zur Analyse.
+              3 Kameras haben 90 Minuten Tracking-Daten aufgezeichnet. Coach Summary, Alerts und Leaderboards sind bereit.
             </div>
             <Button variant="hero" size="sm" className="gap-2" onClick={onLoad}>
               <Play className="w-4 h-4" />
-              Daten laden & analysieren
+              Cockpit laden & analysieren
               <ChevronRight className="w-3 h-3" />
             </Button>
           </div>
@@ -262,7 +262,7 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
 /* ─── Loading / Analyzing State ─── */
 function LoadingState({ progress, phase }: { progress: number; phase: "load" | "analyze" }) {
   const loadLabels = ["Kameradaten synchronisieren...", "Tracking-Punkte zusammenführen...", "Spielerpositionen extrahieren...", "Daten validieren..."];
-  const analyzeLabels = ["Laufwege berechnen...", "Sprint-Analyse...", "Heatmaps generieren...", "Advanced Analytics...", "Dashboard aufbauen..."];
+  const analyzeLabels = ["Coach Summary erstellen...", "Leaderboards berechnen...", "Datenwarnungen prüfen...", "Was-wäre-wenn vorbereiten...", "Cockpit aufbauen..."];
   const labels = phase === "load" ? loadLabels : analyzeLabels;
   const idx = Math.min(Math.floor(progress / (100 / labels.length)), labels.length - 1);
 
@@ -280,7 +280,7 @@ function LoadingState({ progress, phase }: { progress: number; phase: "load" | "
       </div>
       <div>
         <h3 className="text-base font-bold font-display mb-1">
-          {phase === "load" ? "Spieldaten werden geladen" : "Analyse läuft"}
+          {phase === "load" ? "Spieldaten werden geladen" : "Coaching-Cockpit wird aufgebaut"}
         </h3>
         <p className="text-sm text-muted-foreground">{labels[idx]}</p>
       </div>
@@ -301,6 +301,33 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
   const [selectedPlayer, setSelectedPlayer] = useState<DemoPlayer | null>(null);
   const topPlayers = data.players.slice(0, 4);
   const maxHeatVal = Math.max(...data.heatmapGrid.flat(), 0.01);
+  const focusPlayer = data.players.reduce((best, player) => (player.rating > best.rating ? player : best), data.players[0]);
+  const hasDataWarning = data.teamStats.topSpeed > 40;
+  const coachSummary = [
+    {
+      icon: Clipboard,
+      label: "Spielkontrolle",
+      title: data.teamStats.possession >= 52 ? "Du kontrollierst das Spiel" : "Mehr Kontrolle im Zentrum nötig",
+      detail: `${data.teamStats.possession.toFixed(0)}% Ballbesitz · ${data.teamStats.passes} Pässe`,
+    },
+    {
+      icon: hasDataWarning ? TriangleAlert : Shield,
+      label: "Datenqualität",
+      title: hasDataWarning ? "Auffälliger Topspeed erkannt" : "Datenlage wirkt plausibel",
+      detail: hasDataWarning ? `${data.teamStats.topSpeed.toFixed(1)} km/h prüfen · mögliche Fehlkalibrierung` : "Keine kritischen Ausreißer im Kernset",
+    },
+    {
+      icon: Sparkles,
+      label: "Coach-Fokus",
+      title: `${focusPlayer.name} priorisieren`,
+      detail: `${focusPlayer.rating.toFixed(1)} Rating · ${focusPlayer.passAccuracy}% Passquote · ${focusPlayer.sprints} Sprints`,
+    },
+  ];
+  const coachActions = [
+    data.teamStats.passAccuracy < 80 ? "Einen passsicheren Spieler tiefer positionieren, um den Aufbau unter Druck zu stabilisieren." : "Höhere Staffelung zwischen den Linien testen, weil die Passqualität stabil bleibt.",
+    data.teamStats.possession < 50 ? "Im Zentrum Überzahl schaffen, damit zweite Bälle schneller gesichert werden." : "Ballbesitzphasen gezielt in rechte Überladungen ummünzen.",
+    hasDataWarning ? "Vor der nächsten Analyse Kalibrierung und Spitzenwerte prüfen, damit Trainerentscheidungen belastbar bleiben." : "Die aktuelle Datenqualität reicht für individuelle Trainingsableitungen und Wechselentscheidungen aus.",
+  ];
 
   return (
     <motion.div
@@ -399,8 +426,68 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
+          <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 to-transparent p-4 sm:p-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-primary font-semibold">Coach Summary</div>
+                <h3 className="text-xl font-bold font-display mt-1">Schneller Überblick für Trainer</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center text-[10px] md:min-w-[260px]">
+                <div className="rounded-xl border border-border/40 bg-card/70 px-3 py-2">
+                  <div className="text-muted-foreground">Ballbesitz</div>
+                  <div className="mt-1 font-bold font-display text-foreground">{data.teamStats.possession.toFixed(0)}%</div>
+                </div>
+                <div className="rounded-xl border border-border/40 bg-card/70 px-3 py-2">
+                  <div className="text-muted-foreground">Passquote</div>
+                  <div className="mt-1 font-bold font-display text-foreground">{data.teamStats.passAccuracy.toFixed(0)}%</div>
+                </div>
+                <div className="rounded-xl border border-border/40 bg-card/70 px-3 py-2">
+                  <div className="text-muted-foreground">Zielspieler</div>
+                  <div className="mt-1 font-bold font-display text-foreground truncate">{focusPlayer.name}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              {coachSummary.map((item, index) => (
+                <motion.div
+                  key={item.label}
+                  className="rounded-2xl border border-border/40 bg-card/80 p-4"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.08 * index }}
+                >
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                    <item.icon className="h-4 w-4 text-primary" />
+                    {item.label}
+                  </div>
+                  <div className="mt-3 text-base font-semibold font-display text-foreground">{item.title}</div>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.detail}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          <div className={`rounded-2xl border p-4 ${hasDataWarning ? "border-warning/40 bg-warning/10" : "border-border/50 bg-card/50"}`}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="flex items-start gap-3">
+                {hasDataWarning ? <TriangleAlert className="mt-0.5 h-5 w-5 text-warning shrink-0" /> : <CheckCircle2 className="mt-0.5 h-5 w-5 text-primary shrink-0" />}
+                <div>
+                  <div className="text-sm font-semibold font-display">{hasDataWarning ? "Coach Alert: Plausibilität prüfen" : "Coach Alert: Datenlage stabil"}</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {hasDataWarning
+                      ? `Der gemessene Team-Topspeed von ${data.teamStats.topSpeed.toFixed(1)} km/h wirkt auffällig. Vor Detailentscheidungen Kamera-Setup und Kalibrierung prüfen.`
+                      : "Die Hauptmetriken wirken plausibel und können direkt für Trainingsplanung und Spielerfeedback genutzt werden."}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border/40 bg-card/70 px-3 py-2 text-xs text-muted-foreground">
+                {hasDataWarning ? "Warnstatus: auffällig" : "Warnstatus: unkritisch"}
+              </div>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-4">
-            {/* Distance chart */}
             <div className="rounded-xl border border-border/50 bg-card/50 p-4">
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display flex items-center justify-between">
                 <span>Spieler-Distanzen (km)</span>
@@ -416,7 +503,7 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
                     transition={{ delay: 0.2 + i * 0.04 }}
                     onClick={() => setSelectedPlayer(p)}
                   >
-                    <span className="text-[10px] text-muted-foreground w-20 truncate">#{p.num} {p.name}</span>
+                    <span className="text-[10px] text-muted-foreground w-24 truncate">#{p.num} {p.name}</span>
                     <div className="flex-1 h-3 rounded-full bg-muted/30 overflow-hidden">
                       <motion.div
                         className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary"
@@ -431,23 +518,23 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               </div>
             </div>
 
-            {/* Team Heatmap */}
             <div className="rounded-xl border border-border/50 bg-card/50 p-4">
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Team-Heatmap</div>
               <HeatmapField grid={data.heatmapGrid} maxVal={maxHeatVal} />
               <div className="flex items-center justify-between mt-2 text-[9px] text-muted-foreground">
                 <span>Wenig Aktivität</span>
                 <div className="flex gap-0.5">
-                  {["hsl(160,50%,42%)", "hsl(120,55%,48%)", "hsl(55,85%,52%)", "hsl(25,90%,52%)", "hsl(0,85%,50%)"].map((c, i) => (
-                    <div key={i} className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: c }} />
-                  ))}
+                  <div className="w-3 h-1.5 rounded-sm bg-primary/30" />
+                  <div className="w-3 h-1.5 rounded-sm bg-accent/40" />
+                  <div className="w-3 h-1.5 rounded-sm bg-warning/60" />
+                  <div className="w-3 h-1.5 rounded-sm bg-destructive/60" />
+                  <div className="w-3 h-1.5 rounded-sm bg-primary" />
                 </div>
                 <span>Viel Aktivität</span>
               </div>
             </div>
           </div>
 
-          {/* KI-Erkenntnisse */}
           <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-4">
             <div className="flex items-center gap-2 mb-3">
               <Lightbulb className="w-4 h-4 text-warning" />
@@ -455,20 +542,29 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
               <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">Auto-generiert</span>
             </div>
             <div className="grid md:grid-cols-2 gap-2">
-              {[
-                { icon: "🎯", text: "Überladung rechts war Schlüssel: 62% der Angriffe über die rechte Seite führten zu beiden Toren." },
-                { icon: "📉", text: "Leistungsabfall ab 65. Minute: Laufdistanz sank um 12%, Pressing-PPDA stieg von 8.2 auf 13.4." },
-                { icon: "⚔️", text: "Zweikampf-Dominanz im Mittelfeld (64%) ermöglichte kontrollierten Spielaufbau." },
-                { icon: "🔄", text: "Konter-Anfälligkeit: 3 von 4 Gegnerchancen entstanden nach eigenem Ballverlust im Aufbau." },
-              ].map((insight) => (
+              {coachActions.map((insight) => (
                 <motion.div
-                  key={insight.text}
+                  key={insight}
                   className="flex items-start gap-2 text-[10px] text-muted-foreground rounded-lg bg-card/50 p-2.5 border border-border/30"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 >
-                  <span className="text-sm shrink-0">{insight.icon}</span>
-                  <span>{insight.text}</span>
+                  <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span>{insight}</span>
+                </motion.div>
+              ))}
+              {[
+                "Rechte Überladung bleibt das gefährlichste Angriffsmuster im letzten Drittel.",
+                "Mittelfeld-Zweikämpfe sichern aktuell die Spielkontrolle und sollten personell stabil gehalten werden.",
+              ].map((insight) => (
+                <motion.div
+                  key={insight}
+                  className="flex items-start gap-2 text-[10px] text-muted-foreground rounded-lg bg-card/50 p-2.5 border border-border/30"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <Lightbulb className="h-3.5 w-3.5 shrink-0 text-warning" />
+                  <span>{insight}</span>
                 </motion.div>
               ))}
             </div>
@@ -514,33 +610,26 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
             </div>
           </div>
 
-          {/* Additional rankings row */}
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
             <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Sprint-Ranking</div>
-              <div className="space-y-2">
-                {[...data.players].sort((a, b) => b.sprints - a.sprints).slice(0, 5).map((p, i) => (
-                  <motion.div key={p.name} className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }} onClick={() => setSelectedPlayer(p)}>
-                    <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
-                    <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
-                    <span className="text-[10px] font-bold text-foreground">{p.sprints}</span>
-                    <span className="text-[8px] text-muted-foreground">Sprints</span>
-                  </motion.div>
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <div className="text-xs font-semibold text-foreground/80 font-display">Was-wäre-wenn-Analyse</div>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {[
+                  { title: "4-2-3-1 testen", desc: "Mehr Kontrolle im Zentrum und kürzere Abstände hinter dem Ball." },
+                  { title: `${focusPlayer.name} höher schieben`, desc: "Stärksten Spieler näher an Abschlusszonen und zweite Bälle bringen." },
+                  { title: "Rechte Seite überladen", desc: "Beste Angriffsseite aus den aktuellen Mustern noch konsequenter nutzen." },
+                ].map((scenario) => (
+                  <div key={scenario.title} className="rounded-2xl border border-border/40 bg-background/60 p-3">
+                    <div className="text-sm font-semibold font-display text-foreground">{scenario.title}</div>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{scenario.desc}</p>
+                  </div>
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-              <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Zweikampfquote</div>
-              <div className="space-y-2">
-                {[...data.players].sort((a, b) => b.duelsWon - a.duelsWon).slice(0, 5).map((p, i) => (
-                  <motion.div key={p.name} className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 rounded px-1 -mx-1 transition-colors" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.05 }} onClick={() => setSelectedPlayer(p)}>
-                    <span className="text-[10px] font-bold text-primary w-4">{i + 1}.</span>
-                    <span className="text-[10px] text-foreground flex-1 truncate">{p.name}</span>
-                    <span className="text-[10px] font-bold text-foreground">{p.duelsWon}%</span>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
+
             <div className="rounded-xl border border-border/50 bg-card/50 p-4">
               <div className="text-xs font-semibold text-foreground/80 mb-3 font-display">Spielübersicht</div>
               <div className="space-y-2 text-[10px]">
@@ -551,7 +640,7 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
                   { label: "Abseits", value: data.teamStats.offsides },
                   { label: "Gelbe / Rote", value: `${data.teamStats.yellowCards} / ${data.teamStats.redCards}` },
                 ].map((s) => (
-                  <div key={s.label} className="flex items-center justify-between">
+                  <div key={s.label} className="flex items-center justify-between rounded-lg border border-border/20 bg-background/50 px-3 py-2">
                     <span className="text-muted-foreground">{s.label}</span>
                     <span className="font-bold text-foreground">{s.value}</span>
                   </div>
