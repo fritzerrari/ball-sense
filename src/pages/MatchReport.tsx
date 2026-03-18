@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
-import { useMemo, useState, Fragment } from "react";
+import { useState, Fragment } from "react";
 import {
   Activity,
   ArrowLeft,
@@ -99,9 +99,6 @@ export default function MatchReport() {
   const [sortKey, setSortKey] = useState<string>("distance_km");
   const [sortAsc, setSortAsc] = useState(false);
 
-  if (isLoading) return <AppLayout><div className="mx-auto max-w-6xl"><SkeletonCard count={3} /></div></AppLayout>;
-  if (!match) return <AppLayout><div className="mx-auto max-w-6xl py-20 text-center text-muted-foreground">Spiel nicht gefunden</div></AppLayout>;
-
   const homeTeamStats = teamStats?.find((t) => t.team === "home");
   const awayTeamStats = teamStats?.find((t) => t.team === "away");
   const homePlayerStats = (playerStats ?? []).filter((s) => s.team === "home");
@@ -110,17 +107,19 @@ export default function MatchReport() {
   const homeAgg = aggregatePlayerMetrics(homePlayerStats);
   const awayAgg = aggregatePlayerMetrics(awayPlayerStats);
 
-  const coachLinks = useMemo(() => {
-    const recoveries = [...homePlayerStats]
+  const coachLinks = {
+    recoveries: [...homePlayerStats]
       .filter((item) => item.player_id && item.players?.name)
       .sort((a, b) => (b.ball_recoveries ?? 0) - (a.ball_recoveries ?? 0))
-      .slice(0, 3);
-    const passing = [...homePlayerStats]
+      .slice(0, 3),
+    passing: [...homePlayerStats]
       .filter((item) => item.player_id && item.players?.name)
       .sort((a, b) => (b.passes_total ?? 0) - (a.passes_total ?? 0))
-      .slice(0, 3);
-    return { recoveries, passing };
-  }, [homePlayerStats]);
+      .slice(0, 3),
+  };
+
+  if (isLoading) return <AppLayout><div className="mx-auto max-w-6xl"><SkeletonCard count={3} /></div></AppLayout>;
+  if (!match) return <AppLayout><div className="mx-auto max-w-6xl py-20 text-center text-muted-foreground">Spiel nicht gefunden</div></AppLayout>;
 
   const sortPlayers = (stats: any[]) => {
     return [...stats].sort((a, b) => {
@@ -222,9 +221,7 @@ export default function MatchReport() {
               return (
                 <Fragment key={p.id}>
                   <tr className="cursor-pointer border-b border-border/50 transition-colors hover:bg-muted/20" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
-                    <td className="px-3 py-3 font-medium">
-                      <span className="block max-w-[170px] truncate">{p.players?.name ?? "—"}</span>
-                    </td>
+                    <td className="px-3 py-3 font-medium"><span className="block max-w-[170px] truncate">{p.players?.name ?? "—"}</span></td>
                     <td className="px-2 py-3"><ConsentStatusBadge status={p.players?.tracking_consent_status} compact /></td>
                     <td className="px-2 py-3 text-muted-foreground">{p.players?.number ?? "—"}</td>
                     <td className="px-3 py-3 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
@@ -240,9 +237,7 @@ export default function MatchReport() {
                         <Button variant="ghost" size="sm" asChild onClick={(event) => event.stopPropagation()}>
                           <Link to={`/players/${p.player_id}`}>Öffnen</Link>
                         </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
                     </td>
                     <td className="px-2 py-3">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
                   </tr>
@@ -262,9 +257,7 @@ export default function MatchReport() {
                           </div>
                           <div className="space-y-3">
                             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Coach-Navigation</div>
-                            <div className="rounded-xl border border-border bg-background/50 p-3 text-sm text-muted-foreground">
-                              Von hier aus springst du direkt in die Einzelanalyse und den Trainingsplan des Spielers.
-                            </div>
+                            <div className="rounded-xl border border-border bg-background/50 p-3 text-sm text-muted-foreground">Von hier aus springst du direkt in die Einzelanalyse und den Trainingsplan des Spielers.</div>
                             {p.player_id && (
                               <Button variant="heroOutline" size="sm" asChild>
                                 <Link to={`/players/${p.player_id}`}>Zur Spieleranalyse <ArrowRight className="ml-1 h-4 w-4" /></Link>
@@ -288,10 +281,7 @@ export default function MatchReport() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-6xl space-y-6">
-        <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Zurück zu Spiele
-        </Link>
-
+        <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Zurück zu Spiele</Link>
         <div className="glass-card relative overflow-hidden p-6">
           <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-r from-primary/10 via-accent/10 to-transparent pointer-events-none" />
           <div className="relative mb-3 flex flex-wrap items-center justify-between gap-4">
@@ -307,188 +297,30 @@ export default function MatchReport() {
           </div>
           <div className="relative space-y-2">
             <h1 className="break-words text-2xl font-bold font-display sm:text-3xl">{clubName} vs {match.away_club_name || "TBD"}</h1>
-            <p className="text-sm text-muted-foreground">
-              {new Date(match.date).toLocaleDateString("de-DE")}
-              {match.kickoff && ` · ${match.kickoff}`}
-              {match.fields && ` · ${(match.fields as any).name}`}
-            </p>
+            <p className="text-sm text-muted-foreground">{new Date(match.date).toLocaleDateString("de-DE")}{match.kickoff && ` · ${match.kickoff}`}{match.fields && ` · ${(match.fields as any).name}`}</p>
           </div>
-
           {match.status === "setup" && (
             <div className="relative mt-4 space-y-3">
-              <Button variant="tracking" className="w-full" asChild>
-                <Link to={`/matches/${id}/track?cam=0`}><Camera className="mr-2 h-5 w-5" /> Tracking starten</Link>
-              </Button>
+              <Button variant="tracking" className="w-full" asChild><Link to={`/matches/${id}/track?cam=0`}><Camera className="mr-2 h-5 w-5" /> Tracking starten</Link></Button>
               <details className="group">
-                <summary className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
-                  <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" /> Weitere Kameras hinzufügen (Multi-Kamera)
-                </summary>
+                <summary className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"><ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" /> Weitere Kameras hinzufügen (Multi-Kamera)</summary>
                 <div className="mt-2 space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                   <p className="mb-2 text-xs text-muted-foreground">Kopiere diese Links auf weitere Smartphones. Beim Öffnen wird ein 6-stelliger Kamera-Code abgefragt:</p>
-                  {[1, 2].map((i) => (
-                    <button
-                      key={i}
-                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/camera/${id}/track?cam=${i}`); toast.success(`Link Kamera ${i + 1} kopiert!`); }}
-                      className="flex w-full items-center gap-2 rounded-md p-2 text-left text-xs font-mono text-muted-foreground transition-colors hover:bg-muted/50 hover:text-primary"
-                    >
-                      <Camera className="h-3.5 w-3.5 shrink-0" /> Kamera {i + 1} — Link kopieren
-                    </button>
-                  ))}
+                  {[1, 2].map((i) => (<button key={i} onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/camera/${id}/track?cam=${i}`); toast.success(`Link Kamera ${i + 1} kopiert!`); }} className="flex w-full items-center gap-2 rounded-md p-2 text-left text-xs font-mono text-muted-foreground transition-colors hover:bg-muted/50 hover:text-primary"><Camera className="h-3.5 w-3.5 shrink-0" /> Kamera {i + 1} — Link kopieren</button>))}
                 </div>
               </details>
             </div>
           )}
         </div>
-
-        {match.status === "processing" && (
-          <div className="glass-card space-y-3 p-5 glow-border">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-              <div>
-                <h3 className="text-sm font-semibold font-display">Daten werden verarbeitet</h3>
-                <p className="text-xs text-muted-foreground">Die KI analysiert die Tracking-Daten. Dies kann einige Minuten dauern.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {match.status === "live" && (
-          <div className="glass-card flex items-center gap-3 p-4 glow-border">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
-            <span className="text-sm font-medium font-display">Live-Tracking läuft</span>
-            <span className="ml-auto text-xs text-muted-foreground">Daten werden nach Spielende verfügbar</span>
-          </div>
-        )}
-
-        {uploads && uploads.length > 0 && match.status !== "processing" && (
-          <div className="flex flex-wrap gap-3">
-            {uploads.map((u: any) => (
-              <div key={u.id} className="glass-card min-w-[160px] flex-1 p-3">
-                <div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div>
-                <StatusBadge status={u.status} />
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="scrollbar-none flex gap-1 overflow-x-auto rounded-lg bg-muted/30 p-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-all sm:flex-1 ${activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === "Übersicht" && (
-          <div className="space-y-6">
-            {apiStats && <ApiFootballStatsCard stats={apiStats} homeLabel={clubName ?? "Heim"} awayLabel={match.away_club_name ?? "Auswärts"} />}
-
-            {hasStats && (
-              <>
-                <MatchKpiStrip
-                  homeTeamStats={homeTeamStats}
-                  awayTeamStats={awayTeamStats}
-                  homePlayerStats={homePlayerStats}
-                  awayPlayerStats={awayPlayerStats}
-                  homeName={clubName ?? "Heim"}
-                  awayName={match.away_club_name ?? "Auswärts"}
-                />
-                <MatchInsightsPanel
-                  matchId={match.id}
-                  homeHeatmap={homeTeamStats?.formation_heatmap as number[][] | null}
-                  awayHeatmap={awayTeamStats?.formation_heatmap as number[][] | null}
-                  homePlayerStats={homePlayerStats}
-                  awayPlayerStats={awayPlayerStats}
-                  apiStats={apiStats}
-                  events={(events ?? []) as any[]}
-                />
-              </>
-            )}
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              {renderTeamCard(clubName ?? "Heim", homeTeamStats, homeAgg, coachLinks.recoveries)}
-              {renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats, awayAgg, coachLinks.passing)}
-            </div>
-
-            {hasStats ? (
-              <>
-                <ComparisonBarChart
-                  homeTeamStats={homeTeamStats}
-                  awayTeamStats={awayTeamStats}
-                  homePlayerStats={homePlayerStats}
-                  awayPlayerStats={awayPlayerStats}
-                  homeName={clubName ?? "Heim"}
-                  awayName={match.away_club_name ?? "Auswärts"}
-                />
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Laufdistanz" metric="distance_km" unit="km" />
-                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Speed" metric="top_speed_kmh" unit="km/h" />
-                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Sprints" metric="sprint_count" unit="" />
-                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Passgeber" metric="passes_total" unit="" />
-                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Tackles" metric="tackles" unit="" />
-                  <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Ballgewinne" metric="ball_recoveries" unit="" />
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} />
-                  <HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} />
-                </div>
-                <PerformanceAnalysis type="team" matchId={match.id} />
-              </>
-            ) : (
-              <div className="glass-card p-8 text-center">
-                <Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-                <p className="text-muted-foreground">Statistiken werden nach dem Tracking verfügbar.</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === "Berichte & Presse" && (
-          <ReportGenerator
-            matchId={match.id}
-            matchStatus={match.status}
-            clubName={clubName ?? "Heim"}
-            awayClubName={match.away_club_name ?? "Gegner"}
-            matchDate={match.date}
-          />
-        )}
-
+        {match.status === "processing" && <div className="glass-card space-y-3 p-5 glow-border"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div><div><h3 className="text-sm font-semibold font-display">Daten werden verarbeitet</h3><p className="text-xs text-muted-foreground">Die KI analysiert die Tracking-Daten. Dies kann einige Minuten dauern.</p></div></div></div>}
+        {match.status === "live" && <div className="glass-card flex items-center gap-3 p-4 glow-border"><div className="h-2 w-2 animate-pulse rounded-full bg-primary" /><span className="text-sm font-medium font-display">Live-Tracking läuft</span><span className="ml-auto text-xs text-muted-foreground">Daten werden nach Spielende verfügbar</span></div>}
+        {uploads && uploads.length > 0 && match.status !== "processing" && <div className="flex flex-wrap gap-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] flex-1 p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
+        <div className="scrollbar-none flex gap-1 overflow-x-auto rounded-lg bg-muted/30 p-1">{tabs.map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-all sm:flex-1 ${activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{tab}</button>)}</div>
+        {activeTab === "Übersicht" && <div className="space-y-6">{apiStats && <ApiFootballStatsCard stats={apiStats} homeLabel={clubName ?? "Heim"} awayLabel={match.away_club_name ?? "Auswärts"} />}{hasStats && <><MatchKpiStrip homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} /><MatchInsightsPanel matchId={match.id} homeHeatmap={homeTeamStats?.formation_heatmap as number[][] | null} awayHeatmap={awayTeamStats?.formation_heatmap as number[][] | null} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} apiStats={apiStats} events={(events ?? []) as any[]} /></>}<div className="grid gap-4 xl:grid-cols-2">{renderTeamCard(clubName ?? "Heim", homeTeamStats, homeAgg, coachLinks.recoveries)}{renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats, awayAgg, coachLinks.passing)}</div>{hasStats ? <><ComparisonBarChart homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} /><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Laufdistanz" metric="distance_km" unit="km" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Speed" metric="top_speed_kmh" unit="km/h" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Sprints" metric="sprint_count" unit="" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Passgeber" metric="passes_total" unit="" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Tackles" metric="tackles" unit="" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Ballgewinne" metric="ball_recoveries" unit="" /></div><div className="grid gap-4 sm:grid-cols-2"><HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} /><HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} /></div><PerformanceAnalysis type="team" matchId={match.id} /></> : <div className="glass-card p-8 text-center"><Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" /><p className="text-muted-foreground">Statistiken werden nach dem Tracking verfügbar.</p></div>}</div>}
+        {activeTab === "Berichte & Presse" && <ReportGenerator matchId={match.id} matchStatus={match.status} clubName={clubName ?? "Heim"} awayClubName={match.away_club_name ?? "Gegner"} matchDate={match.date} />}
         {activeTab === "Heim" && renderPlayerTable(homePlayerStats)}
         {activeTab === "Auswärts" && renderPlayerTable(awayPlayerStats)}
-
-        {activeTab === "Vergleich" && (
-          <div className="space-y-6">
-            {hasStats ? (
-              <>
-                <ComparisonBarChart
-                  homeTeamStats={homeTeamStats}
-                  awayTeamStats={awayTeamStats}
-                  homePlayerStats={homePlayerStats}
-                  awayPlayerStats={awayPlayerStats}
-                  homeName={clubName ?? "Heim"}
-                  awayName={match.away_club_name ?? "Auswärts"}
-                />
-                <MatchRadarChart
-                  homeTeamStats={homeTeamStats}
-                  awayTeamStats={awayTeamStats}
-                  homePlayerStats={homePlayerStats}
-                  awayPlayerStats={awayPlayerStats}
-                  homeName={clubName ?? "Heim"}
-                  awayName={match.away_club_name ?? "Auswärts"}
-                />
-              </>
-            ) : (
-              <div className="glass-card p-8 text-center">
-                <Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-                <p className="text-muted-foreground">Vergleichs-Charts werden nach dem ersten Tracking verfügbar.</p>
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === "Vergleich" && <div className="space-y-6">{hasStats ? <><ComparisonBarChart homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} /><MatchRadarChart homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} /></> : <div className="glass-card p-8 text-center"><Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" /><p className="text-muted-foreground">Vergleichs-Charts werden nach dem ersten Tracking verfügbar.</p></div>}</div>}
       </div>
     </AppLayout>
   );
