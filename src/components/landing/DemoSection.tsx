@@ -71,9 +71,9 @@ export function DemoSection() {
           viewport={{ once: true }}
         >
           <span className="text-xs font-semibold text-primary font-display tracking-wider uppercase mb-3 block">Interaktive Demo</span>
-          <h2 className="text-3xl md:text-4xl font-bold font-display mb-3">Erlebe FieldIQ — ohne Anmeldung</h2>
-          <p className="text-muted-foreground max-w-lg mx-auto text-sm">
-            So sieht es aus, wenn nach einem Spiel neue Tracking-Daten für dein Team bereitstehen.
+          <h2 className="text-3xl md:text-4xl font-bold font-display mb-3">Erlebe das neue Coaching-Cockpit — ohne Anmeldung</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto text-sm leading-relaxed">
+            Coach Summary, Datenwarnungen, Leaderboards und Was-wäre-wenn-Analyse erscheinen in einem klaren Flow direkt nach dem Spiel.
           </p>
         </motion.div>
 
