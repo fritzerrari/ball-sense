@@ -192,11 +192,11 @@ export default function MatchReport() {
                   Weitere Kameras hinzufügen (Multi-Kamera)
                 </summary>
                 <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border space-y-2">
-                  <p className="text-xs text-muted-foreground mb-2">Kopiere diese Links auf weitere Smartphones für Multi-Kamera-Tracking:</p>
+                  <p className="text-xs text-muted-foreground mb-2">Kopiere diese Links auf weitere Smartphones für Multi-Kamera-Tracking. Beim Öffnen wird ein 6-stelliger Kamera-Code abgefragt:</p>
                   {[1, 2].map(i => (
                     <button
                       key={i}
-                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/matches/${id}/track?cam=${i}`); toast.success(`Link Kamera ${i+1} kopiert!`); }}
+                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/camera/${id}/track?cam=${i}`); toast.success(`Link Kamera ${i+1} kopiert!`); }}
                       className="flex items-center gap-2 w-full text-left text-xs font-mono text-muted-foreground hover:text-primary transition-colors p-2 rounded-md hover:bg-muted/50"
                     >
                       <Camera className="h-3.5 w-3.5 shrink-0" />
