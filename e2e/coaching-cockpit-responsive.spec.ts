@@ -1,6 +1,6 @@
 import { test, expect } from "../playwright-fixture";
 
-const matchPath = "/matches/7a14bbd2-6c19-4aee-9d00-2a79f00e7837";
+const matchUrl = "https://id-preview--8e8804b6-976e-4f60-9dee-74e1ab61bf58.lovable.app/matches/7a14bbd2-6c19-4aee-9d00-2a79f00e7837";
 
 async function assertNoHorizontalOverflow(page: Parameters<typeof test>[0] extends never ? never : any) {
   const metrics = await page.evaluate(() => ({
@@ -14,7 +14,7 @@ async function assertNoHorizontalOverflow(page: Parameters<typeof test>[0] exten
 test.describe("Coaching-Cockpit responsive", () => {
   test("renders cleanly on desktop", async ({ page }) => {
     await page.setViewportSize({ width: 1563, height: 887 });
-    await page.goto(matchPath);
+    await page.goto(matchUrl);
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByRole("heading", { name: /schneller überblick für trainer/i })).toBeVisible();
@@ -22,10 +22,9 @@ test.describe("Coaching-Cockpit responsive", () => {
 
     const tabs = page.getByRole("tab");
     await expect(tabs.first()).toBeVisible();
-    await expect(tabs).toHaveCount(await tabs.count());
 
     await expect(page.getByText(/top-speed|topspeed/i).first()).toBeVisible();
-    await expect(page.getByText(/passquote|passquote/i).first()).toBeVisible();
+    await expect(page.getByText(/passquote/i).first()).toBeVisible();
 
     const truncatedName = page.locator(".truncate, .line-clamp-2").filter({ hasText: /[A-Za-zÄÖÜäöüß-]{6,}\s+[A-Za-zÄÖÜäöüß-]{4,}/ }).first();
     if (await truncatedName.count()) {
@@ -37,7 +36,7 @@ test.describe("Coaching-Cockpit responsive", () => {
 
   test("renders cleanly on tablet", async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 1366 });
-    await page.goto(matchPath);
+    await page.goto(matchUrl);
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByRole("heading", { name: /schneller überblick für trainer/i })).toBeVisible();
@@ -52,8 +51,6 @@ test.describe("Coaching-Cockpit responsive", () => {
           text: element.textContent?.trim() || "",
           right: rect.right,
           left: rect.left,
-          top: rect.top,
-          bottom: rect.bottom,
         };
       }),
     );
