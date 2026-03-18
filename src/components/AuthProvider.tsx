@@ -10,6 +10,8 @@ interface AuthContextType {
   clubName: string | null;
   clubPlan: string | null;
   clubLogoUrl: string | null;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
   signOut: () => Promise<void>;
   refreshClubData: () => Promise<void>;
 }
@@ -22,6 +24,8 @@ const AuthContext = createContext<AuthContextType>({
   clubName: null,
   clubPlan: null,
   clubLogoUrl: null,
+  isAdmin: false,
+  isSuperAdmin: false,
   signOut: async () => {},
   refreshClubData: async () => {},
 });
@@ -36,14 +40,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [clubName, setClubName] = useState<string | null>(null);
   const [clubPlan, setClubPlan] = useState<string | null>(null);
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const fetchClubData = async (userId: string) => {
-    // Get profile with club_id
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("club_id")
-      .eq("user_id", userId)
-      .single();
+    const [{ data: profile }, { data: adminRole }, { data: superAdminRole }] = await Promise.all([
+      supabase.from("profiles").select("club_id").eq("user_id", userId).maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
+      supabase.from("super_admins").select("id").eq("user_id", userId).eq("active", true).maybeSingle(),
+    ]);
+
+    setIsAdmin(!!adminRole);
+    setIsSuperAdmin(!!superAdminRole);
 
     if (profile?.club_id) {
       setClubId(profile.club_id);
@@ -68,17 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let initialLoad = true;
 
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
+      async (_event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          // Use setTimeout to avoid deadlock with Supabase client
           setTimeout(async () => {
             await fetchClubData(newSession.user.id);
-            if (!initialLoad) return; // getSession already handled loading
+            if (!initialLoad) return;
             setLoading(false);
           }, 0);
         } else {
@@ -86,12 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setClubName(null);
           setClubPlan(null);
           setClubLogoUrl(null);
+          setIsAdmin(false);
+          setIsSuperAdmin(false);
           setLoading(false);
         }
       }
     );
 
-    // THEN check existing session
     supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
       initialLoad = false;
       setSession(existingSession);
@@ -113,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setClubName(null);
     setClubPlan(null);
     setClubLogoUrl(null);
+    setIsAdmin(false);
+    setIsSuperAdmin(false);
   };
 
   const refreshClubData = async () => {
@@ -120,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, signOut, refreshClubData }}>
+    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, isAdmin, isSuperAdmin, signOut, refreshClubData }}>
       {children}
     </AuthContext.Provider>
   );

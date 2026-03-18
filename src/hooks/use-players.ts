@@ -93,6 +93,41 @@ export function useUpdatePlayer() {
   });
 }
 
+export function useUpdatePlayerConsent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      playerId,
+      tracking_consent_status,
+      tracking_consent_notes,
+    }: {
+      playerId: string;
+      tracking_consent_status: TrackingConsentStatus;
+      tracking_consent_notes: string | null;
+    }) => {
+      const { data, error } = await supabase.functions.invoke("player-consent-admin", {
+        body: {
+          playerId,
+          tracking_consent_status,
+          tracking_consent_notes,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data?.player;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["players"] });
+      qc.invalidateQueries({ queryKey: ["player"] });
+      qc.invalidateQueries({ queryKey: ["admin_player_consents"] });
+      toast.success("Einwilligung aktualisiert");
+    },
+    onError: (error: Error) => toast.error(error.message || "Fehler beim Aktualisieren der Einwilligung"),
+  });
+}
+
 export function useDeletePlayer() {
   const qc = useQueryClient();
   return useMutation({

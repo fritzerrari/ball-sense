@@ -2,7 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, clubId } = useAuth();
+  const { user, loading, clubId, isSuperAdmin } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -21,7 +21,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     return <Navigate to={`/login?redirect=${encodeURIComponent(redirectTo)}`} replace />;
   }
 
-  if (!clubId && location.pathname !== "/onboarding") {
+  if (!clubId && !isSuperAdmin && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }
 
