@@ -280,7 +280,7 @@ function LoadingState({ progress, phase }: { progress: number; phase: "load" | "
       </div>
       <div>
         <h3 className="text-base font-bold font-display mb-1">
-          {phase === "load" ? "Spieldaten werden geladen" : "Analyse läuft"}
+          {phase === "load" ? "Spieldaten werden geladen" : "Coaching-Cockpit wird aufgebaut"}
         </h3>
         <p className="text-sm text-muted-foreground">{labels[idx]}</p>
       </div>
