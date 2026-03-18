@@ -301,6 +301,33 @@ function DashboardState({ data, onReset, onReload }: { data: DemoData; onReset: 
   const [selectedPlayer, setSelectedPlayer] = useState<DemoPlayer | null>(null);
   const topPlayers = data.players.slice(0, 4);
   const maxHeatVal = Math.max(...data.heatmapGrid.flat(), 0.01);
+  const focusPlayer = data.players.reduce((best, player) => (player.rating > best.rating ? player : best), data.players[0]);
+  const hasDataWarning = data.teamStats.topSpeed > 40;
+  const coachSummary = [
+    {
+      icon: Clipboard,
+      label: "Spielkontrolle",
+      title: data.teamStats.possession >= 52 ? "Du kontrollierst das Spiel" : "Mehr Kontrolle im Zentrum nötig",
+      detail: `${data.teamStats.possession.toFixed(0)}% Ballbesitz · ${data.teamStats.passes} Pässe`,
+    },
+    {
+      icon: hasDataWarning ? TriangleAlert : Shield,
+      label: "Datenqualität",
+      title: hasDataWarning ? "Auffälliger Topspeed erkannt" : "Datenlage wirkt plausibel",
+      detail: hasDataWarning ? `${data.teamStats.topSpeed.toFixed(1)} km/h prüfen · mögliche Fehlkalibrierung` : "Keine kritischen Ausreißer im Kernset",
+    },
+    {
+      icon: Sparkles,
+      label: "Coach-Fokus",
+      title: `${focusPlayer.name} priorisieren`,
+      detail: `${focusPlayer.rating.toFixed(1)} Rating · ${focusPlayer.passAccuracy}% Passquote · ${focusPlayer.sprints} Sprints`,
+    },
+  ];
+  const coachActions = [
+    data.teamStats.passAccuracy < 80 ? "Einen passsicheren Spieler tiefer positionieren, um den Aufbau unter Druck zu stabilisieren." : "Höhere Staffelung zwischen den Linien testen, weil die Passqualität stabil bleibt.",
+    data.teamStats.possession < 50 ? "Im Zentrum Überzahl schaffen, damit zweite Bälle schneller gesichert werden." : "Ballbesitzphasen gezielt in rechte Überladungen ummünzen.",
+    hasDataWarning ? "Vor der nächsten Analyse Kalibrierung und Spitzenwerte prüfen, damit Trainerentscheidungen belastbar bleiben." : "Die aktuelle Datenqualität reicht für individuelle Trainingsableitungen und Wechselentscheidungen aus.",
+  ];
 
   return (
     <motion.div
