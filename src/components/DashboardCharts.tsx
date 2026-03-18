@@ -5,6 +5,7 @@ import { useTranslation, useLocale } from "@/lib/i18n";
 import { Link } from "react-router-dom";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegendContent } from "@/components/ui/chart";
+import { MetricDetailDialog } from "@/components/MetricDetailDialog";
 import { Activity, Gauge, Shield, Trophy } from "lucide-react";
 
 function round(value: number, decimals = 1) {
@@ -133,11 +134,33 @@ export function DashboardCharts() {
   } as const;
 
   const statCards = [
-    { label: "Ø Distanz", value: `${data.seasonStats.avgDistance} km`, icon: Activity },
-    { label: "Ø Ballbesitz", value: `${data.seasonStats.avgPossession}%`, icon: Gauge },
-    { label: "Ø Zweikampfquote", value: `${data.seasonStats.avgDuelRate}%`, icon: Shield },
-    { label: "Sprints gesamt", value: `${data.seasonStats.totalSprints}`, icon: Trophy },
+    {
+      label: "Ø Distanz",
+      value: `${data.seasonStats.avgDistance} km`,
+      icon: Activity,
+      insight: "Die durchschnittliche Teamdistanz hilft dir zu erkennen, ob die Intensität über die Saison stabil bleibt oder phasenweise abfällt.",
+    },
+    {
+      label: "Ø Ballbesitz",
+      value: `${data.seasonStats.avgPossession}%`,
+      icon: Gauge,
+      insight: "Ein hoher Ballbesitzwert ist nur dann stark, wenn daraus Kontrolle und sauberer Aufbau entstehen.",
+    },
+    {
+      label: "Ø Zweikampfquote",
+      value: `${data.seasonStats.avgDuelRate}%`,
+      icon: Shield,
+      insight: "Die Zweikampfquote zeigt, wie robust das Team in direkten Duellen über mehrere Spiele hinweg auftritt.",
+    },
+    {
+      label: "Sprints gesamt",
+      value: `${data.seasonStats.totalSprints}`,
+      icon: Trophy,
+      insight: "Sprints über die Saison sind ein guter Marker für Spieltempo, Tiefe und Umschaltintensität.",
+    },
   ];
+
+  const recentTrend = [...data.trendData].slice(-6).reverse();
 
   return (
     <div className="space-y-6">
@@ -147,86 +170,144 @@ export function DashboardCharts() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {statCards.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="glass-card p-4 space-y-3 overflow-hidden relative">
-            <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />
-            <div className="relative flex items-center justify-between">
-              <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Season</span>
-              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <Icon className="h-4 w-4" />
+        {statCards.map(({ label, value, icon: Icon, insight }) => (
+          <MetricDetailDialog
+            key={label}
+            title={`${label} im Saisonkontext`}
+            subtitle="Die KPI öffnet eine Drilldown-Ansicht, damit du Trends nicht nur siehst, sondern sportlich einordnen kannst."
+            chips={["Season KPI", "Trend", "Overview"]}
+            insight={insight}
+            facts={recentTrend.slice(0, 4).map((item) => ({
+              label: item.label,
+              value:
+                label === "Ø Distanz"
+                  ? `${item.distance} km`
+                  : label === "Ø Ballbesitz"
+                    ? `${item.possession}%`
+                    : label === "Ø Zweikampfquote"
+                      ? `${item.duelRate}%`
+                      : `${item.sprints}`,
+              hint: "Jüngste Matchwerte",
+            }))}
+          >
+            <div className="game-panel p-4 space-y-3 h-full">
+              <div className="relative flex items-center justify-between pr-16">
+                <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Season</span>
+                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <Icon className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="relative">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-2xl font-bold font-display">{value}</p>
               </div>
             </div>
-            <div className="relative">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="text-2xl font-bold font-display">{value}</p>
-            </div>
-          </div>
+          </MetricDetailDialog>
         ))}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="glass-card p-5 sm:p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold font-display">Teamintensität</h3>
-            <p className="text-sm text-muted-foreground">Distanz und Sprintvolumen pro Spiel im direkten Verlauf.</p>
+        <MetricDetailDialog
+          title="Teamintensität im Verlauf"
+          subtitle="Distanz und Sprintvolumen zeigen, wie hoch die physische Spielschärfe über die letzten Partien war."
+          chips={["Tempo", "Belastung", "Rhythmus"]}
+          insight="Achte auf fallende Sprints bei stabiler Distanz: Das deutet oft auf weniger Tiefenläufe oder geringere Umschaltintensität hin."
+          facts={recentTrend.map((item) => ({
+            label: item.label,
+            value: `${item.distance} km · ${item.sprints} Sprints`,
+            hint: item.date,
+          }))}
+          contentClassName="sm:max-w-4xl"
+        >
+          <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+            <div className="relative pr-16">
+              <h3 className="text-base font-semibold font-display">Teamintensität</h3>
+              <p className="text-sm text-muted-foreground">Distanz und Sprintvolumen pro Spiel im direkten Verlauf.</p>
+            </div>
+            <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
+              <AreaChart data={data.trendData}>
+                <defs>
+                  <linearGradient id="dashboard-distance" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-distance)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="var(--color-distance)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend content={<ChartLegendContent />} />
+                <Area type="monotone" dataKey="distance" name="distance" stroke="var(--color-distance)" fill="url(#dashboard-distance)" strokeWidth={2.5} />
+                <Line type="monotone" dataKey="sprints" name="sprints" stroke="var(--color-sprints)" strokeWidth={2.5} dot={{ fill: "var(--color-sprints)", r: 3 }} />
+              </AreaChart>
+            </ChartContainer>
           </div>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-            <AreaChart data={data.trendData}>
-              <defs>
-                <linearGradient id="dashboard-distance" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-distance)" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="var(--color-distance)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Legend content={<ChartLegendContent />} />
-              <Area type="monotone" dataKey="distance" name="distance" stroke="var(--color-distance)" fill="url(#dashboard-distance)" strokeWidth={2.5} />
-              <Line type="monotone" dataKey="sprints" name="sprints" stroke="var(--color-sprints)" strokeWidth={2.5} dot={{ fill: "var(--color-sprints)", r: 3 }} />
-            </AreaChart>
-          </ChartContainer>
-        </div>
+        </MetricDetailDialog>
 
-        <div className="glass-card p-5 sm:p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold font-display">Ballkontrolle</h3>
-            <p className="text-sm text-muted-foreground">Ballbesitz und Passquote zeigen, wie sauber das Team mit Ball agiert.</p>
+        <MetricDetailDialog
+          title="Ballkontrolle im Verlauf"
+          subtitle="Ballbesitz und Passquote zeigen, wie sicher das Team Spiele mit Ball strukturiert."
+          chips={["Control", "Build-up", "Security"]}
+          insight="Wenn Ballbesitz steigt, die Passquote aber nicht mitgeht, fehlt oft die Sauberkeit im Aufbau oder die Qualität der Anschlussaktionen."
+          facts={recentTrend.map((item) => ({
+            label: item.label,
+            value: `${item.possession}% Ballbesitz · ${item.passAccuracy}% Passquote`,
+            hint: item.date,
+          }))}
+          contentClassName="sm:max-w-4xl"
+        >
+          <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+            <div className="relative pr-16">
+              <h3 className="text-base font-semibold font-display">Ballkontrolle</h3>
+              <p className="text-sm text-muted-foreground">Ballbesitz und Passquote zeigen, wie sauber das Team mit Ball agiert.</p>
+            </div>
+            <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
+              <LineChart data={data.trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value}%`} />} />
+                <Legend content={<ChartLegendContent />} />
+                <Line type="monotone" dataKey="possession" name="possession" stroke="var(--color-possession)" strokeWidth={2.5} dot={{ fill: "var(--color-possession)", r: 3 }} />
+                <Line type="monotone" dataKey="passAccuracy" name="passAccuracy" stroke="var(--color-passAccuracy)" strokeWidth={2.5} dot={{ fill: "var(--color-passAccuracy)", r: 3 }} />
+              </LineChart>
+            </ChartContainer>
           </div>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-            <LineChart data={data.trendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value}%`} />} />
-              <Legend content={<ChartLegendContent />} />
-              <Line type="monotone" dataKey="possession" name="possession" stroke="var(--color-possession)" strokeWidth={2.5} dot={{ fill: "var(--color-possession)", r: 3 }} />
-              <Line type="monotone" dataKey="passAccuracy" name="passAccuracy" stroke="var(--color-passAccuracy)" strokeWidth={2.5} dot={{ fill: "var(--color-passAccuracy)", r: 3 }} />
-            </LineChart>
-          </ChartContainer>
-        </div>
+        </MetricDetailDialog>
 
-        <div className="glass-card p-5 sm:p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold font-display">Defensive Wirkung</h3>
-            <p className="text-sm text-muted-foreground">Zweikampfquote und Ballgewinne im Zeitverlauf.</p>
+        <MetricDetailDialog
+          title="Defensive Wirkung im Verlauf"
+          subtitle="Zweikampfquote und Ballgewinne geben Aufschluss über Zugriff, Timing und Aggressivität gegen den Ball."
+          chips={["Defence", "Duels", "Recovery"]}
+          insight="Ballgewinne ohne gute Zweikampfquote können auf lose second balls oder ein reaktives Verteidigen hindeuten. Stark wird es, wenn beide Werte parallel steigen."
+          facts={recentTrend.map((item) => ({
+            label: item.label,
+            value: `${item.duelRate}% Zweikampfquote · ${item.recoveries} Ballgewinne`,
+            hint: item.date,
+          }))}
+          contentClassName="sm:max-w-4xl"
+        >
+          <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+            <div className="relative pr-16">
+              <h3 className="text-base font-semibold font-display">Defensive Wirkung</h3>
+              <p className="text-sm text-muted-foreground">Zweikampfquote und Ballgewinne im Zeitverlauf.</p>
+            </div>
+            <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
+              <BarChart data={data.trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend content={<ChartLegendContent />} />
+                <Bar dataKey="duelRate" name="duelRate" fill="var(--color-duelRate)" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="recoveries" name="recoveries" fill="var(--color-recoveries)" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
           </div>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-            <BarChart data={data.trendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Legend content={<ChartLegendContent />} />
-              <Bar dataKey="duelRate" name="duelRate" fill="var(--color-duelRate)" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="recoveries" name="recoveries" fill="var(--color-recoveries)" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ChartContainer>
-        </div>
+        </MetricDetailDialog>
 
-        <div className="glass-card p-5 sm:p-6 space-y-4">
-          <div>
+        <div className="game-panel p-5 sm:p-6 space-y-4">
+          <div className="relative">
             <h3 className="text-base font-semibold font-display">Leaderboards</h3>
             <p className="text-sm text-muted-foreground">Die konstantesten Saisonträger in Laufarbeit und Spielaufbau.</p>
           </div>
