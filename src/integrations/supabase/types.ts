@@ -271,6 +271,39 @@ export type Database = {
           },
         ]
       }
+      app_modules: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -447,6 +480,54 @@ export type Database = {
           },
         ]
       }
+      club_module_assignments: {
+        Row: {
+          assigned_by: string | null
+          club_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          module_id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          club_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          module_id: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_by?: string | null
+          club_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          module_id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_module_assignments_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_module_assignments_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "app_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clubs: {
         Row: {
           city: string | null
@@ -594,9 +675,12 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          document_type: string | null
           html_content: string
           id: string
           slug: string
+          sort_order: number
+          summary: string | null
           title: string
           updated_at: string
           updated_by: string | null
@@ -604,9 +688,12 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          document_type?: string | null
           html_content?: string
           id?: string
           slug: string
+          sort_order?: number
+          summary?: string | null
           title: string
           updated_at?: string
           updated_by?: string | null
@@ -614,9 +701,12 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          document_type?: string | null
           html_content?: string
           id?: string
           slug?: string
+          sort_order?: number
+          summary?: string | null
           title?: string
           updated_at?: string
           updated_by?: string | null
@@ -838,13 +928,67 @@ export type Database = {
           },
         ]
       }
+      module_permissions: {
+        Row: {
+          action_key: string | null
+          allowed: boolean
+          created_at: string
+          id: string
+          module_id: string
+          plan: string | null
+          role: Database["public"]["Enums"]["app_role"] | null
+          scope_id: string | null
+          scope_type: string
+          tab_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_key?: string | null
+          allowed?: boolean
+          created_at?: string
+          id?: string
+          module_id: string
+          plan?: string | null
+          role?: Database["public"]["Enums"]["app_role"] | null
+          scope_id?: string | null
+          scope_type: string
+          tab_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string | null
+          allowed?: boolean
+          created_at?: string
+          id?: string
+          module_id?: string
+          plan?: string | null
+          role?: Database["public"]["Enums"]["app_role"] | null
+          scope_id?: string | null
+          scope_type?: string
+          tab_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_permissions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "app_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_match_stats: {
         Row: {
           aerial_won: number | null
+          anomaly_flags: Json
           assists: number | null
           avg_speed_kmh: number | null
           ball_contacts: number | null
           ball_recoveries: number | null
+          corrected_avg_speed_kmh: number | null
+          corrected_distance_km: number | null
+          corrected_top_speed_kmh: number | null
           crosses: number | null
           data_source: string
           distance_km: number | null
@@ -864,12 +1008,15 @@ export type Database = {
           passes_total: number | null
           player_id: string | null
           positions_raw: Json | null
+          quality_score: number | null
           rating: number | null
+          raw_metrics: Json
           red_cards: number | null
           shots_on_target: number | null
           shots_total: number | null
           sprint_count: number | null
           sprint_distance_m: number | null
+          suspected_cause: string | null
           tackles: number | null
           team: string
           top_speed_kmh: number | null
@@ -877,10 +1024,14 @@ export type Database = {
         }
         Insert: {
           aerial_won?: number | null
+          anomaly_flags?: Json
           assists?: number | null
           avg_speed_kmh?: number | null
           ball_contacts?: number | null
           ball_recoveries?: number | null
+          corrected_avg_speed_kmh?: number | null
+          corrected_distance_km?: number | null
+          corrected_top_speed_kmh?: number | null
           crosses?: number | null
           data_source?: string
           distance_km?: number | null
@@ -900,12 +1051,15 @@ export type Database = {
           passes_total?: number | null
           player_id?: string | null
           positions_raw?: Json | null
+          quality_score?: number | null
           rating?: number | null
+          raw_metrics?: Json
           red_cards?: number | null
           shots_on_target?: number | null
           shots_total?: number | null
           sprint_count?: number | null
           sprint_distance_m?: number | null
+          suspected_cause?: string | null
           tackles?: number | null
           team: string
           top_speed_kmh?: number | null
@@ -913,10 +1067,14 @@ export type Database = {
         }
         Update: {
           aerial_won?: number | null
+          anomaly_flags?: Json
           assists?: number | null
           avg_speed_kmh?: number | null
           ball_contacts?: number | null
           ball_recoveries?: number | null
+          corrected_avg_speed_kmh?: number | null
+          corrected_distance_km?: number | null
+          corrected_top_speed_kmh?: number | null
           crosses?: number | null
           data_source?: string
           distance_km?: number | null
@@ -936,12 +1094,15 @@ export type Database = {
           passes_total?: number | null
           player_id?: string | null
           positions_raw?: Json | null
+          quality_score?: number | null
           rating?: number | null
+          raw_metrics?: Json
           red_cards?: number | null
           shots_on_target?: number | null
           shots_total?: number | null
           sprint_count?: number | null
           sprint_distance_m?: number | null
+          suspected_cause?: string | null
           tackles?: number | null
           team?: string
           top_speed_kmh?: number | null
@@ -1082,36 +1243,75 @@ export type Database = {
           },
         ]
       }
+      super_admins: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       team_match_stats: {
         Row: {
+          anomaly_flags: Json
           avg_distance_km: number | null
           data_source: string
           formation_heatmap: Json | null
           id: string
           match_id: string
           possession_pct: number | null
+          quality_score: number | null
+          raw_metrics: Json
+          suspected_cause: string | null
           team: string
           top_speed_kmh: number | null
           total_distance_km: number | null
         }
         Insert: {
+          anomaly_flags?: Json
           avg_distance_km?: number | null
           data_source?: string
           formation_heatmap?: Json | null
           id?: string
           match_id: string
           possession_pct?: number | null
+          quality_score?: number | null
+          raw_metrics?: Json
+          suspected_cause?: string | null
           team: string
           top_speed_kmh?: number | null
           total_distance_km?: number | null
         }
         Update: {
+          anomaly_flags?: Json
           avg_distance_km?: number | null
           data_source?: string
           formation_heatmap?: Json | null
           id?: string
           match_id?: string
           possession_pct?: number | null
+          quality_score?: number | null
+          raw_metrics?: Json
+          suspected_cause?: string | null
           team?: string
           top_speed_kmh?: number | null
           total_distance_km?: number | null
@@ -1167,6 +1367,53 @@ export type Database = {
           },
         ]
       }
+      user_module_overrides: {
+        Row: {
+          action_key: string | null
+          allowed: boolean
+          assigned_by: string | null
+          created_at: string
+          id: string
+          module_id: string
+          notes: string | null
+          tab_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_key?: string | null
+          allowed?: boolean
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          module_id: string
+          notes?: string | null
+          tab_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_key?: string | null
+          allowed?: boolean
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          module_id?: string
+          notes?: string | null
+          tab_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_module_overrides_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "app_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -1190,6 +1437,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_module: {
+        Args: {
+          _action_key?: string
+          _club_id: string
+          _module_key: string
+          _plan: string
+          _tab_key?: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       get_user_club_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -1198,6 +1456,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
