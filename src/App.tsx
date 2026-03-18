@@ -65,7 +65,7 @@ const App = () => (
                 <Route path="/matches" element={<ProtectedRoute><Matches /></ProtectedRoute>} />
                 <Route path="/matches/new" element={<ProtectedRoute><NewMatch /></ProtectedRoute>} />
                 <Route path="/matches/:id" element={<ProtectedRoute><MatchReport /></ProtectedRoute>} />
-                <Route path="/matches/:id/track" element={<TrackingPage />} />
+                <Route path="/matches/:id/track" element={<ProtectedRoute><TrackingPage /></ProtectedRoute>} />
                 <Route path="/players" element={<ProtectedRoute><Players /></ProtectedRoute>} />
                 <Route path="/players/:id" element={<ProtectedRoute><PlayerProfile /></ProtectedRoute>} />
                 <Route path="/fields" element={<ProtectedRoute><Fields /></ProtectedRoute>} />
@@ -74,7 +74,7 @@ const App = () => (
                 <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-                <Route path="/install" element={<InstallGuide />} />
+                <Route path="/install" element={<ProtectedRoute><InstallGuide /></ProtectedRoute>} />
                 <Route path="/legal/:slug" element={<LegalPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

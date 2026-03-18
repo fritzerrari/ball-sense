@@ -1,14 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
-import { useState, useRef, useEffect } from "react";
+import { Link, useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { useState, useRef } from "react";
 import { ArrowLeft, Mail, Lock, Eye, EyeOff, Building2, Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
-import { Navigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
   let score = 0;
@@ -28,6 +26,8 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 export default function Login() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTarget = searchParams.get("redirect") || "/dashboard";
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -36,12 +36,11 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [acceptedTos, setAcceptedTos] = useState(false);
 
-  // Rate limiting
   const failCountRef = useRef(0);
   const lockedUntilRef = useRef<number>(0);
 
   if (!loading && user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={redirectTarget} replace />;
   }
 
   const pwStrength = getPasswordStrength(password);
@@ -50,7 +49,6 @@ export default function Login() {
     e.preventDefault();
     if (submitting) return;
 
-    // Rate limiting check
     if (Date.now() < lockedUntilRef.current) {
       const secs = Math.ceil((lockedUntilRef.current - Date.now()) / 1000);
       toast.error(`Zu viele Versuche. Bitte warte ${secs} Sekunden.`);
@@ -101,7 +99,7 @@ export default function Login() {
         }
         failCountRef.current = 0;
         toast.success("Erfolgreich angemeldet!");
-        navigate("/dashboard");
+        navigate(redirectTarget);
       } else {
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
@@ -127,7 +125,7 @@ export default function Login() {
           toast.success("Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse.");
         }
       }
-    } catch (err) {
+    } catch {
       toast.error("Ein unerwarteter Fehler ist aufgetreten.");
     } finally {
       setSubmitting(false);
@@ -228,7 +226,6 @@ export default function Login() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {/* Password strength indicator */}
             {!isLogin && password.length > 0 && (
               <div className="mt-2 space-y-1">
                 <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -245,7 +242,6 @@ export default function Login() {
             )}
           </div>
 
-          {/* ToS checkbox for registration */}
           {!isLogin && (
             <div className="flex items-start gap-2.5">
               <Checkbox
@@ -255,10 +251,7 @@ export default function Login() {
                 className="mt-0.5"
               />
               <label htmlFor="tos" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
-                Ich akzeptiere die{" "}
-                <Link to="/legal/agb" target="_blank" className="text-primary hover:underline">AGB</Link>
-                {" "}und die{" "}
-                <Link to="/legal/datenschutz" target="_blank" className="text-primary hover:underline">Datenschutzrichtlinie</Link>.
+                Ich akzeptiere die <Link to="/legal/agb" target="_blank" className="text-primary hover:underline">AGB</Link> und die <Link to="/legal/datenschutz" target="_blank" className="text-primary hover:underline">Datenschutzrichtlinie</Link>.
               </label>
             </div>
           )}
