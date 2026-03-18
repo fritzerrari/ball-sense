@@ -40,17 +40,19 @@ export function MatchInsightsPanel({
 }: MatchInsightsPanelProps) {
   const weaknessGrid = deriveWeaknessHeatmap(homeHeatmap, awayHeatmap, apiStats);
   const zones = deriveZoneInsights(weaknessGrid, homePlayerStats, apiStats, 3);
+  const duelEntries = homePlayerStats.filter((item) => (item.duels_total ?? 0) > 0);
+  const passEntries = homePlayerStats.filter((item) => item.pass_accuracy);
+
   const conceded = deriveConcededGoalAnalysis(
     events,
     apiStats,
     {
-      duelRate: homePlayerStats.reduce((sum, item) => sum + ((item.duels_total ?? 0) > 0 ? ((item.duels_won ?? 0) / (item.duels_total ?? 1)) * 100 : 0), 0) /
-        Math.max(homePlayerStats.filter((item) => (item.duels_total ?? 0) > 0).length, 1),
+      duelRate:
+        duelEntries.reduce((sum, item) => sum + (((item.duels_won ?? 0) / Math.max(item.duels_total ?? 1, 1)) * 100), 0) /
+        Math.max(duelEntries.length, 1),
       ballRecoveries: homePlayerStats.reduce((sum, item) => sum + (item.ball_recoveries ?? 0), 0),
       fouls: homePlayerStats.reduce((sum, item) => sum + (item.fouls_committed ?? 0), 0),
-      passAccuracy:
-        homePlayerStats.reduce((sum, item) => sum + (item.pass_accuracy ?? 0), 0) /
-        Math.max(homePlayerStats.filter((item) => item.pass_accuracy).length, 1),
+      passAccuracy: passEntries.reduce((sum, item) => sum + (item.pass_accuracy ?? 0), 0) / Math.max(passEntries.length, 1),
     },
     {
       shotsOnTarget: apiStats?.shots_on_target_away ?? 0,
@@ -61,12 +63,13 @@ export function MatchInsightsPanel({
 
   const defensiveLeaders = getTopPlayersForMetric(homePlayerStats, "ball_recoveries", 3, true);
   const buildUpLeaders = getTopPlayersForMetric(homePlayerStats, "passes_total", 3, true);
+  const linkedZonePlayers = zones.flatMap((zone) => zone.players).filter((player) => player.id).slice(0, 4);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
       <MetricDetailDialog
         title="Schwachstellen-Heatmap"
-        subtitle="Diese Ansicht markiert Problemzonen aus Raumkontrolle, gegnerischer Präsenz und Drucksignalen aus dem Spiel.")
+        subtitle="Diese Ansicht markiert Problemzonen aus Raumkontrolle, gegnerischer Präsenz und Drucksignalen aus dem Spiel."
         chips={["Schwachstellen", "Raumkontrolle", "Drilldown"]}
         insight="Die Heatmap ist eine intelligente Risikosicht: Rot heißt nicht automatisch Fehler, sondern priorisierte Zone für Coaching, Restverteidigung und Nachschieben."
         facts={zones.map((zone) => ({
@@ -78,19 +81,17 @@ export function MatchInsightsPanel({
           <div className="space-y-3">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Direkt zu betroffenen Spielern</p>
             <div className="flex flex-wrap gap-2">
-              {zones.flatMap((zone) => zone.players).slice(0, 4).map((player) =>
-                player.id ? (
-                  <Button key={`${player.id}-${player.name}`} variant="heroOutline" size="sm" asChild>
-                    <Link to={`/players/${player.id}`}>{player.name}</Link>
-                  </Button>
-                ) : null,
-              )}
+              {linkedZonePlayers.map((player) => (
+                <Button key={`${player.id}-${player.name}`} variant="heroOutline" size="sm" asChild>
+                  <Link to={`/players/${player.id}`}>{player.name}</Link>
+                </Button>
+              ))}
             </div>
           </div>
         }
         contentClassName="sm:max-w-5xl"
       >
-        <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+        <div className="game-panel h-full space-y-4 p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3 pr-16">
             <div>
               <h3 className="text-base font-semibold font-display">Schwachstellen-Heatmap</h3>
@@ -118,7 +119,7 @@ export function MatchInsightsPanel({
       </MetricDetailDialog>
 
       <div className="space-y-4">
-        <div className="glass-card p-5 sm:p-6 space-y-4 overflow-hidden relative">
+        <div className="glass-card relative space-y-4 overflow-hidden p-5 sm:p-6">
           <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-r from-primary/10 via-accent/10 to-transparent pointer-events-none" />
           <div className="relative flex items-start justify-between gap-3">
             <div>
@@ -165,8 +166,8 @@ export function MatchInsightsPanel({
                     {event.minute}'
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium break-words">{event.event_cause ?? event.event_pattern ?? "Gegentor"}</p>
-                    <p className="text-xs text-muted-foreground break-words">
+                    <p className="break-words text-sm font-medium">{event.event_cause ?? event.event_pattern ?? "Gegentor"}</p>
+                    <p className="break-words text-xs text-muted-foreground">
                       {event.event_zone ?? "Zone offen"}
                       {event.affected_line ? ` · ${event.affected_line}` : ""}
                       {event.notes ? ` · ${event.notes}` : ""}
@@ -178,7 +179,7 @@ export function MatchInsightsPanel({
           )}
         </div>
 
-        <div className="glass-card p-5 sm:p-6 space-y-4">
+        <div className="glass-card space-y-4 p-5 sm:p-6">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <ShieldAlert className="h-4 w-4" />
@@ -192,8 +193,8 @@ export function MatchInsightsPanel({
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Defensive Fokusspieler</p>
             {defensiveLeaders.map((player) => (
-              <Link key={player.id} to={`/players/${player.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 hover:border-primary/40 transition-colors">
-                <span className="flex-1 min-w-0 text-sm font-medium truncate">{player.name}</span>
+              <Link key={player.id} to={`/players/${player.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 transition-colors hover:border-primary/40">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{player.name}</span>
                 <span className="text-xs text-muted-foreground">{player.value} Ballgewinne</span>
                 <ArrowRight className="h-4 w-4 text-primary" />
               </Link>
@@ -203,8 +204,8 @@ export function MatchInsightsPanel({
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Aufbauspiel prüfen</p>
             {buildUpLeaders.map((player) => (
-              <Link key={player.id} to={`/players/${player.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 hover:border-primary/40 transition-colors">
-                <span className="flex-1 min-w-0 text-sm font-medium truncate">{player.name}</span>
+              <Link key={player.id} to={`/players/${player.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 transition-colors hover:border-primary/40">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{player.name}</span>
                 <span className="text-xs text-muted-foreground">{player.value} Pässe</span>
                 <ArrowRight className="h-4 w-4 text-primary" />
               </Link>

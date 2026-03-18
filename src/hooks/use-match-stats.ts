@@ -26,7 +26,7 @@ export function usePlayerMatchStats(matchId: string | undefined) {
       if (!matchId) return [];
       const { data, error } = await supabase
         .from("player_match_stats")
-        .select("*, players(name, number, position)")
+        .select("*, players(id, name, number, position, tracking_consent_status)")
         .eq("match_id", matchId);
       if (error) throw error;
       return data;
@@ -58,14 +58,13 @@ export function usePlayerAllStats(playerId: string | undefined) {
       if (!playerId) return [];
       const { data, error } = await supabase
         .from("player_match_stats")
-        .select("*, matches(date, away_club_name, status)")
+        .select("*, matches(id, date, away_club_name, status)")
         .eq("player_id", playerId)
         .order("matches(date)", { ascending: false });
       if (error) {
-        // Fallback without order if join ordering fails
         const { data: fallback, error: e2 } = await supabase
           .from("player_match_stats")
-          .select("*, matches(date, away_club_name, status)")
+          .select("*, matches(id, date, away_club_name, status)")
           .eq("player_id", playerId);
         if (e2) throw e2;
         return fallback ?? [];
@@ -82,43 +81,39 @@ export function useSeasonStats() {
     queryKey: ["season_stats", clubId],
     queryFn: async () => {
       if (!clubId) return null;
-      // Get done matches count
       const { count: matchCount } = await supabase
         .from("matches")
         .select("*", { count: "exact", head: true })
         .eq("home_club_id", clubId)
         .eq("status", "done");
 
-      // Get aggregated team stats — filter by club's matches only
       const { data: clubMatches } = await supabase
         .from("matches")
         .select("id")
         .eq("home_club_id", clubId)
         .eq("status", "done");
-      
-      const matchIds = clubMatches?.map(m => m.id) ?? [];
+
+      const matchIds = clubMatches?.map((m) => m.id) ?? [];
       let totalKm = 0;
       let topSpeed = 0;
-      
+
       if (matchIds.length > 0) {
         const { data: teamStats } = await supabase
           .from("team_match_stats")
           .select("total_distance_km, top_speed_kmh")
           .in("match_id", matchIds)
           .eq("team", "home");
-        
+
         totalKm = teamStats?.reduce((s, t) => s + (t.total_distance_km || 0), 0) ?? 0;
         topSpeed = teamStats?.reduce((s, t) => Math.max(s, t.top_speed_kmh || 0), 0) ?? 0;
       }
 
-      // Get player count
       const { count: playerCount } = await supabase
         .from("players")
         .select("*", { count: "exact", head: true })
         .eq("club_id", clubId)
         .eq("active", true);
 
-      // Most distance player — filter by club matches
       let topPlayerName: string | null = null;
       if (matchIds.length > 0) {
         const { data: topPlayer } = await supabase
