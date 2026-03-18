@@ -37,28 +37,24 @@ export default function AdminPlayerConsents() {
   const { data: players = [], isLoading } = useQuery({
     queryKey: ["admin_player_consents"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("players")
-        .select("id, name, number, position, active, club_id, tracking_consent_status, tracking_consent_notes, tracking_consent_updated_at, clubs(name)")
-        .order("name");
-
+      const { data, error } = await supabase.functions.invoke("player-consent-admin", {
+        body: { action: "list" },
+      });
       if (error) throw error;
-      return (data ?? []) as AdminPlayerConsentRow[];
+      if (data?.error) throw new Error(data.error);
+      return (data?.players ?? []) as AdminPlayerConsentRow[];
     },
   });
 
-  const filteredPlayers = useMemo(() => {
-    return players.filter((player) => {
-      const matchesSearch =
-        !search ||
-        player.name.toLowerCase().includes(search.toLowerCase()) ||
-        player.clubs?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        player.tracking_consent_notes?.toLowerCase().includes(search.toLowerCase());
-
-      const matchesStatus = statusFilter === "all" || player.tracking_consent_status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [players, search, statusFilter]);
+  const filteredPlayers = useMemo(() => players.filter((player) => {
+    const term = search.toLowerCase();
+    const matchesSearch = !search
+      || player.name.toLowerCase().includes(term)
+      || player.clubs?.name?.toLowerCase().includes(term)
+      || player.tracking_consent_notes?.toLowerCase().includes(term);
+    const matchesStatus = statusFilter === "all" || player.tracking_consent_status === statusFilter;
+    return matchesSearch && matchesStatus;
+  }), [players, search, statusFilter]);
 
   const openEditor = (player: AdminPlayerConsentRow) => {
     setEditingPlayer(player);
@@ -83,25 +79,14 @@ export default function AdminPlayerConsents() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h3 className="text-sm font-semibold font-display">Spieler-Einwilligungen</h3>
-          <p className="text-xs text-muted-foreground">
-            Status, Hinweise und offene Tracking-Freigaben zentral verwalten.
-          </p>
+          <p className="text-xs text-muted-foreground">Status, Hinweisfeld und offene Fälle zentral verwalten.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Spieler oder Verein suchen"
-              className="pl-9 sm:w-64"
-            />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Spieler oder Verein suchen" className="pl-9 sm:w-64" />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as TrackingConsentStatus | "all")}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TrackingConsentStatus | "all")} className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground">
             <option value="all">Alle Status</option>
             <option value="unknown">Offen</option>
             <option value="granted">Liegt vor</option>
@@ -115,9 +100,7 @@ export default function AdminPlayerConsents() {
           <thead>
             <tr className="border-b border-border">
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Spieler</th>
-              {isSuperAdmin && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Verein</th>
-              )}
+              {isSuperAdmin && <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Verein</th>}
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Einwilligung</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Hinweis</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Aktualisiert</th>
@@ -137,14 +120,8 @@ export default function AdminPlayerConsents() {
                 </td>
                 {isSuperAdmin && <td className="px-4 py-3 text-muted-foreground">{player.clubs?.name ?? "—"}</td>}
                 <td className="px-4 py-3"><ConsentStatusBadge status={player.tracking_consent_status} compact /></td>
-                <td className="px-4 py-3 text-xs text-muted-foreground max-w-[320px]">
-                  {player.tracking_consent_notes?.trim() || getConsentHint(player.tracking_consent_status)}
-                </td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {player.tracking_consent_updated_at
-                    ? new Date(player.tracking_consent_updated_at).toLocaleDateString("de-DE")
-                    : "—"}
-                </td>
+                <td className="px-4 py-3 text-xs text-muted-foreground max-w-[320px]">{player.tracking_consent_notes?.trim() || getConsentHint(player.tracking_consent_status)}</td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">{player.tracking_consent_updated_at ? new Date(player.tracking_consent_updated_at).toLocaleDateString("de-DE") : "—"}</td>
                 <td className="px-4 py-3 text-right">
                   <Button variant="outline" size="sm" onClick={() => openEditor(player)}>
                     <ShieldCheck className="mr-1 h-4 w-4" /> Verwalten
@@ -154,9 +131,7 @@ export default function AdminPlayerConsents() {
             ))}
           </tbody>
         </table>
-        {filteredPlayers.length === 0 && (
-          <div className="p-8 text-center text-sm text-muted-foreground">Keine passenden Spieler gefunden.</div>
-        )}
+        {filteredPlayers.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">Keine passenden Spieler gefunden.</div>}
       </div>
 
       <Dialog open={!!editingPlayer} onOpenChange={(open) => !open && setEditingPlayer(null)}>
@@ -168,22 +143,11 @@ export default function AdminPlayerConsents() {
             {editingPlayer && (
               <div>
                 <p className="text-sm font-medium">{editingPlayer.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {editingPlayer.clubs?.name ?? "Aktueller Verein"}
-                </p>
+                <p className="text-xs text-muted-foreground">{editingPlayer.clubs?.name ?? "Aktueller Verein"}</p>
               </div>
             )}
-            <PlayerConsentFields
-              status={formStatus}
-              notes={formNotes}
-              updatedAt={editingPlayer?.tracking_consent_updated_at}
-              onStatusChange={setFormStatus}
-              onNotesChange={setFormNotes}
-              disabled={updateConsent.isPending}
-            />
-            <Button variant="hero" className="w-full" onClick={handleSave} disabled={updateConsent.isPending}>
-              Einwilligung speichern
-            </Button>
+            <PlayerConsentFields status={formStatus} notes={formNotes} updatedAt={editingPlayer?.tracking_consent_updated_at} onStatusChange={setFormStatus} onNotesChange={setFormNotes} disabled={updateConsent.isPending} />
+            <Button variant="hero" className="w-full" onClick={handleSave} disabled={updateConsent.isPending}>Einwilligung speichern</Button>
           </div>
         </DialogContent>
       </Dialog>

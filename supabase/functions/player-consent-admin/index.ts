@@ -40,23 +40,9 @@ Deno.serve(async (req) => {
 
     const callerId = claimsData.claims.sub;
     const [{ data: adminRole }, { data: superAdminRow }, { data: profileRow }] = await Promise.all([
-      anonClient
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", callerId)
-        .eq("role", "admin")
-        .maybeSingle(),
-      anonClient
-        .from("super_admins")
-        .select("id")
-        .eq("user_id", callerId)
-        .eq("active", true)
-        .maybeSingle(),
-      anonClient
-        .from("profiles")
-        .select("club_id")
-        .eq("user_id", callerId)
-        .maybeSingle(),
+      anonClient.from("user_roles").select("id").eq("user_id", callerId).eq("role", "admin").maybeSingle(),
+      anonClient.from("super_admins").select("id").eq("user_id", callerId).eq("active", true).maybeSingle(),
+      anonClient.from("profiles").select("club_id").eq("user_id", callerId).maybeSingle(),
     ]);
 
     const isSuperAdmin = !!superAdminRow;
@@ -66,7 +52,30 @@ Deno.serve(async (req) => {
       return json({ error: "Forbidden" }, 403);
     }
 
-    const { playerId, tracking_consent_status, tracking_consent_notes } = await req.json();
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    const body = await req.json();
+    const action = body?.action ?? "update";
+
+    if (action === "list") {
+      let query = adminClient
+        .from("players")
+        .select("id, name, number, position, active, club_id, tracking_consent_status, tracking_consent_notes, tracking_consent_updated_at, clubs(name)")
+        .order("name");
+
+      if (!isSuperAdmin && profileRow?.club_id) {
+        query = query.eq("club_id", profileRow.club_id);
+      }
+
+      const { data, error } = await query;
+      if (error) return json({ error: error.message }, 400);
+      return json({ players: data ?? [] });
+    }
+
+    const { playerId, tracking_consent_status, tracking_consent_notes } = body;
     const normalizedStatus = tracking_consent_status as ConsentStatus;
 
     if (!playerId) {
@@ -76,11 +85,6 @@ Deno.serve(async (req) => {
     if (!["unknown", "granted", "denied"].includes(normalizedStatus)) {
       return json({ error: "Invalid consent status" }, 400);
     }
-
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
 
     const { data: player, error: playerError } = await adminClient
       .from("players")
