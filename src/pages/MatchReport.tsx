@@ -187,13 +187,15 @@ export default function MatchReport() {
       </div>
       <div className="relative space-y-2">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Direkte Spieler-Drilldowns</p>
-        <div className="flex flex-wrap gap-2">
-          {focusPlayers.map((player) => (
-            <Button key={player.player_id} variant="heroOutline" size="sm" asChild>
-              <Link to={`/players/${player.player_id}`}>{player.players?.name}</Link>
-            </Button>
-          ))}
-        </div>
+          <div className="flex flex-wrap gap-2">
+            {focusPlayers.map((player) => (
+              <Button key={player.player_id} variant="heroOutline" size="sm" asChild>
+                <Link to={`/players/${player.player_id}`} className="max-w-full">
+                  <span className="block max-w-[10rem] truncate sm:max-w-[12rem]">{player.players?.name}</span>
+                </Link>
+              </Button>
+            ))}
+          </div>
       </div>
     </div>
   );
