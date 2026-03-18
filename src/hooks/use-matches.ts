@@ -46,7 +46,7 @@ export function useMatchLineups(matchId: string | undefined) {
       if (!matchId) return [];
       const { data, error } = await supabase
         .from("match_lineups")
-        .select("*, players(name, number, position)")
+        .select("*, players(name, number, position, tracking_consent_status)")
         .eq("match_id", matchId);
       if (error) throw error;
       return data;

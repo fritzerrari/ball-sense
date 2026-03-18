@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
+import type { TrackingConsentStatus } from "@/lib/types";
 
 export function usePlayers() {
   const { clubId } = useAuth();
@@ -38,11 +39,21 @@ export function usePlayer(id: string | undefined) {
   });
 }
 
+type PlayerPayload = {
+  name: string;
+  number: number | null;
+  position: string | null;
+  active?: boolean;
+  tracking_consent_status?: TrackingConsentStatus;
+  tracking_consent_notes?: string | null;
+  tracking_consent_updated_at?: string | null;
+};
+
 export function useCreatePlayer() {
   const qc = useQueryClient();
   const { clubId } = useAuth();
   return useMutation({
-    mutationFn: async (player: { name: string; number: number | null; position: string | null }) => {
+    mutationFn: async (player: PlayerPayload) => {
       if (!clubId) throw new Error("Kein Verein");
       const { data, error } = await supabase
         .from("players")
@@ -63,7 +74,7 @@ export function useCreatePlayer() {
 export function useUpdatePlayer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; name?: string; number?: number | null; position?: string | null; active?: boolean }) => {
+    mutationFn: async ({ id, ...updates }: { id: string } & Partial<PlayerPayload>) => {
       const { data, error } = await supabase
         .from("players")
         .update(updates)

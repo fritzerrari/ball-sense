@@ -955,6 +955,9 @@ export type Database = {
           name: string
           number: number | null
           position: string | null
+          tracking_consent_notes: string | null
+          tracking_consent_status: Database["public"]["Enums"]["tracking_consent_status"]
+          tracking_consent_updated_at: string | null
         }
         Insert: {
           active?: boolean
@@ -964,6 +967,9 @@ export type Database = {
           name: string
           number?: number | null
           position?: string | null
+          tracking_consent_notes?: string | null
+          tracking_consent_status?: Database["public"]["Enums"]["tracking_consent_status"]
+          tracking_consent_updated_at?: string | null
         }
         Update: {
           active?: boolean
@@ -973,6 +979,9 @@ export type Database = {
           name?: string
           number?: number | null
           position?: string | null
+          tracking_consent_notes?: string | null
+          tracking_consent_status?: Database["public"]["Enums"]["tracking_consent_status"]
+          tracking_consent_updated_at?: string | null
         }
         Relationships: [
           {
@@ -1179,6 +1188,7 @@ export type Database = {
         | "red_card"
         | "yellow_red_card"
         | "player_deactivated"
+      tracking_consent_status: "unknown" | "granted" | "denied"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1313,6 +1323,7 @@ export const Constants = {
         "yellow_red_card",
         "player_deactivated",
       ],
+      tracking_consent_status: ["unknown", "granted", "denied"],
     },
   },
 } as const
