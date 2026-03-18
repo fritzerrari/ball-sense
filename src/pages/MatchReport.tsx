@@ -29,6 +29,8 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ConsentStatusBadge } from "@/components/ConsentStatusBadge";
+import { CoachSummary } from "@/components/CoachSummary";
+import { WhatIfBoard } from "@/components/WhatIfBoard";
 
 const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich", "Berichte & Presse"];
 
@@ -83,6 +85,16 @@ function aggregatePlayerMetrics(stats: any[]) {
     passAccuracy: totals.passesTotal > 0 ? round((totals.passesCompleted / totals.passesTotal) * 100, 0) : 0,
     duelRate: totals.duelsTotal > 0 ? round((totals.duelsWon / totals.duelsTotal) * 100, 0) : 0,
   };
+}
+
+function SectionHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</p>
+      <h2 className="text-xl font-semibold font-display">{title}</h2>
+      <p className="max-w-3xl text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
 }
 
 export default function MatchReport() {
@@ -145,10 +157,10 @@ export default function MatchReport() {
 
   const renderTeamCard = (label: string, stats: any, agg: ReturnType<typeof aggregatePlayerMetrics>, focusPlayers: any[]) => (
     <div className="glass-card relative space-y-4 overflow-hidden p-5 sm:p-6">
-      <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />
-      <div className="relative flex items-center justify-between gap-3">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-r from-primary/10 to-transparent" />
+      <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h3 className="font-display text-lg font-semibold break-words">{label}</h3>
+          <h3 className="break-words text-lg font-semibold font-display">{label}</h3>
           <p className="text-sm text-muted-foreground">Interaktive Match-Zusammenfassung mit direkten Wegen in Spielerprofile.</p>
         </div>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -280,10 +292,11 @@ export default function MatchReport() {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6 px-0">
         <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Zurück zu Spiele</Link>
+
         <div className="glass-card relative overflow-hidden p-6">
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-r from-primary/10 via-accent/10 to-transparent pointer-events-none" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-r from-primary/10 via-accent/10 to-transparent" />
           <div className="relative mb-3 flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={match.status} />
@@ -312,11 +325,86 @@ export default function MatchReport() {
             </div>
           )}
         </div>
+
         {match.status === "processing" && <div className="glass-card space-y-3 p-5 glow-border"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div><div><h3 className="text-sm font-semibold font-display">Daten werden verarbeitet</h3><p className="text-xs text-muted-foreground">Die KI analysiert die Tracking-Daten. Dies kann einige Minuten dauern.</p></div></div></div>}
         {match.status === "live" && <div className="glass-card flex items-center gap-3 p-4 glow-border"><div className="h-2 w-2 animate-pulse rounded-full bg-primary" /><span className="text-sm font-medium font-display">Live-Tracking läuft</span><span className="ml-auto text-xs text-muted-foreground">Daten werden nach Spielende verfügbar</span></div>}
-        {uploads && uploads.length > 0 && match.status !== "processing" && <div className="flex flex-wrap gap-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] flex-1 p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
+        {uploads && uploads.length > 0 && match.status !== "processing" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
+
         <div className="scrollbar-none flex gap-1 overflow-x-auto rounded-lg bg-muted/30 p-1">{tabs.map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-all sm:flex-1 ${activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{tab}</button>)}</div>
-        {activeTab === "Übersicht" && <div className="space-y-6">{apiStats && <ApiFootballStatsCard stats={apiStats} homeLabel={clubName ?? "Heim"} awayLabel={match.away_club_name ?? "Auswärts"} />}{hasStats && <><MatchKpiStrip homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} /><MatchInsightsPanel matchId={match.id} homeHeatmap={homeTeamStats?.formation_heatmap as number[][] | null} awayHeatmap={awayTeamStats?.formation_heatmap as number[][] | null} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} apiStats={apiStats} events={(events ?? []) as any[]} /></>}<div className="grid gap-4 xl:grid-cols-2">{renderTeamCard(clubName ?? "Heim", homeTeamStats, homeAgg, coachLinks.recoveries)}{renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats, awayAgg, coachLinks.passing)}</div>{hasStats ? <><ComparisonBarChart homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} /><div className="grid gap-4 xl:grid-cols-3"><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Laufdistanz" metric="distance_km" unit="km" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Speed" metric="top_speed_kmh" unit="km/h" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Sprints" metric="sprint_count" unit="" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Passgeber" metric="passes_total" unit="" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Tackles" metric="tackles" unit="" /><TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Ballgewinne" metric="ball_recoveries" unit="" /></div><div className="grid gap-4 sm:grid-cols-2"><HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} /><HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} /></div><PerformanceAnalysis type="team" matchId={match.id} /></> : <div className="glass-card p-8 text-center"><Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" /><p className="text-muted-foreground">Statistiken werden nach dem Tracking verfügbar.</p></div>}</div>}
+
+        {activeTab === "Übersicht" && (
+          <div className="space-y-8">
+            <CoachSummary
+              clubName={clubName ?? "Heim"}
+              awayName={match.away_club_name ?? "Auswärts"}
+              homeTeamStats={homeTeamStats}
+              awayTeamStats={awayTeamStats}
+              homePlayerStats={homePlayerStats}
+              awayPlayerStats={awayPlayerStats}
+            />
+
+            {apiStats && <ApiFootballStatsCard stats={apiStats} homeLabel={clubName ?? "Heim"} awayLabel={match.away_club_name ?? "Auswärts"} />}
+
+            {hasStats ? (
+              <>
+                <section className="space-y-4">
+                  <SectionHeader eyebrow="Match Pulse" title="Kern-KPIs" description="Die wichtigsten Matchhebel zuerst – kompakt genug zum Scannen, detailliert genug für die Halbzeitansprache." />
+                  <MatchKpiStrip homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} />
+                </section>
+
+                <section className="space-y-4">
+                  <SectionHeader eyebrow="Head to Head" title="Teamvergleich" description="Ein primärer Vergleichsblock für Kontrolle, Intensität und Wirkung – vor den Detailmodulen." />
+                  <div className="grid gap-4 2xl:grid-cols-[1.1fr,0.9fr]">
+                    <ComparisonBarChart homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} />
+                    <MatchRadarChart homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} />
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <SectionHeader eyebrow="Bench View" title="Schnellvergleich je Team" description="Kompakte Teamkarten für das schnelle Lesen von Belastung, Passspiel und Ballgewinnen." />
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {renderTeamCard(clubName ?? "Heim", homeTeamStats, homeAgg, coachLinks.recoveries)}
+                    {renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats, awayAgg, coachLinks.passing)}
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <SectionHeader eyebrow="Leaderboards" title="Top-Spieler & Indikatoren" description="Modernisierte Rankings mit Peak-Einordnung, Ausreißer-Indikator und stabilerem Responsive-Verhalten." />
+                  <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                    <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Laufdistanz" metric="distance_km" unit="km" />
+                    <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Speed" metric="top_speed_kmh" unit="km/h" />
+                    <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Sprints" metric="sprint_count" unit="" />
+                    <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Passgeber" metric="passes_total" unit="" />
+                    <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Tackles" metric="tackles" unit="" />
+                    <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Ballgewinne" metric="ball_recoveries" unit="" />
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <SectionHeader eyebrow="Tactical Read" title="Taktische Insights" description="Heatmaps, Gegentor-Muster und Spieler-Navigation in einem klarer priorisierten Analyseblock." />
+                  <MatchInsightsPanel matchId={match.id} homeHeatmap={homeTeamStats?.formation_heatmap as number[][] | null} awayHeatmap={awayTeamStats?.formation_heatmap as number[][] | null} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} apiStats={apiStats} events={(events ?? []) as any[]} />
+                </section>
+
+                <section className="space-y-4">
+                  <SectionHeader eyebrow="Field View" title="Heatmaps & Teamanalyse" description="Die Gesamtbewegung beider Teams plus vertiefende Analyse für den Staff." />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} />
+                    <HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} />
+                  </div>
+                  <PerformanceAnalysis type="team" matchId={match.id} />
+                </section>
+
+                <section className="space-y-4">
+                  <SectionHeader eyebrow="What If" title="Formationen & Optionen" description="Die Was-wäre-wenn-Analyse sitzt jetzt bewusst nach den Fakten – als nächster Coaching-Schritt, nicht davor." />
+                  <WhatIfBoard players={homePlayerStats} />
+                </section>
+              </>
+            ) : (
+              <div className="glass-card p-8 text-center"><Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" /><p className="text-muted-foreground">Statistiken werden nach dem Tracking verfügbar.</p></div>
+            )}
+          </div>
+        )}
+
         {activeTab === "Berichte & Presse" && <ReportGenerator matchId={match.id} matchStatus={match.status} clubName={clubName ?? "Heim"} awayClubName={match.away_club_name ?? "Gegner"} matchDate={match.date} />}
         {activeTab === "Heim" && renderPlayerTable(homePlayerStats)}
         {activeTab === "Auswärts" && renderPlayerTable(awayPlayerStats)}

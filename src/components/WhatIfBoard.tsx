@@ -44,7 +44,7 @@ export function WhatIfBoard({ players }: { players: Array<{ id?: string | null; 
       ? players.reduce((sum, player) => sum + (player.pass_accuracy || 0), 0) / players.length
       : 0;
 
-    const ideas = [
+    return [
       avgDuelRate < 50
         ? "Mehr Absicherung im Zentrum sinnvoll: Eine Formation mit zusätzlichem ZDM oder Dreierkette könnte das Restverteidigen stabilisieren."
         : "Die Defensivbasis wirkt stabil genug, um offensivere Rollen in höheren Zonen zu testen.",
@@ -55,13 +55,11 @@ export function WhatIfBoard({ players }: { players: Array<{ id?: string | null; 
         ? "Wenn du einen passsicheren Spieler tiefer ziehst, verbessert sich wahrscheinlich Aufbau und Pressingresistenz."
         : "Mit der aktuellen Passqualität kann ein zusätzlicher Offensivspieler zwischen den Linien getestet werden.",
     ];
-
-    return ideas;
   }, [players]);
 
   return (
-    <div className="glass-card space-y-4 p-5 sm:p-6">
-      <div className="flex items-start justify-between gap-3">
+    <div className="glass-card space-y-5 p-5 sm:p-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h3 className="text-base font-semibold font-display">Was-wäre-wenn-Analyse</h3>
           <p className="text-sm text-muted-foreground">Interaktive Ersteinschätzung für Positionswechsel und Formationsumbauten.</p>
@@ -80,38 +78,41 @@ export function WhatIfBoard({ players }: { players: Array<{ id?: string | null; 
         </select>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-pitch/15 p-4">
-        <div className="absolute inset-4 rounded-[1.25rem] border border-pitch-line/40" />
-        <div className="absolute left-1/2 top-4 bottom-4 w-px -translate-x-1/2 bg-pitch-line/30" />
-        <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pitch-line/30" />
-        <div className="relative h-[420px]">
-          {layout.map((slot, index) => {
-            const player = players[index];
-            return (
-              <div key={`${slot}-${index}`} className={`absolute ${SLOT_CLASSES[index] || SLOT_CLASSES[SLOT_CLASSES.length - 1]}`}>
-                <div className="min-w-[90px] rounded-xl border border-border bg-background/90 px-3 py-2 text-center shadow-sm">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{POSITION_LABELS[slot] || slot}</p>
-                  <p className="mt-1 text-xs font-semibold break-words">{player?.players?.name || "Offen"}</p>
-                  <p className="text-[11px] text-muted-foreground">{player?.players?.position ? POSITION_LABELS[player.players.position] || player.players.position : "Noch kein Profil"}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        {suggestions.map((idea) => (
-          <div key={idea} className="flex items-start gap-2 rounded-xl border border-border bg-background/60 p-3 text-sm text-muted-foreground">
-            <Lightbulb className="mt-0.5 h-4 w-4 text-primary" />
-            {idea}
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div className="relative overflow-x-auto rounded-3xl border border-border bg-pitch/15 p-4">
+          <div className="min-w-[640px]">
+            <div className="absolute inset-4 rounded-[1.25rem] border border-pitch-line/40" />
+            <div className="absolute bottom-4 left-1/2 top-4 w-px -translate-x-1/2 bg-pitch-line/30" />
+            <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pitch-line/30" />
+            <div className="relative h-[420px]">
+              {layout.map((slot, index) => {
+                const player = players[index];
+                return (
+                  <div key={`${slot}-${index}`} className={`absolute ${SLOT_CLASSES[index] || SLOT_CLASSES[SLOT_CLASSES.length - 1]}`}>
+                    <div className="w-[82px] rounded-2xl border border-border bg-background/90 px-2.5 py-2 text-center shadow-sm sm:w-[96px]">
+                      <p className="truncate text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{POSITION_LABELS[slot] || slot}</p>
+                      <p className="mt-1 line-clamp-2 text-xs font-semibold leading-4">{player?.players?.name || "Offen"}</p>
+                      <p className="mt-1 truncate text-[11px] text-muted-foreground">{player?.players?.position ? POSITION_LABELS[player.players.position] || player.players.position : "Noch kein Profil"}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="rounded-xl border border-border bg-secondary/50 p-3 text-xs text-muted-foreground">
-        <p>{AI_RECOMMENDATION_DISCLAIMER}</p>
-        <p className="mt-1">{AI_DISCLAIMER}</p>
+        <div className="space-y-3">
+          {suggestions.map((idea) => (
+            <div key={idea} className="flex items-start gap-2 rounded-2xl border border-border bg-background/60 p-3 text-sm text-muted-foreground">
+              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span className="leading-6">{idea}</span>
+            </div>
+          ))}
+          <div className="rounded-2xl border border-border bg-secondary/50 p-3 text-xs leading-5 text-muted-foreground">
+            <p>{AI_RECOMMENDATION_DISCLAIMER}</p>
+            <p className="mt-1">{AI_DISCLAIMER}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
