@@ -1,13 +1,36 @@
 {
+  "id": "/",
   "name": "FieldIQ – KI-Tracking für Amateurfußball",
   "short_name": "FieldIQ",
   "description": "Heatmaps, Laufdistanzen & Sprints – nur mit Smartphones am Spielfeldrand.",
+  "lang": "de-DE",
+  "dir": "ltr",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "any",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "landscape",
   "background_color": "#0a0f1e",
   "theme_color": "#00d4ff",
-  "categories": ["sports", "fitness"],
+  "prefer_related_applications": false,
+  "categories": ["sports", "fitness", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Spiele",
+      "short_name": "Spiele",
+      "url": "/matches"
+    },
+    {
+      "name": "Installationshilfe",
+      "short_name": "Installieren",
+      "url": "/install"
+    }
+  ],
   "icons": [
     {
       "src": "/favicon.ico",

@@ -522,8 +522,13 @@ export default function FieldCalibration() {
             >
               <RotateCcw className="h-4 w-4" /> Zurücksetzen
             </Button>
+            {returnTo && (
+              <Button variant="heroOutline" asChild>
+                <Link to={backHref}>Später zurück</Link>
+              </Button>
+            )}
             <Button variant="hero" disabled={!canSave || saveCalibration.isPending} onClick={handleSave}>
-              <Save className="mr-1 h-4 w-4" /> Kalibrierung speichern
+              <Save className="mr-1 h-4 w-4" /> {saveLabel}
             </Button>
           </div>
         </div>
