@@ -1,6 +1,7 @@
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegendContent } from "@/components/ui/chart";
 import { Activity, Shield, Goal, Gauge, Trophy } from "lucide-react";
+import { MetricDetailDialog } from "@/components/MetricDetailDialog";
 
 interface StatEntry {
   id: string;
@@ -48,6 +49,7 @@ export function PlayerCharts({ stats }: PlayerChartsProps) {
     label:
       s.matches?.away_club_name?.substring(0, 8) ||
       (s.matches?.date ? new Date(s.matches.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) : "—"),
+    date: s.matches?.date ? new Date(s.matches.date).toLocaleDateString("de-DE") : "—",
     km: round(s.distance_km ?? 0),
     topSpeed: round(s.top_speed_kmh ?? 0),
     sprints: s.sprint_count ?? 0,
@@ -112,13 +114,15 @@ export function PlayerCharts({ stats }: PlayerChartsProps) {
   } as const;
 
   const statCards = [
-    { label: "Ø Passquote", value: avgPassAccuracy ? `${avgPassAccuracy}%` : "—", icon: Gauge },
-    { label: "Ø Zweikampfquote", value: avgDuelRate ? `${avgDuelRate}%` : "—", icon: Shield },
-    { label: "Ballgewinne", value: String(totalRecoveries), icon: Activity },
-    { label: "Scorer", value: String(scorerPoints), icon: Goal },
-    { label: "Pässe gesamt", value: String(totalPasses), icon: Trophy },
-    { label: "Ø Rating", value: avgRating ? String(avgRating) : "—", icon: Trophy },
+    { label: "Ø Passquote", value: avgPassAccuracy ? `${avgPassAccuracy}%` : "—", icon: Gauge, key: "passAccuracy" },
+    { label: "Ø Zweikampfquote", value: avgDuelRate ? `${avgDuelRate}%` : "—", icon: Shield, key: "duelRate" },
+    { label: "Ballgewinne", value: String(totalRecoveries), icon: Activity, key: "recoveries" },
+    { label: "Scorer", value: String(scorerPoints), icon: Goal, key: "scorer" },
+    { label: "Pässe gesamt", value: String(totalPasses), icon: Trophy, key: "passes" },
+    { label: "Ø Rating", value: avgRating ? String(avgRating) : "—", icon: Trophy, key: "rating" },
   ];
+
+  const latestGames = [...chartData].slice(-6).reverse();
 
   return (
     <div className="space-y-6">
@@ -128,124 +132,212 @@ export function PlayerCharts({ stats }: PlayerChartsProps) {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-        {statCards.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="glass-card p-4 space-y-3 overflow-hidden relative">
-            <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />
-            <div className="relative flex items-center justify-between">
-              <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Profile</span>
-              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <Icon className="h-4 w-4" />
+        {statCards.map(({ label, value, icon: Icon, key }) => (
+          <MetricDetailDialog
+            key={label}
+            title={`${label} im Formprofil`}
+            subtitle="Diese Kennzahl öffnet einen schnellen Drilldown mit den letzten Spielen des Spielers."
+            chips={["Player KPI", "Form", "Drilldown"]}
+            insight="Nicht jeder Peak ist nachhaltig. Für die Einordnung sind Wiederholbarkeit, Rolle und Stichprobe entscheidend."
+            facts={latestGames.map((item) => ({
+              label: item.label,
+              value:
+                key === "passAccuracy"
+                  ? `${item.passAccuracy ?? "—"}%`
+                  : key === "duelRate"
+                    ? `${item.duelRate ?? "—"}%`
+                    : key === "recoveries"
+                      ? `${item.recoveries}`
+                      : key === "scorer"
+                        ? `${item.goals + item.assists}`
+                        : key === "passes"
+                          ? `${item.passesTotal}`
+                          : `${item.rating ?? "—"}`,
+              hint: item.date,
+            }))}
+          >
+            <div className="game-panel p-4 space-y-3 h-full">
+              <div className="relative flex items-center justify-between pr-16">
+                <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Profile</span>
+                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <Icon className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="relative">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-2xl font-bold font-display">{value}</p>
               </div>
             </div>
-            <div className="relative">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="text-2xl font-bold font-display">{value}</p>
-            </div>
-          </div>
+          </MetricDetailDialog>
         ))}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="glass-card p-5 sm:p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold font-display">Formindex</h3>
-            <p className="text-sm text-muted-foreground">Laufleistung und Bewertung zeigen, wie stabil der Spieler zuletzt performt hat.</p>
+        <MetricDetailDialog
+          title="Formindex im Detail"
+          subtitle="Laufleistung und Rating bilden zusammen ein schnelles Bild über Stabilität und momentane Formkurve."
+          chips={["Form", "Load", "Rating"]}
+          insight="Wenn die Distanz stabil bleibt, das Rating aber sinkt, liegt das Problem oft eher in Spielentscheidungen oder technischer Wirkung als in der reinen Physis."
+          facts={latestGames.map((item) => ({
+            label: item.label,
+            value: `${item.km} km · ${item.rating ?? "—"} Rating`,
+            hint: item.date,
+          }))}
+          contentClassName="sm:max-w-4xl"
+        >
+          <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+            <div className="relative pr-16">
+              <h3 className="text-base font-semibold font-display">Formindex</h3>
+              <p className="text-sm text-muted-foreground">Laufleistung und Bewertung zeigen, wie stabil der Spieler zuletzt performt hat.</p>
+            </div>
+            <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="player-km" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-km)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="var(--color-km)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend content={<ChartLegendContent />} />
+                <Area type="monotone" dataKey="km" name="km" stroke="var(--color-km)" fill="url(#player-km)" strokeWidth={2.5} />
+                <Line type="monotone" dataKey="rating" name="rating" stroke="var(--color-rating)" strokeWidth={2.5} dot={{ fill: "var(--color-rating)", r: 3 }} connectNulls />
+              </AreaChart>
+            </ChartContainer>
           </div>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="player-km" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-km)" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="var(--color-km)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Legend content={<ChartLegendContent />} />
-              <Area type="monotone" dataKey="km" name="km" stroke="var(--color-km)" fill="url(#player-km)" strokeWidth={2.5} />
-              <Line type="monotone" dataKey="rating" name="rating" stroke="var(--color-rating)" strokeWidth={2.5} dot={{ fill: "var(--color-rating)", r: 3 }} connectNulls />
-            </AreaChart>
-          </ChartContainer>
-        </div>
+        </MetricDetailDialog>
 
-        <div className="glass-card p-5 sm:p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold font-display">Aufbau & Passspiel</h3>
-            <p className="text-sm text-muted-foreground">Passvolumen und Genauigkeit im Spielaufbau.</p>
+        <MetricDetailDialog
+          title="Aufbau & Passspiel im Detail"
+          subtitle="Passvolumen und Passgenauigkeit zeigen, ob der Spieler als Taktgeber oder eher als risiko-orientierter Progressor agiert."
+          chips={["Build-up", "Passing", "Security"]}
+          insight="Viel Volumen bei schwankender Quote deutet oft auf hohe Verantwortung im Aufbau hin. Wenig Volumen bei hoher Quote ist dagegen häufig rollenspezifisch und nicht automatisch besser."
+          facts={latestGames.map((item) => ({
+            label: item.label,
+            value: `${item.passesTotal} Pässe · ${item.passAccuracy ?? "—"}%`,
+            hint: item.date,
+          }))}
+          contentClassName="sm:max-w-4xl"
+        >
+          <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+            <div className="relative pr-16">
+              <h3 className="text-base font-semibold font-display">Aufbau & Passspiel</h3>
+              <p className="text-sm text-muted-foreground">Passvolumen und Genauigkeit im Spielaufbau.</p>
+            </div>
+            <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend content={<ChartLegendContent />} />
+                <Bar dataKey="passesTotal" name="passesTotal" fill="var(--color-passesTotal)" radius={[8, 8, 0, 0]} />
+                <Line type="monotone" dataKey="passAccuracy" name="passAccuracy" stroke="var(--color-passAccuracy)" strokeWidth={2.5} dot={{ fill: "var(--color-passAccuracy)", r: 3 }} connectNulls />
+              </BarChart>
+            </ChartContainer>
           </div>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Legend content={<ChartLegendContent />} />
-              <Bar dataKey="passesTotal" name="passesTotal" fill="var(--color-passesTotal)" radius={[8, 8, 0, 0]} />
-              <Line type="monotone" dataKey="passAccuracy" name="passAccuracy" stroke="var(--color-passAccuracy)" strokeWidth={2.5} dot={{ fill: "var(--color-passAccuracy)", r: 3 }} connectNulls />
-            </BarChart>
-          </ChartContainer>
-        </div>
+        </MetricDetailDialog>
 
-        <div className="glass-card p-5 sm:p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold font-display">Defensive Präsenz</h3>
-            <p className="text-sm text-muted-foreground">Zweikämpfe, Tackles, Interceptions und Ballgewinne als Defensivprofil.</p>
+        <MetricDetailDialog
+          title="Defensive Präsenz im Detail"
+          subtitle="Hier siehst du, wie konsequent der Spieler Duelle annimmt, Bälle gewinnt und Aktionen antizipiert."
+          chips={["Defence", "Timing", "Presence"]}
+          insight="Interceptions steigen oft dann, wenn das Raumgefühl gut ist. Hohe Tacklezahlen können stark sein, aber auch auf viele Notfallaktionen hindeuten."
+          facts={latestGames.map((item) => ({
+            label: item.label,
+            value: `${item.duelRate ?? "—"}% Zwk · ${item.tackles} Tackles · ${item.interceptions} Int.`,
+            hint: item.date,
+          }))}
+          contentClassName="sm:max-w-4xl"
+        >
+          <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+            <div className="relative pr-16">
+              <h3 className="text-base font-semibold font-display">Defensive Präsenz</h3>
+              <p className="text-sm text-muted-foreground">Zweikämpfe, Tackles, Interceptions und Ballgewinne als Defensivprofil.</p>
+            </div>
+            <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend content={<ChartLegendContent />} />
+                <Line type="monotone" dataKey="duelRate" name="duelRate" stroke="var(--color-duelRate)" strokeWidth={2.5} dot={{ fill: "var(--color-duelRate)", r: 3 }} connectNulls />
+                <Line type="monotone" dataKey="tackles" name="tackles" stroke="var(--color-tackles)" strokeWidth={2.5} dot={{ fill: "var(--color-tackles)", r: 3 }} />
+                <Line type="monotone" dataKey="interceptions" name="interceptions" stroke="var(--color-interceptions)" strokeWidth={2.5} dot={{ fill: "var(--color-interceptions)", r: 3 }} />
+                <Line type="monotone" dataKey="recoveries" name="recoveries" stroke="var(--color-recoveries)" strokeWidth={2.5} dot={{ fill: "var(--color-recoveries)", r: 3 }} />
+              </LineChart>
+            </ChartContainer>
           </div>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Legend content={<ChartLegendContent />} />
-              <Line type="monotone" dataKey="duelRate" name="duelRate" stroke="var(--color-duelRate)" strokeWidth={2.5} dot={{ fill: "var(--color-duelRate)", r: 3 }} connectNulls />
-              <Line type="monotone" dataKey="tackles" name="tackles" stroke="var(--color-tackles)" strokeWidth={2.5} dot={{ fill: "var(--color-tackles)", r: 3 }} />
-              <Line type="monotone" dataKey="interceptions" name="interceptions" stroke="var(--color-interceptions)" strokeWidth={2.5} dot={{ fill: "var(--color-interceptions)", r: 3 }} />
-              <Line type="monotone" dataKey="recoveries" name="recoveries" stroke="var(--color-recoveries)" strokeWidth={2.5} dot={{ fill: "var(--color-recoveries)", r: 3 }} />
-            </LineChart>
-          </ChartContainer>
-        </div>
+        </MetricDetailDialog>
 
-        <div className="glass-card p-5 sm:p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-semibold font-display">Offensivbeitrag</h3>
-            <p className="text-sm text-muted-foreground">Schussvolumen, Tore und Assists pro Spiel.</p>
+        <MetricDetailDialog
+          title="Offensivbeitrag im Detail"
+          subtitle="Schussvolumen, Zielgenauigkeit und direkte Torbeteiligungen machen sichtbar, wie viel echte Offensivwirkung entsteht."
+          chips={["Attack", "Chance Creation", "Output"]}
+          insight="Viele Schüsse ohne Treffer sind nicht automatisch schlecht. Entscheidender ist, ob Abschlüsse wiederholt in gute Abschlusszonen führen und ob Scorer-Aktionen folgen."
+          facts={latestGames.map((item) => ({
+            label: item.label,
+            value: `${item.shots} Schüsse · ${item.goals} Tore · ${item.assists} Assists`,
+            hint: item.date,
+          }))}
+          contentClassName="sm:max-w-4xl"
+        >
+          <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+            <div className="relative pr-16">
+              <h3 className="text-base font-semibold font-display">Offensivbeitrag</h3>
+              <p className="text-sm text-muted-foreground">Schussvolumen, Tore und Assists pro Spiel.</p>
+            </div>
+            <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend content={<ChartLegendContent />} />
+                <Bar dataKey="shots" name="shots" fill="var(--color-shots)" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="shotsOnTarget" name="shotsOnTarget" fill="var(--color-shotsOnTarget)" radius={[8, 8, 0, 0]} />
+                <Line type="monotone" dataKey="goals" name="goals" stroke="var(--color-goals)" strokeWidth={2.5} dot={{ fill: "var(--color-goals)", r: 3 }} />
+                <Line type="monotone" dataKey="assists" name="assists" stroke="var(--color-assists)" strokeWidth={2.5} dot={{ fill: "var(--color-assists)", r: 3 }} />
+              </BarChart>
+            </ChartContainer>
           </div>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Legend content={<ChartLegendContent />} />
-              <Bar dataKey="shots" name="shots" fill="var(--color-shots)" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="shotsOnTarget" name="shotsOnTarget" fill="var(--color-shotsOnTarget)" radius={[8, 8, 0, 0]} />
-              <Line type="monotone" dataKey="goals" name="goals" stroke="var(--color-goals)" strokeWidth={2.5} dot={{ fill: "var(--color-goals)", r: 3 }} />
-              <Line type="monotone" dataKey="assists" name="assists" stroke="var(--color-assists)" strokeWidth={2.5} dot={{ fill: "var(--color-assists)", r: 3 }} />
-            </BarChart>
-          </ChartContainer>
-        </div>
+        </MetricDetailDialog>
 
-        <div className="glass-card p-5 sm:p-6 space-y-4 xl:col-span-2">
-          <div>
-            <h3 className="text-base font-semibold font-display">Disziplin & Luftduelle</h3>
-            <p className="text-sm text-muted-foreground">Fouls, Kartenindex und gewonnene Kopfballduelle als ergänzendes Wirkungsbild.</p>
+        <MetricDetailDialog
+          title="Disziplin & Luftduelle im Detail"
+          subtitle="Diese Achse kombiniert Risiko, Timing und körperliche Präsenz in direkten Kontaktsituationen."
+          chips={["Discipline", "Aerial", "Contact"]}
+          insight="Viele Fouls oder Karten bedeuten nicht automatisch ein schlechtes Spiel. Entscheidend ist, ob die Härte kontrolliert bleibt und ob Luftduelle stabil gewonnen werden."
+          facts={latestGames.map((item) => ({
+            label: item.label,
+            value: `${item.fouls} Fouls · ${item.cards} Kartenindex · ${item.aerialWon} Kopfballduelle`,
+            hint: item.date,
+          }))}
+          contentClassName="sm:max-w-4xl"
+        >
+          <div className="game-panel p-5 sm:p-6 space-y-4 h-full xl:col-span-2">
+            <div className="relative pr-16">
+              <h3 className="text-base font-semibold font-display">Disziplin & Luftduelle</h3>
+              <p className="text-sm text-muted-foreground">Fouls, Kartenindex und gewonnene Kopfballduelle als ergänzendes Wirkungsbild.</p>
+            </div>
+            <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend content={<ChartLegendContent />} />
+                <Line type="monotone" dataKey="fouls" name="fouls" stroke="var(--color-fouls)" strokeWidth={2.5} dot={{ fill: "var(--color-fouls)", r: 3 }} />
+                <Line type="monotone" dataKey="cards" name="cards" stroke="var(--color-cards)" strokeWidth={2.5} dot={{ fill: "var(--color-cards)", r: 3 }} />
+                <Line type="monotone" dataKey="aerialWon" name="aerialWon" stroke="var(--color-aerialWon)" strokeWidth={2.5} dot={{ fill: "var(--color-aerialWon)", r: 3 }} />
+              </LineChart>
+            </ChartContainer>
           </div>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Legend content={<ChartLegendContent />} />
-              <Line type="monotone" dataKey="fouls" name="fouls" stroke="var(--color-fouls)" strokeWidth={2.5} dot={{ fill: "var(--color-fouls)", r: 3 }} />
-              <Line type="monotone" dataKey="cards" name="cards" stroke="var(--color-cards)" strokeWidth={2.5} dot={{ fill: "var(--color-cards)", r: 3 }} />
-              <Line type="monotone" dataKey="aerialWon" name="aerialWon" stroke="var(--color-aerialWon)" strokeWidth={2.5} dot={{ fill: "var(--color-aerialWon)", r: 3 }} />
-            </LineChart>
-          </ChartContainer>
-        </div>
+        </MetricDetailDialog>
       </div>
     </div>
   );

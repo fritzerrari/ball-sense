@@ -11,14 +11,22 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegendContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { Activity, Shield, Goal, Crosshair, Gauge, Trophy } from "lucide-react";
+import { MetricDetailDialog } from "@/components/MetricDetailDialog";
 
 interface TeamStats {
   total_distance_km?: number | null;
   avg_distance_km?: number | null;
   top_speed_kmh?: number | null;
   possession_pct?: number | null;
+  formation_heatmap?: unknown;
 }
 
 interface PlayerStat {
@@ -94,6 +102,7 @@ function aggregatePlayerMetrics(stats: PlayerStat[]) {
       acc.ballContacts += player.ball_contacts ?? 0;
       acc.aerialWon += player.aerial_won ?? 0;
       acc.crosses += player.crosses ?? 0;
+      acc.distance += player.distance_km ?? 0;
       return acc;
     },
     {
@@ -115,6 +124,7 @@ function aggregatePlayerMetrics(stats: PlayerStat[]) {
       ballContacts: 0,
       aerialWon: 0,
       crosses: 0,
+      distance: 0,
     },
   );
 
@@ -150,63 +160,86 @@ export function MatchKpiStrip({
   const cards = [
     {
       label: "Kontrolle",
-      value: Math.max(homeTeamStats?.possession_pct ?? 0, awayTeamStats?.possession_pct ?? 0),
       unit: "%",
-      winner: leadingTeam(homeTeamStats?.possession_pct ?? 0, awayTeamStats?.possession_pct ?? 0, homeName, awayName),
+      homeValue: homeTeamStats?.possession_pct ?? 0,
+      awayValue: awayTeamStats?.possession_pct ?? 0,
       icon: Gauge,
+      detail: "Ballbesitz zeigt, welches Team das Match strukturell kontrolliert und längere Ballphasen hält.",
     },
     {
       label: "Passquote",
-      value: Math.max(homeAgg.passAccuracy, awayAgg.passAccuracy),
       unit: "%",
-      winner: leadingTeam(homeAgg.passAccuracy, awayAgg.passAccuracy, homeName, awayName),
+      homeValue: homeAgg.passAccuracy,
+      awayValue: awayAgg.passAccuracy,
       icon: Activity,
+      detail: "Die Passquote macht sichtbar, wie sauber der Aufbau war und ob das Team unter Druck sauber blieb.",
     },
     {
       label: "Zweikampfquote",
-      value: Math.max(homeAgg.duelRate, awayAgg.duelRate),
       unit: "%",
-      winner: leadingTeam(homeAgg.duelRate, awayAgg.duelRate, homeName, awayName),
+      homeValue: homeAgg.duelRate,
+      awayValue: awayAgg.duelRate,
       icon: Shield,
+      detail: "Die Zweikampfquote spiegelt Präsenz, Timing und Robustheit in direkten Duellen wider.",
     },
     {
       label: "Ballgewinne",
-      value: Math.max(homeAgg.ballRecoveries, awayAgg.ballRecoveries),
-      winner: leadingTeam(homeAgg.ballRecoveries, awayAgg.ballRecoveries, homeName, awayName),
+      homeValue: homeAgg.ballRecoveries,
+      awayValue: awayAgg.ballRecoveries,
       icon: Trophy,
+      detail: "Ballgewinne zeigen, welches Team second balls, Gegenpressing und Defensivumschalten besser kontrolliert.",
     },
     {
       label: "Schüsse",
-      value: Math.max(homeAgg.shots, awayAgg.shots),
-      winner: leadingTeam(homeAgg.shots, awayAgg.shots, homeName, awayName),
+      homeValue: homeAgg.shots,
+      awayValue: awayAgg.shots,
       icon: Crosshair,
+      detail: "Schüsse geben die Offensivfrequenz wieder, nicht zwingend die Abschlussqualität.",
     },
     {
       label: "Scorer",
-      value: Math.max(homeAgg.goals + homeAgg.assists, awayAgg.goals + awayAgg.assists),
-      winner: leadingTeam(homeAgg.goals + homeAgg.assists, awayAgg.goals + awayAgg.assists, homeName, awayName),
+      homeValue: homeAgg.goals + homeAgg.assists,
+      awayValue: awayAgg.goals + awayAgg.assists,
       icon: Goal,
+      detail: "Scorer fasst direkte Torbeteiligungen zusammen und hebt die produktivere Mannschaft hervor.",
     },
   ];
 
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-      {cards.map(({ label, value, unit, winner, icon: Icon }) => (
-        <div key={label} className="glass-card p-4 space-y-3 overflow-hidden relative">
-          <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />
-          <div className="relative flex items-center justify-between gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Icon className="h-4 w-4" />
+      {cards.map(({ label, unit, homeValue, awayValue, icon: Icon, detail }) => {
+        const winner = leadingTeam(homeValue, awayValue, homeName, awayName);
+        const maxValue = Math.max(homeValue, awayValue);
+
+        return (
+          <MetricDetailDialog
+            key={label}
+            title={`${label} im Matchvergleich`}
+            subtitle={detail}
+            chips={["Match KPI", "Game State", "Drilldown"]}
+            insight={`Führend: ${winner}. Diese Kennzahl hilft dir zu erkennen, ob das Spiel eher über Kontrolle, Intensität oder direkte Aktionen entschieden wurde.`}
+            facts={[
+              { label: homeName, value: formatMetricValue(homeValue, unit), hint: "Wert der Heimmannschaft" },
+              { label: awayName, value: formatMetricValue(awayValue, unit), hint: "Wert der Auswärtsmannschaft" },
+              { label: "Momentum", value: winner, hint: "Team mit Vorteil in dieser Kategorie" },
+            ]}
+          >
+            <div className="h-full p-4 space-y-3 overflow-hidden relative game-panel">
+              <div className="relative flex items-center justify-between gap-3 pr-16">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Battle Pulse</span>
+              </div>
+              <div className="relative space-y-1">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-2xl font-bold font-display">{formatMetricValue(maxValue, unit)}</p>
+                <p className="text-xs text-primary font-medium truncate">{winner}</p>
+              </div>
             </div>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Momentum</span>
-          </div>
-          <div className="relative space-y-1">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold font-display">{formatMetricValue(value, unit)}</p>
-            <p className="text-xs text-primary font-medium truncate">{winner}</p>
-          </div>
-        </div>
-      ))}
+          </MetricDetailDialog>
+        );
+      })}
     </div>
   );
 }
@@ -234,23 +267,36 @@ export function MatchRadarChart({ homeTeamStats, awayTeamStats, homePlayerStats,
   ];
 
   return (
-    <div className="glass-card p-5 sm:p-6 space-y-4">
-      <div>
-        <h3 className="text-base font-semibold font-display">Wirkungsprofil</h3>
-        <p className="text-sm text-muted-foreground">Vergleich der Spielidentität über Intensität, Kontrolle, Duelle und Chance-Erzeugung.</p>
+    <MetricDetailDialog
+      title="Wirkungsprofil im Detail"
+      subtitle="Diese Radar-Ansicht verdichtet das Spiel auf sechs taktische Achsen und zeigt, welche Identität beide Teams wirklich hatten."
+      chips={["Identity", "Control", "Intensity"]}
+      insight="Je voller die Fläche, desto klarer war das Profil eines Teams. Große Unterschiede zwischen den Achsen deuten auf ein asymmetrisches Spielbild hin."
+      facts={data.map((item) => ({
+        label: item.metric,
+        value: `${homeName} ${item.home}% · ${awayName} ${item.away}%`,
+        hint: "Normierter Vergleich innerhalb des Spiels",
+      }))}
+      contentClassName="sm:max-w-4xl"
+    >
+      <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+        <div className="relative pr-16">
+          <h3 className="text-base font-semibold font-display">Wirkungsprofil</h3>
+          <p className="text-sm text-muted-foreground">Vergleich der Spielidentität über Intensität, Kontrolle, Duelle und Chance-Erzeugung.</p>
+        </div>
+        <ChartContainer config={{ ...comparisonConfig, home: { ...comparisonConfig.home, label: homeName }, away: { ...comparisonConfig.away, label: awayName } }} className="h-72 w-full aspect-auto">
+          <RadarChart data={data}>
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <PolarGrid stroke="hsl(var(--border))" />
+            <PolarAngleAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+            <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+            <Radar name="home" dataKey="home" stroke="var(--color-home)" fill="var(--color-home)" fillOpacity={0.18} strokeWidth={2.5} />
+            <Radar name="away" dataKey="away" stroke="var(--color-away)" fill="var(--color-away)" fillOpacity={0.14} strokeWidth={2.5} />
+            <Legend content={<ChartLegendContent />} />
+          </RadarChart>
+        </ChartContainer>
       </div>
-      <ChartContainer config={{ ...comparisonConfig, home: { ...comparisonConfig.home, label: homeName }, away: { ...comparisonConfig.away, label: awayName } }} className="h-72 w-full aspect-auto">
-        <RadarChart data={data}>
-          <ChartTooltip content={<ChartTooltipContent />} />
-          <PolarGrid stroke="hsl(var(--border))" />
-          <PolarAngleAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-          <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-          <Radar name="home" dataKey="home" stroke="var(--color-home)" fill="var(--color-home)" fillOpacity={0.18} strokeWidth={2.5} />
-          <Radar name="away" dataKey="away" stroke="var(--color-away)" fill="var(--color-away)" fillOpacity={0.14} strokeWidth={2.5} />
-          <Legend content={<ChartLegendContent />} />
-        </RadarChart>
-      </ChartContainer>
-    </div>
+    </MetricDetailDialog>
   );
 }
 
@@ -290,21 +336,33 @@ export function TopPlayersChart({
   }));
 
   return (
-    <div className="glass-card p-5 sm:p-6 space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold font-display">{title}</h3>
-        <p className="text-xs text-muted-foreground">Top 5 Spieler im aktuellen Match</p>
+    <MetricDetailDialog
+      title={`${title} im Detail`}
+      subtitle="Die Leaderboards zeigen, welche Spieler in dieser Match-Kategorie das größte Gewicht hatten."
+      chips={["Top 5", "Player Impact", "Ranking"]}
+      insight="Nutze diese Ansicht, um Spitzenwerte von nachhaltiger Spielwirkung zu unterscheiden. Hohe Peaks sind wertvoll, müssen aber immer im Kontext von Rolle und Minuten gelesen werden."
+      facts={sorted.map((player, index) => ({
+        label: `#${index + 1}`,
+        value: `${player.players?.name ?? "—"} · ${formatMetricValue((player[metric] as number) ?? 0, unit ? ` ${unit}` : undefined)}`,
+        hint: "Einzelwert im aktuellen Match",
+      }))}
+    >
+      <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+        <div className="relative pr-16">
+          <h3 className="text-sm font-semibold font-display">{title}</h3>
+          <p className="text-xs text-muted-foreground">Top 5 Spieler im aktuellen Match</p>
+        </div>
+        <ChartContainer config={{ value: { label: title, color: "hsl(var(--primary))" } }} className="h-52 w-full aspect-auto">
+          <BarChart data={chartData} layout="vertical" margin={{ left: 4, right: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+            <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+            <YAxis type="category" dataKey="name" width={96} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+            <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value}${unit ? ` ${unit}` : ""}`} />} />
+            <Bar dataKey="value" name="value" fill="var(--color-value)" radius={[0, 8, 8, 0]} />
+          </BarChart>
+        </ChartContainer>
       </div>
-      <ChartContainer config={{ value: { label: title, color: "hsl(var(--primary))" } }} className="h-52 w-full aspect-auto">
-        <BarChart data={chartData} layout="vertical" margin={{ left: 4, right: 10 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-          <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-          <YAxis type="category" dataKey="name" width={96} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-          <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value}${unit ? ` ${unit}` : ""}`} />} />
-          <Bar dataKey="value" name="value" fill="var(--color-value)" radius={[0, 8, 8, 0]} />
-        </BarChart>
-      </ChartContainer>
-    </div>
+    </MetricDetailDialog>
   );
 }
 
@@ -324,22 +382,35 @@ export function ComparisonBarChart({ homeTeamStats, awayTeamStats, homePlayerSta
   ];
 
   return (
-    <div className="glass-card p-5 sm:p-6 space-y-4">
-      <div>
-        <h3 className="text-base font-semibold font-display">Statistik-Vergleich</h3>
-        <p className="text-sm text-muted-foreground">Direkter Vergleich von Match-Kontrolle, Duellstärke und Offensivproduktion.</p>
+    <MetricDetailDialog
+      title="Direkter Matchvergleich"
+      subtitle="Diese Vergleichsansicht bündelt die wichtigsten Teamachsen in einer kompakten Game-Board-Perspektive."
+      chips={["Head to Head", "Tempo", "Control"]}
+      insight="Wenn ein Team in mehreren Kategorien gleichzeitig führt, ist die Spielkontrolle meist stabil. Einzelne Ausreißer zeigen eher situative Vorteile als ein dominantes Gesamtbild."
+      facts={data.map((item) => ({
+        label: item.metric,
+        value: `${homeName} ${item.home} · ${awayName} ${item.away}`,
+        hint: "Direktvergleich pro Kategorie",
+      }))}
+      contentClassName="sm:max-w-4xl"
+    >
+      <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+        <div className="relative pr-16">
+          <h3 className="text-base font-semibold font-display">Statistik-Vergleich</h3>
+          <p className="text-sm text-muted-foreground">Direkter Vergleich von Match-Kontrolle, Duellstärke und Offensivproduktion.</p>
+        </div>
+        <ChartContainer config={{ home: { label: homeName, color: "hsl(var(--primary))" }, away: { label: awayName, color: "hsl(var(--accent))" } }} className="h-72 w-full aspect-auto">
+          <BarChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Legend content={<ChartLegendContent />} />
+            <Bar dataKey="home" name="home" fill="var(--color-home)" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="away" name="away" fill="var(--color-away)" radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ChartContainer>
       </div>
-      <ChartContainer config={{ home: { label: homeName, color: "hsl(var(--primary))" }, away: { label: awayName, color: "hsl(var(--accent))" } }} className="h-72 w-full aspect-auto">
-        <BarChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-          <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-          <ChartTooltip content={<ChartTooltipContent />} />
-          <Legend content={<ChartLegendContent />} />
-          <Bar dataKey="home" name="home" fill="var(--color-home)" radius={[8, 8, 0, 0]} />
-          <Bar dataKey="away" name="away" fill="var(--color-away)" radius={[8, 8, 0, 0]} />
-        </BarChart>
-      </ChartContainer>
-    </div>
+    </MetricDetailDialog>
   );
 }
