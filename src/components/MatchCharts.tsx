@@ -10,6 +10,8 @@ import {
   YAxis,
   CartesianGrid,
   Legend,
+  Cell,
+  LabelList,
 } from "recharts";
 import {
   ChartContainer,
@@ -224,9 +226,9 @@ export function MatchKpiStrip({
               { label: "Momentum", value: winner, hint: "Team mit Vorteil in dieser Kategorie" },
             ]}
           >
-            <div className="h-full p-4 space-y-3 overflow-hidden relative game-panel">
+            <div className="relative h-full space-y-3 overflow-hidden p-4 game-panel">
               <div className="relative flex items-center justify-between gap-3 pr-16">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" />
                 </div>
                 <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Battle Pulse</span>
@@ -234,7 +236,7 @@ export function MatchKpiStrip({
               <div className="relative space-y-1">
                 <p className="text-xs text-muted-foreground">{label}</p>
                 <p className="text-2xl font-bold font-display">{formatMetricValue(maxValue, unit)}</p>
-                <p className="text-xs text-primary font-medium truncate">{winner}</p>
+                <p className="truncate text-xs font-medium text-primary">{winner}</p>
               </div>
             </div>
           </MetricDetailDialog>
@@ -279,12 +281,12 @@ export function MatchRadarChart({ homeTeamStats, awayTeamStats, homePlayerStats,
       }))}
       contentClassName="sm:max-w-4xl"
     >
-      <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+      <div className="h-full p-5 space-y-4 sm:p-6 game-panel">
         <div className="relative pr-16">
           <h3 className="text-base font-semibold font-display">Wirkungsprofil</h3>
           <p className="text-sm text-muted-foreground">Vergleich der Spielidentität über Intensität, Kontrolle, Duelle und Chance-Erzeugung.</p>
         </div>
-        <ChartContainer config={{ ...comparisonConfig, home: { ...comparisonConfig.home, label: homeName }, away: { ...comparisonConfig.away, label: awayName } }} className="h-72 w-full aspect-auto">
+        <ChartContainer config={{ ...comparisonConfig, home: { ...comparisonConfig.home, label: homeName }, away: { ...comparisonConfig.away, label: awayName } }} className="aspect-auto h-72 w-full">
           <RadarChart data={data}>
             <ChartTooltip content={<ChartTooltipContent />} />
             <PolarGrid stroke="hsl(var(--border))" />
@@ -298,6 +300,60 @@ export function MatchRadarChart({ homeTeamStats, awayTeamStats, homePlayerStats,
       </div>
     </MetricDetailDialog>
   );
+}
+
+function getTopChartMeta(title: string) {
+  if (title.includes("Laufdistanz")) {
+    return {
+      eyebrow: "Distance Leaders",
+      highlight: "Intensitätsprofil",
+      icon: Activity,
+      summaryLabel: "Team mit höchstem Volumen",
+    };
+  }
+
+  if (title.includes("Top Speed")) {
+    return {
+      eyebrow: "Velocity Peak",
+      highlight: "Explosivitätsprofil",
+      icon: Gauge,
+      summaryLabel: "Spieler mit größtem Peak",
+    };
+  }
+
+  if (title.includes("Sprints")) {
+    return {
+      eyebrow: "Repeated Runs",
+      highlight: "High-Intensity Output",
+      icon: Trophy,
+      summaryLabel: "Aggressivster Runner",
+    };
+  }
+
+  if (title.includes("Pass")) {
+    return {
+      eyebrow: "Distribution Hub",
+      highlight: "Ballzirkulation",
+      icon: Crosshair,
+      summaryLabel: "Aktivster Passgeber",
+    };
+  }
+
+  if (title.includes("Tackles")) {
+    return {
+      eyebrow: "Defensive Duels",
+      highlight: "Defensivdruck",
+      icon: Shield,
+      summaryLabel: "Stärkster Stopper",
+    };
+  }
+
+  return {
+    eyebrow: "Recovery Engine",
+    highlight: "Gegenpressing",
+    icon: Goal,
+    summaryLabel: "Bester Balleroberer",
+  };
 }
 
 export function TopPlayersChart({
@@ -330,10 +386,18 @@ export function TopPlayersChart({
 
   if (!sorted.length) return null;
 
-  const chartData = sorted.map((s) => ({
-    name: s.players?.name?.substring(0, 14) ?? "—",
+  const chartData = sorted.map((s, index) => ({
+    name: s.players?.name?.substring(0, 16) ?? "—",
     value: Math.round(((s[metric] as number) ?? 0) * 10) / 10,
+    fullName: s.players?.name ?? "—",
+    rank: index + 1,
+    fill: `hsl(var(--primary) / ${Math.max(1 - index * 0.14, 0.34)})`,
   }));
+
+  const leader = sorted[0];
+  const average = chartData.reduce((sum, item) => sum + item.value, 0) / chartData.length;
+  const meta = getTopChartMeta(title);
+  const Icon = meta.icon;
 
   return (
     <MetricDetailDialog
@@ -347,20 +411,92 @@ export function TopPlayersChart({
         hint: "Einzelwert im aktuellen Match",
       }))}
     >
-      <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
-        <div className="relative pr-16">
-          <h3 className="text-sm font-semibold font-display">{title}</h3>
-          <p className="text-xs text-muted-foreground">Top 5 Spieler im aktuellen Match</p>
+      <div className="game-panel h-full p-5 sm:p-6">
+        <div className="relative flex h-full flex-col gap-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/70 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-muted-foreground backdrop-blur-sm">
+                <Icon className="h-3.5 w-3.5 text-primary" />
+                {meta.eyebrow}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold font-display">{title}</h3>
+                <p className="text-sm text-muted-foreground">Top 5 Spieler im aktuellen Match</p>
+              </div>
+            </div>
+            <div className="min-w-[120px] rounded-2xl border border-border/80 bg-background/70 px-3 py-2 text-right backdrop-blur-sm">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Peak</p>
+              <p className="text-xl font-bold font-display text-foreground">{formatMetricValue(chartData[0]?.value ?? 0, unit ? ` ${unit}` : undefined)}</p>
+              <p className="truncate text-xs font-medium text-primary">{leader?.players?.name ?? "—"}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="rounded-2xl border border-border/70 bg-muted/20 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>{meta.highlight}</span>
+                <span>Ø Top 5: {formatMetricValue(average, unit ? ` ${unit}` : undefined)}</span>
+              </div>
+              <ChartContainer config={{ value: { label: title, color: "hsl(var(--primary))" } }} className="aspect-auto h-60 w-full">
+                <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 26, top: 4, bottom: 4 }} barCategoryGap={12}>
+                  <CartesianGrid strokeDasharray="2 6" stroke="hsl(var(--border))" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={112}
+                    tick={{ fill: "hsl(var(--foreground))", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value, _name, item) => [
+                          `${value}${unit ? ` ${unit}` : ""}`,
+                          (item?.payload as { fullName?: string } | undefined)?.fullName ?? title,
+                        ]}
+                      />
+                    }
+                  />
+                  <Bar dataKey="value" name="value" radius={[999, 999, 999, 999]} barSize={18} background={{ fill: "hsl(var(--muted))", radius: 999 }}>
+                    {chartData.map((entry) => (
+                      <Cell key={entry.rank} fill={entry.fill} />
+                    ))}
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      offset={10}
+                      formatter={(value: number) => formatMetricValue(value, unit ? ` ${unit}` : undefined)}
+                      className="fill-foreground"
+                      fontSize={11}
+                    />
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            </div>
+
+            <div className="grid min-w-[132px] gap-3 sm:w-[148px]">
+              <div className="rounded-2xl border border-primary/20 bg-primary/10 p-3">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{meta.summaryLabel}</p>
+                <p className="mt-2 line-clamp-2 text-sm font-semibold font-display text-foreground">{leader?.players?.name ?? "—"}</p>
+                <p className="mt-1 text-xs text-primary">#{chartData[0]?.rank ?? 1}</p>
+              </div>
+              <div className="rounded-2xl border border-border/80 bg-background/60 p-3 backdrop-blur-sm">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Spread</p>
+                <p className="mt-2 text-lg font-bold font-display">
+                  {formatMetricValue((chartData[0]?.value ?? 0) - (chartData[chartData.length - 1]?.value ?? 0), unit ? ` ${unit}` : undefined)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Differenz zwischen Platz 1 und 5</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <ChartContainer config={{ value: { label: title, color: "hsl(var(--primary))" } }} className="h-52 w-full aspect-auto">
-          <BarChart data={chartData} layout="vertical" margin={{ left: 4, right: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-            <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-            <YAxis type="category" dataKey="name" width={96} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-            <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value}${unit ? ` ${unit}` : ""}`} />} />
-            <Bar dataKey="value" name="value" fill="var(--color-value)" radius={[0, 8, 8, 0]} />
-          </BarChart>
-        </ChartContainer>
       </div>
     </MetricDetailDialog>
   );
@@ -394,12 +530,12 @@ export function ComparisonBarChart({ homeTeamStats, awayTeamStats, homePlayerSta
       }))}
       contentClassName="sm:max-w-4xl"
     >
-      <div className="game-panel p-5 sm:p-6 space-y-4 h-full">
+      <div className="h-full p-5 space-y-4 sm:p-6 game-panel">
         <div className="relative pr-16">
           <h3 className="text-base font-semibold font-display">Statistik-Vergleich</h3>
           <p className="text-sm text-muted-foreground">Direkter Vergleich von Match-Kontrolle, Duellstärke und Offensivproduktion.</p>
         </div>
-        <ChartContainer config={{ home: { label: homeName, color: "hsl(var(--primary))" }, away: { label: awayName, color: "hsl(var(--accent))" } }} className="h-72 w-full aspect-auto">
+        <ChartContainer config={{ home: { label: homeName, color: "hsl(var(--primary))" }, away: { label: awayName, color: "hsl(var(--accent))" } }} className="aspect-auto h-72 w-full">
           <BarChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
