@@ -7,25 +7,36 @@ const CONSENT_CONFIG = {
   granted: {
     label: "Einwilligung liegt vor",
     shortLabel: "Tracking erlaubt",
+    hint: "Einwilligung liegt vor – Spieler darf ins Tracking aufgenommen werden.",
     icon: ShieldCheck,
     className: "border-primary/20 bg-primary/10 text-primary",
   },
   denied: {
     label: "Keine Einwilligung",
     shortLabel: "Nicht trackbar",
+    hint: "Nicht freigegeben – Spieler sollte vom Tracking ausgeschlossen werden.",
     icon: ShieldOff,
     className: "border-destructive/20 bg-destructive/10 text-destructive",
   },
   unknown: {
     label: "Einwilligung offen",
     shortLabel: "Einwilligung offen",
+    hint: "Noch offen – Tracking vor Einsatz klären und dokumentieren.",
     icon: ShieldAlert,
     className: "border-border bg-secondary text-secondary-foreground",
   },
 } as const;
 
+function getConsentKey(status: TrackingConsentStatus) {
+  return status === "granted" || status === "denied" ? status : "unknown";
+}
+
 export function canTrackPlayer(status: TrackingConsentStatus) {
   return status === "granted";
+}
+
+export function getConsentHint(status: TrackingConsentStatus) {
+  return CONSENT_CONFIG[getConsentKey(status)].hint;
 }
 
 export function ConsentStatusBadge({
@@ -37,8 +48,7 @@ export function ConsentStatusBadge({
   compact?: boolean;
   className?: string;
 }) {
-  const key = status === "granted" || status === "denied" ? status : "unknown";
-  const config = CONSENT_CONFIG[key];
+  const config = CONSENT_CONFIG[getConsentKey(status)];
   const Icon = config.icon;
 
   return (
