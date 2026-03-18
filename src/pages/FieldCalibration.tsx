@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +79,7 @@ const featureLabels: Record<string, { label: string; icon: typeof Goal }> = {
 export default function FieldCalibration() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: field, isLoading } = useField(id);
   const saveCalibration = useSaveCalibration();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +96,10 @@ export default function FieldCalibration() {
 
   const cornerLabels = ["Links-Oben", "Rechts-Oben", "Rechts-Unten", "Links-Unten"];
   const canSave = points.length === 4;
+  const returnTo = searchParams.get("returnTo");
+  const backHref = returnTo || "/fields";
+  const backLabel = returnTo ? "Zurück zum Tracking" : "Zurück zu Plätze";
+  const saveLabel = returnTo ? "Speichern & weiter" : "Kalibrierung speichern";
 
   useEffect(() => {
     if (field) {
@@ -269,7 +274,7 @@ export default function FieldCalibration() {
       calibrated_at: new Date().toISOString(),
     };
     await saveCalibration.mutateAsync({ fieldId: id, calibration });
-    navigate("/fields");
+    navigate(backHref);
   };
 
   const confidenceMeta = layoutSuggestion.confidence ? confidenceCopy[layoutSuggestion.confidence] : null;
@@ -295,8 +300,8 @@ export default function FieldCalibration() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-3xl space-y-6">
-        <Link to="/fields" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Zurück zu Plätze
+        <Link to={backHref} className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> {backLabel}
         </Link>
 
         <h1 className="font-display flex items-center gap-2 text-2xl font-bold">
@@ -517,8 +522,13 @@ export default function FieldCalibration() {
             >
               <RotateCcw className="h-4 w-4" /> Zurücksetzen
             </Button>
+            {returnTo && (
+              <Button variant="heroOutline" asChild>
+                <Link to={backHref}>Später zurück</Link>
+              </Button>
+            )}
             <Button variant="hero" disabled={!canSave || saveCalibration.isPending} onClick={handleSave}>
-              <Save className="mr-1 h-4 w-4" /> Kalibrierung speichern
+              <Save className="mr-1 h-4 w-4" /> {saveLabel}
             </Button>
           </div>
         </div>

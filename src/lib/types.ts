@@ -47,25 +47,28 @@ export interface Match {
   status: MatchStatus;
   home_formation: string | null;
   away_formation: string | null;
+  consent_players_confirmed: boolean;
+  consent_minors_confirmed: boolean;
+  track_opponent: boolean;
+  opponent_consent_confirmed: boolean;
   created_at: string;
-  // Joined
   fields?: Field;
   home_club?: Club;
 }
 
-export type MatchStatus = 'setup' | 'live' | 'processing' | 'done';
+export type MatchStatus = "setup" | "live" | "processing" | "done";
 
 export interface MatchLineup {
   id: string;
   match_id: string;
   player_id: string | null;
-  team: 'home' | 'away';
+  team: "home" | "away";
   starting: boolean;
   shirt_number: number | null;
   player_name: string | null;
   subbed_in_min: number | null;
   subbed_out_min: number | null;
-  // Joined
+  excluded_from_tracking: boolean;
   players?: Player;
 }
 
@@ -74,7 +77,7 @@ export interface TrackingUpload {
   match_id: string;
   camera_index: number;
   file_path: string | null;
-  status: 'uploaded' | 'processing' | 'done' | 'error';
+  status: "uploaded" | "processing" | "done" | "error";
   frames_count: number | null;
   duration_sec: number | null;
   uploaded_at: string;
@@ -93,7 +96,6 @@ export interface PlayerMatchStats {
   minutes_played: number | null;
   heatmap_grid: number[][] | null;
   positions_raw: PositionEntry[] | null;
-  // Extended stats
   ball_contacts: number | null;
   passes_total: number | null;
   passes_completed: number | null;
@@ -115,14 +117,13 @@ export interface PlayerMatchStats {
   dribbles_success: number | null;
   aerial_won: number | null;
   rating: number | null;
-  // Joined
   players?: Player;
 }
 
 export interface PositionEntry {
-  t: number; // timestamp ms
-  x: number; // field x (0-1)
-  y: number; // field y (0-1)
+  t: number;
+  x: number;
+  y: number;
 }
 
 export interface TeamMatchStats {
@@ -142,8 +143,7 @@ export interface HeatmapGrid {
   data: number[][];
 }
 
-// Plan types
-export type PlanType = 'trial' | 'starter' | 'club' | 'pro';
+export type PlanType = "trial" | "starter" | "club" | "pro";
 
 export interface GuestPlayer {
   name: string;

@@ -1,24 +1,33 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Users, Map, Swords, Settings, LogOut, ChevronLeft, Menu, BrainCircuit, Shield, Download,
+  BrainCircuit,
+  Download,
+  Home,
+  LogOut,
+  Map,
+  MoreHorizontal,
+  Settings,
+  Shield,
+  Users,
+  Swords,
+  Camera,
 } from "lucide-react";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthProvider";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "@/lib/i18n";
 import { MobileInstallFab } from "./MobileInstallFab";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useTranslation } from "@/lib/i18n";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, clubName, clubPlan, clubLogoUrl, signOut } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useTranslation();
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const { data: isAdmin } = useQuery({
     queryKey: ["user_role_sidebar", user?.id],
@@ -36,20 +45,31 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const navItems = [
-    { label: t("nav.dashboard"), icon: LayoutDashboard, href: "/dashboard" },
+  const mainItems = [
+    { label: t("nav.dashboard"), icon: Home, href: "/dashboard" },
     { label: t("nav.matches"), icon: Swords, href: "/matches" },
     { label: t("nav.squad"), icon: Users, href: "/players" },
-    { label: t("nav.fields"), icon: Map, href: "/fields" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
+  ];
+
+  const manageItems = [
+    { label: t("nav.fields"), icon: Map, href: "/fields" },
     { label: t("nav.settings"), icon: Settings, href: "/settings" },
     { label: "Installation", icon: Download, href: "/install" },
   ];
 
-  const allNavItems = [
-    ...navItems,
-    ...(isAdmin ? [{ label: t("nav.admin"), icon: Shield, href: "/admin" }] : []),
+  const adminItems = isAdmin ? [{ label: t("nav.admin"), icon: Shield, href: "/admin" }] : [];
+
+  const mobileItems = [
+    { label: "Start", icon: Home, href: "/dashboard" },
+    { label: "Spiele", icon: Swords, href: "/matches" },
+    { label: "Kader", icon: Users, href: "/players" },
   ];
+
+  const isActive = (href: string) => {
+    if (href === "/dashboard") return location.pathname === "/dashboard";
+    return location.pathname.startsWith(href);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -59,111 +79,178 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const planLabel = clubPlan === "starter" ? "Starter" : clubPlan === "club" ? "Club" : clubPlan === "pro" ? "Pro" : "Trial";
 
   return (
-    <div className="min-h-screen flex bg-background">
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)} />
-      )}
-
-      <aside
-        className={`fixed md:sticky top-0 left-0 z-50 h-screen flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200
-          ${collapsed ? "w-16" : "w-56"}
-          ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-        `}
-      >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
-          {!collapsed && (
-            <Link to="/dashboard" className="font-display text-lg font-bold flex items-center gap-1.5">
-              {clubLogoUrl ? (
-                <img src={clubLogoUrl} alt="Logo" className="w-7 h-7 rounded-md object-cover border border-border" />
-              ) : (
-                <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-black">F</span>
-              )}
-              <span className="text-foreground">Field</span>
-              <span className="gradient-text">IQ</span>
-            </Link>
-          )}
-          {collapsed && (
-            <Link to="/dashboard" className="mx-auto">
-              <span className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground text-sm font-black">F</span>
-            </Link>
-          )}
-          {!collapsed && (
-            <button
-              onClick={() => { setCollapsed(!collapsed); setMobileOpen(false); }}
-              className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground transition-colors"
-            >
-              <ChevronLeft className={`h-4 w-4 transition-transform ${collapsed ? "rotate-180" : ""}`} />
-            </button>
-          )}
+    <div className="min-h-screen bg-background md:grid md:grid-cols-[240px_1fr]">
+      <aside className="hidden border-r border-sidebar-border bg-sidebar md:flex md:min-h-screen md:flex-col">
+        <div className="border-b border-sidebar-border px-5 py-5">
+          <Link to="/dashboard" className="flex items-center gap-2 font-display text-lg font-bold">
+            {clubLogoUrl ? (
+              <img src={clubLogoUrl} alt={clubName ?? "FieldIQ"} className="h-9 w-9 rounded-lg border border-border object-cover" />
+            ) : (
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-black text-primary-foreground">F</span>
+            )}
+            <span>Field<span className="gradient-text">IQ</span></span>
+          </Link>
+          {clubName && <p className="mt-2 text-sm text-muted-foreground">{clubName}</p>}
         </div>
 
-        <nav className="flex-1 py-4 px-2 space-y-1">
-          {allNavItems.map((item) => {
-            const active = location.pathname.startsWith(item.href);
-            return (
+        <div className="flex-1 space-y-6 px-3 py-5">
+          <nav className="space-y-1">
+            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Kernbereich</p>
+            {mainItems.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                  ${active
-                    ? "bg-primary/10 text-primary border border-primary/20"
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  isActive(item.href)
+                    ? "border border-primary/20 bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }
-                  ${collapsed ? "justify-center" : ""}
-                `}
+                }`}
               >
                 <item.icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                <span>{item.label}</span>
               </Link>
-            );
-          })}
-        </nav>
+            ))}
+          </nav>
 
-        <div className="px-2 py-4 border-t border-sidebar-border">
+          <nav className="space-y-1">
+            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Verwaltung</p>
+            {manageItems.map((item) => (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  isActive(item.href)
+                    ? "border border-primary/20 bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </nav>
+
+          {adminItems.length > 0 && (
+            <nav className="space-y-1">
+              <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Admin</p>
+              {adminItems.map((item) => (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                    isActive(item.href)
+                      ? "border border-primary/20 bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+          )}
+        </div>
+
+        <div className="border-t border-sidebar-border p-3">
           <button
             onClick={handleSignOut}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all w-full ${collapsed ? "justify-center" : ""}`}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
           >
             <LogOut className="h-5 w-5 shrink-0" />
-            {!collapsed && <span>{t("nav.signout")}</span>}
+            <span>{t("nav.signout")}</span>
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 min-h-screen">
-        <header className="h-16 border-b border-border flex items-center px-4 md:px-6 gap-4 bg-card/50">
-          <button className="md:hidden p-2 hover:bg-muted rounded-lg" onClick={() => setMobileOpen(true)}>
-            <Menu className="h-5 w-5" />
-          </button>
-          {collapsed && (
-            <button
-              onClick={() => setCollapsed(false)}
-              className="hidden md:block p-1.5 rounded-md hover:bg-muted text-muted-foreground transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4 rotate-180" />
-            </button>
-          )}
-          {clubName && (
-            <div className="flex items-center gap-2 hidden sm:flex">
-              {clubLogoUrl && (
-                <img src={clubLogoUrl} alt={clubName} className="w-7 h-7 rounded-md object-cover border border-border" />
-              )}
-              <span className="text-sm font-medium font-display">{clubName}</span>
+      <main className="min-h-screen pb-24 md:pb-0">
+        <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
+          <div className="flex h-16 items-center gap-4 px-4 md:px-6">
+            <div className="min-w-0 md:hidden">
+              <Link to="/dashboard" className="font-display text-lg font-bold">Field<span className="gradient-text">IQ</span></Link>
             </div>
-          )}
-          <div className="flex-1" />
-          <div className="flex items-center gap-2">
-            <LanguageToggle />
-            <ThemeToggle />
-            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">{planLabel}</span>
+            <div className="hidden min-w-0 md:block">
+              {clubName && <p className="truncate text-sm font-medium font-display">{clubName}</p>}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <LanguageToggle />
+              <ThemeToggle />
+              <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{planLabel}</span>
+            </div>
           </div>
         </header>
-        <div className="p-4 md:p-6 lg:p-8">
-          {children}
-        </div>
+
+        <div className="p-4 md:p-6 lg:p-8">{children}</div>
         <MobileInstallFab />
       </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur md:hidden">
+        <div className="grid grid-cols-5 px-2 py-2">
+          {mobileItems.map((item) => (
+            <Link
+              key={item.href}
+              to={item.href}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors ${
+                isActive(item.href) ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              <item.icon className="h-5 w-5" />
+              <span>{item.label}</span>
+            </Link>
+          ))}
+
+          <Link
+            to="/matches"
+            className="-mt-5 flex flex-col items-center gap-1 rounded-2xl border border-primary/20 bg-primary px-2 py-3 text-[11px] font-semibold text-primary-foreground shadow-lg"
+          >
+            <Camera className="h-5 w-5" />
+            <span>Tracking</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground"
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            <span>Mehr</span>
+          </button>
+        </div>
+      </div>
+
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent side="bottom" className="rounded-t-3xl border-border bg-background">
+          <SheetHeader>
+            <SheetTitle className="font-display">Mehr</SheetTitle>
+            <SheetDescription>Verwaltung, Installation und Admin getrennt vom Hauptmenü.</SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-2">
+            {[...manageItems, ...adminItems].map((item) => (
+              <Link
+                key={item.href}
+                to={item.href}
+                onClick={() => setMoreOpen(false)}
+                className="flex items-center gap-3 rounded-xl border border-border bg-card/60 px-4 py-3 text-sm font-medium text-foreground"
+              >
+                <item.icon className="h-5 w-5 text-primary" />
+                <span>{item.label}</span>
+              </Link>
+            ))}
+
+            <button
+              type="button"
+              onClick={async () => {
+                setMoreOpen(false);
+                await handleSignOut();
+              }}
+              className="flex w-full items-center gap-3 rounded-xl border border-border bg-card/60 px-4 py-3 text-sm font-medium text-foreground"
+            >
+              <LogOut className="h-5 w-5 text-primary" />
+              <span>{t("nav.signout")}</span>
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

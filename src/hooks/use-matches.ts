@@ -85,6 +85,10 @@ export function useCreateMatch() {
       home_formation?: string;
       away_formation?: string;
       match_type?: string;
+      consent_players_confirmed: boolean;
+      consent_minors_confirmed: boolean;
+      track_opponent: boolean;
+      opponent_consent_confirmed: boolean;
       lineups: Omit<MatchLineup, "id" | "match_id" | "players">[];
     }) => {
       if (!clubId) throw new Error("Kein Verein");
@@ -98,10 +102,8 @@ export function useCreateMatch() {
       if (matchError) throw matchError;
 
       if (lineups.length > 0) {
-        const lineupsWithMatch = lineups.map(l => ({ ...l, match_id: newMatch.id }));
-        const { error: lineupError } = await supabase
-          .from("match_lineups")
-          .insert(lineupsWithMatch);
+        const lineupsWithMatch = lineups.map((lineup) => ({ ...lineup, match_id: newMatch.id }));
+        const { error: lineupError } = await supabase.from("match_lineups").insert(lineupsWithMatch);
         if (lineupError) throw lineupError;
       }
 
@@ -111,7 +113,7 @@ export function useCreateMatch() {
       qc.invalidateQueries({ queryKey: ["matches"] });
       toast.success("Spiel erstellt");
     },
-    onError: (e) => toast.error("Fehler: " + (e as Error).message),
+    onError: (error) => toast.error("Fehler: " + (error as Error).message),
   });
 }
 
@@ -128,9 +130,9 @@ export function useUpdateMatch() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ["matches"] });
-      qc.invalidateQueries({ queryKey: ["match"] });
+      qc.invalidateQueries({ queryKey: ["match", variables.id] });
     },
     onError: () => toast.error("Fehler beim Aktualisieren"),
   });

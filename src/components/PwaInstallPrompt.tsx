@@ -1,59 +1,77 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { useTranslation } from "@/lib/i18n";
+import { Download, Share, Smartphone, X } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function PwaInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [dismissed, setDismissed] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const { canInstall, dismiss, install, isIos, setShowIosModal, showIosModal } = usePwaInstall();
   const { t } = useTranslation();
 
-  useEffect(() => {
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setIsStandalone(true);
-      return;
-    }
-    if (sessionStorage.getItem("pwa-dismissed")) {
-      setDismissed(true);
-      return;
-    }
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener("beforeinstallprompt", handler as any);
-    return () => window.removeEventListener("beforeinstallprompt", handler as any);
-  }, []);
-
-  if (isStandalone || dismissed || !deferredPrompt) return null;
-
-  const handleInstall = async () => {
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-  };
-
-  const handleDismiss = () => {
-    setDismissed(true);
-    sessionStorage.setItem("pwa-dismissed", "1");
-  };
+  if (!canInstall) return null;
 
   return (
-    <div className="glass-card p-4 flex items-center gap-3 glow-border">
-      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <Download className="h-4 w-4 text-primary" />
+    <>
+      <div className="glass-card glow-border flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Download className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{t("pwa.install")}</p>
+            <p className="text-xs text-muted-foreground">
+              {isIos ? "Installiere die App direkt auf dem Homescreen für den schnellsten Tracking-Start." : t("pwa.desc")}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:justify-end">
+          <Button variant="hero" size="sm" onClick={() => void install()}>
+            <Download className="mr-1 h-4 w-4" />
+            {isIos ? "Auf Homescreen" : t("common.install")}
+          </Button>
+          <Button variant="heroOutline" size="sm" asChild>
+            <Link to="/install">Anleitung</Link>
+          </Button>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="rounded-md p-2 text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Installationshinweis schließen"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">{t("pwa.install")}</p>
-        <p className="text-xs text-muted-foreground">{t("pwa.desc")}</p>
-      </div>
-      <Button variant="hero" size="sm" onClick={handleInstall}>
-        {t("common.install")}
-      </Button>
-      <button onClick={handleDismiss} className="text-muted-foreground hover:text-foreground p-1">
-        <X className="h-4 w-4" />
-      </button>
-    </div>
+
+      <Dialog open={showIosModal} onOpenChange={setShowIosModal}>
+        <DialogContent className="border-border bg-card sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Smartphone className="h-5 w-5 text-primary" /> Auf iPhone installieren
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 space-y-3">
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+              1. Öffne unten in Safari den <span className="font-medium">Teilen</span>-Button.
+            </div>
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+              2. Wähle <span className="font-medium">Zum Home-Bildschirm</span>.
+            </div>
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+              3. Bestätige mit <span className="font-medium">Hinzufügen</span>.
+            </div>
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 text-xs text-primary flex items-start gap-2">
+              <Share className="mt-0.5 h-4 w-4 shrink-0" />
+              FieldIQ startet danach wie eine echte App direkt vom Homescreen.
+            </div>
+            <Button variant="heroOutline" className="w-full" asChild>
+              <Link to="/install" onClick={() => setShowIosModal(false)}>Ausführliche Anleitung</Link>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
