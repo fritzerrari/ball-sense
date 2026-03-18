@@ -239,17 +239,17 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
           </div>
           <div className="flex-1">
             <div className="text-sm font-bold font-display text-foreground mb-1">
-              🎉 Neue Spieldaten verfügbar!
+              🎉 Neues Coaching-Cockpit verfügbar!
             </div>
             <div className="text-xs text-foreground/80 mb-2">
               FC Musterstadt vs. SV Beispielburg · Sonntag, 2. März 2026 · 15:30 Uhr
             </div>
             <div className="text-xs text-muted-foreground mb-4">
-              3 Kameras haben 90 Minuten Tracking-Daten aufgezeichnet. Bereit zur Analyse.
+              3 Kameras haben 90 Minuten Tracking-Daten aufgezeichnet. Coach Summary, Alerts und Leaderboards sind bereit.
             </div>
             <Button variant="hero" size="sm" className="gap-2" onClick={onLoad}>
               <Play className="w-4 h-4" />
-              Daten laden & analysieren
+              Cockpit laden & analysieren
               <ChevronRight className="w-3 h-3" />
             </Button>
           </div>
