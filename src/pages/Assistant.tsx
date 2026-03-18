@@ -328,7 +328,7 @@ export default function AssistantPage() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          messages: [{ role: "user", content: text.trim() }],
+          messages: allMessages,
           includeContext: true,
           selectedPlayersContext: selectedContext,
           liveMode: isLiveAuto,
