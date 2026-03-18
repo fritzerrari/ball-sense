@@ -27,6 +27,7 @@ import { HeatmapField } from "@/components/HeatmapField";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ConsentStatusBadge } from "@/components/ConsentStatusBadge";
 import { CoachSummary } from "@/components/CoachSummary";
