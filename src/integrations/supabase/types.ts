@@ -625,42 +625,60 @@ export type Database = {
       }
       match_events: {
         Row: {
+          affected_line: string | null
           created_at: string
+          event_cause: string | null
+          event_pattern: string | null
           event_type: Database["public"]["Enums"]["match_event_type"]
+          event_zone: string | null
           id: string
           match_id: string
           minute: number
           notes: string | null
           player_id: string | null
           player_name: string | null
+          possession_phase: string | null
           related_player_id: string | null
           related_player_name: string | null
+          severity: number | null
           team: string
         }
         Insert: {
+          affected_line?: string | null
           created_at?: string
+          event_cause?: string | null
+          event_pattern?: string | null
           event_type: Database["public"]["Enums"]["match_event_type"]
+          event_zone?: string | null
           id?: string
           match_id: string
           minute: number
           notes?: string | null
           player_id?: string | null
           player_name?: string | null
+          possession_phase?: string | null
           related_player_id?: string | null
           related_player_name?: string | null
+          severity?: number | null
           team: string
         }
         Update: {
+          affected_line?: string | null
           created_at?: string
+          event_cause?: string | null
+          event_pattern?: string | null
           event_type?: Database["public"]["Enums"]["match_event_type"]
+          event_zone?: string | null
           id?: string
           match_id?: string
           minute?: number
           notes?: string | null
           player_id?: string | null
           player_name?: string | null
+          possession_phase?: string | null
           related_player_id?: string | null
           related_player_name?: string | null
+          severity?: number | null
           team?: string
         }
         Relationships: [
@@ -1188,6 +1206,17 @@ export type Database = {
         | "red_card"
         | "yellow_red_card"
         | "player_deactivated"
+        | "goal"
+        | "conceded_goal"
+        | "yellow_card"
+        | "foul"
+        | "assist"
+        | "shot"
+        | "shot_on_target"
+        | "corner"
+        | "penalty"
+        | "counter_attack"
+        | "set_piece"
       tracking_consent_status: "unknown" | "granted" | "denied"
     }
     CompositeTypes: {
@@ -1322,6 +1351,17 @@ export const Constants = {
         "red_card",
         "yellow_red_card",
         "player_deactivated",
+        "goal",
+        "conceded_goal",
+        "yellow_card",
+        "foul",
+        "assist",
+        "shot",
+        "shot_on_target",
+        "corner",
+        "penalty",
+        "counter_attack",
+        "set_piece",
       ],
       tracking_consent_status: ["unknown", "granted", "denied"],
     },
