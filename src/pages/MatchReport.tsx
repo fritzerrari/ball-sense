@@ -1,12 +1,26 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
-import { useState, Fragment } from "react";
-import { Activity, ArrowLeft, ArrowUpDown, Camera, ChevronDown, ChevronUp, Crosshair, Download, FileText, Gauge, Loader2, Shield, Share2, Sparkles } from "lucide-react";
+import { useMemo, useState, Fragment } from "react";
+import {
+  Activity,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpDown,
+  Camera,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  FileText,
+  Loader2,
+  Share2,
+  Sparkles,
+} from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
 import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
 import { MatchKpiStrip, MatchRadarChart, TopPlayersChart, ComparisonBarChart } from "@/components/MatchCharts";
+import { MatchInsightsPanel } from "@/components/MatchInsightsPanel";
 import { PerformanceAnalysis } from "@/components/PerformanceAnalysis";
-import { useMatch, useTrackingUploads } from "@/hooks/use-matches";
+import { useMatch, useTrackingUploads, useMatchEvents } from "@/hooks/use-matches";
 import { usePlayerMatchStats, useTeamMatchStats, useApiFootballStats } from "@/hooks/use-match-stats";
 import { useAuth } from "@/components/AuthProvider";
 import { HeatmapField } from "@/components/HeatmapField";
@@ -14,8 +28,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { ConsentStatusBadge } from "@/components/ConsentStatusBadge";
 
-const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich", "KI-Bericht"];
+const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich", "Berichte & Presse"];
 
 function round(value: number, decimals = 1) {
   const factor = 10 ** decimals;
@@ -78,22 +93,34 @@ export default function MatchReport() {
   const { data: teamStats } = useTeamMatchStats(id);
   const { data: uploads } = useTrackingUploads(id);
   const { data: apiStats } = useApiFootballStats(id);
+  const { data: events } = useMatchEvents(id);
   const [activeTab, setActiveTab] = useState("Übersicht");
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string>("distance_km");
   const [sortAsc, setSortAsc] = useState(false);
 
-  if (isLoading) return <AppLayout><div className="max-w-6xl mx-auto"><SkeletonCard count={3} /></div></AppLayout>;
-  if (!match) return <AppLayout><div className="max-w-6xl mx-auto text-muted-foreground text-center py-20">Spiel nicht gefunden</div></AppLayout>;
+  if (isLoading) return <AppLayout><div className="mx-auto max-w-6xl"><SkeletonCard count={3} /></div></AppLayout>;
+  if (!match) return <AppLayout><div className="mx-auto max-w-6xl py-20 text-center text-muted-foreground">Spiel nicht gefunden</div></AppLayout>;
 
   const homeTeamStats = teamStats?.find((t) => t.team === "home");
   const awayTeamStats = teamStats?.find((t) => t.team === "away");
   const homePlayerStats = (playerStats ?? []).filter((s) => s.team === "home");
   const awayPlayerStats = (playerStats ?? []).filter((s) => s.team === "away");
   const hasStats = (playerStats?.length ?? 0) > 0;
-
   const homeAgg = aggregatePlayerMetrics(homePlayerStats);
   const awayAgg = aggregatePlayerMetrics(awayPlayerStats);
+
+  const coachLinks = useMemo(() => {
+    const recoveries = [...homePlayerStats]
+      .filter((item) => item.player_id && item.players?.name)
+      .sort((a, b) => (b.ball_recoveries ?? 0) - (a.ball_recoveries ?? 0))
+      .slice(0, 3);
+    const passing = [...homePlayerStats]
+      .filter((item) => item.player_id && item.players?.name)
+      .sort((a, b) => (b.passes_total ?? 0) - (a.passes_total ?? 0))
+      .slice(0, 3);
+    return { recoveries, passing };
+  }, [homePlayerStats]);
 
   const sortPlayers = (stats: any[]) => {
     return [...stats].sort((a, b) => {
@@ -112,42 +139,49 @@ export default function MatchReport() {
   };
 
   const SortHeader = ({ label, field }: { label: string; field: string }) => (
-    <th className="text-left py-3 px-4 text-muted-foreground font-medium text-xs cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort(field)}>
+    <th className="cursor-pointer px-4 py-3 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" onClick={() => handleSort(field)}>
       <span className="flex items-center gap-1">{label} <ArrowUpDown className="h-3 w-3" /></span>
     </th>
   );
 
-  const renderTeamCard = (label: string, stats: any, agg: ReturnType<typeof aggregatePlayerMetrics>) => (
-    <div className="glass-card p-5 sm:p-6 space-y-4 overflow-hidden relative">
+  const renderTeamCard = (label: string, stats: any, agg: ReturnType<typeof aggregatePlayerMetrics>, focusPlayers: any[]) => (
+    <div className="glass-card relative space-y-4 overflow-hidden p-5 sm:p-6">
       <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />
       <div className="relative flex items-center justify-between gap-3">
-        <div>
-          <h3 className="font-semibold font-display text-lg">{label}</h3>
-          <p className="text-sm text-muted-foreground">Moderne Match-Zusammenfassung aus Team- und Einzelwerten.</p>
+        <div className="min-w-0">
+          <h3 className="font-display text-lg font-semibold break-words">{label}</h3>
+          <p className="text-sm text-muted-foreground">Interaktive Match-Zusammenfassung mit direkten Wegen in Spielerprofile.</p>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Sparkles className="h-4 w-4" />
         </div>
       </div>
-      <div className="relative grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="relative grid grid-cols-2 gap-3 xl:grid-cols-4">
         {[
-          { label: "Gesamtdistanz", value: stats?.total_distance_km ? `${stats.total_distance_km.toFixed(1)} km` : "—", icon: Activity },
-          { label: "Ballbesitz", value: stats?.possession_pct ? `${round(stats.possession_pct, 0)}%` : "—", icon: Gauge },
-          { label: "Passquote", value: agg.passAccuracy ? `${agg.passAccuracy}%` : "—", icon: Gauge },
-          { label: "Zweikampfquote", value: agg.duelRate ? `${agg.duelRate}%` : "—", icon: Shield },
-          { label: "Ballgewinne", value: String(agg.ballRecoveries), icon: Shield },
-          { label: "Schüsse", value: String(agg.shots), icon: Crosshair },
-          { label: "Scorer", value: String(agg.goals + agg.assists), icon: Sparkles },
-          { label: "Fouls / Karten", value: `${agg.fouls} / ${agg.yellow + agg.red}`, icon: Shield },
+          { label: "Gesamtdistanz", value: stats?.total_distance_km ? `${stats.total_distance_km.toFixed(1)} km` : "—" },
+          { label: "Ballbesitz", value: stats?.possession_pct ? `${round(stats.possession_pct, 0)}%` : "—" },
+          { label: "Passquote", value: agg.passAccuracy ? `${agg.passAccuracy}%` : "—" },
+          { label: "Zweikampfquote", value: agg.duelRate ? `${agg.duelRate}%` : "—" },
+          { label: "Ballgewinne", value: String(agg.ballRecoveries) },
+          { label: "Schüsse", value: String(agg.shots) },
+          { label: "Scorer", value: String(agg.goals + agg.assists) },
+          { label: "Fouls / Karten", value: `${agg.fouls} / ${agg.yellow + agg.red}` },
         ].map((item) => (
-          <div key={item.label} className="rounded-xl border border-border bg-background/50 p-3 space-y-2">
-            <item.icon className="h-4 w-4 text-primary" />
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>
-              <p className="text-lg font-bold font-display">{item.value}</p>
-            </div>
+          <div key={item.label} className="rounded-xl border border-border bg-background/50 p-3">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>
+            <p className="mt-2 break-words text-lg font-bold font-display">{item.value}</p>
           </div>
         ))}
+      </div>
+      <div className="relative space-y-2">
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Direkte Spieler-Drilldowns</p>
+        <div className="flex flex-wrap gap-2">
+          {focusPlayers.map((player) => (
+            <Button key={player.player_id} variant="heroOutline" size="sm" asChild>
+              <Link to={`/players/${player.player_id}`}>{player.players?.name}</Link>
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -156,18 +190,20 @@ export default function MatchReport() {
     if (stats.length === 0) {
       return (
         <div className="glass-card p-8 text-center">
-          <Activity className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+          <Activity className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">Noch keine Spielerstatistiken verfügbar.</p>
         </div>
       );
     }
+
     return (
       <div className="glass-card overflow-x-auto">
-        <table className="w-full text-sm min-w-[860px]">
+        <table className="min-w-[980px] w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs">Spieler</th>
-              <th className="text-left py-3 px-2 text-muted-foreground font-medium text-xs">#</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Spieler</th>
+              <th className="px-2 py-3 text-left text-xs font-medium text-muted-foreground">Consent</th>
+              <th className="px-2 py-3 text-left text-xs font-medium text-muted-foreground">#</th>
               <SortHeader label="km" field="distance_km" />
               <SortHeader label="Top" field="top_speed_kmh" />
               <SortHeader label="Pässe" field="passes_total" />
@@ -176,7 +212,7 @@ export default function MatchReport() {
               <SortHeader label="Ballgew." field="ball_recoveries" />
               <SortHeader label="Tore" field="goals" />
               <SortHeader label="Ass." field="assists" />
-              <th className="text-left py-3 px-3 text-muted-foreground font-medium text-xs hidden sm:table-cell">Min</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Profil</th>
               <th className="w-8" />
             </tr>
           </thead>
@@ -185,27 +221,38 @@ export default function MatchReport() {
               const duelPct = p.duels_total > 0 ? Math.round((p.duels_won / p.duels_total) * 100) : null;
               return (
                 <Fragment key={p.id}>
-                  <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
-                    <td className="py-3 px-3 font-medium truncate max-w-[140px]">{p.players?.name ?? "—"}</td>
-                    <td className="py-3 px-2 text-muted-foreground">{p.players?.number ?? "—"}</td>
-                    <td className="py-3 px-3 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
-                    <td className="py-3 px-3">{p.top_speed_kmh?.toFixed(1) ?? "—"}</td>
-                    <td className="py-3 px-3">{p.passes_total ?? 0}</td>
-                    <td className="py-3 px-3">{p.pass_accuracy ? `${Math.round(p.pass_accuracy)}%` : "—"}</td>
-                    <td className="py-3 px-3">{duelPct !== null ? `${duelPct}%` : "—"}</td>
-                    <td className="py-3 px-3">{p.ball_recoveries ?? 0}</td>
-                    <td className="py-3 px-3 font-semibold">{p.goals ?? 0}</td>
-                    <td className="py-3 px-3">{p.assists ?? 0}</td>
-                    <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">{p.minutes_played ?? "—"}</td>
-                    <td className="py-3 px-2">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
+                  <tr className="cursor-pointer border-b border-border/50 transition-colors hover:bg-muted/20" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
+                    <td className="px-3 py-3 font-medium">
+                      <span className="block max-w-[170px] truncate">{p.players?.name ?? "—"}</span>
+                    </td>
+                    <td className="px-2 py-3"><ConsentStatusBadge status={p.players?.tracking_consent_status} compact /></td>
+                    <td className="px-2 py-3 text-muted-foreground">{p.players?.number ?? "—"}</td>
+                    <td className="px-3 py-3 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
+                    <td className="px-3 py-3">{p.top_speed_kmh?.toFixed(1) ?? "—"}</td>
+                    <td className="px-3 py-3">{p.passes_total ?? 0}</td>
+                    <td className="px-3 py-3">{p.pass_accuracy ? `${Math.round(p.pass_accuracy)}%` : "—"}</td>
+                    <td className="px-3 py-3">{duelPct !== null ? `${duelPct}%` : "—"}</td>
+                    <td className="px-3 py-3">{p.ball_recoveries ?? 0}</td>
+                    <td className="px-3 py-3 font-semibold">{p.goals ?? 0}</td>
+                    <td className="px-3 py-3">{p.assists ?? 0}</td>
+                    <td className="px-3 py-3">
+                      {p.player_id ? (
+                        <Button variant="ghost" size="sm" asChild onClick={(event) => event.stopPropagation()}>
+                          <Link to={`/players/${p.player_id}`}>Öffnen</Link>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-3">{expandedPlayer === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</td>
                   </tr>
                   {expandedPlayer === p.id && (
                     <tr>
-                      <td colSpan={12} className="p-4 bg-muted/10">
-                        <div className="grid lg:grid-cols-[1.1fr,1fr,1fr] gap-4">
-                          <HeatmapField label="Heatmap" grid={p.heatmap_grid as number[][] | null} compact />
+                      <td colSpan={13} className="bg-muted/10 p-4">
+                        <div className="grid gap-4 lg:grid-cols-[1.1fr,1fr,1fr]">
+                          <HeatmapField label="Heatmap" grid={p.heatmap_grid as number[][] | null} />
                           <div className="space-y-3">
-                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Physis & Ball</div>
+                            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Physis & Ball</div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="rounded-xl border border-border bg-background/50 p-3"><div className="text-[10px] text-muted-foreground">Ø Speed</div><div className="text-sm font-bold font-display">{p.avg_speed_kmh?.toFixed(1) ?? "—"} km/h</div></div>
                               <div className="rounded-xl border border-border bg-background/50 p-3"><div className="text-[10px] text-muted-foreground">Sprint-Distanz</div><div className="text-sm font-bold font-display">{p.sprint_distance_m ? `${Math.round(p.sprint_distance_m)} m` : "—"}</div></div>
@@ -214,19 +261,17 @@ export default function MatchReport() {
                             </div>
                           </div>
                           <div className="space-y-3">
-                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Taktische Aktionen</div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="rounded-xl border border-border bg-background/50 p-3"><div className="text-[10px] text-muted-foreground">Pässe</div><div className="text-sm font-bold font-display">{p.passes_completed ?? 0}/{p.passes_total ?? 0}</div></div>
-                              <div className="rounded-xl border border-border bg-background/50 p-3"><div className="text-[10px] text-muted-foreground">Tackles</div><div className="text-sm font-bold font-display">{p.tackles ?? 0}</div></div>
-                              <div className="rounded-xl border border-border bg-background/50 p-3"><div className="text-[10px] text-muted-foreground">Interceptions</div><div className="text-sm font-bold font-display">{p.interceptions ?? 0}</div></div>
-                              <div className="rounded-xl border border-border bg-background/50 p-3"><div className="text-[10px] text-muted-foreground">Schüsse</div><div className="text-sm font-bold font-display">{p.shots_on_target ?? 0}/{p.shots_total ?? 0}</div></div>
-                              <div className="rounded-xl border border-border bg-background/50 p-3"><div className="text-[10px] text-muted-foreground">Fouls</div><div className="text-sm font-bold font-display">{p.fouls_committed ?? 0}</div></div>
-                              <div className="rounded-xl border border-border bg-background/50 p-3"><div className="text-[10px] text-muted-foreground">Kopfbälle</div><div className="text-sm font-bold font-display">{p.aerial_won ?? 0}</div></div>
+                            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Coach-Navigation</div>
+                            <div className="rounded-xl border border-border bg-background/50 p-3 text-sm text-muted-foreground">
+                              Von hier aus springst du direkt in die Einzelanalyse und den Trainingsplan des Spielers.
                             </div>
+                            {p.player_id && (
+                              <Button variant="heroOutline" size="sm" asChild>
+                                <Link to={`/players/${p.player_id}`}>Zur Spieleranalyse <ArrowRight className="ml-1 h-4 w-4" /></Link>
+                              </Button>
+                            )}
+                            <PerformanceAnalysis type="player" playerId={p.player_id} playerName={p.players?.name} />
                           </div>
-                        </div>
-                        <div className="mt-3">
-                          <PerformanceAnalysis type="player" playerId={p.player_id} playerName={p.players?.name} />
                         </div>
                       </td>
                     </tr>
@@ -242,23 +287,26 @@ export default function MatchReport() {
 
   return (
     <AppLayout>
-      <div className="max-w-6xl mx-auto space-y-6">
-        <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Zurück zu Spiele
         </Link>
 
-        <div className="glass-card p-6 overflow-hidden relative">
+        <div className="glass-card relative overflow-hidden p-6">
           <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-r from-primary/10 via-accent/10 to-transparent pointer-events-none" />
-          <div className="relative flex items-center justify-between mb-3 gap-4 flex-wrap">
-            <StatusBadge status={match.status} />
-            <div className="flex gap-2 flex-wrap">
-              <Button variant="ghost" size="sm" onClick={() => toast.info("PDF-Export wird vorbereitet...")}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
-              <Button variant="ghost" size="sm" onClick={() => toast.info("Excel-Export wird vorbereitet...")}><Download className="h-4 w-4 mr-1" /> Excel</Button>
-              <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(window.location.href); toast.success("Link kopiert!"); }}><Share2 className="h-4 w-4 mr-1" /> Teilen</Button>
+          <div className="relative mb-3 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={match.status} />
+              <ConsentStatusBadge status={match.opponent_consent_confirmed ? "granted" : "denied"} compact className="max-w-none" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" size="sm" onClick={() => toast.info("PDF-Export wird vorbereitet...")}><FileText className="mr-1 h-4 w-4" /> PDF</Button>
+              <Button variant="ghost" size="sm" onClick={() => toast.info("Excel-Export wird vorbereitet...")}><Download className="mr-1 h-4 w-4" /> Excel</Button>
+              <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(window.location.href); toast.success("Link kopiert!"); }}><Share2 className="mr-1 h-4 w-4" /> Teilen</Button>
             </div>
           </div>
           <div className="relative space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold font-display">{clubName} vs {match.away_club_name || "TBD"}</h1>
+            <h1 className="break-words text-2xl font-bold font-display sm:text-3xl">{clubName} vs {match.away_club_name || "TBD"}</h1>
             <p className="text-sm text-muted-foreground">
               {new Date(match.date).toLocaleDateString("de-DE")}
               {match.kickoff && ` · ${match.kickoff}`}
@@ -267,27 +315,23 @@ export default function MatchReport() {
           </div>
 
           {match.status === "setup" && (
-            <div className="mt-4 space-y-3 relative">
+            <div className="relative mt-4 space-y-3">
               <Button variant="tracking" className="w-full" asChild>
-                <Link to={`/matches/${id}/track?cam=0`}>
-                  <Camera className="h-5 w-5 mr-2" /> Tracking starten
-                </Link>
+                <Link to={`/matches/${id}/track?cam=0`}><Camera className="mr-2 h-5 w-5" /> Tracking starten</Link>
               </Button>
               <details className="group">
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1">
-                  <ChevronDown className="h-3 w-3 group-open:rotate-180 transition-transform" />
-                  Weitere Kameras hinzufügen (Multi-Kamera)
+                <summary className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                  <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" /> Weitere Kameras hinzufügen (Multi-Kamera)
                 </summary>
-                <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border space-y-2">
-                  <p className="text-xs text-muted-foreground mb-2">Kopiere diese Links auf weitere Smartphones für Multi-Kamera-Tracking. Beim Öffnen wird ein 6-stelliger Kamera-Code abgefragt:</p>
+                <div className="mt-2 space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="mb-2 text-xs text-muted-foreground">Kopiere diese Links auf weitere Smartphones. Beim Öffnen wird ein 6-stelliger Kamera-Code abgefragt:</p>
                   {[1, 2].map((i) => (
                     <button
                       key={i}
                       onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/camera/${id}/track?cam=${i}`); toast.success(`Link Kamera ${i + 1} kopiert!`); }}
-                      className="flex items-center gap-2 w-full text-left text-xs font-mono text-muted-foreground hover:text-primary transition-colors p-2 rounded-md hover:bg-muted/50"
+                      className="flex w-full items-center gap-2 rounded-md p-2 text-left text-xs font-mono text-muted-foreground transition-colors hover:bg-muted/50 hover:text-primary"
                     >
-                      <Camera className="h-3.5 w-3.5 shrink-0" />
-                      Kamera {i + 1} — Link kopieren
+                      <Camera className="h-3.5 w-3.5 shrink-0" /> Kamera {i + 1} — Link kopieren
                     </button>
                   ))}
                 </div>
@@ -297,44 +341,29 @@ export default function MatchReport() {
         </div>
 
         {match.status === "processing" && (
-          <div className="glass-card p-5 glow-border space-y-3">
+          <div className="glass-card space-y-3 p-5 glow-border">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Loader2 className="h-5 w-5 text-primary animate-spin" />
-              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
               <div>
-                <h3 className="font-semibold font-display text-sm">Daten werden verarbeitet</h3>
+                <h3 className="text-sm font-semibold font-display">Daten werden verarbeitet</h3>
                 <p className="text-xs text-muted-foreground">Die KI analysiert die Tracking-Daten. Dies kann einige Minuten dauern.</p>
               </div>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { label: "Upload", done: true },
-                { label: "Spieler-Erkennung", done: false },
-                { label: "Statistiken", done: false },
-                { label: "Heatmaps", done: false },
-              ].map((step, index) => (
-                <div key={step.label} className="text-center">
-                  <div className={`h-1.5 rounded-full mb-1 ${step.done ? "bg-primary" : index === 1 ? "bg-primary/40 animate-pulse" : "bg-muted"}`} />
-                  <span className="text-[10px] text-muted-foreground">{step.label}</span>
-                </div>
-              ))}
             </div>
           </div>
         )}
 
         {match.status === "live" && (
-          <div className="glass-card p-4 glow-border flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <div className="glass-card flex items-center gap-3 p-4 glow-border">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
             <span className="text-sm font-medium font-display">Live-Tracking läuft</span>
-            <span className="text-xs text-muted-foreground ml-auto">Daten werden nach Spielende verfügbar</span>
+            <span className="ml-auto text-xs text-muted-foreground">Daten werden nach Spielende verfügbar</span>
           </div>
         )}
 
         {uploads && uploads.length > 0 && match.status !== "processing" && (
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex flex-wrap gap-3">
             {uploads.map((u: any) => (
-              <div key={u.id} className="glass-card p-3 flex-1 min-w-[160px]">
+              <div key={u.id} className="glass-card min-w-[160px] flex-1 p-3">
                 <div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div>
                 <StatusBadge status={u.status} />
               </div>
@@ -342,14 +371,12 @@ export default function MatchReport() {
           </div>
         )}
 
-        <div className="flex gap-1 bg-muted/30 rounded-lg p-1 overflow-x-auto scrollbar-none">
+        <div className="scrollbar-none flex gap-1 overflow-x-auto rounded-lg bg-muted/30 p-1">
           {tabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap flex-shrink-0 sm:flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-all sm:flex-1 ${activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               {tab}
             </button>
@@ -358,28 +385,33 @@ export default function MatchReport() {
 
         {activeTab === "Übersicht" && (
           <div className="space-y-6">
-            {apiStats && (
-              <ApiFootballStatsCard
-                stats={apiStats}
-                homeLabel={clubName ?? "Heim"}
-                awayLabel={match.away_club_name ?? "Auswärts"}
-              />
-            )}
+            {apiStats && <ApiFootballStatsCard stats={apiStats} homeLabel={clubName ?? "Heim"} awayLabel={match.away_club_name ?? "Auswärts"} />}
 
             {hasStats && (
-              <MatchKpiStrip
-                homeTeamStats={homeTeamStats}
-                awayTeamStats={awayTeamStats}
-                homePlayerStats={homePlayerStats}
-                awayPlayerStats={awayPlayerStats}
-                homeName={clubName ?? "Heim"}
-                awayName={match.away_club_name ?? "Auswärts"}
-              />
+              <>
+                <MatchKpiStrip
+                  homeTeamStats={homeTeamStats}
+                  awayTeamStats={awayTeamStats}
+                  homePlayerStats={homePlayerStats}
+                  awayPlayerStats={awayPlayerStats}
+                  homeName={clubName ?? "Heim"}
+                  awayName={match.away_club_name ?? "Auswärts"}
+                />
+                <MatchInsightsPanel
+                  matchId={match.id}
+                  homeHeatmap={homeTeamStats?.formation_heatmap as number[][] | null}
+                  awayHeatmap={awayTeamStats?.formation_heatmap as number[][] | null}
+                  homePlayerStats={homePlayerStats}
+                  awayPlayerStats={awayPlayerStats}
+                  apiStats={apiStats}
+                  events={(events ?? []) as any[]}
+                />
+              </>
             )}
 
-            <div className="grid xl:grid-cols-2 gap-4">
-              {renderTeamCard(clubName ?? "Heim", homeTeamStats, homeAgg)}
-              {renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats, awayAgg)}
+            <div className="grid gap-4 xl:grid-cols-2">
+              {renderTeamCard(clubName ?? "Heim", homeTeamStats, homeAgg, coachLinks.recoveries)}
+              {renderTeamCard(match.away_club_name ?? "Auswärts", awayTeamStats, awayAgg, coachLinks.passing)}
             </div>
 
             {hasStats ? (
@@ -400,7 +432,7 @@ export default function MatchReport() {
                   <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Tackles" metric="tackles" unit="" />
                   <TopPlayersChart stats={[...homePlayerStats, ...awayPlayerStats]} title="Top Ballgewinne" metric="ball_recoveries" unit="" />
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <HeatmapField label="Team-Heatmap Heim" grid={homeTeamStats?.formation_heatmap as number[][] | null} />
                   <HeatmapField label="Team-Heatmap Auswärts" grid={awayTeamStats?.formation_heatmap as number[][] | null} />
                 </div>
@@ -408,14 +440,14 @@ export default function MatchReport() {
               </>
             ) : (
               <div className="glass-card p-8 text-center">
-                <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                <Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
                 <p className="text-muted-foreground">Statistiken werden nach dem Tracking verfügbar.</p>
               </div>
             )}
           </div>
         )}
 
-        {activeTab === "KI-Bericht" && (
+        {activeTab === "Berichte & Presse" && (
           <ReportGenerator
             matchId={match.id}
             matchStatus={match.status}
@@ -451,7 +483,7 @@ export default function MatchReport() {
               </>
             ) : (
               <div className="glass-card p-8 text-center">
-                <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                <Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
                 <p className="text-muted-foreground">Vergleichs-Charts werden nach dem ersten Tracking verfügbar.</p>
               </div>
             )}
