@@ -24,6 +24,7 @@ interface MetricDetailDialogProps {
   chips?: string[];
   triggerClassName?: string;
   contentClassName?: string;
+  footer?: ReactNode;
   children: ReactNode;
 }
 
@@ -35,6 +36,7 @@ export function MetricDetailDialog({
   chips = [],
   triggerClassName,
   contentClassName,
+  footer,
   children,
 }: MetricDetailDialogProps) {
   return (
@@ -59,8 +61,8 @@ export function MetricDetailDialog({
                 Drilldown
               </div>
               <div className="space-y-2">
-                <DialogTitle className="font-display text-xl sm:text-2xl">{title}</DialogTitle>
-                {subtitle && <DialogDescription className="max-w-2xl text-sm leading-6">{subtitle}</DialogDescription>}
+                <DialogTitle className="font-display text-xl break-words sm:text-2xl">{title}</DialogTitle>
+                {subtitle && <DialogDescription className="max-w-2xl break-words text-sm leading-6">{subtitle}</DialogDescription>}
               </div>
             </DialogHeader>
 
@@ -88,12 +90,14 @@ export function MetricDetailDialog({
                 {facts.map((fact) => (
                   <div key={fact.label} className="rounded-2xl border border-border bg-background/60 p-4">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{fact.label}</p>
-                    <p className="mt-2 text-lg font-bold font-display text-foreground">{fact.value}</p>
+                    <p className="mt-2 break-words text-lg font-bold font-display text-foreground">{fact.value}</p>
                     {fact.hint && <p className="mt-2 text-xs leading-5 text-muted-foreground">{fact.hint}</p>}
                   </div>
                 ))}
               </div>
             )}
+
+            {footer && <div className="mt-5">{footer}</div>}
           </div>
         </div>
       </DialogContent>
