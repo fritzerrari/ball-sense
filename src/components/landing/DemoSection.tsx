@@ -110,10 +110,10 @@ function NotificationState({ onLoad }: { onLoad: () => void }) {
   ];
 
   const analysisCategories = [
-    { icon: Route, label: "Laufdaten", items: ["Distanz", "Speed", "Sprints", "Heatmaps"] },
-    { icon: Target, label: "Spielstatistiken", items: ["Pässe", "Zweikämpfe", "Schüsse", "Ballkontakte"] },
-    { icon: Sparkles, label: "KI-Berichte", items: ["Spielbericht", "Halbzeitanalyse", "Social Media", "Trainingsplan"] },
-    { icon: Gauge, label: "Advanced Analytics", items: ["xG", "PPDA", "Field Tilt", "Konter"] },
+    { icon: Clipboard, label: "Coach Summary", items: ["Spielkontrolle", "Fokusspieler", "Warnsignal", "Nächste Aktion"] },
+    { icon: BarChart3, label: "Leaderboards", items: ["Top-Speed", "Passquote", "Sprints", "Zweikämpfe"] },
+    { icon: TriangleAlert, label: "Datenqualität", items: ["Ausreißer", "Plausibilität", "Warnstatus", "Kalibrier-Hinweise"] },
+    { icon: Sparkles, label: "Taktik-Tools", items: ["Heatmaps", "KI-Erkenntnisse", "Formationen", "Was-wäre-wenn"] },
   ];
 
   return (
