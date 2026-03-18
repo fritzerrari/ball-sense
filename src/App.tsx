@@ -19,6 +19,7 @@ const Matches = lazy(() => import("./pages/Matches"));
 const NewMatch = lazy(() => import("./pages/NewMatch"));
 const MatchReport = lazy(() => import("./pages/MatchReport"));
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
+const CameraTrackingPage = lazy(() => import("./pages/CameraTrackingPage"));
 const Players = lazy(() => import("./pages/Players"));
 const PlayerProfile = lazy(() => import("./pages/PlayerProfile"));
 const Fields = lazy(() => import("./pages/Fields"));
