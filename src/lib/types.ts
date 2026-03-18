@@ -9,6 +9,8 @@ export interface Club {
   created_at: string;
 }
 
+export type TrackingConsentStatus = "unknown" | "granted" | "denied";
+
 export interface Player {
   id: string;
   club_id: string;
@@ -16,6 +18,9 @@ export interface Player {
   number: number | null;
   position: string | null;
   active: boolean;
+  tracking_consent_status: TrackingConsentStatus;
+  tracking_consent_updated_at?: string | null;
+  tracking_consent_notes?: string | null;
   created_at: string;
 }
 
