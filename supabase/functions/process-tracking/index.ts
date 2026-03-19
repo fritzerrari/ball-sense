@@ -39,6 +39,7 @@ interface LineupEntry {
   starting: boolean;
   subbed_in_min: number | null;
   subbed_out_min: number | null;
+  excluded_from_tracking: boolean;
 }
 
 interface MatchEvent {
@@ -50,6 +51,22 @@ interface MatchEvent {
   related_player_id: string | null;
   player_name: string | null;
   related_player_name: string | null;
+}
+
+interface MatchContext {
+  field_id: string | null;
+  home_club_id: string;
+  track_opponent: boolean;
+  opponent_consent_confirmed: boolean;
+}
+
+interface TrackProfile {
+  tid: number;
+  cx: number;
+  cy: number;
+  sidelineRatio: number;
+  edgeRatio: number;
+  positions: { t: number; x: number; y: number }[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -71,10 +88,9 @@ function buildTracks(frames: TrackingFrame[]) {
   const THRESHOLD = 0.12; // max normalised distance to match
 
   for (const frame of frames) {
-    const used = new Set<number>(); // detection indices already assigned
-    const matched = new Set<number>(); // track ids already matched
+    const used = new Set<number>();
+    const matched = new Set<number>();
 
-    // 1) Match existing tracks to closest detection
     for (const [tid, pos] of active) {
       let bestIdx = -1;
       let bestDist = THRESHOLD;
@@ -95,7 +111,6 @@ function buildTracks(frames: TrackingFrame[]) {
       }
     }
 
-    // 2) Create new tracks for unmatched detections
     for (let i = 0; i < frame.detections.length; i++) {
       if (used.has(i)) continue;
       const det = frame.detections[i];
@@ -104,7 +119,6 @@ function buildTracks(frames: TrackingFrame[]) {
       active.set(tid, { x: det.x, y: det.y });
     }
 
-    // 3) Remove tracks not seen for too long (>5 frames equivalent, ~2.5s at 2fps)
     for (const [tid] of active) {
       if (!matched.has(tid)) {
         const last = tracks.get(tid)!;
@@ -153,12 +167,12 @@ function computeTrackStats(
     const curr = positions[i];
     const dx = (curr.x - prev.x) * fieldW;
     const dy = (curr.y - prev.y) * fieldH;
-    const dist = Math.sqrt(dx * dx + dy * dy); // meters
-    const dt = (curr.t - prev.t) / 1000; // seconds
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const dt = (curr.t - prev.t) / 1000;
     if (dt <= 0) continue;
 
     totalDist += dist;
-    const speed = (dist / dt) * 3.6; // km/h
+    const speed = (dist / dt) * 3.6;
     speeds.push(speed);
     if (speed > topSpeed) topSpeed = speed;
 
@@ -176,7 +190,6 @@ function computeTrackStats(
   const avgSpeed =
     speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
 
-  // Build 10×7 heatmap grid
   const COLS = 10;
   const ROWS = 7;
   const grid: number[][] = Array.from({ length: ROWS }, () =>
@@ -187,7 +200,7 @@ function computeTrackStats(
     const row = Math.min(ROWS - 1, Math.floor(p.y * ROWS));
     grid[row][col]++;
   }
-  // Normalise to 0-1
+
   const maxVal = Math.max(1, ...grid.flat());
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -198,7 +211,7 @@ function computeTrackStats(
   const durationMs = positions[positions.length - 1].t - positions[0].t;
 
   return {
-    distance_km: Math.round(totalDist / 10) / 100, // round to 2 decimals
+    distance_km: Math.round(totalDist / 10) / 100,
     top_speed_kmh: Math.round(topSpeed * 10) / 10,
     avg_speed_kmh: Math.round(avgSpeed * 10) / 10,
     sprint_count: sprintCount,
@@ -257,6 +270,77 @@ function getOverlapMinutes(
   );
 }
 
+function shouldTrackTeam(match: MatchContext | null, team: "home" | "away") {
+  if (team === "home") return true;
+  return Boolean(match?.track_opponent && match?.opponent_consent_confirmed);
+}
+
+function getExpectedZone(
+  position: string | null | undefined,
+  team: "home" | "away",
+  zones: Record<string, { x: number; y: number }>,
+) {
+  if (!position) return null;
+  const base = zones[position.toUpperCase()];
+  if (!base) return null;
+  return team === "home" ? base : { x: base.x, y: 1 - base.y };
+}
+
+function buildTrackProfiles(
+  sortedTracks: Array<[number, { t: number; x: number; y: number }[]]>,
+): TrackProfile[] {
+  return sortedTracks.map(([tid, positions]) => {
+    const cx = positions.reduce((sum, p) => sum + p.x, 0) / positions.length;
+    const cy = positions.reduce((sum, p) => sum + p.y, 0) / positions.length;
+    const sidelineFrames = positions.filter((p) => p.x <= 0.08 || p.x >= 0.92).length;
+    const edgeFrames = positions.filter((p) => p.y <= 0.05 || p.y >= 0.95).length;
+
+    return {
+      tid,
+      cx,
+      cy,
+      sidelineRatio: sidelineFrames / Math.max(1, positions.length),
+      edgeRatio: edgeFrames / Math.max(1, positions.length),
+      positions,
+    };
+  });
+}
+
+function isTrackablePlayer(player: LineupEntry, match: MatchContext | null) {
+  return !player.excluded_from_tracking && shouldTrackTeam(match, player.team);
+}
+
+function scoreTrackCandidate(
+  player: LineupEntry,
+  track: TrackProfile,
+  expectedZone: { x: number; y: number } | null,
+  playerWindow: { startMin: number | null; endMin: number },
+  fallbackEndMin: number,
+) {
+  const trackRange = getTrackTimeRange(track.positions);
+  const overlapMinutes = getOverlapMinutes(playerWindow, trackRange);
+  if (overlapMinutes <= 0) {
+    return { overlapMinutes, overlapRatio: 0, score: Infinity };
+  }
+
+  const activeMinutes = Math.max(
+    0.5,
+    (playerWindow.endMin ?? fallbackEndMin) - (playerWindow.startMin ?? 0),
+  );
+  const overlapRatio = Math.min(1, overlapMinutes / activeMinutes);
+  const zoneDist = expectedZone
+    ? Math.sqrt((track.cx - expectedZone.x) ** 2 + (track.cy - expectedZone.y) ** 2)
+    : Math.abs(track.cy - (player.team === "home" ? 0.5 : 0.5));
+  const overlapPenalty = 1 / (overlapMinutes + 0.25);
+  const coveragePenalty = (1 - overlapRatio) * 0.35;
+  const officialPenalty = track.sidelineRatio * (expectedZone ? 0.2 : 0.9) + track.edgeRatio * 0.1;
+
+  return {
+    overlapMinutes,
+    overlapRatio,
+    score: zoneDist + overlapPenalty + coveragePenalty + officialPenalty,
+  };
+}
 // ── Main Handler ──────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
