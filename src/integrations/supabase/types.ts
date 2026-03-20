@@ -1476,6 +1476,26 @@ export type Database = {
         | "penalty"
         | "counter_attack"
         | "set_piece"
+        | "free_kick"
+        | "throw_in"
+        | "offside"
+        | "save"
+        | "blocked_shot"
+        | "own_goal"
+        | "handball"
+        | "injury"
+        | "drink_break"
+        | "clearance"
+        | "bad_pass"
+        | "lost_duel"
+        | "won_duel"
+        | "dribble"
+        | "cross"
+        | "header"
+        | "tackle"
+        | "interception"
+        | "ball_recovery"
+        | "kickoff"
       tracking_consent_status: "unknown" | "granted" | "denied"
     }
     CompositeTypes: {
@@ -1621,6 +1641,26 @@ export const Constants = {
         "penalty",
         "counter_attack",
         "set_piece",
+        "free_kick",
+        "throw_in",
+        "offside",
+        "save",
+        "blocked_shot",
+        "own_goal",
+        "handball",
+        "injury",
+        "drink_break",
+        "clearance",
+        "bad_pass",
+        "lost_duel",
+        "won_duel",
+        "dribble",
+        "cross",
+        "header",
+        "tackle",
+        "interception",
+        "ball_recovery",
+        "kickoff",
       ],
       tracking_consent_status: ["unknown", "granted", "denied"],
     },
