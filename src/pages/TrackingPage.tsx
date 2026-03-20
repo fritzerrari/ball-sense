@@ -631,6 +631,14 @@ export default function TrackingPage() {
               >
                 <ShieldAlert className="h-6 w-6 mr-2" /> ROTE KARTE
               </Button>
+              <LiveEventTicker
+                matchId={id!}
+                elapsedSec={elapsedSec}
+                homePlayers={homePlayers as any}
+                awayPlayers={awayPlayers as any}
+                trackOpponent={match?.track_opponent}
+                onEventAdded={() => queryClient.invalidateQueries({ queryKey: ["match_events", id] })}
+              />
               <Button
                 onClick={handleEnd}
                 className="min-h-[60px] text-base font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl col-span-2"
