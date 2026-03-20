@@ -20,6 +20,7 @@ import ReportGenerator from "@/components/ReportGenerator";
 import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
 import { MatchKpiStrip, MatchRadarChart, TopPlayersChart, ComparisonBarChart } from "@/components/MatchCharts";
 import { MatchInsightsPanel } from "@/components/MatchInsightsPanel";
+import { MatchEventStats } from "@/components/MatchEventStats";
 import { PerformanceAnalysis } from "@/components/PerformanceAnalysis";
 import { useMatch, useTrackingUploads, useMatchEvents } from "@/hooks/use-matches";
 import { usePlayerMatchStats, useTeamMatchStats, useApiFootballStats } from "@/hooks/use-match-stats";
@@ -401,6 +402,13 @@ export default function MatchReport() {
                     <SectionHeader eyebrow="Tactical Read" title="Taktische Insights" description="Heatmaps, Gegentor-Muster und Spieler-Navigation in einem klarer priorisierten Analyseblock." />
                     <MatchInsightsPanel matchId={match.id} homeHeatmap={homeTeamStats?.formation_heatmap as number[][] | null} awayHeatmap={awayTeamStats?.formation_heatmap as number[][] | null} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} apiStats={apiStats} events={(events ?? []) as any[]} />
                   </section>
+
+                  {(events?.length ?? 0) > 0 && (
+                    <section className="space-y-4">
+                      <SectionHeader eyebrow="Match Events" title="Spielereignisse" description="Alle erfassten Ereignisse – von Ecken über Freistöße bis Zweikämpfe – im direkten Teamvergleich." />
+                      <MatchEventStats events={(events ?? []) as any[]} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} />
+                    </section>
+                  )}
 
                   <section className="space-y-4">
                     <SectionHeader eyebrow="Field View" title="Heatmaps & Teamanalyse" description="Die Gesamtbewegung beider Teams plus vertiefende Analyse für den Staff." />

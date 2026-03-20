@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Camera, Pause, Play, Users, RefreshCw, Flag, Timer, Loader2, Upload, AlertTriangle, Check, Wifi, WifiOff, Sparkles, ShieldAlert } from "lucide-react";
+import { LiveEventTicker } from "@/components/LiveEventTicker";
 import { useMatch, useMatchEvents, useMatchLineups, useUpdateMatch } from "@/hooks/use-matches";
 import { useField } from "@/hooks/use-fields";
 import { FootballTracker } from "@/lib/football-tracker";
@@ -57,6 +58,7 @@ export default function TrackingPage() {
 
   const { data: matchEvents } = useMatchEvents(id);
   const homePlayers = (lineups ?? []).filter(l => l.team === "home");
+  const awayPlayers = (lineups ?? []).filter(l => l.team === "away");
   const currentMinute = Math.floor(elapsedSec / 60);
 
   const getPlayerStartMinute = useCallback((player: any) => {
@@ -630,6 +632,14 @@ export default function TrackingPage() {
               >
                 <ShieldAlert className="h-6 w-6 mr-2" /> ROTE KARTE
               </Button>
+              <LiveEventTicker
+                matchId={id!}
+                elapsedSec={elapsedSec}
+                homePlayers={homePlayers as any}
+                awayPlayers={awayPlayers as any}
+                trackOpponent={match?.track_opponent}
+                onEventAdded={() => queryClient.invalidateQueries({ queryKey: ["match_events", id] })}
+              />
               <Button
                 onClick={handleEnd}
                 className="min-h-[60px] text-base font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl col-span-2"
