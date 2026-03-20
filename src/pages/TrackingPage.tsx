@@ -58,6 +58,7 @@ export default function TrackingPage() {
 
   const { data: matchEvents } = useMatchEvents(id);
   const homePlayers = (lineups ?? []).filter(l => l.team === "home");
+  const awayPlayers = (lineups ?? []).filter(l => l.team === "away");
   const currentMinute = Math.floor(elapsedSec / 60);
 
   const getPlayerStartMinute = useCallback((player: any) => {
