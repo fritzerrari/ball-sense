@@ -461,13 +461,17 @@ export function TopPlayersChart({
 
   if (!sorted.length) return null;
 
-  const chartData = sorted.map((s, index) => ({
-    name: s.players?.name?.substring(0, 14) ?? "—",
-    value: Math.round(((s[metric] as number) ?? 0) * 10) / 10,
-    fullName: s.players?.name ?? "—",
-    rank: index + 1,
-    fill: `hsl(var(--primary) / ${Math.max(1 - index * 0.14, 0.34)})`,
-  }));
+  const chartData = sorted.map((s, index) => {
+    const isAway = (s as PlayerStat).team === "away";
+    return {
+      name: `${isAway ? "⚔ " : ""}${s.players?.name?.substring(0, 14) ?? "—"}`,
+      value: Math.round(((s[metric] as number) ?? 0) * 10) / 10,
+      fullName: `${s.players?.name ?? "—"} (${isAway ? "Gast" : "Heim"})`,
+      rank: index + 1,
+      fill: isAway ? `hsl(var(--accent) / ${Math.max(1 - index * 0.12, 0.4)})` : `hsl(var(--primary) / ${Math.max(1 - index * 0.14, 0.34)})`,
+      team: isAway ? "away" : "home",
+    };
+  });
 
   const leader = sorted[0];
   const average = chartData.reduce((sum, item) => sum + item.value, 0) / chartData.length;
