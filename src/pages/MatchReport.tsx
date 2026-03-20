@@ -20,6 +20,7 @@ import ReportGenerator from "@/components/ReportGenerator";
 import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
 import { MatchKpiStrip, MatchRadarChart, TopPlayersChart, ComparisonBarChart } from "@/components/MatchCharts";
 import { MatchInsightsPanel } from "@/components/MatchInsightsPanel";
+import { MatchEventStats } from "@/components/MatchEventStats";
 import { PerformanceAnalysis } from "@/components/PerformanceAnalysis";
 import { useMatch, useTrackingUploads, useMatchEvents } from "@/hooks/use-matches";
 import { usePlayerMatchStats, useTeamMatchStats, useApiFootballStats } from "@/hooks/use-match-stats";
