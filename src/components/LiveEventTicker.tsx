@@ -142,7 +142,7 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
         minute: min,
         event_type: selectedEvent.type as any,
         player_id: playerId || null,
-        player_name: player?.player_name ?? playerName || null,
+        player_name: player?.player_name ?? (playerName || null),
         event_zone: zone || null,
         notes: notes || null,
       });
