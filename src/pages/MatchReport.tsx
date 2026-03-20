@@ -403,6 +403,13 @@ export default function MatchReport() {
                     <MatchInsightsPanel matchId={match.id} homeHeatmap={homeTeamStats?.formation_heatmap as number[][] | null} awayHeatmap={awayTeamStats?.formation_heatmap as number[][] | null} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} apiStats={apiStats} events={(events ?? []) as any[]} />
                   </section>
 
+                  {(events?.length ?? 0) > 0 && (
+                    <section className="space-y-4">
+                      <SectionHeader eyebrow="Match Events" title="Spielereignisse" description="Alle erfassten Ereignisse – von Ecken über Freistöße bis Zweikämpfe – im direkten Teamvergleich." />
+                      <MatchEventStats events={(events ?? []) as any[]} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} />
+                    </section>
+                  )}
+
                   <section className="space-y-4">
                     <SectionHeader eyebrow="Field View" title="Heatmaps & Teamanalyse" description="Die Gesamtbewegung beider Teams plus vertiefende Analyse für den Staff." />
                     <div className="grid gap-4 sm:grid-cols-2">
