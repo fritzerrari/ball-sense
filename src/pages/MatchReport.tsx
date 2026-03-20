@@ -424,8 +424,47 @@ export default function MatchReport() {
           <TabsContent value="Berichte & Presse" className="mt-0">
             <ReportGenerator matchId={match.id} matchStatus={match.status} clubName={clubName ?? "Heim"} awayClubName={match.away_club_name ?? "Gegner"} matchDate={match.date} />
           </TabsContent>
-          <TabsContent value="Heim" className="mt-0">{renderPlayerTable(homePlayerStats)}</TabsContent>
-          <TabsContent value="Auswärts" className="mt-0">{renderPlayerTable(awayPlayerStats)}</TabsContent>
+          <TabsContent value="Heim" className="mt-0 space-y-4">
+            <div className="glass-card flex items-center gap-3 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold font-display text-sm">H</div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold font-display">{clubName ?? "Heimmannschaft"}</h3>
+                <p className="text-xs text-muted-foreground">{homePlayerStats.length} Spieler getrackt · Formation: {match.home_formation ?? "—"}</p>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                <Activity className="h-3 w-3" /> Eigenes Team
+              </div>
+            </div>
+            {renderPlayerTable(homePlayerStats)}
+          </TabsContent>
+          <TabsContent value="Auswärts" className="mt-0 space-y-4">
+            <div className="glass-card flex items-center gap-3 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent-foreground font-bold font-display text-sm">G</div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold font-display">{match.away_club_name ?? "Gegner"}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {match.track_opponent
+                    ? `${awayPlayerStats.length} Spieler getrackt · Formation: ${match.away_formation ?? "—"}`
+                    : "Gegner-Tracking ist für dieses Spiel deaktiviert"}
+                </p>
+              </div>
+              <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                match.track_opponent && match.opponent_consent_confirmed
+                  ? "border-primary/20 bg-primary/10 text-primary"
+                  : "border-destructive/20 bg-destructive/10 text-destructive"
+              }`}>
+                {match.track_opponent ? <Activity className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                {match.track_opponent ? "Getrackt" : "Nicht getrackt"}
+              </div>
+            </div>
+            {!match.track_opponent ? (
+              <div className="glass-card p-8 text-center">
+                <EyeOff className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
+                <h3 className="mb-1 font-semibold font-display">Gegner-Tracking deaktiviert</h3>
+                <p className="text-sm text-muted-foreground">Für dieses Spiel wurde kein Tracking der gegnerischen Mannschaft aktiviert oder die Einwilligung fehlt.</p>
+              </div>
+            ) : renderPlayerTable(awayPlayerStats)}
+          </TabsContent>
           <TabsContent value="Vergleich" className="mt-0">
             <div className="space-y-6">{hasStats ? <><ComparisonBarChart homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} /><MatchRadarChart homeTeamStats={homeTeamStats} awayTeamStats={awayTeamStats} homePlayerStats={homePlayerStats} awayPlayerStats={awayPlayerStats} homeName={clubName ?? "Heim"} awayName={match.away_club_name ?? "Auswärts"} /></> : <div className="glass-card p-8 text-center"><Activity className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" /><p className="text-muted-foreground">Vergleichs-Charts werden nach dem ersten Tracking verfügbar.</p></div>}</div>
           </TabsContent>
