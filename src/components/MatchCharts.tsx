@@ -33,6 +33,7 @@ interface TeamStats {
 
 interface PlayerStat {
   id: string;
+  team?: string;
   distance_km?: number | null;
   top_speed_kmh?: number | null;
   sprint_count?: number | null;
