@@ -468,8 +468,28 @@ function DashboardState({ data, onReload }: { data: DemoData; onReset: () => voi
                 <span className="text-[9px] bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20">Neu</span>
               </div>
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-                <div className="overflow-hidden rounded-2xl border border-border/40 bg-background/70">
-                  <img src={latestAnalysisImage} alt="Aktueller Coaching-Cockpit Analyse-Screen mit KI-Auswertung" className="h-full w-full object-cover" loading="lazy" />
+                <div className="overflow-hidden rounded-2xl border border-border/40 bg-background/70 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <Activity className="w-3.5 h-3.5 text-primary" />
+                    <span className="font-semibold text-foreground">Coaching-Cockpit Preview</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "Ballbesitz", val: `${data.teamStats.possession.toFixed(0)}%` },
+                      { label: "Passquote", val: `${data.teamStats.passAccuracy.toFixed(0)}%` },
+                      { label: "Sprints", val: `${data.players.reduce((s, p) => s + p.sprints, 0)}` },
+                    ].map((s) => (
+                      <div key={s.label} className="rounded-lg bg-muted/30 border border-border/30 p-2 text-center">
+                        <div className="text-xs font-bold font-display text-primary">{s.val}</div>
+                        <div className="text-[8px] text-muted-foreground">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <MiniHeatmap />
+                  <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
+                    <Sparkles className="w-3 h-3 text-primary" />
+                    <span>KI-Analyse abgeschlossen · 3 Empfehlungen</span>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
