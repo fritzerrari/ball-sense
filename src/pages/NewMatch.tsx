@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
-import { ArrowLeft, ArrowRight, Calendar, Users, Camera, QrCode, Loader2, Check, Dumbbell, Swords, ShieldCheck, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Users, Camera, QrCode, Loader2, Check, Dumbbell, Swords, ShieldCheck, EyeOff, UserPlus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { usePlayers } from "@/hooks/use-players";
 import { useFields } from "@/hooks/use-fields";
@@ -87,7 +87,6 @@ export default function NewMatch() {
     return player?.number ?? 0;
   };
 
-  // Sync guest player rows when awaySquadSize changes
   useEffect(() => {
     setGuestPlayers((prev) => {
       if (prev.length < awaySquadSize) {
@@ -153,6 +152,30 @@ export default function NewMatch() {
 
   const addGuestRow = () => {
     setGuestPlayers([...guestPlayers, { name: "", number: String(guestPlayers.length + 1), position: "" }]);
+  };
+
+  // Select all starters
+  const handleSelectAllStarters = () => {
+    const allIds = activePlayers.slice(0, squadSize).map(p => p.id);
+    setHomeStarters(new Set(allIds));
+    // Remove from bench
+    const bench = new Set(homeBench);
+    allIds.forEach(id => bench.delete(id));
+    setHomeBench(bench);
+  };
+
+  // Select all training players
+  const handleSelectAllTraining = () => {
+    if (trainingPlayers.size === activePlayers.length) {
+      setTrainingPlayers(new Set());
+    } else {
+      setTrainingPlayers(new Set(activePlayers.map(p => p.id)));
+    }
+  };
+
+  // Clear all starters
+  const handleClearStarters = () => {
+    setHomeStarters(new Set());
   };
 
   const canProceed = () => {
@@ -260,11 +283,15 @@ export default function NewMatch() {
         <div className="flex items-center gap-1 sm:gap-2">
           {steps.map((currentStep, index) => (
             <div key={currentStep.label} className="flex flex-1 items-center gap-1 sm:gap-2">
-              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold font-display transition-colors ${
-                index === step ? "bg-primary text-primary-foreground" : index < step ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-              }`}>
+              <button
+                onClick={() => index < step && setStep(index)}
+                disabled={index >= step}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold font-display transition-colors ${
+                  index === step ? "bg-primary text-primary-foreground" : index < step ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30" : "bg-muted text-muted-foreground"
+                }`}
+              >
                 {index < step ? <Check className="h-4 w-4" /> : <currentStep.icon className="h-4 w-4 sm:hidden" />}
-              </div>
+              </button>
               <span className="hidden text-xs text-muted-foreground sm:block">{currentStep.label}</span>
               {index < steps.length - 1 && <div className={`h-px flex-1 ${index < step ? "bg-primary/30" : "bg-border"}`} />}
             </div>
@@ -279,12 +306,12 @@ export default function NewMatch() {
                 <button onClick={() => { setMatchType("match"); setStep(1); }} className="glass-card group p-6 text-left transition-all hover:border-primary/40">
                   <Swords className="mb-3 h-10 w-10 text-primary transition-transform group-hover:scale-110" />
                   <h3 className="mb-1 font-semibold font-display">Spiel</h3>
-                  <p className="text-sm text-muted-foreground">Wettkampf mit Einwilligungscheck, Startelf, Gegnerdaten und vollständiger Analyse.</p>
+                  <p className="text-sm text-muted-foreground">Wettkampf mit Analyse, Gegner & Statistiken.</p>
                 </button>
                 <button onClick={() => { setMatchType("training"); setStep(1); }} className="glass-card group p-6 text-left transition-all hover:border-primary/40">
                   <Dumbbell className="mb-3 h-10 w-10 text-primary transition-transform group-hover:scale-110" />
                   <h3 className="mb-1 font-semibold font-display">Training</h3>
-                  <p className="text-sm text-muted-foreground">Trainingseinheit mit klarer Einwilligungsbestätigung und optionalem Tracking-Ausschluss einzelner Spieler.</p>
+                  <p className="text-sm text-muted-foreground">Trainingseinheit mit Tracking & Laufanalyse.</p>
                 </button>
               </div>
             </>
@@ -379,10 +406,16 @@ export default function NewMatch() {
 
           {step === 2 && isTraining && (
             <>
-              <h2 className="text-lg font-semibold font-display flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" /> Spieler auswählen
-              </h2>
-              <p className="text-sm text-muted-foreground">Wähle mindestens 1 Spieler für das Training aus und schließe bei Bedarf einzelne Spieler vom Tracking aus.</p>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold font-display flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" /> Spieler auswählen
+                </h2>
+                <Button variant="outline" size="sm" onClick={handleSelectAllTraining}>
+                  <UserPlus className="mr-1 h-4 w-4" />
+                  {trainingPlayers.size === activePlayers.length ? "Alle abwählen" : "Alle auswählen"}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">Wähle mindestens 1 Spieler. {trainingPlayers.size} ausgewählt.</p>
               <div className="space-y-2 max-h-[420px] overflow-y-auto">
                 {activePlayers.map((player) => {
                   const isSelected = trainingPlayers.has(player.id);
@@ -415,9 +448,21 @@ export default function NewMatch() {
 
           {step === 2 && !isTraining && (
             <>
-              <h2 className="text-lg font-semibold font-display flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" /> Aufstellung Heim
-              </h2>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="text-lg font-semibold font-display flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" /> Aufstellung Heim
+                </h2>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleSelectAllStarters}>
+                    <UserPlus className="mr-1 h-4 w-4" /> Alle als Starter
+                  </Button>
+                  {homeStarters.size > 0 && (
+                    <Button variant="ghost" size="sm" onClick={handleClearStarters}>
+                      Auswahl löschen
+                    </Button>
+                  )}
+                </div>
+              </div>
 
               <div>
                 <label className="mb-1.5 block text-sm text-muted-foreground">Spieleranzahl pro Team</label>
@@ -443,7 +488,7 @@ export default function NewMatch() {
 
               <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
                 <span className="text-primary font-bold text-sm">💡</span>
-                <span><strong>Aufstellung optional.</strong> Falls du die Aufstellung nicht kennst, kannst du diesen Schritt überspringen – die KI erkennt Spieler automatisch anhand der Trikots und Bewegungsmuster. Positionen werden ebenfalls automatisch zugeordnet.</span>
+                <span><strong>Aufstellung optional.</strong> Falls du die Aufstellung nicht kennst, kannst du diesen Schritt überspringen – die KI erkennt Spieler automatisch.</span>
               </div>
               <div className="space-y-2 max-h-[420px] overflow-y-auto">
                 {activePlayers.map((player) => {
@@ -518,11 +563,11 @@ export default function NewMatch() {
                 </div>
               )}
 
-              <p className="text-sm text-muted-foreground">{trackOpponent ? "Gegner wird mitgetrackt — Spielerdaten sind optional. Leere Felder = KI-Erkennung." : "Optional: Gegnerdaten können ohne Tracking als Spielkontext leer bleiben."}</p>
+              <p className="text-sm text-muted-foreground">{trackOpponent ? "Gegner wird mitgetrackt — Spielerdaten sind optional." : "Optional: Gegnerdaten als Spielkontext."}</p>
 
               <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
                 <span className="text-primary font-bold text-sm">🤖</span>
-                <span><strong>KI-Erkennung aktiv.</strong> Wenn du keine Gegnerdaten einträgst, erkennt die KI automatisch die gegnerischen Spieler anhand von Trikotnummern und Bewegungsmustern. Du kannst die Daten auch nach dem Spiel ergänzen.</span>
+                <span><strong>KI-Erkennung aktiv.</strong> Wenn du keine Gegnerdaten einträgst, erkennt die KI automatisch die gegnerischen Spieler.</span>
               </div>
 
               {!trackOpponent ? (
@@ -563,7 +608,7 @@ export default function NewMatch() {
               </div>
               <div className="glass-card flex items-start gap-2 p-4 text-sm text-muted-foreground">
                 <Camera className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <span>{isTraining ? "1 Kamera reicht für Trainingseinheiten meist aus." : "Empfehlung: 3 Kameras für vollständige Abdeckung des gesamten Spielfelds."}</span>
+                <span>{isTraining ? "1 Kamera reicht für Trainingseinheiten." : "Empfehlung: 3 Kameras für vollständige Abdeckung."}</span>
               </div>
               <div className="rounded-lg bg-muted/50 p-4">
                 <div className="relative aspect-[105/68] rounded border-2 border-primary/20">
