@@ -1,9 +1,11 @@
-import { useState, useRef } from "react";
-import { Sparkles, Loader2, Copy, X, Dumbbell, Activity } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Sparkles, Loader2, Copy, X, Dumbbell, Activity, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/AuthProvider";
+import { useLatestAiReport, useSaveAiReport, useDeleteAiReport } from "@/hooks/use-ai-reports";
 
 const ANALYZE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-performance`;
 
@@ -15,36 +17,87 @@ interface Props {
 }
 
 export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Props) {
-  const [report, setReport] = useState("");
+  const { user } = useAuth();
+  const [streamContent, setStreamContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<"analysis" | "training">("analysis");
   const abortRef = useRef<AbortController | null>(null);
+  const reportIdRef = useRef<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const reportType = mode === "training" ? "training" : type === "team" ? "team" : "analysis";
+  const { data: savedReport, isLoading: loadingReport } = useLatestAiReport(reportType, playerId, matchId);
+  const saveMutation = useSaveAiReport();
+  const deleteMutation = useDeleteAiReport();
+
+  // Show saved report on mount
+  useEffect(() => {
+    if (savedReport && savedReport.content && !isGenerating) {
+      setStreamContent(savedReport.content);
+      setIsOpen(true);
+      setMode(savedReport.report_type === "training" ? "training" : "analysis");
+      reportIdRef.current = savedReport.id;
+    }
+  }, [savedReport?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const clearSaveTimer = useCallback(() => {
+    if (saveTimer.current) {
+      clearInterval(saveTimer.current);
+      saveTimer.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearSaveTimer(), [clearSaveTimer]);
 
   const generate = async (genMode: "analysis" | "training" = "analysis") => {
+    if (!user) { toast.error("Bitte erneut anmelden."); return; }
+
     setIsGenerating(true);
-    setReport("");
+    setStreamContent("");
     setIsOpen(true);
     setMode(genMode);
     abortRef.current = new AbortController();
+    reportIdRef.current = null;
     let soFar = "";
+
+    const rType = genMode === "training" ? "training" : type === "team" ? "team" : "analysis";
+
+    // Create DB record immediately
+    try {
+      const id = await saveMutation.mutateAsync({
+        user_id: user.id,
+        match_id: matchId,
+        player_id: playerId,
+        report_type: rType,
+        content: "",
+        status: "generating",
+      });
+      reportIdRef.current = id;
+    } catch { /* continue even if save fails */ }
+
+    // Periodic save every 3 seconds while streaming
+    clearSaveTimer();
+    saveTimer.current = setInterval(() => {
+      if (reportIdRef.current && soFar) {
+        saveMutation.mutate({
+          id: reportIdRef.current,
+          user_id: user.id,
+          report_type: rType,
+          content: soFar,
+          status: "generating",
+        });
+      }
+    }, 3000);
 
     try {
       const { data } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
-
-      if (!accessToken) {
-        toast.error("Bitte erneut anmelden.");
-        setIsGenerating(false);
-        return;
-      }
+      if (!accessToken) { toast.error("Bitte erneut anmelden."); setIsGenerating(false); clearSaveTimer(); return; }
 
       const resp = await fetch(ANALYZE_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ type: genMode === "training" ? "training" : type, playerId, matchId }),
         signal: abortRef.current.signal,
       });
@@ -55,6 +108,7 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
         else if (resp.status === 402) toast.error("KI-Kontingent erschöpft. Bitte Credits aufladen.");
         else toast.error(err.error || "Analyse fehlgeschlagen");
         setIsGenerating(false);
+        clearSaveTimer();
         return;
       }
 
@@ -80,29 +134,52 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               soFar += content;
-              setReport(soFar);
+              setStreamContent(soFar);
             }
-          } catch {
-            // ignore partial SSE chunks
-          }
+          } catch { /* ignore partial SSE chunks */ }
         }
       }
     } catch (e: any) {
       if (e.name !== "AbortError") toast.error("Analyse fehlgeschlagen");
     } finally {
+      clearSaveTimer();
       setIsGenerating(false);
+      // Final save
+      if (reportIdRef.current && soFar) {
+        saveMutation.mutate({
+          id: reportIdRef.current,
+          user_id: user.id,
+          report_type: rType,
+          content: soFar,
+          status: "complete",
+        });
+      }
     }
   };
 
   const cancel = () => {
     abortRef.current?.abort();
+    clearSaveTimer();
     setIsGenerating(false);
+  };
+
+  const handleDelete = async () => {
+    if (reportIdRef.current) {
+      deleteMutation.mutate(reportIdRef.current);
+    }
+    reportIdRef.current = null;
+    setStreamContent("");
+    setIsOpen(false);
   };
 
   const title = mode === "training" ? "KI-Trainingsplan" : "KI-Leistungsanalyse";
   const subtitle = mode === "training"
     ? "Positionsspezifische Maßnahmen, Belastungssteuerung und konkrete Wochenplanung."
     : "Moderne Leistungsdiagnostik mit Physis, Ballarbeit, Duellen, Offensive und Disziplin.";
+
+  const report = streamContent;
+
+  if (loadingReport) return null;
 
   return (
     <div>
@@ -140,23 +217,23 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
 
             <div className="flex gap-2 shrink-0">
               {isGenerating ? (
-                <Button variant="ghost" size="sm" onClick={cancel}>
+                <Button variant="ghost" size="sm" onClick={cancel} title="Abbrechen">
                   <X className="h-4 w-4" />
                 </Button>
               ) : (
                 <>
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(report);
-                      toast.success("Kopiert!");
-                    }}
+                    variant="ghost" size="sm"
+                    onClick={() => { navigator.clipboard.writeText(report); toast.success("Kopiert!"); }}
                     disabled={!report}
+                    title="Kopieren"
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
+                  <Button variant="ghost" size="sm" onClick={handleDelete} title="Löschen">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} title="Schließen">
                     <X className="h-4 w-4" />
                   </Button>
                 </>
@@ -176,6 +253,13 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
             <div className="relative flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-4 py-4 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               {mode === "training" ? "Generiere strukturierten Trainingsplan..." : "Analysiere Leistungsdaten und Muster..."}
+            </div>
+          )}
+
+          {isGenerating && report && (
+            <div className="relative flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <span>Wird automatisch gespeichert…</span>
             </div>
           )}
 
