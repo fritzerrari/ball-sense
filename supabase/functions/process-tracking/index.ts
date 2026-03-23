@@ -648,6 +648,13 @@ Deno.serve(async (req) => {
     const sortedTracks = [...tracks.entries()].sort((a, b) => b[1].length - a[1].length);
     const trackProfiles = buildTrackProfiles(sortedTracks);
 
+    // Update cameraCount on all profiles when multiple cameras were used
+    if (sessions.length > 1) {
+      for (const tp of trackProfiles) {
+        tp.cameraCount = sessions.length;
+      }
+    }
+
     // 7) Position-based player-to-track assignment
     // Works regardless of shirt numbers: uses position zones, temporal overlap,
     // and team-half heuristics as fallback
