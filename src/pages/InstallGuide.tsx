@@ -69,14 +69,22 @@ export default function InstallGuide() {
           <TrackingWorkflowGuide />
         </section>
 
-        <div className="mt-12 text-center">
-          <p className="mb-4 text-sm text-muted-foreground">Alles bereit? Starte jetzt mit deinem Verein.</p>
-          <Button variant="hero" size="xl" asChild>
-            <Link to="/login">
-              Kostenlos loslegen
-              <ChevronRight className="ml-1 h-5 w-5" />
+        <div className="mt-12 text-center space-y-3">
+          <p className="mb-4 text-sm text-muted-foreground">Du willst noch mehr wissen?</p>
+          <Button variant="outline" size="lg" asChild>
+            <Link to="/guide">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Komplette Anleitung lesen
             </Link>
           </Button>
+          <div className="pt-2">
+            <Button variant="hero" size="xl" asChild>
+              <Link to="/login">
+                Kostenlos loslegen
+                <ChevronRight className="ml-1 h-5 w-5" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     </div>
