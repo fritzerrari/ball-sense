@@ -44,6 +44,8 @@ export default function NewMatch() {
   const [matchPositions, setMatchPositions] = useState<Record<string, string>>({});
   const [trainingPlayers, setTrainingPlayers] = useState<Set<string>>(new Set());
   const [excludedPlayers, setExcludedPlayers] = useState<Set<string>>(new Set());
+  const [squadSize, setSquadSize] = useState(11);
+  const [awaySquadSize, setAwaySquadSize] = useState(11);
   const [guestPlayers, setGuestPlayers] = useState<GuestPlayer[]>(
     Array.from({ length: 11 }, (_, i) => ({ name: "", number: String(i + 1), position: "" })),
   );
