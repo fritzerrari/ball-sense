@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 
-interface AiReport {
+export interface AiReport {
   id: string;
   user_id: string;
   match_id: string | null;
@@ -44,6 +44,50 @@ export function useLatestAiReport(
     },
     enabled: !!user,
     staleTime: 30_000,
+  });
+}
+
+/** Poll a specific report by ID for live status updates */
+export function usePollAiReport(reportId: string | null) {
+  return useQuery<AiReport | null>({
+    queryKey: ["ai_report_poll", reportId],
+    queryFn: async () => {
+      if (!reportId) return null;
+      const { data, error } = await supabase
+        .from("ai_reports" as any)
+        .select("*")
+        .eq("id", reportId)
+        .single();
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: !!reportId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "queued" || status === "generating") return 2000;
+      return false;
+    },
+  });
+}
+
+/** Get queue position for a given report */
+export function useQueuePosition(reportId: string | null, createdAt: string | null) {
+  return useQuery<{ position: number; total: number } | null>({
+    queryKey: ["ai_queue_position", reportId],
+    queryFn: async () => {
+      if (!reportId || !createdAt) return null;
+      const { data } = await supabase
+        .from("ai_reports" as any)
+        .select("id, created_at")
+        .in("status", ["queued", "generating"])
+        .order("created_at", { ascending: true });
+      if (!data) return null;
+      const items = data as any[];
+      const idx = items.findIndex((i: any) => i.id === reportId);
+      return { position: idx === -1 ? items.length : idx + 1, total: items.length };
+    },
+    enabled: !!reportId && !!createdAt,
+    refetchInterval: 3000,
   });
 }
 
