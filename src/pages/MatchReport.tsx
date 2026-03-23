@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
+import { ProcessingRoadmap } from "@/components/ProcessingRoadmap";
 import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
 import { MatchKpiStrip, MatchRadarChart, TopPlayersChart, ComparisonBarChart } from "@/components/MatchCharts";
 import { MatchInsightsPanel } from "@/components/MatchInsightsPanel";
@@ -331,7 +332,7 @@ export default function MatchReport() {
           )}
         </div>
 
-        {match.status === "processing" && <div className="glass-card space-y-3 p-5 glow-border"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div><div><h3 className="text-sm font-semibold font-display">Daten werden verarbeitet</h3><p className="text-xs text-muted-foreground">Die KI analysiert die Tracking-Daten. Dies kann einige Minuten dauern.</p></div></div></div>}
+        {match.status === "processing" && <ProcessingRoadmap uploadCount={uploads?.length ?? 1} />}
         {match.status === "live" && <div className="glass-card flex items-center gap-3 p-4 glow-border"><div className="h-2 w-2 animate-pulse rounded-full bg-primary" /><span className="text-sm font-medium font-display">Live-Tracking läuft</span><span className="ml-auto text-xs text-muted-foreground">Daten werden nach Spielende verfügbar</span></div>}
         {uploads && uploads.length > 0 && match.status !== "processing" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
 
