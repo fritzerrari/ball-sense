@@ -10,7 +10,8 @@ export interface Detection {
   w: number;
   h: number;
   confidence: number;
-  label: string;
+  label: string; // "person" | "ball"
+  team?: "home" | "away";
 }
 
 export interface TrackingFrame {
@@ -21,6 +22,15 @@ export interface TrackingFrame {
 type ProgressCallback = (pct: number) => void;
 type DetectionCallback = (frame: TrackingFrame) => void;
 
+interface StablePlayer {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  team: "home" | "away";
+}
+
 export class FootballTracker {
   private modelLoaded = false;
   private tracking = false;
@@ -29,12 +39,26 @@ export class FootballTracker {
   private intervalId: number | null = null;
   private startTime = 0;
   private videoElement: HTMLVideoElement | null = null;
+  private stablePlayers: StablePlayer[] = [];
+  private ballX = 0.5;
+  private ballY = 0.5;
+  private ballVx = 0.01;
+  private ballVy = 0.005;
+  private homeSquadSize = 11;
+  private awaySquadSize = 0; // 0 = don't track away
+
+  /**
+   * Configure the number of players to simulate.
+   */
+  setSquadSizes(home: number, away: number) {
+    this.homeSquadSize = home;
+    this.awaySquadSize = away;
+  }
 
   /**
    * Load the YOLO model. Currently simulates download progress.
    */
   async loadModel(onProgress?: ProgressCallback): Promise<void> {
-    // Simulate model loading with progress
     for (let i = 0; i <= 100; i += 2) {
       await new Promise(r => setTimeout(r, 30));
       onProgress?.(i);
@@ -58,7 +82,6 @@ export class FootballTracker {
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-      // Lock zoom to 1x to ensure calibration and tracking use identical FOV
       const track = stream.getVideoTracks()[0];
       if (track) {
         try {
@@ -67,7 +90,7 @@ export class FootballTracker {
             await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min } as any] });
           }
         } catch {
-          // zoom constraint not supported — no action needed
+          // zoom constraint not supported
         }
       }
 
@@ -75,12 +98,11 @@ export class FootballTracker {
       await videoElement.play();
     } catch (err) {
       console.warn("Kamera nicht verfügbar, nutze Platzhalter-Modus");
-      // Camera unavailable — tracking page will show placeholder
     }
   }
 
   /**
-   * Load calibration data for a field. Checks localStorage first, then Supabase.
+   * Load calibration data for a field.
    */
   async loadCalibration(fieldId: string): Promise<any | null> {
     const cached = localStorage.getItem(`calibration_${fieldId}`);
@@ -90,8 +112,79 @@ export class FootballTracker {
     return null;
   }
 
+  private initStablePlayers() {
+    this.stablePlayers = [];
+    let id = 0;
+
+    // Home team — lower half (y: 0.1–0.5)
+    for (let i = 0; i < this.homeSquadSize; i++) {
+      this.stablePlayers.push({
+        id: id++,
+        x: 0.1 + (i / Math.max(1, this.homeSquadSize - 1)) * 0.8,
+        y: 0.15 + Math.random() * 0.3,
+        vx: (Math.random() - 0.5) * 0.008,
+        vy: (Math.random() - 0.5) * 0.005,
+        team: "home",
+      });
+    }
+
+    // Away team — upper half (y: 0.5–0.9)
+    for (let i = 0; i < this.awaySquadSize; i++) {
+      this.stablePlayers.push({
+        id: id++,
+        x: 0.1 + (i / Math.max(1, this.awaySquadSize - 1)) * 0.8,
+        y: 0.55 + Math.random() * 0.3,
+        vx: (Math.random() - 0.5) * 0.008,
+        vy: (Math.random() - 0.5) * 0.005,
+        team: "away",
+      });
+    }
+
+    // Init ball
+    this.ballX = 0.5;
+    this.ballY = 0.5;
+    this.ballVx = (Math.random() - 0.5) * 0.02;
+    this.ballVy = (Math.random() - 0.5) * 0.015;
+  }
+
+  private updateStablePlayers() {
+    for (const p of this.stablePlayers) {
+      // Small random walk with drift
+      p.vx += (Math.random() - 0.5) * 0.004;
+      p.vy += (Math.random() - 0.5) * 0.003;
+      // Dampen velocity
+      p.vx *= 0.92;
+      p.vy *= 0.92;
+      // Clamp speed
+      const maxV = 0.015;
+      p.vx = Math.max(-maxV, Math.min(maxV, p.vx));
+      p.vy = Math.max(-maxV, Math.min(maxV, p.vy));
+
+      p.x += p.vx;
+      p.y += p.vy;
+
+      // Bounce off edges
+      if (p.x < 0.05) { p.x = 0.05; p.vx = Math.abs(p.vx); }
+      if (p.x > 0.95) { p.x = 0.95; p.vx = -Math.abs(p.vx); }
+      if (p.y < 0.05) { p.y = 0.05; p.vy = Math.abs(p.vy); }
+      if (p.y > 0.95) { p.y = 0.95; p.vy = -Math.abs(p.vy); }
+    }
+
+    // Update ball
+    this.ballVx += (Math.random() - 0.5) * 0.006;
+    this.ballVy += (Math.random() - 0.5) * 0.006;
+    this.ballVx *= 0.9;
+    this.ballVy *= 0.9;
+    this.ballX += this.ballVx;
+    this.ballY += this.ballVy;
+    if (this.ballX < 0.02 || this.ballX > 0.98) this.ballVx *= -1;
+    if (this.ballY < 0.02 || this.ballY > 0.98) this.ballVy *= -1;
+    this.ballX = Math.max(0.02, Math.min(0.98, this.ballX));
+    this.ballY = Math.max(0.02, Math.min(0.98, this.ballY));
+  }
+
   /**
-   * Start tracking loop. Currently generates mock detections.
+   * Start tracking loop with realistic mock detections.
    */
   startTracking(canvasElement: HTMLCanvasElement | null, matchId: string, onDetections?: DetectionCallback): void {
     if (!this.modelLoaded) throw new Error("Modell nicht geladen");
@@ -99,28 +192,41 @@ export class FootballTracker {
     this.paused = false;
     this.startTime = Date.now();
     this.frames = [];
+    this.initStablePlayers();
 
     const loop = () => {
       if (!this.tracking) return;
       if (!this.paused) {
+        this.updateStablePlayers();
         const now = Date.now();
-        const numPlayers = 10 + Math.floor(Math.random() * 12);
-        const detections: Detection[] = Array.from({ length: numPlayers }, (_, i) => ({
-          id: i,
-          x: 0.1 + Math.random() * 0.8,
-          y: 0.1 + Math.random() * 0.8,
-          w: 0.02 + Math.random() * 0.01,
-          h: 0.04 + Math.random() * 0.02,
-          confidence: 0.7 + Math.random() * 0.3,
+
+        const detections: Detection[] = this.stablePlayers.map(p => ({
+          id: p.id,
+          x: p.x,
+          y: p.y,
+          w: 0.02 + Math.random() * 0.005,
+          h: 0.04 + Math.random() * 0.01,
+          confidence: 0.75 + Math.random() * 0.25,
           label: "person",
+          team: p.team,
         }));
+
+        // Add ball detection
+        detections.push({
+          id: 999,
+          x: this.ballX,
+          y: this.ballY,
+          w: 0.01,
+          h: 0.01,
+          confidence: 0.6 + Math.random() * 0.3,
+          label: "ball",
+        });
 
         const frame: TrackingFrame = { timestamp: now - this.startTime, detections };
         this.frames.push(frame);
         onDetections?.(frame);
       }
     };
-    // Run at ~2fps for stub — use only setInterval, no rAF to avoid memory leak
     this.intervalId = window.setInterval(loop, 500);
   }
 
@@ -139,7 +245,6 @@ export class FootballTracker {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    // Stop camera
     if (this.videoElement?.srcObject) {
       const stream = this.videoElement.srcObject as MediaStream;
       stream.getTracks().forEach(t => t.stop());
@@ -165,9 +270,9 @@ export class FootballTracker {
   }
 
   /**
-   * Upload tracking session data to Supabase storage.
+   * Upload tracking session data to storage.
    * Uses XMLHttpRequest for real upload progress reporting.
-   * Includes retry logic (up to 3 attempts) and timeout (60s per attempt).
+   * Includes retry logic (up to 5 attempts) and timeout (120s per attempt).
    */
   async uploadMatch(
     matchId: string,
@@ -176,7 +281,6 @@ export class FootballTracker {
     supabaseAnonKey: string,
     onProgress?: (stage: string, pct: number) => void,
   ): Promise<{ filePath: string; framesCount: number; durationSec: number }> {
-    // Stage 1: Prepare & compress data
     onProgress?.("compress", 0);
     const sessionData = {
       matchId,
@@ -197,10 +301,9 @@ export class FootballTracker {
     const filePath = `tracking/${objectPath}`;
     const uploadUrl = `${supabaseUrl}/storage/v1/object/tracking/${objectPath}`;
 
-    // Stage 2: Upload with retry
     onProgress?.("upload", 0);
-    const MAX_RETRIES = 3;
-    const TIMEOUT_MS = 60_000;
+    const MAX_RETRIES = 5;
+    const TIMEOUT_MS = 120_000;
     let lastError: Error | null = null;
     let uploaded = false;
 
@@ -230,7 +333,7 @@ export class FootballTracker {
           };
 
           xhr.onerror = () => reject(new Error("Netzwerkfehler beim Upload"));
-          xhr.ontimeout = () => reject(new Error("Upload-Timeout (60s)"));
+          xhr.ontimeout = () => reject(new Error("Upload-Timeout (120s)"));
 
           xhr.send(blob);
         });
@@ -241,19 +344,16 @@ export class FootballTracker {
         lastError = err as Error;
         console.warn(`[Tracker] Upload Versuch ${attempt}/${MAX_RETRIES} fehlgeschlagen:`, lastError.message);
         if (attempt < MAX_RETRIES) {
-          // Exponential backoff: 1s, 2s
-          await new Promise(r => setTimeout(r, attempt * 1000));
-          onProgress?.("upload", 0); // Reset progress for retry
+          await new Promise(r => setTimeout(r, attempt * 1500));
+          onProgress?.("upload", 0);
         }
       }
     }
 
     if (!uploaded) {
-      // Fallback: Save locally for later retry
       console.warn("[Tracker] Alle Upload-Versuche fehlgeschlagen, lokaler Fallback");
       try {
         localStorage.setItem(`tracking_${matchId}_cam${cameraIndex}`, jsonString);
-        // Also save metadata for retry UI
         const pendingUploads = JSON.parse(localStorage.getItem("pending_uploads") ?? "[]");
         pendingUploads.push({
           matchId,
