@@ -475,38 +475,38 @@ export default function TrackingPage() {
       />
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
-        {/* Stepper */}
-        {(phase === "loading" || phase === "camera" || phase === "calibration") && (
-          <div className="w-full max-w-sm mb-6">
-            <div className="flex items-center gap-2">
-              {[
-                { key: "loading", label: "KI laden" },
-                { key: "camera", label: "Kamera" },
-                { key: "calibration", label: "Kalibrierung" },
-              ].map((step, i, arr) => {
-                const steps = arr.map(s => s.key);
-                const currentIdx = steps.indexOf(phase);
-                const stepIdx = i;
-                const isDone = stepIdx < currentIdx;
-                const isActive = stepIdx === currentIdx;
-                return (
-                  <div key={step.key} className="flex items-center gap-2 flex-1">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
-                      isDone ? "bg-primary text-primary-foreground" : isActive ? "bg-primary/20 text-primary border-2 border-primary" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                    </div>
-                    <span className={`text-xs font-medium hidden sm:inline ${isActive ? "text-foreground" : "text-muted-foreground"}`}>{step.label}</span>
-                    {i < arr.length - 1 && <div className={`flex-1 h-0.5 rounded ${isDone ? "bg-primary" : "bg-muted"}`} />}
+        {/* Stepper — visible for all phases */}
+        <div className="w-full max-w-lg mb-6">
+          <div className="flex items-center gap-1">
+            {[
+              { key: "loading", label: "KI laden" },
+              { key: "camera", label: "Kamera" },
+              { key: "calibration", label: "Kalibrierung" },
+              { key: "tracking", label: "Tracking" },
+              { key: "ended", label: "Upload" },
+            ].map((step, i, arr) => {
+              const steps = arr.map(s => s.key);
+              const currentIdx = steps.indexOf(phase);
+              const stepIdx = i;
+              const isDone = stepIdx < currentIdx;
+              const isActive = stepIdx === currentIdx;
+              return (
+                <div key={step.key} className="flex items-center gap-1 flex-1">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
+                    isDone ? "bg-primary text-primary-foreground" : isActive ? "bg-primary/20 text-primary border-2 border-primary" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
                   </div>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground text-center mt-3">
-              Schritt {["loading", "camera", "calibration"].indexOf(phase) + 1} von 3
-            </p>
+                  <span className={`text-[10px] font-medium hidden sm:inline truncate ${isActive ? "text-foreground" : "text-muted-foreground"}`}>{step.label}</span>
+                  {i < arr.length - 1 && <div className={`flex-1 h-0.5 rounded min-w-[8px] ${isDone ? "bg-primary" : "bg-muted"}`} />}
+                </div>
+              );
+            })}
           </div>
-        )}
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            Schritt {["loading", "camera", "calibration", "tracking", "ended"].indexOf(phase) + 1} von 5
+          </p>
+        </div>
 
         {/* Phase: Loading */}
         {phase === "loading" && (
