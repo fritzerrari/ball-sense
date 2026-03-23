@@ -6,7 +6,8 @@ import { Camera, Pause, Play, Users, RefreshCw, Flag, Timer, Loader2, Upload, Al
 import { LiveEventTicker } from "@/components/LiveEventTicker";
 import { useMatch, useMatchEvents, useMatchLineups, useUpdateMatch } from "@/hooks/use-matches";
 import { useField } from "@/hooks/use-fields";
-import { FootballTracker } from "@/lib/football-tracker";
+import { FootballTracker, type Detection } from "@/lib/football-tracker";
+import { TrackingOverlay } from "@/components/TrackingOverlay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
