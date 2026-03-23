@@ -441,6 +441,9 @@ export default function CameraTrackingPage() {
                 <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleStartTracking}>
                   Tracking starten <ChevronRight className="ml-2 h-5 w-5" />
                 </Button>
+                <Button variant="outline" size="lg" className="w-full" onClick={handleLiveSnapshot}>
+                  <Camera className="mr-2 h-4 w-4" /> Neu kalibrieren
+                </Button>
               </>
             ) : (
               <>
