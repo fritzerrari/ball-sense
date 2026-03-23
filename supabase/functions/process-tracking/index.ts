@@ -753,6 +753,59 @@ Deno.serve(async (req) => {
       `[process-tracking] Assigned ${playerStats.length} players, ${unassignedTracks.length} unassigned (${likelyOfficials.length} likely officials)`
     );
 
+    // ── KI Position Inference ──
+    // For players without a known position, infer from their track centroid
+    // and write back to the players table
+    const positionInferences: { playerId: string; inferredPosition: string }[] = [];
+    for (const ps of playerStats) {
+      if (!ps.player_id) continue;
+      const existingPos = playerPositions[ps.player_id];
+      if (existingPos) continue; // already has a position
+
+      // Find the assigned track for this player
+      const assignedIdx = [...usedTrackIndices].find((idx) => {
+        const tc = trackProfiles[idx];
+        return tc && ps.stats.positions_raw.length > 0 &&
+          Math.abs(tc.cx - ps.stats.positions_raw.reduce((s, p) => s + p.x, 0) / ps.stats.positions_raw.length) < 0.01;
+      });
+
+      if (assignedIdx === undefined) continue;
+      const tc = trackProfiles[assignedIdx];
+
+      // Determine closest position zone based on centroid
+      // Adjust for team: away team has mirrored Y
+      const cx = tc.cx;
+      const cy = ps.team === "away" ? 1 - tc.cy : tc.cy;
+
+      let bestPos = "ZM";
+      let bestDist = Infinity;
+      for (const [pos, zone] of Object.entries(POSITION_ZONES)) {
+        const d = Math.sqrt((cx - zone.x) ** 2 + (cy - zone.y) ** 2);
+        if (d < bestDist) {
+          bestDist = d;
+          bestPos = pos;
+        }
+      }
+
+      positionInferences.push({ playerId: ps.player_id, inferredPosition: bestPos });
+      console.log(`[process-tracking] KI-Inference: ${ps.player_name} → ${bestPos} (dist=${bestDist.toFixed(3)})`);
+    }
+
+    // Write inferred positions back to players table
+    for (const inf of positionInferences) {
+      const { error: posErr } = await supabase
+        .from("players")
+        .update({ position: inf.inferredPosition })
+        .eq("id", inf.playerId)
+        .is("position", null); // only if still null
+      if (posErr) {
+        console.log(`[process-tracking] Could not update position for ${inf.playerId}:`, posErr.message);
+      }
+    }
+    if (positionInferences.length > 0) {
+      console.log(`[process-tracking] Inferred positions for ${positionInferences.length} players`);
+    }
+
     // 8) Replace player_match_stats
     await supabase.from("player_match_stats").delete().eq("match_id", matchId);
 

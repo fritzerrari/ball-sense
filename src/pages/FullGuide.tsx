@@ -125,25 +125,37 @@ const sections: GuideSection[] = [
     ),
   },
 
-  /* ===== 4  TRIKOTNUMMERN ===== */
+  /* ===== 4  POSITIONEN & TRIKOTNUMMERN ===== */
   {
     id: "no-jersey-numbers",
     icon: <Shirt className="h-5 w-5" />,
-    title: "Spielererkennung ohne Trikotnummern",
+    title: "Spielererkennung ohne Positionen & Trikotnummern",
     content: (
       <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
         <p>
-          <strong>Trikotnummern sind komplett optional.</strong> Die KI nutzt mehrere Methoden zur Spielererkennung:
+          <strong>Sowohl Positionen als auch Trikotnummern sind komplett optional.</strong> Die KI nutzt mehrere Methoden zur Spielererkennung:
         </p>
+        <h4 className="font-semibold text-foreground mt-2">Wenn du die Positionen nicht kennst:</h4>
         <ol className="list-decimal pl-5 space-y-2">
-          <li><strong>Positionsbasierte Zuordnung:</strong> Vor dem Spiel ordnest du jedem Spieler eine Startposition zu (z.B. LV, IV, ZM, ST). Die KI nutzt die Startpositionen als Ausgangspunkt und verfolgt die Bewegungen der Spieler relativ zueinander.</li>
-          <li><strong>Bewegungsmuster:</strong> Jeder Spieler hat ein einzigartiges Bewegungsmuster – die KI lernt diese über die Spielzeit und kann Spieler zunehmend sicherer zuordnen.</li>
-          <li><strong>Räumliche Konsistenz:</strong> Spieler, die nah beieinander starten, werden über die gesamte Spielzeit konsistent verfolgt.</li>
-          <li><strong>Multi-Kamera-Bonus:</strong> Bei 2–3 Kameras steigt die Zuordnungs-Konfidenz deutlich, da die KI den gleichen Spieler aus verschiedenen Blickwinkeln erkennt.</li>
+          <li>Wähle in der Aufstellung bei der Position einfach <strong>„Auto (KI)"</strong> – das ist die Standardeinstellung.</li>
+          <li>Die KI ordnet den Spieler basierend auf seiner <strong>Team-Hälfte</strong> (Heim unten, Gast oben) einem Track zu.</li>
+          <li><strong>Nach dem Spiel</strong> analysiert die KI die Bewegungsmuster jedes Spielers und erkennt automatisch, ob er sich wie ein Torwart, Verteidiger, Mittelfeldspieler oder Stürmer bewegt hat.</li>
+          <li>Die erkannte Position wird <strong>automatisch im Spielerprofil gespeichert</strong> – beim nächsten Spiel steht sie dann schon bereit.</li>
         </ol>
-        <p className="rounded-lg bg-primary/5 p-3 text-xs mt-3">
-          <strong>💡 Best Practice:</strong> Auch wenn Trikotnummern optional sind – wenn dein Team einheitliche Nummern trägt, gib sie ein. Das erhöht die Erkennungsgenauigkeit auf 95%+.
-        </p>
+        <h4 className="font-semibold text-foreground mt-3">Erkennungsmethoden der KI:</h4>
+        <ol className="list-decimal pl-5 space-y-2">
+          <li><strong>Positionsbasierte Zuordnung:</strong> Wenn eine Position gesetzt ist, nutzt die KI die taktischen Zonen als Ausgangspunkt.</li>
+          <li><strong>Team-Hälfte:</strong> Ohne Position wird die Team-Hälfte als grober Anhaltspunkt genutzt (Heim: untere Hälfte, Gast: obere Hälfte).</li>
+          <li><strong>Bewegungsmuster:</strong> Nach dem Spiel analysiert die KI den Schwerpunkt der Bewegung (Centroid) und ordnet eine Position zu.</li>
+          <li><strong>Räumliche Konsistenz:</strong> Spieler werden über die gesamte Spielzeit konsistent verfolgt.</li>
+          <li><strong>Multi-Kamera-Bonus:</strong> Bei 2–3 Kameras steigt die Zuordnungs-Konfidenz, da die KI den gleichen Spieler aus verschiedenen Blickwinkeln erkennt.</li>
+        </ol>
+        <div className="rounded-lg bg-primary/5 p-3 text-xs mt-3">
+          <strong>💡 Praxis-Tipp:</strong> Selbst wenn du gar keine Positionen und keine Trikotnummern einträgst, funktioniert das Tracking. Die Genauigkeit ist dann etwas niedriger (~70–80%), aber nach 2–3 Spielen hat die KI alle Positionen automatisch erkannt und die Genauigkeit steigt auf 90%+.
+        </div>
+        <div className="rounded-lg bg-primary/5 p-3 text-xs mt-2">
+          <strong>💡 Best Practice:</strong> Wenn du grob weißt, wer Torwart und wer Stürmer ist – trage wenigstens diese ein. Für den Rest reicht „Auto (KI)".
+        </div>
       </div>
     ),
   },

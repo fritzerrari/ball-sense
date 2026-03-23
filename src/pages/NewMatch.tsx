@@ -17,6 +17,12 @@ interface GuestPlayer {
   position: string;
 }
 
+const MATCH_POSITIONS = [
+  "", "TW", "IV", "LV", "RV", "LIV", "RIV",
+  "ZDM", "ZM", "LM", "RM", "ZOM",
+  "LA", "RA", "ST", "HS",
+];
+
 export default function NewMatch() {
   const navigate = useNavigate();
   const { clubName } = useAuth();
@@ -35,6 +41,7 @@ export default function NewMatch() {
   const [homeStarters, setHomeStarters] = useState<Set<string>>(new Set());
   const [homeBench, setHomeBench] = useState<Set<string>>(new Set());
   const [shirtNumbers, setShirtNumbers] = useState<Record<string, number>>({});
+  const [matchPositions, setMatchPositions] = useState<Record<string, string>>({});
   const [trainingPlayers, setTrainingPlayers] = useState<Set<string>>(new Set());
   const [excludedPlayers, setExcludedPlayers] = useState<Set<string>>(new Set());
   const [guestPlayers, setGuestPlayers] = useState<GuestPlayer[]>(
@@ -400,12 +407,17 @@ export default function NewMatch() {
                 <Users className="h-5 w-5 text-primary" /> Aufstellung Heim
               </h2>
               <p className="text-sm text-muted-foreground">Startelf: {homeStarters.size}/11 · Bank: {homeBench.size}/7 · Ausgewählt: {selectedHomeCount}</p>
+              <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
+                <span className="text-primary font-bold text-sm">💡</span>
+                <span><strong>Positionen sind optional.</strong> Falls du die Position eines Spielers nicht kennst, lass das Feld leer – die KI erkennt die Position automatisch anhand der Bewegungsmuster nach dem Spiel und trägt sie ein.</span>
+              </div>
               <div className="space-y-2 max-h-[420px] overflow-y-auto">
                 {activePlayers.map((player) => {
                   const isStarter = homeStarters.has(player.id);
                   const isBench = homeBench.has(player.id);
                   const isSelected = isStarter || isBench;
                   const isExcluded = excludedPlayers.has(player.id);
+                  const currentPos = matchPositions[player.id] ?? player.position ?? "";
                   return (
                     <div key={player.id} className={`rounded-lg border p-3 ${isStarter ? "border-primary/30 bg-primary/5" : isBench ? "border-border bg-muted/30" : "border-border/50"}`}>
                       <div className="flex items-center gap-3">
@@ -414,7 +426,18 @@ export default function NewMatch() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium">{player.name}</div>
-                          <div className="text-xs text-muted-foreground">{player.position ?? "—"}</div>
+                          {isSelected ? (
+                            <select
+                              value={currentPos}
+                              onChange={(e) => setMatchPositions({ ...matchPositions, [player.id]: e.target.value })}
+                              className="mt-0.5 w-20 rounded border border-border/50 bg-transparent px-1 py-0.5 text-[10px] text-muted-foreground outline-none"
+                            >
+                              <option value="">Auto (KI)</option>
+                              {MATCH_POSITIONS.filter(p => p).map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">{player.position || "Keine Position"}</div>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           <button onClick={() => toggleStarter(player.id)} className={`rounded px-2.5 py-1 text-xs font-medium transition-all ${isStarter ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>Start</button>
