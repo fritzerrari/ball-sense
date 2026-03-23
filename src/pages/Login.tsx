@@ -32,8 +32,20 @@ export default function Login() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const isMobile = useIsMobile();
   const redirectTarget = searchParams.get("redirect") || "/dashboard";
-  const initialMode = searchParams.get("mode") === "camera" ? "camera" as LoginMode : "login" as LoginMode;
+
+  const initialMode = useMemo(() => {
+    const paramMode = searchParams.get("mode");
+    if (paramMode === "camera") return "camera" as LoginMode;
+    if (paramMode === "login" || paramMode === "register") return paramMode as LoginMode;
+    // On mobile or PWA standalone → default to camera code entry
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+      || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (isMobile || isStandalone) return "camera" as LoginMode;
+    return "login" as LoginMode;
+  }, []);
+
   const [mode, setMode] = useState<LoginMode>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
