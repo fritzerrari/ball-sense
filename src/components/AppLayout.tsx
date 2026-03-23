@@ -162,7 +162,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="min-h-screen pb-24 md:pb-0">
+      <main className="min-h-[100dvh] pb-28 md:pb-0">
         <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
           <div className="flex h-16 items-center gap-4 px-4 md:px-6">
             <div className="min-w-0 md:hidden">
@@ -183,8 +183,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <MobileInstallFab />
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur md:hidden">
-        <div className="grid grid-cols-5 px-2 py-2">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden">
+        <div className="grid grid-cols-5 px-2 py-2 safe-area-pad">
           {mobileItems.map((item) => (
             <Link
               key={item.href}
