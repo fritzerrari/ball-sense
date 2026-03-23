@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Camera, Check, Flag, Loader2, LockKeyhole, Upload } from "lucide-react";
+import { Camera, Check, CheckCircle2, Flag, Loader2, LockKeyhole, Upload, Users, ShieldCheck } from "lucide-react";
 import { FootballTracker } from "@/lib/football-tracker";
 import { toast } from "sonner";
 
