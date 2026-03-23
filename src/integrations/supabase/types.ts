@@ -865,6 +865,7 @@ export type Database = {
           kickoff: string | null
           match_type: string
           opponent_consent_confirmed: boolean
+          processing_progress: Json | null
           status: string
           track_opponent: boolean
         }
@@ -883,6 +884,7 @@ export type Database = {
           kickoff?: string | null
           match_type?: string
           opponent_consent_confirmed?: boolean
+          processing_progress?: Json | null
           status?: string
           track_opponent?: boolean
         }
@@ -901,6 +903,7 @@ export type Database = {
           kickoff?: string | null
           match_type?: string
           opponent_consent_confirmed?: boolean
+          processing_progress?: Json | null
           status?: string
           track_opponent?: boolean
         }

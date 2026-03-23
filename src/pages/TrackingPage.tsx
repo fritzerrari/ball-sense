@@ -6,7 +6,8 @@ import { Camera, Pause, Play, Users, RefreshCw, Flag, Timer, Loader2, Upload, Al
 import { LiveEventTicker } from "@/components/LiveEventTicker";
 import { useMatch, useMatchEvents, useMatchLineups, useUpdateMatch } from "@/hooks/use-matches";
 import { useField } from "@/hooks/use-fields";
-import { FootballTracker } from "@/lib/football-tracker";
+import { FootballTracker, type Detection } from "@/lib/football-tracker";
+import { TrackingOverlay } from "@/components/TrackingOverlay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,6 +32,7 @@ export default function TrackingPage() {
   const [paused, setPaused] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [detections, setDetections] = useState(0);
+  const [currentDetections, setCurrentDetections] = useState<Detection[]>([]);
   const [quality, setQuality] = useState<"Gut" | "Mittel" | "Schlecht">("Gut");
   const [subModalOpen, setSubModalOpen] = useState(false);
   const [subMinute, setSubMinute] = useState("");
@@ -195,8 +197,10 @@ export default function TrackingPage() {
   const handleStartTracking = () => {
     if (!trackerRef.current) return;
     trackerRef.current.startTracking(null, id ?? "", (frame) => {
-      setDetections(frame.detections.length);
-      setQuality(frame.detections.length >= 15 ? "Gut" : frame.detections.length >= 8 ? "Mittel" : "Schlecht");
+      setCurrentDetections(frame.detections);
+      const pCount = frame.detections.filter(d => d.label === "person").length;
+      setDetections(pCount);
+      setQuality(pCount >= 15 ? "Gut" : pCount >= 8 ? "Mittel" : "Schlecht");
     });
     setPhase("tracking");
     if (id) updateMatch.mutate({ id, status: "live" });
@@ -590,6 +594,7 @@ export default function TrackingPage() {
             {/* Camera preview */}
             <div className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden">
               <video ref={trackingVideoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+              <TrackingOverlay detections={currentDetections} />
               {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
                   <Camera className="h-12 w-12" />
