@@ -30,6 +30,7 @@ const Assistant = lazy(() => import("./pages/Assistant"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 const InstallGuide = lazy(() => import("./pages/InstallGuide"));
+const FullGuide = lazy(() => import("./pages/FullGuide"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +78,7 @@ const App = () => (
                 <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/install" element={<InstallGuide />} />
+                <Route path="/guide" element={<FullGuide />} />
                 <Route path="/legal/:slug" element={<LegalPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
