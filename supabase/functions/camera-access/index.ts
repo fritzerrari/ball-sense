@@ -24,31 +24,94 @@ function isValidCameraIndex(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 2;
 }
 
+function jsonResp(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const body = await req.json();
-    const { action, matchId, cameraIndex } = body ?? {};
+    const { action } = body ?? {};
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // ── New: lookup action — find active match by code only (no matchId needed) ──
+    if (action === "lookup") {
+      const code = String(body.code ?? "").trim();
+      if (!CODE_REGEX.test(code)) {
+        return jsonResp({ error: "Code muss 6-stellig sein" }, 400);
+      }
+
+      const codeHash = await sha256(code);
+
+      // Find the active access code
+      const { data: accessCode } = await supabase
+        .from("camera_access_codes")
+        .select("id, club_id")
+        .eq("code_hash", codeHash)
+        .eq("active", true)
+        .maybeSingle();
+
+      if (!accessCode) {
+        return jsonResp({ error: "Code ungültig oder deaktiviert" }, 401);
+      }
+
+      // Find the most recent match for this club that is not 'completed'
+      const { data: matches } = await supabase
+        .from("matches")
+        .select("id, date, kickoff, away_club_name, status")
+        .eq("home_club_id", accessCode.club_id)
+        .in("status", ["setup", "live", "ready"])
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (!matches || matches.length === 0) {
+        return jsonResp({ error: "Kein aktives Spiel gefunden. Bitte den Trainer kontaktieren." }, 404);
+      }
+
+      const match = matches[0];
+
+      // Create session for camera 0 by default
+      const cameraIndex = 0;
+      const sessionToken = createToken();
+      const sessionHash = await sha256(sessionToken);
+      const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+
+      await supabase.from("camera_access_sessions").insert({
+        code_id: accessCode.id,
+        club_id: accessCode.club_id,
+        match_id: match.id,
+        camera_index: cameraIndex,
+        session_token_hash: sessionHash,
+        expires_at: expiresAt,
+      });
+
+      await supabase.from("camera_access_codes").update({ last_used_at: new Date().toISOString() }).eq("id", accessCode.id);
+
+      return jsonResp({ sessionToken, expiresAt, matchId: match.id, cameraIndex, match });
+    }
+
+    // ── Existing actions require matchId + cameraIndex ──
+    const { matchId, cameraIndex } = body ?? {};
 
     if (!UUID_REGEX.test(matchId ?? "")) {
-      return new Response(JSON.stringify({ error: "Ungültige Match-ID" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return jsonResp({ error: "Ungültige Match-ID" }, 400);
     }
     if (!isValidCameraIndex(cameraIndex)) {
-      return new Response(JSON.stringify({ error: "Ungültige Kamera" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return jsonResp({ error: "Ungültige Kamera" }, 400);
     }
-
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     if (action === "login") {
       const code = String(body.code ?? "").trim();
       if (!CODE_REGEX.test(code)) {
-        return new Response(JSON.stringify({ error: "Code muss 6-stellig sein" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return jsonResp({ error: "Code muss 6-stellig sein" }, 400);
       }
 
       const { data: match } = await supabase.from("matches").select("id, home_club_id").eq("id", matchId).single();
       if (!match?.home_club_id) {
-        return new Response(JSON.stringify({ error: "Spiel nicht gefunden" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return jsonResp({ error: "Spiel nicht gefunden" }, 404);
       }
 
       const codeHash = await sha256(code);
@@ -61,7 +124,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!accessCode) {
-        return new Response(JSON.stringify({ error: "Code ungültig oder deaktiviert" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return jsonResp({ error: "Code ungültig oder deaktiviert" }, 401);
       }
 
       const sessionToken = createToken();
@@ -79,13 +142,13 @@ serve(async (req) => {
 
       await supabase.from("camera_access_codes").update({ last_used_at: new Date().toISOString() }).eq("id", accessCode.id);
 
-      return new Response(JSON.stringify({ sessionToken, expiresAt }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return jsonResp({ sessionToken, expiresAt });
     }
 
     if (action === "session") {
       const sessionToken = String(body.sessionToken ?? "").trim();
       if (sessionToken.length < 20) {
-        return new Response(JSON.stringify({ error: "Ungültige Session" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return jsonResp({ error: "Ungültige Session" }, 401);
       }
 
       const sessionHash = await sha256(sessionToken);
@@ -99,7 +162,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!session) {
-        return new Response(JSON.stringify({ error: "Session abgelaufen oder ungültig" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return jsonResp({ error: "Session abgelaufen oder ungültig" }, 401);
       }
 
       await supabase.from("camera_access_sessions").update({ last_used_at: new Date().toISOString() }).eq("id", session.id);
@@ -110,12 +173,12 @@ serve(async (req) => {
         .eq("id", matchId)
         .single();
 
-      return new Response(JSON.stringify({ match }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return jsonResp({ match });
     }
 
-    return new Response(JSON.stringify({ error: "Ungültige Aktion" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return jsonResp({ error: "Ungültige Aktion" }, 400);
   } catch (error) {
     console.error("camera-access error", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unbekannter Fehler" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return jsonResp({ error: error instanceof Error ? error.message : "Unbekannter Fehler" }, 500);
   }
 });
