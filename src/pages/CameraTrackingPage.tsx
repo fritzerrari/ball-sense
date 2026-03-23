@@ -509,14 +509,31 @@ export default function CameraTrackingPage() {
               </div>
             )}
 
-            <Button
-              variant="destructive"
-              size="xl"
-              className="w-full min-h-[56px]"
-              onClick={handleEnd}
-            >
-              <Flag className="mr-2 h-5 w-5" /> Tracking beenden
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="lg"
+                className="flex-1"
+                onClick={() => {
+                  trackerRef.current?.stopTracking();
+                  setDetectionConfirmed(false);
+                  setPeakDetections(0);
+                  setDetections(0);
+                  setElapsedSec(0);
+                  setPhase("calibration");
+                }}
+              >
+                <Camera className="mr-2 h-4 w-4" /> Neu kalibrieren
+              </Button>
+              <Button
+                variant="destructive"
+                size="lg"
+                className="flex-1"
+                onClick={handleEnd}
+              >
+                <Flag className="mr-2 h-4 w-4" /> Beenden
+              </Button>
+            </div>
           </div>
         )}
 
