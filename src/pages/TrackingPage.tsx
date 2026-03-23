@@ -197,8 +197,10 @@ export default function TrackingPage() {
   const handleStartTracking = () => {
     if (!trackerRef.current) return;
     trackerRef.current.startTracking(null, id ?? "", (frame) => {
-      setDetections(frame.detections.length);
-      setQuality(frame.detections.length >= 15 ? "Gut" : frame.detections.length >= 8 ? "Mittel" : "Schlecht");
+      setCurrentDetections(frame.detections);
+      const pCount = frame.detections.filter(d => d.label === "person").length;
+      setDetections(pCount);
+      setQuality(pCount >= 15 ? "Gut" : pCount >= 8 ? "Mittel" : "Schlecht");
     });
     setPhase("tracking");
     if (id) updateMatch.mutate({ id, status: "live" });
