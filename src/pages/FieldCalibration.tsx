@@ -97,6 +97,7 @@ export default function FieldCalibration() {
   const cornerLabels = ["Links-Oben", "Rechts-Oben", "Rechts-Unten", "Links-Unten"];
   const canSave = points.length === 4;
   const returnTo = searchParams.get("returnTo");
+  const fromSnapshot = searchParams.get("fromSnapshot") === "1";
   const backHref = returnTo || "/fields";
   const backLabel = returnTo ? "Zurück zum Tracking" : "Zurück zu Plätze";
   const saveLabel = returnTo ? "Speichern & weiter" : "Kalibrierung speichern";
@@ -107,6 +108,22 @@ export default function FieldCalibration() {
       setHeight(String(field.height_m));
     }
   }, [field]);
+
+  // Auto-load snapshot from live camera if available
+  useEffect(() => {
+    if (fromSnapshot) {
+      const snapshot = sessionStorage.getItem("calibration_snapshot");
+      if (snapshot) {
+        sessionStorage.removeItem("calibration_snapshot");
+        setImageUrl(snapshot);
+        // Create a File object for auto-detect compatibility
+        fetch(snapshot)
+          .then((res) => res.blob())
+          .then((blob) => setImageFile(new File([blob], "live-snapshot.jpg", { type: "image/jpeg" })));
+        toast.success("Live-Kamerabild geladen – setze jetzt die 4 Eckpunkte.");
+      }
+    }
+  }, [fromSnapshot]);
 
   const resetLayoutSuggestion = useCallback(() => {
     setLayoutSuggestion(EMPTY_LAYOUT_SUGGESTION);
