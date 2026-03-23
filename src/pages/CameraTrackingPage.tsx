@@ -233,7 +233,26 @@ export default function CameraTrackingPage() {
         {phase === "tracking" && (
           <div className="rounded-2xl border border-border bg-card/60 p-5 text-center space-y-4">
             <div className="font-display text-5xl font-bold text-primary">{formatTime(elapsedSec)}</div>
-            <p className="text-sm text-muted-foreground">{detections} Spieler erkannt</p>
+
+            {/* Detection confirmation banner */}
+            {detectionConfirmed ? (
+              <div className="flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-left">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+                <div>
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-400">Erkennung bestätigt</p>
+                  <p className="text-xs text-muted-foreground">{detections} Spieler aktuell · {peakDetections} max. erkannt</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
+                <Users className="h-5 w-5 shrink-0 animate-pulse text-amber-500" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Suche Spieler…</p>
+                  <p className="text-xs text-muted-foreground">{detections} erkannt – warte auf Bestätigung</p>
+                </div>
+              </div>
+            )}
+
             <Button variant="destructive" className="w-full" onClick={handleEnd}><Flag className="mr-2 h-4 w-4" />Tracking beenden</Button>
           </div>
         )}
