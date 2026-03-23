@@ -186,10 +186,17 @@ const sections: GuideSection[] = [
     content: (
       <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
         <p>Die Kalibrierung verknüpft die Kamera-Perspektive mit dem realen Spielfeld. Sie muss <strong>pro Kamera und pro Feld einmal</strong> durchgeführt werden.</p>
+
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <p className="font-semibold text-amber-700 dark:text-amber-400">⚠️ Wichtig: Zoom & Bildausschnitt</p>
+          <p className="mt-1">Das Kalibrierungsfoto muss <strong>exakt denselben Zoom und Bildausschnitt</strong> haben wie das spätere Tracking-Bild. FieldIQ sperrt den Zoom automatisch auf 1× – nutze am besten den <strong>„Live-Foto"</strong>-Button auf der Tracking-Seite, um direkt aus dem Kamerabild zu kalibrieren.</p>
+        </div>
+
         <h4 className="font-semibold text-foreground mt-3">Schritt-für-Schritt:</h4>
         <ol className="list-decimal pl-5 space-y-2">
           <li>Öffne das Spiel und tippe auf <strong>„Kalibrieren"</strong>.</li>
-          <li>Die Kamera öffnet sich – mache ein <strong>Foto des Spielfelds</strong> aus der Kameraposition.</li>
+          <li><strong>Empfohlen:</strong> Nutze den <strong>„Live-Foto für Kalibrierung"</strong>-Button – dieser erstellt ein Standbild direkt aus dem aktuellen Kamera-Feed mit garantiert identischem Zoom.</li>
+          <li><strong>Alternativ:</strong> Lade ein Foto hoch – achte darauf, dass Zoom-Stufe und Position <strong>exakt</strong> der Tracking-Position entsprechen.</li>
           <li>Tippe nacheinander die <strong>4 Eckpunkte</strong> des Spielfelds auf dem Foto an (Ecke oben-links → oben-rechts → unten-rechts → unten-links).</li>
           <li>Die Punkte können per <strong>Drag & Drop</strong> feinjustiert werden – zoome bei Bedarf in das Bild hinein.</li>
           <li>Optional: Tippe auf <strong>„KI-Erkennung"</strong> – die KI versucht, die Feldlinien automatisch zu erkennen und schlägt Eckpunkte vor.</li>
@@ -199,6 +206,7 @@ const sections: GuideSection[] = [
         <ul className="list-disc pl-5 space-y-1">
           <li>Alle 4 Ecken des Spielfelds müssen im Foto <strong>sichtbar</strong> sein.</li>
           <li>Je <strong>höher</strong> die Kamera positioniert ist, desto besser die Kalibrierung.</li>
+          <li><strong>Zoom nicht manuell verändern</strong> – FieldIQ sperrt den Zoom auf 1×, um Abweichungen zwischen Kalibrierung und Tracking zu vermeiden.</li>
           <li>Bei <strong>schlechtem Kontrast</strong> (Schnee, Nebel) die Punkte manuell setzen – die KI-Erkennung funktioniert am besten bei klaren Linien.</li>
           <li>Die Kalibrierung muss nur einmal pro Feld gemacht werden und bleibt für alle Spiele auf diesem Platz erhalten.</li>
         </ul>
