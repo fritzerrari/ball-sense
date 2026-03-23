@@ -448,36 +448,60 @@ const POSITION_ZONES: Record<string, { x: number; y: number }> = {
 
 // ── Main Handler ──────────────────────────────────────────────────
 
+async function sha256(value: string) {
+  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(buffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: corsHeaders,
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
-    if (userError || !userData?.user) {
+    // Support two auth methods:
+    // 1. Bearer JWT (from authenticated coach UI)
+    // 2. x-camera-session-token (from camera PWA)
+    const authHeader = req.headers.get("Authorization");
+    const cameraSessionToken = req.headers.get("x-camera-session-token");
+
+    let isAuthorized = false;
+
+    if (authHeader?.startsWith("Bearer ")) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData, error: userError } = await userClient.auth.getUser();
+      if (!userError && userData?.user) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized && cameraSessionToken && cameraSessionToken.length >= 20) {
+      // Validate camera session token against any active session
+      const tokenHash = await sha256(cameraSessionToken);
+      const { data: session } = await supabase
+        .from("camera_access_sessions")
+        .select("id")
+        .eq("session_token_hash", tokenHash)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+      if (session) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: corsHeaders,
       });
     }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { matchId } = await req.json();
     if (!matchId) {
@@ -623,6 +647,13 @@ Deno.serve(async (req) => {
 
     const sortedTracks = [...tracks.entries()].sort((a, b) => b[1].length - a[1].length);
     const trackProfiles = buildTrackProfiles(sortedTracks);
+
+    // Update cameraCount on all profiles when multiple cameras were used
+    if (sessions.length > 1) {
+      for (const tp of trackProfiles) {
+        tp.cameraCount = sessions.length;
+      }
+    }
 
     // 7) Position-based player-to-track assignment
     // Works regardless of shirt numbers: uses position zones, temporal overlap,
