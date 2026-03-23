@@ -17,6 +17,12 @@ interface GuestPlayer {
   position: string;
 }
 
+const MATCH_POSITIONS = [
+  "", "TW", "IV", "LV", "RV", "LIV", "RIV",
+  "ZDM", "ZM", "LM", "RM", "ZOM",
+  "LA", "RA", "ST", "HS",
+];
+
 export default function NewMatch() {
   const navigate = useNavigate();
   const { clubName } = useAuth();
