@@ -41,6 +41,7 @@ export default function NewMatch() {
   const [homeStarters, setHomeStarters] = useState<Set<string>>(new Set());
   const [homeBench, setHomeBench] = useState<Set<string>>(new Set());
   const [shirtNumbers, setShirtNumbers] = useState<Record<string, number>>({});
+  const [matchPositions, setMatchPositions] = useState<Record<string, string>>({});
   const [trainingPlayers, setTrainingPlayers] = useState<Set<string>>(new Set());
   const [excludedPlayers, setExcludedPlayers] = useState<Set<string>>(new Set());
   const [guestPlayers, setGuestPlayers] = useState<GuestPlayer[]>(
