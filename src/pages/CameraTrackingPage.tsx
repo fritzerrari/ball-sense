@@ -128,7 +128,15 @@ export default function CameraTrackingPage() {
         body: JSON.stringify({ action: "update_status", matchId: id, cameraIndex: cam, sessionToken, status: "live" }),
       }).catch(() => null);
     }
-    trackerRef.current.startTracking(null, id, (frame) => setDetections(frame.detections.length));
+    trackerRef.current.startTracking(null, id, (frame) => {
+      const count = frame.detections.length;
+      setDetections(count);
+      setPeakDetections((prev) => Math.max(prev, count));
+      if (count >= 2 && !detectionConfirmed) {
+        setDetectionConfirmed(true);
+        toast.success(`Erkennung bestätigt: ${count} Spieler erkannt`);
+      }
+    });
     setPhase("tracking");
   };
 
