@@ -162,7 +162,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="min-h-screen pb-24 md:pb-0">
+      <main className="min-h-[100dvh] pb-28 md:pb-0">
         <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
           <div className="flex h-16 items-center gap-4 px-4 md:px-6">
             <div className="min-w-0 md:hidden">
