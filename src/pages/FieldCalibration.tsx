@@ -97,6 +97,7 @@ export default function FieldCalibration() {
   const cornerLabels = ["Links-Oben", "Rechts-Oben", "Rechts-Unten", "Links-Unten"];
   const canSave = points.length === 4;
   const returnTo = searchParams.get("returnTo");
+  const fromSnapshot = searchParams.get("fromSnapshot") === "1";
   const backHref = returnTo || "/fields";
   const backLabel = returnTo ? "Zurück zum Tracking" : "Zurück zu Plätze";
   const saveLabel = returnTo ? "Speichern & weiter" : "Kalibrierung speichern";
