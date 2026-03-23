@@ -32,6 +32,7 @@ export default function TrackingPage() {
   const [paused, setPaused] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [detections, setDetections] = useState(0);
+  const [currentDetections, setCurrentDetections] = useState<Detection[]>([]);
   const [quality, setQuality] = useState<"Gut" | "Mittel" | "Schlecht">("Gut");
   const [subModalOpen, setSubModalOpen] = useState(false);
   const [subMinute, setSubMinute] = useState("");
