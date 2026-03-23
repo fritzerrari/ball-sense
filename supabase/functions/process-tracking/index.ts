@@ -6,6 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── Types ────────────────────────────────────────────────────────
+
 interface Detection {
   id: number;
   x: number;
@@ -67,6 +69,7 @@ interface TrackProfile {
   sidelineRatio: number;
   edgeRatio: number;
   positions: { t: number; x: number; y: number }[];
+  cameraCount: number; // how many cameras contributed to this track
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -80,12 +83,10 @@ function euclidean(a: { x: number; y: number }, b: { x: number; y: number }) {
  * nearest-neighbour tracker. Each track gets a stable id.
  */
 function buildTracks(frames: TrackingFrame[]) {
-  // track id → array of { timestamp, x, y }
   const tracks = new Map<number, { t: number; x: number; y: number }[]>();
   let nextTrackId = 0;
-  // current active tracks: trackId → last known position
   const active = new Map<number, { x: number; y: number }>();
-  const THRESHOLD = 0.12; // max normalised distance to match
+  const THRESHOLD = 0.12;
 
   for (const frame of frames) {
     const used = new Set<number>();
@@ -133,7 +134,75 @@ function buildTracks(frames: TrackingFrame[]) {
 }
 
 /**
- * From a position trace, compute physical stats assuming a 105×68m pitch.
+ * Merge frames from multiple camera sessions by timestamp.
+ * Detections from different cameras at similar timestamps (±250ms)
+ * that are spatially close (<0.05 norm distance) are deduplicated.
+ */
+function mergeMultiCameraFrames(sessions: TrackingSession[]): {
+  mergedFrames: TrackingFrame[];
+  totalDurationSec: number;
+  cameraContributions: Map<number, number>; // cameraIndex → frame count
+} {
+  if (sessions.length === 1) {
+    return {
+      mergedFrames: sessions[0].frames,
+      totalDurationSec: sessions[0].durationSec,
+      cameraContributions: new Map([[sessions[0].cameraIndex, sessions[0].frames.length]]),
+    };
+  }
+
+  const TIME_MERGE_MS = 250;
+  const SPATIAL_MERGE_DIST = 0.05;
+
+  // Collect all frames tagged with camera index
+  const allTagged: { frame: TrackingFrame; camIdx: number }[] = [];
+  const cameraContributions = new Map<number, number>();
+
+  for (const session of sessions) {
+    cameraContributions.set(session.cameraIndex, session.frames.length);
+    for (const frame of session.frames) {
+      allTagged.push({ frame, camIdx: session.cameraIndex });
+    }
+  }
+
+  // Sort all frames by timestamp
+  allTagged.sort((a, b) => a.frame.timestamp - b.frame.timestamp);
+
+  // Group frames within TIME_MERGE_MS windows
+  const mergedFrames: TrackingFrame[] = [];
+  let i = 0;
+  while (i < allTagged.length) {
+    const windowStart = allTagged[i].frame.timestamp;
+    const windowDetections: Detection[] = [...allTagged[i].frame.detections];
+    let j = i + 1;
+
+    while (j < allTagged.length && allTagged[j].frame.timestamp - windowStart <= TIME_MERGE_MS) {
+      // Merge detections: only add if not spatially close to existing
+      for (const det of allTagged[j].frame.detections) {
+        const isDuplicate = windowDetections.some(
+          (existing) => euclidean(existing, det) < SPATIAL_MERGE_DIST
+        );
+        if (!isDuplicate) {
+          windowDetections.push(det);
+        }
+      }
+      j++;
+    }
+
+    mergedFrames.push({
+      timestamp: windowStart,
+      detections: windowDetections,
+    });
+    i = j;
+  }
+
+  const totalDurationSec = Math.max(...sessions.map((s) => s.durationSec));
+
+  return { mergedFrames, totalDurationSec, cameraContributions };
+}
+
+/**
+ * From a position trace, compute physical stats assuming fieldW×fieldH meter pitch.
  */
 function computeTrackStats(
   positions: { t: number; x: number; y: number }[],
@@ -159,7 +228,6 @@ function computeTrackStats(
   let sprintDist = 0;
   let inSprint = false;
   const SPRINT_THRESHOLD_KMH = 20;
-
   const speeds: number[] = [];
 
   for (let i = 1; i < positions.length; i++) {
@@ -192,9 +260,7 @@ function computeTrackStats(
 
   const COLS = 10;
   const ROWS = 7;
-  const grid: number[][] = Array.from({ length: ROWS }, () =>
-    Array(COLS).fill(0),
-  );
+  const grid: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
   for (const p of positions) {
     const col = Math.min(COLS - 1, Math.floor(p.x * COLS));
     const row = Math.min(ROWS - 1, Math.floor(p.y * ROWS));
@@ -302,6 +368,7 @@ function buildTrackProfiles(
       sidelineRatio: sidelineFrames / Math.max(1, positions.length),
       edgeRatio: edgeFrames / Math.max(1, positions.length),
       positions,
+      cameraCount: 1, // updated later for multi-cam
     };
   });
 }
@@ -310,6 +377,12 @@ function isTrackablePlayer(player: LineupEntry, match: MatchContext | null) {
   return !player.excluded_from_tracking && shouldTrackTeam(match, player.team);
 }
 
+/**
+ * Score how well a track matches a player. Works with or without position/shirt info.
+ * - If position is known → use zone distance as primary signal
+ * - If no position → fall back to team-half proximity + temporal overlap
+ * - Shirt numbers are NOT used for track assignment (camera can't read them)
+ */
 function scoreTrackCandidate(
   player: LineupEntry,
   track: TrackProfile,
@@ -328,19 +401,51 @@ function scoreTrackCandidate(
     (playerWindow.endMin ?? fallbackEndMin) - (playerWindow.startMin ?? 0),
   );
   const overlapRatio = Math.min(1, overlapMinutes / activeMinutes);
-  const zoneDist = expectedZone
-    ? Math.sqrt((track.cx - expectedZone.x) ** 2 + (track.cy - expectedZone.y) ** 2)
-    : Math.abs(track.cy - (player.team === "home" ? 0.5 : 0.5));
+
+  // Zone distance: position-based if available, otherwise team-half heuristic
+  let zoneDist: number;
+  if (expectedZone) {
+    zoneDist = Math.sqrt((track.cx - expectedZone.x) ** 2 + (track.cy - expectedZone.y) ** 2);
+  } else {
+    // No position known: use team-half proximity
+    // Home team expected in lower half (y < 0.5), away in upper half (y > 0.5)
+    const expectedY = player.team === "home" ? 0.35 : 0.65;
+    zoneDist = Math.abs(track.cy - expectedY) * 0.7; // softer penalty
+  }
+
   const overlapPenalty = 1 / (overlapMinutes + 0.25);
   const coveragePenalty = (1 - overlapRatio) * 0.35;
   const officialPenalty = track.sidelineRatio * (expectedZone ? 0.2 : 0.9) + track.edgeRatio * 0.1;
 
+  // Multi-camera bonus: tracks seen by multiple cameras are more reliable
+  const multiCamBonus = track.cameraCount > 1 ? -0.05 * (track.cameraCount - 1) : 0;
+
   return {
     overlapMinutes,
     overlapRatio,
-    score: zoneDist + overlapPenalty + coveragePenalty + officialPenalty,
+    score: zoneDist + overlapPenalty + coveragePenalty + officialPenalty + multiCamBonus,
   };
 }
+
+// Position zone map for all standard football positions
+const POSITION_ZONES: Record<string, { x: number; y: number }> = {
+  TW: { x: 0.5, y: 0.06 },
+  IV: { x: 0.5, y: 0.2 },
+  LV: { x: 0.15, y: 0.22 },
+  RV: { x: 0.85, y: 0.22 },
+  LIV: { x: 0.35, y: 0.2 },
+  RIV: { x: 0.65, y: 0.2 },
+  ZDM: { x: 0.5, y: 0.35 },
+  ZM: { x: 0.5, y: 0.45 },
+  LM: { x: 0.15, y: 0.45 },
+  RM: { x: 0.85, y: 0.45 },
+  ZOM: { x: 0.5, y: 0.55 },
+  LA: { x: 0.15, y: 0.65 },
+  RA: { x: 0.85, y: 0.65 },
+  ST: { x: 0.5, y: 0.75 },
+  HS: { x: 0.5, y: 0.65 },
+};
+
 // ── Main Handler ──────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -349,7 +454,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -362,12 +466,10 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify user
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: userData, error: userError } =
-      await userClient.auth.getUser();
+    const { data: userData, error: userError } = await userClient.auth.getUser();
     if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -375,7 +477,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role for data operations
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { matchId } = await req.json();
@@ -388,7 +489,7 @@ Deno.serve(async (req) => {
 
     console.log(`[process-tracking] Starting for match ${matchId}`);
 
-    // 1) Get tracking uploads for this match
+    // 1) Get ALL tracking uploads for this match
     const { data: uploads, error: uplErr } = await supabase
       .from("tracking_uploads")
       .select("*")
@@ -403,26 +504,44 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2) Download tracking JSON from storage
-    const upload = uploads[0];
-    // file_path may be stored as "tracking/matchId/cam_0.json" or "matchId/cam_0.json"
-    // The storage client already targets bucket "tracking", so strip the prefix if present
-    const rawPath = upload.file_path as string;
-    const storagePath = rawPath.startsWith("tracking/") ? rawPath.slice("tracking/".length) : rawPath;
-    console.log(`[process-tracking] Downloading from bucket 'tracking', path: ${storagePath}`);
+    console.log(`[process-tracking] Found ${uploads.length} camera upload(s)`);
 
-    const { data: fileData, error: dlErr } = await supabase.storage
-      .from("tracking")
-      .download(storagePath);
+    // 2) Download ALL tracking JSONs and merge
+    const sessions: TrackingSession[] = [];
+    for (const upload of uploads) {
+      const rawPath = upload.file_path as string;
+      const storagePath = rawPath.startsWith("tracking/") ? rawPath.slice("tracking/".length) : rawPath;
+      console.log(`[process-tracking] Downloading camera ${upload.camera_index} from: ${storagePath}`);
 
-    if (dlErr) throw dlErr;
-    const sessionJson = await fileData.text();
-    const session: TrackingSession = JSON.parse(sessionJson);
+      const { data: fileData, error: dlErr } = await supabase.storage
+        .from("tracking")
+        .download(storagePath);
+
+      if (dlErr) {
+        console.error(`[process-tracking] Failed to download camera ${upload.camera_index}:`, dlErr);
+        continue; // skip failed downloads, process what we have
+      }
+
+      const sessionJson = await fileData.text();
+      const session: TrackingSession = JSON.parse(sessionJson);
+      sessions.push(session);
+      console.log(`[process-tracking] Camera ${upload.camera_index}: ${session.frames.length} frames, ${session.durationSec}s`);
+    }
+
+    if (sessions.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Could not download any tracking data", matchId }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // 3) Merge multi-camera frames
+    const { mergedFrames, totalDurationSec, cameraContributions } = mergeMultiCameraFrames(sessions);
     console.log(
-      `[process-tracking] Loaded ${session.frames.length} frames, ${session.durationSec}s`,
+      `[process-tracking] Merged ${sessions.length} camera(s) → ${mergedFrames.length} frames, ${totalDurationSec}s`
     );
 
-    // 3) Get match and field dimensions
+    // 4) Get match and field dimensions
     const { data: match } = await supabase
       .from("matches")
       .select("field_id, home_club_id, track_opponent, opponent_consent_confirmed")
@@ -445,7 +564,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4) Get lineups, events and player positions
+    // 5) Get lineups, events and player positions
     const { data: lineups } = await supabase
       .from("match_lineups")
       .select("id, player_id, player_name, team, shirt_number, starting, subbed_in_min, subbed_out_min, excluded_from_tracking")
@@ -461,12 +580,19 @@ Deno.serve(async (req) => {
     const typedEvents = (matchEvents || []) as MatchEvent[];
 
     const trackableLineups = typedLineups.filter((player) => isTrackablePlayer(player, matchContext));
-    const skippedHomePlayers = typedLineups.filter((player) => player.team === "home" && player.excluded_from_tracking);
-    const skippedAwayPlayers = typedLineups.filter((player) => player.team === "away" && !shouldTrackTeam(matchContext, "away"));
+    const skippedHomePlayers = typedLineups.filter((p) => p.team === "home" && p.excluded_from_tracking);
+    const skippedAwayPlayers = typedLineups.filter((p) => p.team === "away" && !shouldTrackTeam(matchContext, "away"));
+
+    // Categorize players by shirt number availability for logging
+    const playersWithNumber = trackableLineups.filter((p) => p.shirt_number != null);
+    const playersWithoutNumber = trackableLineups.filter((p) => p.shirt_number == null);
+    console.log(
+      `[process-tracking] Players: ${playersWithNumber.length} with shirt#, ${playersWithoutNumber.length} without shirt#`
+    );
 
     const playerIds = trackableLineups.map((l) => l.player_id).filter(Boolean);
     const uniquePlayerIds = [...new Set(playerIds)] as string[];
-    let playerPositions: Record<string, string> = {};
+    const playerPositions: Record<string, string> = {};
     if (uniquePlayerIds.length > 0) {
       const { data: players } = await supabase
         .from("players")
@@ -482,45 +608,44 @@ Deno.serve(async (req) => {
     const homePlayers = trackableLineups.filter((l) => l.team === "home");
     const awayPlayers = trackableLineups.filter((l) => l.team === "away");
     console.log(
-      `[process-tracking] Lineups: ${homePlayers.length} home tracked, ${awayPlayers.length} away tracked, ${typedEvents.length} events`,
+      `[process-tracking] Lineups: ${homePlayers.length} home, ${awayPlayers.length} away, ${typedEvents.length} events`
     );
     if (skippedHomePlayers.length > 0) {
-      console.log(`[process-tracking] Skipped ${skippedHomePlayers.length} home players excluded from tracking`);
+      console.log(`[process-tracking] Skipped ${skippedHomePlayers.length} home excluded`);
     }
     if (skippedAwayPlayers.length > 0) {
-      console.log(`[process-tracking] Skipped ${skippedAwayPlayers.length} away players (no opponent approval)`);
+      console.log(`[process-tracking] Skipped ${skippedAwayPlayers.length} away (no consent)`);
     }
 
-    // 5) Build tracks from detections
-    const tracks = buildTracks(session.frames);
-    console.log(`[process-tracking] Built ${tracks.size} tracks`);
+    // 6) Build tracks from merged detections
+    const tracks = buildTracks(mergedFrames);
+    console.log(`[process-tracking] Built ${tracks.size} tracks from merged frames`);
 
     const sortedTracks = [...tracks.entries()].sort((a, b) => b[1].length - a[1].length);
-
-    // 6) Position-based player-to-track assignment
-    const POSITION_ZONES: Record<string, { x: number; y: number }> = {
-      TW: { x: 0.5, y: 0.06 },
-      IV: { x: 0.5, y: 0.2 },
-      LV: { x: 0.15, y: 0.22 },
-      RV: { x: 0.85, y: 0.22 },
-      LIV: { x: 0.35, y: 0.2 },
-      RIV: { x: 0.65, y: 0.2 },
-      ZDM: { x: 0.5, y: 0.35 },
-      ZM: { x: 0.5, y: 0.45 },
-      LM: { x: 0.15, y: 0.45 },
-      RM: { x: 0.85, y: 0.45 },
-      ZOM: { x: 0.5, y: 0.55 },
-      LA: { x: 0.15, y: 0.65 },
-      RA: { x: 0.85, y: 0.65 },
-      ST: { x: 0.5, y: 0.75 },
-      HS: { x: 0.5, y: 0.65 },
-    };
-
     const trackProfiles = buildTrackProfiles(sortedTracks);
 
+    // 7) Position-based player-to-track assignment
+    // Works regardless of shirt numbers: uses position zones, temporal overlap,
+    // and team-half heuristics as fallback
     const allPlayers = [...homePlayers, ...awayPlayers];
     const usedTrackIndices = new Set<number>();
-    const fallbackEndMin = Math.max(1, Math.ceil(session.durationSec / 60));
+    const fallbackEndMin = Math.max(1, Math.ceil(totalDurationSec / 60));
+
+    // Sort players by assignment priority:
+    // 1. Players with known positions get assigned first (more constraints = better match)
+    // 2. Players without positions get remaining tracks
+    const sortedPlayers = [...allPlayers].sort((a, b) => {
+      const posA = a.player_id ? playerPositions[a.player_id] : null;
+      const posB = b.player_id ? playerPositions[b.player_id] : null;
+      const hasZoneA = posA && POSITION_ZONES[posA.toUpperCase()] ? 1 : 0;
+      const hasZoneB = posB && POSITION_ZONES[posB.toUpperCase()] ? 1 : 0;
+      // Players with known zones first
+      if (hasZoneA !== hasZoneB) return hasZoneB - hasZoneA;
+      // Starting players before subs
+      if (a.starting !== b.starting) return a.starting ? -1 : 1;
+      return 0;
+    });
+
     const playerStats: Array<{
       player_id: string | null;
       player_name: string | null;
@@ -529,13 +654,13 @@ Deno.serve(async (req) => {
       confidence: number;
     }> = [];
 
-    for (const player of allPlayers) {
+    for (const player of sortedPlayers) {
       const position = player.player_id ? playerPositions[player.player_id] : null;
       const expectedZone = getExpectedZone(position, player.team, POSITION_ZONES);
       const playerWindow = getPlayerWindow(player, typedEvents, fallbackEndMin);
 
       if (playerWindow.startMin === null || playerWindow.endMin <= playerWindow.startMin) {
-        console.log(`[process-tracking] Skipping inactive player ${player.player_name}`);
+        console.log(`[process-tracking] Skipping inactive: ${player.player_name}`);
         continue;
       }
 
@@ -568,7 +693,9 @@ Deno.serve(async (req) => {
         const stats = computeTrackStats(tc.positions, fieldW, fieldH);
         const confidenceBase = Math.max(0, 1 - bestScore * 0.8);
         const officialPenalty = tc.sidelineRatio > 0.45 ? 0.25 : 0;
-        const confidence = Math.max(0.1, confidenceBase - officialPenalty);
+        // Boost confidence if position was known (better constraint)
+        const positionBonus = expectedZone ? 0.05 : 0;
+        const confidence = Math.min(1, Math.max(0.1, confidenceBase - officialPenalty + positionBonus));
 
         playerStats.push({
           player_id: player.player_id || null,
@@ -577,19 +704,25 @@ Deno.serve(async (req) => {
           stats,
           confidence: Math.round(confidence * 100) / 100,
         });
+
+        const shirtInfo = player.shirt_number != null ? `#${player.shirt_number}` : "no#";
         console.log(
-          `[process-tracking] Assigned ${player.player_name} (${player.team}/${position || "?"}) → track ${tc.tid} overlap=${bestOverlapMinutes.toFixed(1)}m confidence=${confidence.toFixed(2)} sideline=${tc.sidelineRatio.toFixed(2)}`,
+          `[process-tracking] ${player.player_name} (${player.team}/${position || "?"}/${shirtInfo}) → track ${tc.tid} overlap=${bestOverlapMinutes.toFixed(1)}m conf=${confidence.toFixed(2)}`
+        );
+      } else {
+        console.log(
+          `[process-tracking] No track found for ${player.player_name} (${player.team}/${position || "?"})`
         );
       }
     }
 
-    const unassignedTracks = trackProfiles.filter((_, index) => !usedTrackIndices.has(index));
-    const likelyOfficials = unassignedTracks.filter((track) => track.sidelineRatio >= 0.45 || track.edgeRatio >= 0.4);
+    const unassignedTracks = trackProfiles.filter((_, i) => !usedTrackIndices.has(i));
+    const likelyOfficials = unassignedTracks.filter((t) => t.sidelineRatio >= 0.45 || t.edgeRatio >= 0.4);
     console.log(
-      `[process-tracking] Computed stats for ${playerStats.length} players, left ${unassignedTracks.length} unassigned tracks (${likelyOfficials.length} likely officials/non-players)`,
+      `[process-tracking] Assigned ${playerStats.length} players, ${unassignedTracks.length} unassigned (${likelyOfficials.length} likely officials)`
     );
 
-    // 7) Replace player_match_stats for this match
+    // 8) Replace player_match_stats
     await supabase.from("player_match_stats").delete().eq("match_id", matchId);
 
     const playerInserts = playerStats.map((ps) => ({
@@ -603,10 +736,11 @@ Deno.serve(async (req) => {
       sprint_distance_m: ps.stats.sprint_distance_m,
       heatmap_grid: ps.stats.heatmap_grid,
       positions_raw: ps.stats.positions_raw,
-      minutes_played: ps.stats.minutes_played || Math.round(session.durationSec / 60),
+      minutes_played: ps.stats.minutes_played || Math.round(totalDurationSec / 60),
       data_source: "fieldiq",
       raw_metrics: {
         assignment_confidence: ps.confidence,
+        cameras_used: sessions.length,
       },
     }));
 
@@ -620,7 +754,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 8) Replace and compute team_match_stats
+    // 9) Replace and compute team_match_stats
     await supabase.from("team_match_stats").delete().eq("match_id", matchId);
 
     const teamGroups = { home: [] as typeof playerStats, away: [] as typeof playerStats };
@@ -661,6 +795,8 @@ Deno.serve(async (req) => {
         data_source: "fieldiq",
         raw_metrics: {
           tracked_player_count: players.length,
+          cameras_used: sessions.length,
+          camera_indices: [...cameraContributions.keys()],
           opponent_tracking_enabled: shouldTrackTeam(matchContext, "away"),
           likely_official_tracks_ignored: likelyOfficials.length,
         },
@@ -677,24 +813,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 9) Update upload status
-    await supabase
-      .from("tracking_uploads")
-      .update({ status: "done" })
-      .eq("id", upload.id);
+    // 10) Update all upload statuses to done
+    for (const upload of uploads) {
+      await supabase
+        .from("tracking_uploads")
+        .update({ status: "done" })
+        .eq("id", upload.id);
+    }
 
-    // 10) Update match status to done
+    // 11) Update match status
     await supabase
       .from("matches")
       .update({ status: "done" })
       .eq("id", matchId);
 
-    console.log(`[process-tracking] ✅ Complete for match ${matchId}`);
+    console.log(`[process-tracking] ✅ Complete: ${playerStats.length} players, ${sessions.length} camera(s)`);
 
     return new Response(
       JSON.stringify({
         success: true,
         matchId,
+        camerasProcessed: sessions.length,
+        cameraIndices: [...cameraContributions.keys()],
         playersProcessed: playerStats.length,
         teamsProcessed: teamInserts.length,
       }),
