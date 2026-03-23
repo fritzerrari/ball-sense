@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useSearchParams, Navigate } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { ArrowLeft, Mail, Lock, Eye, EyeOff, Building2, Loader2, ShieldCheck, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
