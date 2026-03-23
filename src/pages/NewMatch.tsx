@@ -44,6 +44,8 @@ export default function NewMatch() {
   const [matchPositions, setMatchPositions] = useState<Record<string, string>>({});
   const [trainingPlayers, setTrainingPlayers] = useState<Set<string>>(new Set());
   const [excludedPlayers, setExcludedPlayers] = useState<Set<string>>(new Set());
+  const [squadSize, setSquadSize] = useState(11);
+  const [awaySquadSize, setAwaySquadSize] = useState(11);
   const [guestPlayers, setGuestPlayers] = useState<GuestPlayer[]>(
     Array.from({ length: 11 }, (_, i) => ({ name: "", number: String(i + 1), position: "" })),
   );
@@ -85,13 +87,23 @@ export default function NewMatch() {
     return player?.number ?? 0;
   };
 
+  // Sync guest player rows when awaySquadSize changes
+  useEffect(() => {
+    setGuestPlayers((prev) => {
+      if (prev.length < awaySquadSize) {
+        return [...prev, ...Array.from({ length: awaySquadSize - prev.length }, (_, i) => ({ name: "", number: String(prev.length + i + 1), position: "" }))];
+      }
+      return prev.slice(0, awaySquadSize);
+    });
+  }, [awaySquadSize]);
+
   const toggleStarter = (playerId: string) => {
     const next = new Set(homeStarters);
     if (next.has(playerId)) {
       next.delete(playerId);
     } else {
-      if (next.size >= 11) {
-        toast.error("Maximal 11 Startspieler");
+      if (next.size >= squadSize) {
+        toast.error(`Maximal ${squadSize} Startspieler`);
         return;
       }
       next.add(playerId);
@@ -406,10 +418,32 @@ export default function NewMatch() {
               <h2 className="text-lg font-semibold font-display flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" /> Aufstellung Heim
               </h2>
-              <p className="text-sm text-muted-foreground">Startelf: {homeStarters.size}/11 · Bank: {homeBench.size}/7 · Ausgewählt: {selectedHomeCount}</p>
+
+              <div>
+                <label className="mb-1.5 block text-sm text-muted-foreground">Spieleranzahl pro Team</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[5, 7, 9, 11].map((size) => (
+                    <button key={size} onClick={() => setSquadSize(size)} className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${squadSize === size ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+                      {size}er
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    min={1}
+                    max={15}
+                    value={squadSize}
+                    onChange={(e) => setSquadSize(Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 11)))}
+                    className="w-16 rounded-lg border border-border bg-muted px-2 py-1.5 text-center text-sm text-foreground"
+                    title="Eigene Anzahl"
+                  />
+                </div>
+              </div>
+
+              <p className="text-sm text-muted-foreground">Startelf: {homeStarters.size}/{squadSize} · Bank: {homeBench.size}/7 · Ausgewählt: {selectedHomeCount}</p>
+
               <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
                 <span className="text-primary font-bold text-sm">💡</span>
-                <span><strong>Positionen sind optional.</strong> Falls du die Position eines Spielers nicht kennst, lass das Feld leer – die KI erkennt die Position automatisch anhand der Bewegungsmuster nach dem Spiel und trägt sie ein.</span>
+                <span><strong>Aufstellung optional.</strong> Falls du die Aufstellung nicht kennst, kannst du diesen Schritt überspringen – die KI erkennt Spieler automatisch anhand der Trikots und Bewegungsmuster. Positionen werden ebenfalls automatisch zugeordnet.</span>
               </div>
               <div className="space-y-2 max-h-[420px] overflow-y-auto">
                 {activePlayers.map((player) => {
@@ -461,7 +495,36 @@ export default function NewMatch() {
               <h2 className="text-lg font-semibold font-display flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" /> Aufstellung Gast {awayName && `— ${awayName}`}
               </h2>
-              <p className="text-sm text-muted-foreground">{trackOpponent ? "Gegner wird mitgetrackt — nur Spieler mit vorliegender Einwilligung eintragen." : "Optional: Gegnerdaten können ohne Tracking als Spielkontext leer bleiben."}</p>
+
+              {trackOpponent && (
+                <div>
+                  <label className="mb-1.5 block text-sm text-muted-foreground">Spieleranzahl Gegner</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[5, 7, 9, 11].map((size) => (
+                      <button key={size} onClick={() => setAwaySquadSize(size)} className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${awaySquadSize === size ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+                        {size}er
+                      </button>
+                    ))}
+                    <input
+                      type="number"
+                      min={1}
+                      max={15}
+                      value={awaySquadSize}
+                      onChange={(e) => setAwaySquadSize(Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 11)))}
+                      className="w-16 rounded-lg border border-border bg-muted px-2 py-1.5 text-center text-sm text-foreground"
+                      title="Eigene Anzahl"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <p className="text-sm text-muted-foreground">{trackOpponent ? "Gegner wird mitgetrackt — Spielerdaten sind optional. Leere Felder = KI-Erkennung." : "Optional: Gegnerdaten können ohne Tracking als Spielkontext leer bleiben."}</p>
+
+              <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
+                <span className="text-primary font-bold text-sm">🤖</span>
+                <span><strong>KI-Erkennung aktiv.</strong> Wenn du keine Gegnerdaten einträgst, erkennt die KI automatisch die gegnerischen Spieler anhand von Trikotnummern und Bewegungsmustern. Du kannst die Daten auch nach dem Spiel ergänzen.</span>
+              </div>
+
               {!trackOpponent ? (
                 <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
                   Gegner-Tracking ist deaktiviert. Falls du den Gegner tracken willst, aktiviere dies bei den Einwilligungen im Schritt Details.
