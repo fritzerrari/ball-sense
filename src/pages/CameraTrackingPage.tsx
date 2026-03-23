@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Camera, Check, Flag, Loader2, LockKeyhole, Upload } from "lucide-react";
+import { Camera, Check, CheckCircle2, Flag, Loader2, LockKeyhole, Upload, Users, ShieldCheck } from "lucide-react";
 import { FootballTracker } from "@/lib/football-tracker";
 import { toast } from "sonner";
 
@@ -37,6 +37,8 @@ export default function CameraTrackingPage() {
   const [detections, setDetections] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadDone, setUploadDone] = useState(false);
+  const [detectionConfirmed, setDetectionConfirmed] = useState(false);
+  const [peakDetections, setPeakDetections] = useState(0);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -126,7 +128,15 @@ export default function CameraTrackingPage() {
         body: JSON.stringify({ action: "update_status", matchId: id, cameraIndex: cam, sessionToken, status: "live" }),
       }).catch(() => null);
     }
-    trackerRef.current.startTracking(null, id, (frame) => setDetections(frame.detections.length));
+    trackerRef.current.startTracking(null, id, (frame) => {
+      const count = frame.detections.length;
+      setDetections(count);
+      setPeakDetections((prev) => Math.max(prev, count));
+      if (count >= 2 && !detectionConfirmed) {
+        setDetectionConfirmed(true);
+        toast.success(`Erkennung bestätigt: ${count} Spieler erkannt`);
+      }
+    });
     setPhase("tracking");
   };
 
@@ -223,7 +233,26 @@ export default function CameraTrackingPage() {
         {phase === "tracking" && (
           <div className="rounded-2xl border border-border bg-card/60 p-5 text-center space-y-4">
             <div className="font-display text-5xl font-bold text-primary">{formatTime(elapsedSec)}</div>
-            <p className="text-sm text-muted-foreground">{detections} Spieler erkannt</p>
+
+            {/* Detection confirmation banner */}
+            {detectionConfirmed ? (
+              <div className="flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-left">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+                <div>
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-400">Erkennung bestätigt</p>
+                  <p className="text-xs text-muted-foreground">{detections} Spieler aktuell · {peakDetections} max. erkannt</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
+                <Users className="h-5 w-5 shrink-0 animate-pulse text-amber-500" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Suche Spieler…</p>
+                  <p className="text-xs text-muted-foreground">{detections} erkannt – warte auf Bestätigung</p>
+                </div>
+              </div>
+            )}
+
             <Button variant="destructive" className="w-full" onClick={handleEnd}><Flag className="mr-2 h-4 w-4" />Tracking beenden</Button>
           </div>
         )}

@@ -349,9 +349,30 @@ const sections: GuideSection[] = [
           <li>Stelle sicher, dass die Kalibrierung abgeschlossen ist.</li>
           <li>Tippe auf <strong>„Tracking starten"</strong> – auf jedem Smartphone separat.</li>
           <li>Das KI-Modell wird einmalig geladen (<strong>~5 Sekunden</strong>).</li>
-          <li>Du siehst einen <strong>grünen Indikator</strong>, sobald die Spielererkennung aktiv ist.</li>
-          <li>Die Anzahl erkannter Spieler wird in Echtzeit angezeigt.</li>
+          <li>Die Kamera zeigt zunächst einen <strong>gelben Status „Suche Spieler…"</strong> mit einem pulsierenden Icon.</li>
+          <li>Sobald mindestens 2 Spieler erkannt werden, wechselt der Status auf <strong className="text-green-600">✅ „Erkennung bestätigt"</strong> mit einer grünen Anzeige.</li>
+          <li>Die Anzeige zeigt in Echtzeit die <strong>Anzahl aktuell erkannter Spieler</strong> und die <strong>maximale Erkennung</strong> (Peak).</li>
         </ol>
+
+        <h4 className="font-semibold text-foreground mt-3">Muss ich die Spieler aufstellen lassen?</h4>
+        <div className="rounded-lg bg-primary/5 p-3 text-xs">
+          <strong>Nein!</strong> Die Spieler müssen sich <strong>nicht</strong> speziell aufstellen oder positionieren. Du kannst das Tracking direkt <strong>beim Anstoß</strong> starten. Die KI erkennt die Spieler automatisch anhand ihrer Bewegungsmuster – egal ob sie gerade stehen, laufen oder sich aufwärmen.
+        </div>
+
+        <h4 className="font-semibold text-foreground mt-3">Wann am besten starten?</h4>
+        <ul className="list-disc pl-5 space-y-1">
+          <li><strong>Empfohlen:</strong> Drücke „Tracking starten" <strong>1–2 Minuten vor dem Anstoß</strong>, während die Spieler sich aufstellen. So hat die KI etwas Vorlauf für die erste Zuordnung.</li>
+          <li><strong>Alternativ:</strong> Start <strong>direkt beim Anstoß</strong> – funktioniert genauso, die KI braucht dann ca. 10–15 Sekunden länger für die initiale Erkennung.</li>
+          <li><strong>Auch möglich:</strong> Start <strong>während des laufenden Spiels</strong> – die KI erkennt die Spieler auch mitten in der Partie. Die Daten vor dem Startpunkt fehlen dann natürlich.</li>
+        </ul>
+
+        <h4 className="font-semibold text-foreground mt-3">Erkennungsbestätigung verstehen:</h4>
+        <ul className="list-disc pl-5 space-y-1">
+          <li><strong>🟡 „Suche Spieler…"</strong> – Die KI hat noch keine ausreichende Anzahl an Spielern erkannt. Das ist in den ersten Sekunden normal.</li>
+          <li><strong>🟢 „Erkennung bestätigt"</strong> – Mindestens 2 Spieler wurden erkannt und werden aktiv verfolgt. Die Zahl steigt im Verlauf weiter an.</li>
+          <li><strong>„X Spieler aktuell · Y max. erkannt"</strong> – Zeigt die aktuelle Erkennung und die bisherige Maximal-Erkennung. Schwankungen sind normal (Spieler verlassen den Bildbereich, Überlappungen, etc.).</li>
+        </ul>
+
         <h4 className="font-semibold text-foreground mt-3">Wichtig vor dem Start:</h4>
         <ul className="list-disc pl-5 space-y-1">
           <li><strong>Energiesparmodus deaktivieren</strong> – der Bildschirm darf sich nicht abschalten</li>
