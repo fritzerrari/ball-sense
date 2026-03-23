@@ -87,13 +87,23 @@ export default function NewMatch() {
     return player?.number ?? 0;
   };
 
+  // Sync guest player rows when awaySquadSize changes
+  useEffect(() => {
+    setGuestPlayers((prev) => {
+      if (prev.length < awaySquadSize) {
+        return [...prev, ...Array.from({ length: awaySquadSize - prev.length }, (_, i) => ({ name: "", number: String(prev.length + i + 1), position: "" }))];
+      }
+      return prev.slice(0, awaySquadSize);
+    });
+  }, [awaySquadSize]);
+
   const toggleStarter = (playerId: string) => {
     const next = new Set(homeStarters);
     if (next.has(playerId)) {
       next.delete(playerId);
     } else {
-      if (next.size >= 11) {
-        toast.error("Maximal 11 Startspieler");
+      if (next.size >= squadSize) {
+        toast.error(`Maximal ${squadSize} Startspieler`);
         return;
       }
       next.add(playerId);
