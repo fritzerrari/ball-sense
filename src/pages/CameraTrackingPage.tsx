@@ -37,6 +37,8 @@ export default function CameraTrackingPage() {
   const [detections, setDetections] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadDone, setUploadDone] = useState(false);
+  const [detectionConfirmed, setDetectionConfirmed] = useState(false);
+  const [peakDetections, setPeakDetections] = useState(0);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
