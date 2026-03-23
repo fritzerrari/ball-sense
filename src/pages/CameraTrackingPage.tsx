@@ -226,6 +226,48 @@ export default function CameraTrackingPage() {
             <Check className="mx-auto h-10 w-10 text-primary" />
             <h2 className="font-display text-xl font-bold">{isCalibrated ? "Platz erkannt" : "Kalibrierung fehlt"}</h2>
             <p className="text-sm text-muted-foreground">{match?.fields?.name || "Platz"}{match?.fields?.width_m && match?.fields?.height_m ? ` · ${match.fields.width_m}×${match.fields.height_m}m` : ""}</p>
+
+            {/* Live snapshot for calibration — ensures identical FOV */}
+            {!isCalibrated && match?.field_id && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left space-y-2">
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">⚠️ Kalibrierung empfohlen</p>
+                <p className="text-xs text-muted-foreground">Erstelle ein Kalibrierungs-Foto direkt aus dem aktuellen Kamerabild – so wird garantiert derselbe Zoom & Bildausschnitt wie beim Tracking verwendet.</p>
+                <Button
+                  variant="heroOutline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    // Capture snapshot from live video
+                    const video = videoRef.current;
+                    if (!video || !video.videoWidth) {
+                      toast.error("Kamera noch nicht bereit");
+                      return;
+                    }
+                    const canvas = document.createElement("canvas");
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext("2d");
+                    if (!ctx) return;
+                    ctx.drawImage(video, 0, 0);
+                    canvas.toBlob((blob) => {
+                      if (!blob) return;
+                      // Store snapshot in sessionStorage for the calibration page to pick up
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        sessionStorage.setItem("calibration_snapshot", reader.result as string);
+                        // Navigate to calibration with returnTo
+                        const returnPath = `/camera/${id}/track?cam=${cam}`;
+                        window.location.href = `/fields/${match.field_id}/calibrate?returnTo=${encodeURIComponent(returnPath)}&fromSnapshot=1`;
+                      };
+                      reader.readAsDataURL(blob);
+                    }, "image/jpeg", 0.92);
+                  }}
+                >
+                  <Camera className="mr-1 h-4 w-4" /> Live-Foto für Kalibrierung
+                </Button>
+              </div>
+            )}
+
             <Button variant="hero" className="w-full" onClick={handleStartTracking}>{isCalibrated ? "Tracking starten" : "Trotzdem starten"}</Button>
           </div>
         )}

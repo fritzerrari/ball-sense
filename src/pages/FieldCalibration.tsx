@@ -109,6 +109,22 @@ export default function FieldCalibration() {
     }
   }, [field]);
 
+  // Auto-load snapshot from live camera if available
+  useEffect(() => {
+    if (fromSnapshot) {
+      const snapshot = sessionStorage.getItem("calibration_snapshot");
+      if (snapshot) {
+        sessionStorage.removeItem("calibration_snapshot");
+        setImageUrl(snapshot);
+        // Create a File object for auto-detect compatibility
+        fetch(snapshot)
+          .then((res) => res.blob())
+          .then((blob) => setImageFile(new File([blob], "live-snapshot.jpg", { type: "image/jpeg" })));
+        toast.success("Live-Kamerabild geladen – setze jetzt die 4 Eckpunkte.");
+      }
+    }
+  }, [fromSnapshot]);
+
   const resetLayoutSuggestion = useCallback(() => {
     setLayoutSuggestion(EMPTY_LAYOUT_SUGGESTION);
   }, []);

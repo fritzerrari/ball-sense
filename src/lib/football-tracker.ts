@@ -57,6 +57,20 @@ export class FootballTracker {
         audio: false,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      // Lock zoom to 1x to ensure calibration and tracking use identical FOV
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        try {
+          const caps = track.getCapabilities?.() as MediaTrackCapabilities & { zoom?: { min: number; max: number } };
+          if (caps?.zoom) {
+            await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min } as any] });
+          }
+        } catch {
+          // zoom constraint not supported — no action needed
+        }
+      }
+
       videoElement.srcObject = stream;
       await videoElement.play();
     } catch (err) {
