@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
+import { ProcessingRoadmap } from "@/components/ProcessingRoadmap";
 import ApiFootballStatsCard from "@/components/ApiFootballStatsCard";
 import { MatchKpiStrip, MatchRadarChart, TopPlayersChart, ComparisonBarChart } from "@/components/MatchCharts";
 import { MatchInsightsPanel } from "@/components/MatchInsightsPanel";
