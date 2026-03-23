@@ -18,7 +18,7 @@ import { getRandomDemoData, type DemoData, type DemoPlayer } from "@/lib/demo-da
 
 type DemoState = "notification" | "loading" | "analyzing" | "dashboard";
 
-const latestAnalysisImage = "/landing/coaching-cockpit-latest.png";
+// Removed external image reference - using programmatic mockup instead
 
 export function DemoSection() {
   const [state, setState] = useState<DemoState>("notification");
