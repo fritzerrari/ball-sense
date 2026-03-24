@@ -545,8 +545,8 @@ export default function FieldCalibration() {
             className="relative aspect-video cursor-crosshair overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/30 select-none"
             style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
             onPointerDown={handlePointerDown}
+            onClick={handleClick}
             onTouchStart={(e) => {
-              // Prevent default to avoid scroll/zoom interference on mobile
               if (imageUrl && points.length < 4) {
                 e.preventDefault();
               }
