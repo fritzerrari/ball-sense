@@ -86,6 +86,7 @@ export default function CameraTrackingPage() {
   const [cameraReady, setCameraReady] = useState(false);
   const [highlightClipCount, setHighlightClipCount] = useState(0);
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
+  const [liveStats, setLiveStats] = useState<LiveSnapshot | null>(null);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
