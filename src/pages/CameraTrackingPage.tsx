@@ -827,7 +827,7 @@ export default function CameraTrackingPage() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className={`flex-1 flex flex-col items-center p-4 sm:p-6 ${phase === "tracking" ? "" : "justify-center"}`}>
         {/* Phase: Auth — Code + auto model loading */}
         {phase === "auth" && (
           <div className="w-full max-w-sm space-y-6 text-center">
@@ -982,7 +982,9 @@ export default function CameraTrackingPage() {
 
         {/* Phase: Tracking */}
         {phase === "tracking" && (
-          <div className="w-full max-w-lg space-y-4">
+          <div className="w-full max-w-lg flex flex-col" style={{ maxHeight: "calc(100dvh - 7rem)" }}>
+            {/* Scrollable content area */}
+            <div className="flex-1 overflow-y-auto space-y-4 pb-2">
             {/* Timer */}
             <div className="text-center">
               <div className="text-5xl sm:text-6xl font-bold font-display tracking-tight gradient-text">{formatTime(elapsedSec)}</div>
@@ -1026,22 +1028,16 @@ export default function CameraTrackingPage() {
 
             {/* Detection banner */}
             {detectionConfirmed ? (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-left">
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-                <div>
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">✅ Erkennung bestätigt</p>
-                  <p className="text-xs text-muted-foreground">
-                    {playerCount} aktuell · {peakDetections} max. erkannt
-                  </p>
-                </div>
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-left">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                <p className="text-xs text-muted-foreground">
+                  {playerCount} aktuell · {peakDetections} max.
+                </p>
               </div>
             ) : (
-              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
-                <Users className="h-5 w-5 shrink-0 animate-pulse text-amber-500" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Suche Spieler…</p>
-                  <p className="text-xs text-muted-foreground">{playerCount} erkannt — warte auf Bestätigung</p>
-                </div>
+              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-left">
+                <Users className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
+                <p className="text-xs text-muted-foreground">Suche Spieler… {playerCount} erkannt</p>
               </div>
             )}
 
@@ -1079,27 +1075,23 @@ export default function CameraTrackingPage() {
 
             {/* Stability warning */}
             {stabilityWarning && (
-              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">📱 {stabilityWarning}</p>
-                </div>
-                <div className="flex gap-1.5">
-                  <Button variant="ghost" size="sm" onClick={() => setStabilityWarning(null)}>OK</Button>
-                  <Button variant="outline" size="sm" onClick={() => {
-                    setStabilityWarning(null);
-                    setShowInlineCalibration(true);
-                    setCalibrationPoints([]);
-                  }}>
-                    <Crosshair className="mr-1 h-3.5 w-3.5" /> Kalibrieren
-                  </Button>
-                </div>
+              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-left">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                <p className="text-xs flex-1">{stabilityWarning}</p>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setStabilityWarning(null)}>OK</Button>
+                <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => {
+                  setStabilityWarning(null);
+                  setShowInlineCalibration(true);
+                  setCalibrationPoints([]);
+                }}>
+                  <Crosshair className="h-3.5 w-3.5" />
+                </Button>
               </div>
             )}
 
             {/* Live events from coach */}
             {liveEvents.length > 0 && (
-              <div className="rounded-xl border border-border bg-card/50 p-3 max-h-24 overflow-y-auto space-y-1">
+              <div className="rounded-xl border border-border bg-card/50 p-3 max-h-20 overflow-y-auto space-y-1">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1">
                   <Bell className="h-3 w-3" /> Letzte Ereignisse
                 </div>
@@ -1112,8 +1104,10 @@ export default function CameraTrackingPage() {
                 ))}
               </div>
             )}
+            </div>
 
-            <div className="flex gap-2">
+            {/* Sticky bottom buttons — always visible */}
+            <div className="flex gap-2 pt-3 pb-2 bg-background sticky bottom-0 border-t border-border mt-auto">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => {
                 setShowInlineCalibration(true);
                 setCalibrationPoints([]);

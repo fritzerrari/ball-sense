@@ -31,7 +31,11 @@ export function TrackingOverlay({ detections, width = 1280, height = 720, classN
 
     ctx.clearRect(0, 0, w, h);
 
-    for (const det of detections) {
+    // Only draw persons and ball — filter out other labels
+    const validDetections = detections.filter(d => d.label === "person" || d.label === "ball");
+    let playerIndex = 0;
+
+    for (const det of validDetections) {
       const cx = det.x * w;
       const cy = det.y * h;
 
@@ -73,11 +77,12 @@ export function TrackingOverlay({ detections, width = 1280, height = 720, classN
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // ID label
+      // ID label — use sequential player index for consistent numbering
+      playerIndex++;
       ctx.font = "bold 9px system-ui";
       ctx.fillStyle = color;
       ctx.textAlign = "center";
-      ctx.fillText(String(det.id + 1), cx, cy - r - 3);
+      ctx.fillText(String(playerIndex), cx, cy - r - 3);
     }
   }, [detections, width, height]);
 
