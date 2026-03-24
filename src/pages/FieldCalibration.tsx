@@ -266,14 +266,24 @@ export default function FieldCalibration() {
         confidence: data?.confidence ?? null,
         detectedFeatures: Array.isArray(data?.detectedFeatures) ? data.detectedFeatures : [],
         suggestedDimensions: data?.suggestedDimensions
-          ? {
-              width: Number(data.suggestedDimensions.width),
-              height: Number(data.suggestedDimensions.height),
-            }
+          ? { width: Number(data.suggestedDimensions.width), height: Number(data.suggestedDimensions.height) }
           : null,
+        isRealPitch: data?.isRealPitch === true,
+        isPartialView: data?.isPartialView === true,
+        visiblePortion: data?.visiblePortion ?? null,
+        inferredFullDimensions: data?.inferredFullDimensions
+          ? { width: Number(data.inferredFullDimensions.width), height: Number(data.inferredFullDimensions.height) }
+          : null,
+        pitchRejectionReason: data?.pitchRejectionReason ?? null,
       };
 
       setLayoutSuggestion(nextSuggestion);
+
+      // Not a real pitch → warn and abort
+      if (!nextSuggestion.isRealPitch) {
+        toast.error(nextSuggestion.pitchRejectionReason || "Kein Fußballplatz erkannt. Bitte ein Bild des Spielfelds verwenden.");
+        return;
+      }
 
       if (data?.corners && data.corners.length === 4) {
         setPoints(data.corners);
@@ -282,7 +292,26 @@ export default function FieldCalibration() {
         toast.error("Ecken konnten nicht erkannt werden. Bitte manuell setzen.");
       }
 
-      if (nextSuggestion.suggestedDimensions) {
+      // Auto-set coverage for partial views
+      if (nextSuggestion.isPartialView) {
+        const portion = nextSuggestion.visiblePortion;
+        if (portion === "left_half") {
+          handleCoverageChange("left_half");
+          toast.info("Teilansicht erkannt: Linke Spielfeldhälfte");
+        } else if (portion === "right_half") {
+          handleCoverageChange("right_half");
+          toast.info("Teilansicht erkannt: Rechte Spielfeldhälfte");
+        } else {
+          handleCoverageChange("custom");
+          toast.info(`Teilansicht erkannt: ${portion ?? "Ausschnitt"} — bitte Bereich anpassen`);
+        }
+      }
+
+      // Use inferred full dimensions for the field, visible dimensions as info
+      if (nextSuggestion.inferredFullDimensions) {
+        applySuggestedDimensions(nextSuggestion.inferredFullDimensions);
+        toast.success(`Feldmaße abgeleitet: ${nextSuggestion.inferredFullDimensions.width}×${nextSuggestion.inferredFullDimensions.height}m`);
+      } else if (nextSuggestion.suggestedDimensions) {
         applySuggestedDimensions(nextSuggestion.suggestedDimensions);
         toast.success(`Feldtyp erkannt: ${nextSuggestion.fieldType ?? "Standardfeld"}`);
       }
