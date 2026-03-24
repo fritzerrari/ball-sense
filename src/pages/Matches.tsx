@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, Swords, Calendar, MapPin, Trash2, Dumbbell, Search, Radio, Clock3, History } from "lucide-react";
+import { Plus, Swords, Calendar, MapPin, Trash2, Dumbbell, Search, Radio, Clock3, History, Camera, Loader2, CheckCircle2, ArrowRight, BarChart3, Sparkles } from "lucide-react";
 import { useMatches, useDeleteMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -74,6 +74,95 @@ function SummaryCard({
   );
 }
 
+/** Prominent banner for active/processing/done matches */
+function ActiveMatchBanner({ match, clubName }: { match: any; clubName: string | null }) {
+  const locale = useLocale();
+  const isTraining = match.match_type === "training";
+  const label = isTraining ? "Training" : `${clubName} vs ${match.away_club_name || "TBD"}`;
+  const dateStr = new Date(match.date).toLocaleDateString(locale);
+
+  if (match.status === "live" || match.status === "tracking") {
+    return (
+      <Link to={`/matches/${match.id}`} className="block">
+        <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 sm:p-5 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5">
+          <div className="absolute top-3 right-3 flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-primary" />
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-primary">Live</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+              <Camera className="h-6 w-6 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-bold font-display truncate">{label}</p>
+              <p className="text-sm text-muted-foreground">{dateStr}{match.kickoff && ` · ${match.kickoff}`}{match.fields?.name && ` · ${match.fields.name}`}</p>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground shrink-0" />
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  if (match.status === "processing") {
+    const progress = match.processing_progress as any;
+    const pct = progress?.percent ?? null;
+    return (
+      <Link to={`/matches/${match.id}`} className="block">
+        <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 sm:p-5 transition-all hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+              <Loader2 className="h-6 w-6 text-amber-500 animate-spin" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-bold font-display truncate">{label}</p>
+              <p className="text-sm text-muted-foreground">
+                Analyse wird verarbeitet…
+                {pct != null && ` (${Math.round(pct)}%)`}
+              </p>
+              {pct != null && (
+                <div className="mt-2 h-1.5 w-full rounded-full bg-amber-500/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-amber-500 transition-all duration-500" style={{ width: `${Math.min(100, pct)}%` }} />
+                </div>
+              )}
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground shrink-0" />
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  if (match.status === "done") {
+    return (
+      <Link to={`/matches/${match.id}`} className="block">
+        <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent p-4 sm:p-5 transition-all hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
+              <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-bold font-display truncate">{label}</p>
+              <p className="text-sm text-muted-foreground">{dateStr} · Analyse fertig — Ergebnisse ansehen</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <Sparkles className="h-3.5 w-3.5" /> Ergebnisse
+              </span>
+              <ArrowRight className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  return null;
+}
+
 export default function Matches() {
   const { clubName } = useAuth();
   const { data: matches, isLoading } = useMatches();
@@ -86,6 +175,20 @@ export default function Matches() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
   const { t } = useTranslation();
   const locale = useLocale();
+
+  // Matches that need prominent display
+  const activeMatches = useMemo(() => {
+    return (matches ?? []).filter((m) =>
+      ["live", "tracking", "processing", "done"].includes(m.status)
+    ).sort((a, b) => {
+      // Priority: live > processing > done
+      const priority: Record<string, number> = { live: 0, tracking: 0, processing: 1, done: 2 };
+      const pa = priority[a.status] ?? 3;
+      const pb = priority[b.status] ?? 3;
+      if (pa !== pb) return pa - pb;
+      return getMatchTimestamp(b) - getMatchTimestamp(a);
+    }).slice(0, 3); // Show max 3 banners
+  }, [matches]);
 
   const summary = useMemo(() => {
     const list = matches ?? [];
@@ -145,6 +248,15 @@ export default function Matches() {
             <Link to="/matches/new"><Plus className="mr-1 h-4 w-4" /> {t("matches.new")}</Link>
           </Button>
         </div>
+
+        {/* ── Prominent Active Match Banners ── */}
+        {activeMatches.length > 0 && (
+          <div className="space-y-3">
+            {activeMatches.map((match) => (
+              <ActiveMatchBanner key={match.id} match={match} clubName={clubName} />
+            ))}
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <SummaryCard label="Live-Sessions" value={summary.live} icon={Radio} active={timelineFilter === "live"} onClick={() => setTimelineFilter("live")} />
@@ -260,9 +372,11 @@ export default function Matches() {
                   const isTraining = match.match_type === "training";
                   const timeline = getTimeline(match);
                   const label = isTraining ? "Training" : `${clubName} vs ${match.away_club_name || "TBD"}`;
+                  const isActive = ["live", "tracking", "processing"].includes(match.status);
+                  const isDone = match.status === "done";
 
                   return (
-                    <tr key={match.id} className="border-b border-border/50 transition-colors hover:bg-muted/20">
+                    <tr key={match.id} className={`border-b border-border/50 transition-colors hover:bg-muted/20 ${isActive ? "bg-primary/[0.03]" : isDone ? "bg-emerald-500/[0.03]" : ""}`}>
                       <td className="px-4 py-3">
                         <span className="flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
@@ -276,8 +390,14 @@ export default function Matches() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-medium text-foreground">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex items-center gap-2">
                           <p className="truncate">{label}</p>
+                          {isActive && (
+                            <span className="relative flex h-2 w-2 shrink-0">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                            </span>
+                          )}
                           <p className="mt-1 text-xs text-muted-foreground lg:hidden">{getTimelineLabel(timeline)}</p>
                         </div>
                       </td>
@@ -295,8 +415,10 @@ export default function Matches() {
                       <td className="px-4 py-3"><StatusBadge status={match.status} /></td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link to={`/matches/${match.id}`}>{t("common.details")}</Link>
+                          <Button variant={isDone ? "hero" : "ghost"} size="sm" asChild>
+                            <Link to={`/matches/${match.id}`}>
+                              {isDone ? <><BarChart3 className="mr-1 h-3.5 w-3.5" /> Ergebnisse</> : t("common.details")}
+                            </Link>
                           </Button>
                           <Button
                             variant="ghost"
