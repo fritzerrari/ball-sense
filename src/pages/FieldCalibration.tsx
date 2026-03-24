@@ -104,6 +104,7 @@ export default function FieldCalibration() {
   const saveCalibration = useSaveCalibration();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastInputRef = useRef<{ x: number; y: number; ts: number } | null>(null);
 
   const [points, setPoints] = useState<CornerPoint[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -187,33 +188,38 @@ export default function FieldCalibration() {
     if (navigator.vibrate) navigator.vibrate(30);
   }, []);
 
+  const handlePointInput = useCallback((clientX: number, clientY: number) => {
+    const pos = getRelativePos(clientX, clientY);
+    if (!pos) return;
+    const now = Date.now();
+    const last = lastInputRef.current;
+    if (last && now - last.ts < 350 && Math.abs(last.x - pos.x) < 1.5 && Math.abs(last.y - pos.y) < 1.5) {
+      return;
+    }
+    lastInputRef.current = { x: pos.x, y: pos.y, ts: now };
+    addPoint(pos.x, pos.y);
+  }, [addPoint, getRelativePos]);
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (draggingIndex !== null) return;
     if ((e.target as HTMLElement).closest("[data-drag-handle]")) return;
-    const pos = getRelativePos(e.clientX, e.clientY);
-    if (!pos) return;
-    addPoint(pos.x, pos.y);
+    handlePointInput(e.clientX, e.clientY);
   };
 
   // onClick as fallback for mobile browsers where pointerDown doesn't fire reliably
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (draggingIndex !== null) return;
     if ((e.target as HTMLElement).closest("[data-drag-handle]")) return;
-    // Only use click fallback if pointerDown didn't already handle it
-    // We detect this by checking if points changed recently (within 300ms)
-    const pos = getRelativePos(e.clientX, e.clientY);
-    if (!pos) return;
-    // On desktop, pointerDown already added the point, so skip
-    // On mobile Safari, pointerDown may not fire, so click is the fallback
-    setPoints((prev) => {
-      if (prev.length >= 4) return prev;
-      // Check if a point was already added near this position (by pointerDown)
-      const lastPoint = prev[prev.length - 1];
-      if (lastPoint && Math.abs(lastPoint.x - pos.x) < 2 && Math.abs(lastPoint.y - pos.y) < 2) {
-        return prev; // Already handled by pointerDown
-      }
-      if (navigator.vibrate) navigator.vibrate(30);
-      return [...prev, { x: pos.x, y: pos.y }];
-    });
+    handlePointInput(e.clientX, e.clientY);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (draggingIndex !== null) return;
+    if ((e.target as HTMLElement).closest("[data-drag-handle]")) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    e.preventDefault();
+    handlePointInput(touch.clientX, touch.clientY);
   };
 
   const startDrag = (index: number, e: React.PointerEvent) => {
@@ -546,11 +552,8 @@ export default function FieldCalibration() {
             style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
             onPointerDown={handlePointerDown}
             onClick={handleClick}
-            onTouchStart={(e) => {
-              if (imageUrl && points.length < 4) {
-                e.preventDefault();
-              }
-            }}
+            onTouchEnd={handleTouchEnd}
+            onContextMenu={(e) => e.preventDefault()}
           >
             {imageUrl && <img src={imageUrl} alt="Spielfeld" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable={false} />}
 
