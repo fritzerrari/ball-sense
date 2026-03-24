@@ -20,6 +20,7 @@ import {
   Crosshair,
 } from "lucide-react";
 import { FootballTracker, type Detection, type UploadMode, type StabilityEvent } from "@/lib/football-tracker";
+import { LiveStatsEngine, type LiveSnapshot } from "@/lib/live-stats-engine";
 import type { HighlightClip } from "@/lib/highlight-recorder";
 import { TrackingOverlay } from "@/components/TrackingOverlay";
 import { supabase } from "@/integrations/supabase/client";
