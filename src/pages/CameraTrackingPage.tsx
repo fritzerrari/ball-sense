@@ -39,8 +39,11 @@ type MatchData = {
   away_club_name: string | null;
   status: string;
   field_id: string | null;
+  match_type?: string;
   fields?: { name?: string; width_m?: number; height_m?: number; calibration?: unknown } | null;
 };
+
+type LineupCounts = { home: number; away: number };
 
 interface MatchEvent {
   event_type: string;
@@ -90,6 +93,7 @@ export default function CameraTrackingPage() {
   const [highlightClipCount, setHighlightClipCount] = useState(0);
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
   const [liveStats, setLiveStats] = useState<LiveSnapshot | null>(null);
+  const [lineupCounts, setLineupCounts] = useState<LineupCounts>({ home: 0, away: 0 });
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const liveEngineRef = useRef<LiveStatsEngine | null>(null);
@@ -104,7 +108,10 @@ export default function CameraTrackingPage() {
   const sessionToken = useMemo(() => localStorage.getItem(sessionKey), [sessionKey]);
   const isCalibrated = Boolean(match?.fields?.calibration);
   const currentStepIdx = WIZARD_STEPS.findIndex((s) => s.key === (phase === "ended" ? "tracking" : phase));
-  const playerCount = currentDetections.filter(d => d.label === "person").length;
+  const personDetections = currentDetections.filter(d => d.label === "person");
+  const playerCount = personDetections.length;
+  const homePlayerCount = personDetections.filter(d => d.team === "home").length;
+  const awayPlayerCount = personDetections.filter(d => d.team === "away").length;
 
   const formatTime = (sec: number) =>
     `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
@@ -173,6 +180,9 @@ export default function CameraTrackingPage() {
     if (!resp.ok) throw new Error((await resp.json().catch(() => ({ error: "Session ungültig" }))).error);
     const data = await resp.json();
     setMatch(data.match);
+    if (data.lineupCounts) {
+      setLineupCounts(data.lineupCounts);
+    }
   };
 
   // Auto-restore session
@@ -306,6 +316,10 @@ export default function CameraTrackingPage() {
 
   const handleStartTracking = async () => {
     if (!trackerRef.current || !id) return;
+
+    // Set squad sizes from lineup data so simulation matches reality
+    trackerRef.current.setSquadSizes(lineupCounts.home, lineupCounts.away);
+
     const token = localStorage.getItem(sessionKey);
     if (token) {
       await fetch(CAMERA_OPS_URL, {
@@ -1020,9 +1034,13 @@ export default function CameraTrackingPage() {
 
               {inlineCalibrationOverlay}
 
-              <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
-                <Users className="h-4 w-4 text-primary" />
-                <span className="font-medium">{playerCount} Spieler</span>
+              <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-xs">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium">
+                  <span className="text-blue-400">{homePlayerCount}</span>
+                  {" vs "}
+                  <span className="text-red-400">{awayPlayerCount}</span>
+                </span>
               </div>
             </div>
 
@@ -1031,13 +1049,13 @@ export default function CameraTrackingPage() {
               <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-left">
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                 <p className="text-xs text-muted-foreground">
-                  {playerCount} aktuell · {peakDetections} max.
+                  ✅ {homePlayerCount} Heim · {awayPlayerCount} Gast erkannt ({playerCount} gesamt)
                 </p>
               </div>
             ) : (
               <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-left">
                 <Users className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
-                <p className="text-xs text-muted-foreground">Suche Spieler… {playerCount} erkannt</p>
+                <p className="text-xs text-muted-foreground">Suche Spieler… {playerCount} erkannt — warte auf Bestätigung</p>
               </div>
             )}
 

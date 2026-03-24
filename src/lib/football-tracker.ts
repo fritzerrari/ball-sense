@@ -59,7 +59,7 @@ export class FootballTracker {
   private ballY = 0.5;
   private ballVx = 0.01;
   private ballVy = 0.005;
-  private homeSquadSize = 11;
+  private homeSquadSize = 0;
   private awaySquadSize = 0;
 
   // Live streaming state
@@ -326,20 +326,26 @@ export class FootballTracker {
   private initStablePlayers() {
     this.stablePlayers = [];
     let id = 0;
-    for (let i = 0; i < this.homeSquadSize; i++) {
+
+    // If no squad sizes configured, use reasonable defaults based on simulation
+    // In real mode, these come from match lineups
+    const homeSize = this.homeSquadSize > 0 ? this.homeSquadSize : 7;
+    const awaySize = this.awaySquadSize > 0 ? this.awaySquadSize : 7;
+
+    for (let i = 0; i < homeSize; i++) {
       this.stablePlayers.push({
         id: id++,
-        x: 0.1 + (i / Math.max(1, this.homeSquadSize - 1)) * 0.8,
+        x: 0.1 + (i / Math.max(1, homeSize - 1)) * 0.8,
         y: 0.15 + Math.random() * 0.3,
         vx: (Math.random() - 0.5) * 0.008,
         vy: (Math.random() - 0.5) * 0.005,
         team: "home",
       });
     }
-    for (let i = 0; i < this.awaySquadSize; i++) {
+    for (let i = 0; i < awaySize; i++) {
       this.stablePlayers.push({
         id: id++,
-        x: 0.1 + (i / Math.max(1, this.awaySquadSize - 1)) * 0.8,
+        x: 0.1 + (i / Math.max(1, awaySize - 1)) * 0.8,
         y: 0.55 + Math.random() * 0.3,
         vx: (Math.random() - 0.5) * 0.008,
         vy: (Math.random() - 0.5) * 0.005,
