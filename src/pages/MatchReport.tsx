@@ -443,6 +443,24 @@ export default function MatchReport() {
           )}
         </div>
 
+        {/* Partial field coverage warning */}
+        {isExtrapolated && hasStats && (
+          <div className="glass-card border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <EyeOff className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Teilfeld erkannt – {Math.round(coverageRatio * 100)}% Abdeckung</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Die Kamera hat nicht das gesamte Spielfeld erfasst. Physische Metriken (Distanz, Sprints) wurden automatisch auf das volle Spielfeld hochgerechnet. 
+                  Die Genauigkeit verbessert sich mit zusätzlichen Kameras oder besserer Platzierung.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {match.status === "processing" && <ProcessingRoadmap matchId={match.id} uploadCount={uploads?.length ?? 1} />}
         {/* Live Analysis Progress Banner */}
         {(isLive || hasPartialData) && (
