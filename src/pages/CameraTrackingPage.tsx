@@ -349,7 +349,6 @@ export default function CameraTrackingPage() {
   };
 
   const handleEnd = () => {
-    trackerRef.current?.stopTracking();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
     }
