@@ -1148,7 +1148,6 @@ export default function CameraTrackingPage() {
               <p className="text-sm text-muted-foreground">
                 {formatTime(elapsedSec)} · {trackerRef.current?.getFrameCount() ?? 0} Frames aufgezeichnet
               </p>
-              </p>
             </div>
 
             {uploadDone ? (
