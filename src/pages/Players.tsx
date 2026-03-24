@@ -134,8 +134,67 @@ export default function Players() {
           </div>
         </div>
 
-        {isLoading ? <SkeletonTable rows={5} cols={6} /> : filtered.length === 0 ? (
-          <EmptyState icon={<Users className="h-10 w-10" />} title={t("players.noPlayers")} description={search ? t("players.noResults") : t("players.addFirst")} action={!search && <Button variant="heroOutline" onClick={openCreate}>{t("players.add")}</Button>} />
+        {isLoading ? <SkeletonTable rows={5} cols={6} /> : filtered.length === 0 && !search ? (
+          <div className="glass-card p-8 space-y-6">
+            <div className="text-center space-y-2">
+              <Users className="h-12 w-12 mx-auto text-muted-foreground/50" />
+              <h2 className="text-xl font-bold font-display">Wie möchtest du starten?</h2>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Du kannst deinen Kader jetzt anlegen — oder die KI erkennt Spieler automatisch beim Tracking.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+              {/* Option 1: Manual */}
+              <button
+                onClick={openCreate}
+                className="group relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border bg-card hover:border-primary hover:shadow-lg transition-all text-center"
+              >
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                  <Plus className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Manuell anlegen</p>
+                  <p className="text-xs text-muted-foreground mt-1">Spieler einzeln mit Name, Nummer & Position hinzufügen</p>
+                </div>
+              </button>
+
+              {/* Option 2: Photo Import */}
+              <button
+                onClick={() => setImportOpen(true)}
+                className="group relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border bg-card hover:border-primary hover:shadow-lg transition-all text-center"
+              >
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                  <Camera className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Foto-Import</p>
+                  <p className="text-xs text-muted-foreground mt-1">Spielerliste fotografieren — KI liest Namen & Nummern aus</p>
+                </div>
+              </button>
+
+              {/* Option 3: AI Auto-Detect */}
+              <Link
+                to="/matches/new"
+                className="group relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:border-primary hover:shadow-lg transition-all text-center"
+              >
+                <span className="absolute -top-2.5 right-3 text-[10px] font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded-full">EMPFOHLEN</span>
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                  <Users className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Überspringen</p>
+                  <p className="text-xs text-muted-foreground mt-1">Direkt Spiel anlegen — KI erkennt Spieler & Teams automatisch</p>
+                </div>
+              </Link>
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center">
+              💡 Du kannst Spieler jederzeit nachträglich anlegen oder KI-erkannte Spieler deinem Kader zuordnen.
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState icon={<Users className="h-10 w-10" />} title={t("players.noPlayers")} description={t("players.noResults")} />
         ) : (
           <div className="glass-card overflow-hidden">
             <table className="w-full text-sm">
