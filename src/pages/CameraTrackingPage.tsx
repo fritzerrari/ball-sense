@@ -29,6 +29,7 @@ import { toast } from "sonner";
 const CAMERA_ACCESS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-access`;
 const CAMERA_OPS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`;
 const PROCESS_TRACKING_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-tracking`;
+const DETECT_FIELD_CORNERS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/detect-field-corners`;
 
 // Simplified 3-step wizard
 type Phase = "auth" | "camera" | "tracking" | "ended";
