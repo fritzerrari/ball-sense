@@ -1146,7 +1146,8 @@ export default function CameraTrackingPage() {
                 {uploadDone ? "Upload erfolgreich! 🎉" : uploading ? "Wird hochgeladen…" : "Tracking beendet"}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {formatTime(elapsedSec)} · {trackerRef.current?.getFrameCount() ?? 0} Frames · {peakDetections} max. Spieler
+                {formatTime(elapsedSec)} · {trackerRef.current?.getFrameCount() ?? 0} Frames aufgezeichnet
+              </p>
               </p>
             </div>
 
