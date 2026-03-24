@@ -102,7 +102,8 @@ export default function FieldCalibration() {
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [layoutSuggestion, setLayoutSuggestion] = useState<LayoutSuggestion>(EMPTY_LAYOUT_SUGGESTION);
-
+  const [coverage, setCoverage] = useState<FieldCoverage>("full");
+  const [fieldRect, setFieldRect] = useState<FieldRect>({ x: 0, y: 0, w: 1, h: 1 });
   const cornerLabels = ["Links-Oben", "Rechts-Oben", "Rechts-Unten", "Links-Unten"];
   const canSave = points.length === 4;
   const returnTo = searchParams.get("returnTo");
