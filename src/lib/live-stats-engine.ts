@@ -138,7 +138,8 @@ export class LiveStatsEngine {
     }
 
     // Remove stale tracks
-    for (const [tid, pos] of this.activePositions) {
+    const staleEntries = Array.from(this.activePositions.entries());
+    for (const [tid, pos] of staleEntries) {
       if (!matched.has(tid) && frame.timestamp - pos.t > TRACK_TIMEOUT_MS) {
         this.activePositions.delete(tid);
       }
