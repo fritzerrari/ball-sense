@@ -678,11 +678,21 @@ export default function CameraTrackingPage() {
               variant="hero"
               size="xl"
               className="w-full min-h-[56px]"
-              onClick={handleStartTracking}
+              onClick={() => {
+                if (!isCalibrated) {
+                  setShowInlineCalibration(true);
+                  setCalibrationPoints([]);
+                  toast.info("Bitte zuerst den Platz kalibrieren — markiere die 4 Eckpunkte des Spielfelds.");
+                  return;
+                }
+                handleStartTracking();
+              }}
               disabled={!modelLoaded || !cameraReady}
             >
               {!modelLoaded ? (
                 <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Modell wird geladen…</>
+              ) : !isCalibrated ? (
+                <><Crosshair className="mr-2 h-5 w-5" /> Platz kalibrieren &amp; starten</>
               ) : (
                 <>Tracking starten <ChevronRight className="ml-2 h-5 w-5" /></>
               )}
@@ -690,7 +700,7 @@ export default function CameraTrackingPage() {
 
             {!isCalibrated && (
               <p className="text-xs text-amber-600 dark:text-amber-400">
-                ⚠️ Ohne Kalibrierung sind die Tracking-Daten weniger genau.
+                ⚠️ Kalibrierung ist erforderlich für genaue Tracking-Daten.
               </p>
             )}
 
