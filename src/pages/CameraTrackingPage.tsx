@@ -193,22 +193,23 @@ export default function CameraTrackingPage() {
     }
   }, [phase]);
 
-  // Incremental chunk upload every 5 minutes during tracking
+  // 30-second micro-batch sync during tracking
   useEffect(() => {
     if (phase !== "tracking") return;
-    const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-    const uploadIncrementalChunk = async () => {
+    const SYNC_INTERVAL_MS = 30_000; // 30 seconds
+    const syncMicroBatch = async () => {
       const token = localStorage.getItem(sessionKey);
-      if (!trackerRef.current || !id || !token) return;
+      if (!liveEngineRef.current || !trackerRef.current || !id || !token) return;
       try {
+        const syncData = liveEngineRef.current.getStatsForSync();
+        if (syncData.totalFrames < 5) return; // Not enough data yet
         const frames = trackerRef.current.getRecentFrames?.() ?? [];
-        if (frames.length < 10) return; // Not enough data yet
         const durationSec = trackerRef.current.getElapsedSeconds();
         const trackingData = {
           matchId: id, cameraIndex: cam, frames, framesCount: frames.length,
           durationSec, createdAt: new Date().toISOString(),
         };
-        // Upload chunk via camera-ops
+        // Upload tracking data chunk
         await fetch(CAMERA_OPS_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -223,12 +224,12 @@ export default function CameraTrackingPage() {
           headers: { "Content-Type": "application/json", "x-camera-session-token": token },
           body: JSON.stringify({ matchId: id, action: "incremental" }),
         });
-        console.log(`[Incremental] Uploaded ${frames.length} frames chunk`);
+        console.log(`[MicroBatch] Synced ${syncData.totalFrames} frames, ${syncData.playerStats.length} players`);
       } catch (err) {
-        console.warn("[Incremental] Chunk upload failed:", err);
+        console.warn("[MicroBatch] Sync failed:", err);
       }
     };
-    const interval = setInterval(uploadIncrementalChunk, INTERVAL_MS);
+    const interval = setInterval(syncMicroBatch, SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [phase, id, cam, sessionKey]);
 
