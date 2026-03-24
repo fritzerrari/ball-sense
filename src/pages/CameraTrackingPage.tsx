@@ -363,29 +363,43 @@ export default function CameraTrackingPage() {
     if (!trackerRef.current || !id || !token) return;
     setUploading(true);
     try {
-      const result = await trackerRef.current.uploadMatch(
-        id, cam,
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      );
-      const registerResp = await fetch(CAMERA_OPS_URL, {
+      // Build session data from tracker frames
+      const frames = trackerRef.current.stopTracking();
+      const durationSec = trackerRef.current.getElapsedSeconds();
+      const trackingData = {
+        matchId: id,
+        cameraIndex: cam,
+        frames,
+        framesCount: frames.length,
+        durationSec,
+        createdAt: new Date().toISOString(),
+      };
+
+      toast.info("Daten werden hochgeladen…");
+
+      // Upload tracking data through camera-ops (service role bypasses storage RLS)
+      const uploadResp = await fetch(CAMERA_OPS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "register_upload",
+          action: "upload_tracking",
           matchId: id, cameraIndex: cam, sessionToken: token,
-          filePath: result.filePath, framesCount: result.framesCount, durationSec: result.durationSec,
+          trackingData,
+          framesCount: frames.length,
+          durationSec,
         }),
       });
-      if (!registerResp.ok)
-        throw new Error((await registerResp.json().catch(() => ({ error: "Upload konnte nicht registriert werden" }))).error);
+      const uploadData = await uploadResp.json().catch(() => ({ error: "Upload fehlgeschlagen" }));
+      if (!uploadResp.ok) throw new Error(uploadData.error || "Upload fehlgeschlagen");
 
+      // Set match status to processing
       await fetch(CAMERA_OPS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "update_status", matchId: id, cameraIndex: cam, sessionToken: token, status: "processing" }),
       });
 
+      // Trigger processing
       await fetch(PROCESS_TRACKING_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-camera-session-token": token },
@@ -404,8 +418,9 @@ export default function CameraTrackingPage() {
       }
 
       setUploadDone(true);
-      toast.success("Upload erfolgreich! 🎉");
+      toast.success("Upload erfolgreich! Analyse wird gestartet 🎉");
     } catch (error) {
+      console.error("[Upload] Error:", error);
       toast.error(error instanceof Error ? error.message : "Upload fehlgeschlagen");
     } finally {
       setUploading(false);
