@@ -700,7 +700,7 @@ async function runProcessing(supabase: any, matchId: string) {
       sprint_count: ps.stats.sprint_count, sprint_distance_m: ps.stats.sprint_distance_m,
       heatmap_grid: ps.stats.heatmap_grid, positions_raw: ps.stats.positions_raw,
       minutes_played: ps.stats.minutes_played || Math.round(totalDurationSec / 60),
-      data_source: "fieldiq", raw_metrics: { assignment_confidence: ps.confidence, cameras_used: sessions.length },
+      data_source: "fieldiq", raw_metrics: { assignment_confidence: ps.confidence, cameras_used: sessions.length, player_name: ps.player_name, auto_discovered: useAutoDiscovery && !ps.player_id },
     }));
     if (playerInserts.length > 0) {
       const { error: insertErr } = await supabase.from("player_match_stats").insert(playerInserts);
