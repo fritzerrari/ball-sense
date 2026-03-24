@@ -2,7 +2,7 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
-import { ArrowLeft, ArrowRight, Calendar, Users, Camera, QrCode, Loader2, Check, Dumbbell, Swords, ShieldCheck, EyeOff, UserPlus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Users, Camera, Loader2, Check, Dumbbell, Swords, ShieldCheck, EyeOff, UserPlus, Copy, Share2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { usePlayers } from "@/hooks/use-players";
 import { useFields } from "@/hooks/use-fields";
@@ -10,6 +10,7 @@ import { useCreateMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { FORMATIONS } from "@/lib/constants";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface GuestPlayer {
   name: string;
@@ -25,7 +26,7 @@ const MATCH_POSITIONS = [
 
 export default function NewMatch() {
   const navigate = useNavigate();
-  const { clubName } = useAuth();
+  const { clubName, clubId, session } = useAuth();
   const { data: players } = usePlayers();
   const { data: fields } = useFields();
   const createMatch = useCreateMatch();
@@ -55,21 +56,24 @@ export default function NewMatch() {
   const [trackOpponent, setTrackOpponent] = useState(false);
   const [opponentConsentConfirmed, setOpponentConsentConfirmed] = useState(false);
 
+  // Post-creation state
+  const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
+  const [generatedCodes, setGeneratedCodes] = useState<string[]>([]);
+  const [generatingCodes, setGeneratingCodes] = useState(false);
+
   const activePlayers = (players ?? []).filter((player) => player.active);
   const isTraining = matchType === "training";
 
+  // Simplified 3-step wizard
   const steps = isTraining
     ? [
-        { label: "Typ", icon: Dumbbell },
-        { label: "Details", icon: Calendar },
+        { label: "Details", icon: Dumbbell },
         { label: "Spieler", icon: Users },
         { label: "Kameras", icon: Camera },
       ]
     : [
-        { label: "Typ", icon: Swords },
         { label: "Details", icon: Calendar },
-        { label: "Heim", icon: Users },
-        { label: "Gast", icon: Users },
+        { label: "Aufstellung", icon: Users },
         { label: "Kameras", icon: Camera },
       ];
 
@@ -154,17 +158,14 @@ export default function NewMatch() {
     setGuestPlayers([...guestPlayers, { name: "", number: String(guestPlayers.length + 1), position: "" }]);
   };
 
-  // Select all starters
   const handleSelectAllStarters = () => {
     const allIds = activePlayers.slice(0, squadSize).map(p => p.id);
     setHomeStarters(new Set(allIds));
-    // Remove from bench
     const bench = new Set(homeBench);
     allIds.forEach(id => bench.delete(id));
     setHomeBench(bench);
   };
 
-  // Select all training players
   const handleSelectAllTraining = () => {
     if (trainingPlayers.size === activePlayers.length) {
       setTrainingPlayers(new Set());
@@ -173,18 +174,20 @@ export default function NewMatch() {
     }
   };
 
-  // Clear all starters
   const handleClearStarters = () => {
     setHomeStarters(new Set());
   };
 
   const canProceed = () => {
-    if (step === 0) return true;
-    if (step === 1) {
+    if (step === 0) {
       return Boolean(date && fieldId && consentPlayersConfirmed && consentMinorsConfirmed && (!trackOpponent || opponentConsentConfirmed));
     }
-    if (isTraining && step === 2) return trainingPlayers.size >= 1;
+    if (step === 1 && isTraining) return trainingPlayers.size >= 1;
     return true;
+  };
+
+  const generateCameraCode = (): string => {
+    return String(Math.floor(100000 + Math.random() * 900000));
   };
 
   const handleCreate = async () => {
@@ -265,10 +268,117 @@ export default function NewMatch() {
       lineups,
     });
 
-    navigate(`/matches/${newMatch.id}`);
+    setCreatedMatchId(newMatch.id);
+
+    // Auto-generate camera codes
+    setGeneratingCodes(true);
+    const codes: string[] = [];
+    try {
+      for (let i = 0; i < cameras; i++) {
+        const codeStr = generateCameraCode();
+        codes.push(codeStr);
+        // Hash and store the code
+        const encoder = new TextEncoder();
+        const data = encoder.encode(codeStr);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+
+        await supabase.from("camera_access_codes").insert({
+          club_id: clubId!,
+          code_hash: hashHex,
+          label: `Kamera ${i + 1} – ${awayName || (isTraining ? "Training" : "Spiel")} ${date}`,
+          created_by_user_id: session!.user.id,
+        });
+      }
+      setGeneratedCodes(codes);
+    } catch {
+      toast.error("Codes konnten nicht generiert werden");
+    }
+    setGeneratingCodes(false);
+  };
+
+  const copyCode = (codeStr: string, index: number) => {
+    navigator.clipboard.writeText(codeStr).then(() => {
+      toast.success(`Code für Kamera ${index + 1} kopiert`);
+    }).catch(() => {
+      toast.error("Kopieren fehlgeschlagen");
+    });
+  };
+
+  const shareCode = (codeStr: string, index: number) => {
+    const url = `${window.location.origin}/camera/${createdMatchId}/track?cam=${index}`;
+    const text = `Kamera ${index + 1} Code: ${codeStr}\nLink: ${url}`;
+    if (navigator.share) {
+      navigator.share({ title: `Kamera ${index + 1}`, text }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text).then(() => toast.success("Code & Link kopiert"));
+    }
   };
 
   const selectedHomeCount = homeStarters.size + homeBench.size;
+
+  // If match was created, show codes screen
+  if (createdMatchId) {
+    return (
+      <AppLayout>
+        <div className="mx-auto max-w-3xl space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <Check className="h-8 w-8 text-emerald-400" />
+            </div>
+            <h1 className="text-2xl font-bold font-display">{isTraining ? "Training erstellt!" : "Spiel erstellt!"}</h1>
+            <p className="text-sm text-muted-foreground">Teile die Kamera-Codes mit deinen Helfern.</p>
+          </div>
+
+          {generatingCodes ? (
+            <div className="flex items-center justify-center gap-2 py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Codes werden generiert…</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {generatedCodes.map((codeStr, i) => (
+                <div key={i} className="glass-card p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                        <Camera className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold font-display">Kamera {i + 1}</p>
+                        <p className="text-xs text-muted-foreground">Kamera-Code</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-center py-3 bg-muted rounded-xl">
+                    <span className="text-3xl font-mono font-bold tracking-[0.3em] text-foreground">{codeStr}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={() => copyCode(codeStr, i)}>
+                      <Copy className="mr-2 h-4 w-4" /> Kopieren
+                    </Button>
+                    <Button variant="outline" className="flex-1" onClick={() => shareCode(codeStr, i)}>
+                      <Share2 className="mr-2 h-4 w-4" /> Teilen
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <Button variant="hero" size="lg" className="flex-1" onClick={() => navigate(`/matches/${createdMatchId}`)}>
+              Zum Spiel <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="lg" onClick={() => navigate("/matches")}>
+              Übersicht
+            </Button>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -277,7 +387,9 @@ export default function NewMatch() {
           <Link to="/matches" className="rounded-lg p-2 transition-colors hover:bg-muted">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-2xl font-bold font-display">{isTraining && step > 0 ? "Neues Training" : "Neues Spiel / Training"}</h1>
+          <h1 className="text-2xl font-bold font-display">
+            {step === 0 ? "Neues Spiel / Training" : isTraining ? "Neues Training" : "Neues Spiel"}
+          </h1>
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2">
@@ -299,29 +411,25 @@ export default function NewMatch() {
         </div>
 
         <div className="glass-card space-y-5 p-6">
+          {/* Step 0: Type + Details combined */}
           {step === 0 && (
             <>
-              <h2 className="text-lg font-semibold font-display">Was möchtest du aufzeichnen?</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <button onClick={() => { setMatchType("match"); setStep(1); }} className="glass-card group p-6 text-left transition-all hover:border-primary/40">
-                  <Swords className="mb-3 h-10 w-10 text-primary transition-transform group-hover:scale-110" />
-                  <h3 className="mb-1 font-semibold font-display">Spiel</h3>
-                  <p className="text-sm text-muted-foreground">Wettkampf mit Analyse, Gegner & Statistiken.</p>
+              {/* Type toggle */}
+              <div className="flex gap-2 p-1 bg-muted rounded-xl">
+                <button
+                  onClick={() => setMatchType("match")}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${matchType === "match" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Swords className="h-4 w-4" /> Spiel
                 </button>
-                <button onClick={() => { setMatchType("training"); setStep(1); }} className="glass-card group p-6 text-left transition-all hover:border-primary/40">
-                  <Dumbbell className="mb-3 h-10 w-10 text-primary transition-transform group-hover:scale-110" />
-                  <h3 className="mb-1 font-semibold font-display">Training</h3>
-                  <p className="text-sm text-muted-foreground">Trainingseinheit mit Tracking & Laufanalyse.</p>
+                <button
+                  onClick={() => setMatchType("training")}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${matchType === "training" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Dumbbell className="h-4 w-4" /> Training
                 </button>
               </div>
-            </>
-          )}
 
-          {step === 1 && (
-            <>
-              <h2 className="text-lg font-semibold font-display flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" /> {isTraining ? "Training-Details" : "Spiel-Details"}
-              </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm text-muted-foreground">Datum *</label>
@@ -346,13 +454,15 @@ export default function NewMatch() {
 
               {!isTraining && (
                 <>
-                  <div>
-                    <label className="mb-1 block text-sm text-muted-foreground">Heim</label>
-                    <input type="text" value={clubName ?? ""} disabled className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground/50" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm text-muted-foreground">Gegner</label>
-                    <input type="text" value={awayName} onChange={(event) => setAwayName(event.target.value)} placeholder="Vereinsname eingeben..." className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm text-muted-foreground">Heim</label>
+                      <input type="text" value={clubName ?? ""} disabled className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground/50" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm text-muted-foreground">Gegner</label>
+                      <input type="text" value={awayName} onChange={(event) => setAwayName(event.target.value)} placeholder="Vereinsname eingeben..." className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
+                    </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -371,31 +481,32 @@ export default function NewMatch() {
                 </>
               )}
 
-              <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4">
+              {/* Compact consent section */}
+              <div className="space-y-2 rounded-xl border border-border bg-card/60 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <ShieldCheck className="h-4 w-4 text-primary" /> Einwilligungen & Datenschutz
+                  <ShieldCheck className="h-4 w-4 text-primary" /> Einwilligungen
                 </div>
 
-                <label className="flex items-start gap-3 text-sm text-foreground">
+                <label className="flex items-start gap-3 text-xs text-foreground">
                   <Checkbox checked={consentPlayersConfirmed} onCheckedChange={(value) => setConsentPlayersConfirmed(Boolean(value))} />
-                  <span>Ich bestätige, dass alle getrackten Spieler eingewilligt haben.</span>
+                  <span>Alle getrackten Spieler haben eingewilligt.</span>
                 </label>
 
-                <label className="flex items-start gap-3 text-sm text-foreground">
+                <label className="flex items-start gap-3 text-xs text-foreground">
                   <Checkbox checked={consentMinorsConfirmed} onCheckedChange={(value) => setConsentMinorsConfirmed(Boolean(value))} />
-                  <span>Ich bestätige, dass alle Spieler volljährig sind oder eine wirksame Eltern-Einwilligung vorliegt.</span>
+                  <span>Alle Spieler sind volljährig oder haben Eltern-Einwilligung.</span>
                 </label>
 
                 {!isTraining && (
                   <>
-                    <label className="flex items-start gap-3 text-sm text-foreground">
+                    <label className="flex items-start gap-3 text-xs text-foreground">
                       <Checkbox checked={trackOpponent} onCheckedChange={(value) => setTrackOpponent(Boolean(value))} />
-                      <span>Auch die gegnerische Mannschaft soll getrackt werden.</span>
+                      <span>Gegner auch tracken</span>
                     </label>
                     {trackOpponent && (
-                      <label className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
+                      <label className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-2 text-xs text-foreground">
                         <Checkbox checked={opponentConsentConfirmed} onCheckedChange={(value) => setOpponentConsentConfirmed(Boolean(value))} />
-                        <span>Ich bestätige, dass auch für die gegnerische Mannschaft die nötige Einwilligung vorliegt.</span>
+                        <span>Einwilligung des Gegners liegt vor.</span>
                       </label>
                     )}
                   </>
@@ -404,7 +515,8 @@ export default function NewMatch() {
             </>
           )}
 
-          {step === 2 && isTraining && (
+          {/* Step 1: Players (Heim + Gast combined for match, or training players) */}
+          {step === 1 && isTraining && (
             <>
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold font-display flex items-center gap-2">
@@ -446,11 +558,12 @@ export default function NewMatch() {
             </>
           )}
 
-          {step === 2 && !isTraining && (
+          {step === 1 && !isTraining && (
             <>
+              {/* Home team */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h2 className="text-lg font-semibold font-display flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" /> Aufstellung Heim
+                  <Users className="h-5 w-5 text-primary" /> Aufstellung
                 </h2>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={handleSelectAllStarters}>
@@ -484,13 +597,13 @@ export default function NewMatch() {
                 </div>
               </div>
 
-              <p className="text-sm text-muted-foreground">Startelf: {homeStarters.size}/{squadSize} · Bank: {homeBench.size}/7 · Ausgewählt: {selectedHomeCount}</p>
+              <p className="text-sm text-muted-foreground">Startelf: {homeStarters.size}/{squadSize} · Bank: {homeBench.size}/7</p>
 
               <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
                 <span className="text-primary font-bold text-sm">💡</span>
                 <span><strong>Aufstellung optional.</strong> Falls du die Aufstellung nicht kennst, kannst du diesen Schritt überspringen – die KI erkennt Spieler automatisch.</span>
               </div>
-              <div className="space-y-2 max-h-[420px] overflow-y-auto">
+              <div className="space-y-2 max-h-[350px] overflow-y-auto">
                 {activePlayers.map((player) => {
                   const isStarter = homeStarters.has(player.id);
                   const isBench = homeBench.has(player.id);
@@ -515,7 +628,7 @@ export default function NewMatch() {
                               {MATCH_POSITIONS.filter(p => p).map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
                           ) : (
-                            <div className="text-xs text-muted-foreground">{player.position || "Keine Position"}</div>
+                            <div className="text-xs text-muted-foreground">{player.position || "—"}</div>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
@@ -532,65 +645,54 @@ export default function NewMatch() {
                   );
                 })}
               </div>
-            </>
-          )}
 
-          {step === 3 && !isTraining && (
-            <>
-              <h2 className="text-lg font-semibold font-display flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" /> Aufstellung Gast {awayName && `— ${awayName}`}
-              </h2>
-
+              {/* Guest section inline */}
               {trackOpponent && (
-                <div>
-                  <label className="mb-1.5 block text-sm text-muted-foreground">Spieleranzahl Gegner</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[5, 7, 9, 11].map((size) => (
-                      <button key={size} onClick={() => setAwaySquadSize(size)} className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${awaySquadSize === size ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-                        {size}er
-                      </button>
-                    ))}
-                    <input
-                      type="number"
-                      min={1}
-                      max={15}
-                      value={awaySquadSize}
-                      onChange={(e) => setAwaySquadSize(Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 11)))}
-                      className="w-16 rounded-lg border border-border bg-muted px-2 py-1.5 text-center text-sm text-foreground"
-                      title="Eigene Anzahl"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <p className="text-sm text-muted-foreground">{trackOpponent ? "Gegner wird mitgetrackt — Spielerdaten sind optional." : "Optional: Gegnerdaten als Spielkontext."}</p>
-
-              <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
-                <span className="text-primary font-bold text-sm">🤖</span>
-                <span><strong>KI-Erkennung aktiv.</strong> Wenn du keine Gegnerdaten einträgst, erkennt die KI automatisch die gegnerischen Spieler.</span>
-              </div>
-
-              {!trackOpponent ? (
-                <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-                  Gegner-Tracking ist deaktiviert. Falls du den Gegner tracken willst, aktiviere dies bei den Einwilligungen im Schritt Details.
-                </div>
-              ) : (
                 <>
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                    {guestPlayers.map((guestPlayer, index) => (
-                      <div key={index} className="flex gap-2">
-                        <input type="number" placeholder="#" value={guestPlayer.number} onChange={(event) => updateGuestPlayer(index, "number", event.target.value)} className="w-14 rounded-lg border border-border bg-muted px-2 py-2 text-center text-sm text-foreground" />
-                        <input type="text" placeholder={`Spieler ${index + 1}`} value={guestPlayer.name} onChange={(event) => updateGuestPlayer(index, "name", event.target.value)} className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
-                        <input type="text" placeholder="Pos" value={guestPlayer.position} onChange={(event) => updateGuestPlayer(index, "position", event.target.value)} className="w-16 rounded-lg border border-border bg-muted px-2 py-2 text-center text-sm text-foreground placeholder:text-muted-foreground" />
+                  <div className="border-t border-border pt-4 mt-4">
+                    <h3 className="text-base font-semibold font-display flex items-center gap-2 mb-3">
+                      <Users className="h-4 w-4 text-primary" /> Gast {awayName && `— ${awayName}`}
+                    </h3>
+
+                    <div className="mb-3">
+                      <label className="mb-1.5 block text-sm text-muted-foreground">Spieleranzahl Gegner</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[5, 7, 9, 11].map((size) => (
+                          <button key={size} onClick={() => setAwaySquadSize(size)} className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${awaySquadSize === size ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+                            {size}er
+                          </button>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="rounded-lg border border-primary/10 bg-primary/5 p-2 text-xs text-muted-foreground flex items-start gap-2 mb-3">
+                      <span className="text-primary font-bold">🤖</span>
+                      <span><strong>KI-Erkennung aktiv.</strong> Gegnerdaten sind optional.</span>
+                    </div>
+
+                    <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                      {guestPlayers.map((guestPlayer, index) => (
+                        <div key={index} className="flex gap-2">
+                          <input type="number" placeholder="#" value={guestPlayer.number} onChange={(event) => updateGuestPlayer(index, "number", event.target.value)} className="w-14 rounded-lg border border-border bg-muted px-2 py-2 text-center text-sm text-foreground" />
+                          <input type="text" placeholder={`Spieler ${index + 1}`} value={guestPlayer.name} onChange={(event) => updateGuestPlayer(index, "name", event.target.value)} className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
+                          <input type="text" placeholder="Pos" value={guestPlayer.position} onChange={(event) => updateGuestPlayer(index, "position", event.target.value)} className="w-16 rounded-lg border border-border bg-muted px-2 py-2 text-center text-sm text-foreground placeholder:text-muted-foreground" />
+                        </div>
+                      ))}
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={addGuestRow} className="mt-2">+ Weiteren Spieler</Button>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={addGuestRow}>+ Weiteren Spieler</Button>
                 </>
               )}
+
+              {!trackOpponent && !isTraining && (
+                <div className="rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  Gegner-Tracking ist deaktiviert. Aktiviere es bei den Einwilligungen im Schritt "Details".
+                </div>
+              )}
             </>
           )}
 
+          {/* Step 2: Cameras */}
           {step === lastStep && (
             <>
               <h2 className="text-lg font-semibold font-display flex items-center gap-2">
@@ -624,22 +726,9 @@ export default function NewMatch() {
                   </div>
                 </div>
               </div>
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Tracking-Links (nach dem Erstellen aktiv):</p>
-                {Array.from({ length: cameras }).map((_, index) => (
-                  <div key={index} className="glass-card flex items-center justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <QrCode className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium">Kamera {index + 1}</div>
-                        <div className="font-mono text-xs text-muted-foreground">/matches/:id/track?cam={index}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Die Kamera-Codes werden nach dem Erstellen automatisch generiert und angezeigt.
+              </p>
             </>
           )}
         </div>
@@ -648,9 +737,7 @@ export default function NewMatch() {
           <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
             <ArrowLeft className="mr-1 h-4 w-4" /> Zurück
           </Button>
-          {step === 0 ? (
-            <div />
-          ) : step < lastStep ? (
+          {step < lastStep ? (
             <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
               Weiter <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
