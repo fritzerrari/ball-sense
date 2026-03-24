@@ -1025,7 +1025,7 @@ export default function CameraTrackingPage() {
                 muted
                 autoPlay
               />
-              {!showInlineCalibration && <TrackingOverlay detections={currentDetections} />}
+              {/* TrackingOverlay hidden: simulation mode generates random positions that don't match real players */}
               {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
                   <Camera className="h-12 w-12" />
@@ -1034,30 +1034,26 @@ export default function CameraTrackingPage() {
 
               {inlineCalibrationOverlay}
 
-              <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-xs">
-                <Users className="h-3.5 w-3.5 text-primary" />
-                <span className="font-medium">
-                  <span className="text-blue-400">{homePlayerCount}</span>
-                  {" vs "}
-                  <span className="text-red-400">{awayPlayerCount}</span>
-                </span>
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card/80 backdrop-blur-sm border border-border text-xs">
+                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="font-medium text-muted-foreground">REC</span>
+              </div>
+              <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 backdrop-blur-sm border border-amber-500/30 text-xs text-amber-400">
+                <Camera className="h-3 w-3" />
+                <span>Simulation</span>
               </div>
             </div>
 
-            {/* Detection banner */}
-            {detectionConfirmed ? (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-left">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+            {/* Simulation info banner */}
+            <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-left">
+              <Camera className="h-4 w-4 shrink-0 text-amber-500" />
+              <div>
+                <p className="text-xs font-medium text-foreground">Simulationsmodus aktiv</p>
                 <p className="text-xs text-muted-foreground">
-                  ✅ {homePlayerCount} Heim · {awayPlayerCount} Gast erkannt ({playerCount} gesamt)
+                  Daten werden für die Backend-Analyse gesammelt. Echte Spielererkennung erfolgt serverseitig nach dem Spiel.
                 </p>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-left">
-                <Users className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
-                <p className="text-xs text-muted-foreground">Suche Spieler… {playerCount} erkannt — warte auf Bestätigung</p>
-              </div>
-            )}
+            </div>
 
             {/* Live Stats Dashboard */}
             {liveStats && liveStats.teams.length > 0 && (
@@ -1150,7 +1146,7 @@ export default function CameraTrackingPage() {
                 {uploadDone ? "Upload erfolgreich! 🎉" : uploading ? "Wird hochgeladen…" : "Tracking beendet"}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {formatTime(elapsedSec)} · {trackerRef.current?.getFrameCount() ?? 0} Frames · {peakDetections} max. Spieler
+                {formatTime(elapsedSec)} · {trackerRef.current?.getFrameCount() ?? 0} Frames aufgezeichnet
               </p>
             </div>
 
