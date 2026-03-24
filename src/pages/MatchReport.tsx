@@ -124,6 +124,22 @@ export default function MatchReport() {
     if (!clubId || !session?.user?.id || !id) return;
     setGeneratingCode(true);
     try {
+      // Deactivate old codes for this club first (keep max 3)
+      const { data: existingCodes } = await supabase
+        .from("camera_access_codes")
+        .select("id, created_at")
+        .eq("club_id", clubId)
+        .eq("active", true)
+        .order("created_at", { ascending: true });
+
+      if (existingCodes && existingCodes.length >= 3) {
+        // Deactivate oldest code to make room
+        await supabase
+          .from("camera_access_codes")
+          .update({ active: false })
+          .eq("id", existingCodes[0].id);
+      }
+
       const values = new Uint32Array(1);
       crypto.getRandomValues(values);
       const code = String(values[0] % 1_000_000).padStart(6, "0");
