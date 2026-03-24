@@ -199,7 +199,7 @@ export class LiveStatsEngine {
    */
   getSnapshot(): LiveSnapshot {
     // Filter to significant tracks (>10 frames = actually tracked)
-    const significantTracks = [...this.tracks.values()].filter(t => t.frameCount > 10);
+    const significantTracks = Array.from(this.tracks.values()).filter(t => t.frameCount > 10);
 
     const teams: LiveTeamStats[] = [];
     for (const team of ["home", "away"] as const) {
