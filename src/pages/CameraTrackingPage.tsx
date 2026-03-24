@@ -437,12 +437,25 @@ export default function CameraTrackingPage() {
         body: JSON.stringify({ action: "update_status", matchId: id, cameraIndex: cam, sessionToken: token, status: "processing" }),
       });
 
-      // Trigger processing
-      await fetch(PROCESS_TRACKING_URL, {
+      // Trigger processing - try with camera session token header
+      const processResp = await fetch(PROCESS_TRACKING_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-camera-session-token": token },
         body: JSON.stringify({ matchId: id }),
       });
+      if (!processResp.ok) {
+        console.warn("[Upload] Process-tracking trigger failed, will retry via anon key");
+        // Fallback: trigger with anon key (process-tracking also accepts this for camera sessions)
+        await fetch(PROCESS_TRACKING_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-camera-session-token": token,
+            "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ matchId: id }),
+        }).catch(e => console.error("[Upload] Retry also failed:", e));
+      }
 
       // Upload highlight clips if any
       const recorder = trackerRef.current.getHighlightRecorder();
