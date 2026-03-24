@@ -12,7 +12,7 @@ import { usePlayers } from "@/hooks/use-players";
 import { useFields } from "@/hooks/use-fields";
 import { useCreateMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
-import { FORMATIONS } from "@/lib/constants";
+import { FORMATIONS, FORMATIONS_BY_SIZE, SQUAD_FORMATS } from "@/lib/constants";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -41,8 +41,8 @@ export default function NewMatch() {
   const [kickoff, setKickoff] = useState("");
   const [fieldId, setFieldId] = useState("");
   const [awayName, setAwayName] = useState("");
-  const [homeFormation, setHomeFormation] = useState("4-4-2");
-  const [awayFormation, setAwayFormation] = useState("4-4-2");
+  const [homeFormation, setHomeFormation] = useState("");
+  const [awayFormation, setAwayFormation] = useState("");
   const [homeStarters, setHomeStarters] = useState<Set<string>>(new Set());
   const [homeBench, setHomeBench] = useState<Set<string>>(new Set());
   const [shirtNumbers, setShirtNumbers] = useState<Record<string, number>>({});
@@ -421,6 +421,33 @@ export default function NewMatch() {
 
               {!isTraining && (
                 <>
+                  {/* Squad format selector */}
+                  <div>
+                    <label className="mb-1 block text-sm text-muted-foreground">Spielformat *</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {SQUAD_FORMATS.map((fmt) => (
+                        <button
+                          key={fmt.size}
+                          type="button"
+                          onClick={() => {
+                            setSquadSize(fmt.size);
+                            setAwaySquadSize(fmt.size);
+                            const fmts = FORMATIONS_BY_SIZE[fmt.size] ?? FORMATIONS;
+                            if (!fmts.includes(homeFormation)) setHomeFormation(fmts[0]);
+                            if (!fmts.includes(awayFormation)) setAwayFormation(fmts[0]);
+                          }}
+                          className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
+                            squadSize === fmt.size
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border text-muted-foreground hover:border-primary/40"
+                          }`}
+                        >
+                          {fmt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm text-muted-foreground">Heim</label>
@@ -431,17 +458,20 @@ export default function NewMatch() {
                       <input type="text" value={awayName} onChange={(e) => setAwayName(e.target.value)} placeholder="Vereinsname..." className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
                     </div>
                   </div>
+
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm text-muted-foreground">Formation Heim</label>
                       <select value={homeFormation} onChange={(e) => setHomeFormation(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
-                        {FORMATIONS.map((f) => <option key={f}>{f}</option>)}
+                        <option value="">Auto (KI)</option>
+                        {(FORMATIONS_BY_SIZE[squadSize] ?? FORMATIONS).map((f) => <option key={f}>{f}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm text-muted-foreground">Formation Gast</label>
                       <select value={awayFormation} onChange={(e) => setAwayFormation(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
-                        {FORMATIONS.map((f) => <option key={f}>{f}</option>)}
+                        <option value="">Auto (KI)</option>
+                        {(FORMATIONS_BY_SIZE[squadSize] ?? FORMATIONS).map((f) => <option key={f}>{f}</option>)}
                       </select>
                     </div>
                   </div>

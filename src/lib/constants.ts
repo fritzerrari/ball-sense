@@ -2,6 +2,20 @@ import type { PlanType } from "./types";
 
 export const FORMATIONS = ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1", "3-4-3", "5-3-2", "5-4-1"];
 
+export const SQUAD_FORMATS = [
+  { label: "5 vs 5", size: 5 },
+  { label: "7 vs 7", size: 7 },
+  { label: "9 vs 9", size: 9 },
+  { label: "11 vs 11", size: 11 },
+] as const;
+
+export const FORMATIONS_BY_SIZE: Record<number, string[]> = {
+  5: ["1-2-1", "2-1-1", "1-1-2", "2-2"],
+  7: ["2-3-1", "3-2-1", "2-2-2", "3-1-2"],
+  9: ["3-3-2", "3-2-3", "4-3-1", "3-4-1"],
+  11: ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1", "3-4-3", "5-3-2", "5-4-1"],
+};
+
 export const POSITIONS = [
   "TW", "IV", "LV", "RV", "LIV", "RIV",
   "ZDM", "ZM", "LM", "RM", "ZOM",
