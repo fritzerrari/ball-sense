@@ -1034,9 +1034,13 @@ export default function CameraTrackingPage() {
 
               {inlineCalibrationOverlay}
 
-              <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
-                <Users className="h-4 w-4 text-primary" />
-                <span className="font-medium">{playerCount} Spieler</span>
+              <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-xs">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium">
+                  <span className="text-blue-400">{homePlayerCount}</span>
+                  {" vs "}
+                  <span className="text-red-400">{awayPlayerCount}</span>
+                </span>
               </div>
             </div>
 
