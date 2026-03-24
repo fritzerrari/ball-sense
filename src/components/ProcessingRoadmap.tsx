@@ -1,6 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
-import { CheckCircle2, Circle, Loader2, Clock, Cpu, Users, BarChart3, Grid3X3, Sparkles } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { CheckCircle2, Circle, Loader2, Clock, Cpu, Users, BarChart3, Grid3X3, Sparkles, RefreshCw, AlertTriangle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ProcessingPhase {
   key: string;
@@ -22,85 +25,189 @@ const PHASES: ProcessingPhase[] = [
 const TOTAL_ESTIMATED_MIN = PHASES.reduce((sum, p) => sum + p.durationMin, 0);
 
 interface ProcessingRoadmapProps {
+  matchId: string;
   matchCreatedAt?: string;
   uploadCount?: number;
 }
 
-export function ProcessingRoadmap({ matchCreatedAt, uploadCount = 1 }: ProcessingRoadmapProps) {
-  const [elapsed, setElapsed] = useState(0);
+interface ProcessingProgress {
+  phase: string;
+  progress: number;
+  detail: string | null;
+  updated_at: string;
+}
 
-  // Tick every second
+export function ProcessingRoadmap({ matchId, matchCreatedAt, uploadCount = 1 }: ProcessingRoadmapProps) {
+  const [elapsed, setElapsed] = useState(0);
+  const [dbProgress, setDbProgress] = useState<ProcessingProgress | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  // Tick every second for elapsed counter
   useEffect(() => {
     const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate current phase based on elapsed time
-  const { currentPhaseIndex, phaseProgress, overallProgress, estimatedEnd } = useMemo(() => {
-    const totalSec = TOTAL_ESTIMATED_MIN * 60;
-    const cameraMultiplier = Math.max(1, uploadCount * 0.7);
-    const adjustedTotal = totalSec * cameraMultiplier;
-    const progress = Math.min((elapsed / adjustedTotal) * 100, 95); // cap at 95% until done
-
-    let accumulated = 0;
-    let phaseIdx = 0;
-    let phaseProg = 100;
-
-    for (let i = 0; i < PHASES.length; i++) {
-      const phaseSec = PHASES[i].durationMin * 60 * cameraMultiplier;
-      if (elapsed < accumulated + phaseSec) {
-        phaseIdx = i;
-        phaseProg = phaseSec > 0 ? Math.min(((elapsed - accumulated) / phaseSec) * 100, 100) : 100;
-        break;
+  // Poll DB for real progress every 3 seconds
+  useEffect(() => {
+    if (!matchId) return;
+    const poll = async () => {
+      const { data } = await supabase
+        .from("matches")
+        .select("processing_progress, status")
+        .eq("id", matchId)
+        .single();
+      if (data && (data as any).processing_progress) {
+        setDbProgress((data as any).processing_progress as ProcessingProgress);
       }
-      accumulated += phaseSec;
-      if (i === PHASES.length - 1) {
-        phaseIdx = i;
-        phaseProg = 95;
+    };
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [matchId]);
+
+  const handleRetry = useCallback(async () => {
+    setIsRetrying(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) { toast.error("Bitte erneut anmelden"); return; }
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-tracking`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ matchId, action: "retry" }),
+      });
+      if (resp.ok) {
+        toast.success("Verarbeitung wird erneut gestartet");
+        setDbProgress({ phase: "upload", progress: 0, detail: "Erneut gestartet", updated_at: new Date().toISOString() });
+        setElapsed(0);
+      } else {
+        toast.error("Retry fehlgeschlagen");
       }
+    } catch {
+      toast.error("Verbindungsfehler");
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [matchId]);
+
+  // Use DB progress if available, otherwise fall back to time-based estimation
+  const { currentPhaseIndex, phaseProgress, overallProgress, estimatedEnd, isError, isComplete } = useMemo(() => {
+    const phaseKeys = PHASES.map(p => p.key);
+
+    if (dbProgress) {
+      if (dbProgress.phase === "error") {
+        return { currentPhaseIndex: 0, phaseProgress: 0, overallProgress: 0, estimatedEnd: new Date(), isError: true, isComplete: false };
+      }
+      if (dbProgress.phase === "complete") {
+        return { currentPhaseIndex: PHASES.length - 1, phaseProgress: 100, overallProgress: 100, estimatedEnd: new Date(), isError: false, isComplete: true };
+      }
+
+      const phaseIdx = Math.max(0, phaseKeys.indexOf(dbProgress.phase));
+      const phaseProg = Math.min(100, ((dbProgress.progress - (phaseIdx > 0 ? phaseIdx * 15 : 0)) / 15) * 100);
+      const remaining = Math.max(0, (100 - dbProgress.progress) / 100 * TOTAL_ESTIMATED_MIN * 60);
+
+      return {
+        currentPhaseIndex: phaseIdx,
+        phaseProgress: Math.max(0, Math.min(100, phaseProg)),
+        overallProgress: dbProgress.progress,
+        estimatedEnd: new Date(Date.now() + remaining * 1000),
+        isError: false,
+        isComplete: false,
+      };
     }
 
-    const remainingSec = Math.max(0, adjustedTotal - elapsed);
-    const endTime = new Date(Date.now() + remainingSec * 1000);
+    // Fallback: time-based
+    const totalSec = TOTAL_ESTIMATED_MIN * 60 * Math.max(1, uploadCount * 0.7);
+    const progress = Math.min((elapsed / totalSec) * 100, 95);
+    let accumulated = 0, phaseIdx = 0, phaseProg = 100;
+    const cameraMultiplier = Math.max(1, uploadCount * 0.7);
+    for (let i = 0; i < PHASES.length; i++) {
+      const phaseSec = PHASES[i].durationMin * 60 * cameraMultiplier;
+      if (elapsed < accumulated + phaseSec) { phaseIdx = i; phaseProg = phaseSec > 0 ? Math.min(((elapsed - accumulated) / phaseSec) * 100, 100) : 100; break; }
+      accumulated += phaseSec;
+      if (i === PHASES.length - 1) { phaseIdx = i; phaseProg = 95; }
+    }
+    const remainingSec = Math.max(0, totalSec - elapsed);
 
     return {
-      currentPhaseIndex: phaseIdx,
-      phaseProgress: phaseProg,
-      overallProgress: progress,
-      estimatedEnd: endTime,
+      currentPhaseIndex: phaseIdx, phaseProgress: phaseProg, overallProgress: progress,
+      estimatedEnd: new Date(Date.now() + remainingSec * 1000), isError: false, isComplete: false,
     };
-  }, [elapsed, uploadCount]);
+  }, [elapsed, uploadCount, dbProgress]);
 
   const formatTime = (date: Date) =>
     date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 
   const formatRemaining = () => {
+    if (isComplete) return "Fertig!";
+    if (isError) return "Fehler";
     const totalSec = TOTAL_ESTIMATED_MIN * 60 * Math.max(1, uploadCount * 0.7);
-    const remaining = Math.max(0, totalSec - elapsed);
+    const remaining = dbProgress
+      ? Math.max(0, (100 - (dbProgress.progress || 0)) / 100 * totalSec)
+      : Math.max(0, totalSec - elapsed);
     const mins = Math.floor(remaining / 60);
     const secs = Math.floor(remaining % 60);
     if (mins > 0) return `~${mins} Min ${secs > 0 ? `${secs}s` : ""} verbleibend`;
     return secs > 0 ? `~${secs}s verbleibend` : "Fast fertig...";
   };
 
+
+  if (isComplete) {
+    return (
+      <div className="glass-card p-5 sm:p-6 glow-border">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <CheckCircle2 className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold font-display">Verarbeitung abgeschlossen</h3>
+            <p className="text-xs text-muted-foreground">Alle Daten wurden erfolgreich analysiert.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card space-y-5 p-5 sm:p-6 glow-border">
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          {isError ? <AlertTriangle className="h-5 w-5 text-destructive" /> : <Loader2 className="h-5 w-5 animate-spin text-primary" />}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold font-display">KI-Analyse läuft</h3>
+          <h3 className="text-sm font-semibold font-display">{isError ? "Verarbeitung fehlgeschlagen" : "KI-Analyse läuft"}</h3>
           <p className="text-xs text-muted-foreground">
-            {uploadCount > 1
+            {isError
+              ? (dbProgress?.detail || "Ein Fehler ist aufgetreten")
+              : uploadCount > 1
               ? `${uploadCount} Kamera-Uploads werden parallel verarbeitet`
               : "Tracking-Daten werden analysiert und aufbereitet"}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
-          <Clock className="h-3 w-3" />
-          {formatRemaining()}
+        <div className="flex items-center gap-2">
+          {isError && (
+            <Button variant="outline" size="sm" onClick={handleRetry} disabled={isRetrying}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRetrying ? "animate-spin" : ""}`} />
+              Erneut versuchen
+            </Button>
+          )}
+          {!isError && (
+            <div className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+              <Clock className="h-3 w-3" />
+              {formatRemaining()}
+            </div>
+          )}
+
+      {/* Detail from DB */}
+      {dbProgress?.detail && !isError && (
+        <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+          {dbProgress.detail}
+        </div>
+      )}
         </div>
       </div>
 
