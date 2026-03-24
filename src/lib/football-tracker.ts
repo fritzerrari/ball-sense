@@ -115,6 +115,9 @@ export class FootballTracker {
           const caps = track.getCapabilities?.() as MediaTrackCapabilities & { zoom?: { min: number; max: number } };
           if (caps?.zoom) {
             await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min } as any] });
+            // Store calibrated zoom level
+            const settings = track.getSettings() as MediaTrackSettings & { zoom?: number };
+            this.calibratedZoom = settings.zoom ?? caps.zoom.min;
           }
         } catch { /* zoom not supported */ }
       }
@@ -123,6 +126,49 @@ export class FootballTracker {
     } catch {
       console.warn("Kamera nicht verfügbar, nutze Platzhalter-Modus");
     }
+  }
+
+  /**
+   * Set callback for zoom change detection.
+   */
+  setZoomChangeCallback(cb: ((currentZoom: number, calibratedZoom: number) => void) | null) {
+    this.onZoomChange = cb;
+  }
+
+  /**
+   * Start periodic zoom monitoring (every 60s).
+   */
+  startZoomMonitoring() {
+    if (this.zoomCheckIntervalId) return;
+    this.zoomCheckIntervalId = window.setInterval(() => {
+      if (!this.videoElement?.srcObject) return;
+      const stream = this.videoElement.srcObject as MediaStream;
+      const track = stream.getVideoTracks()[0];
+      if (!track) return;
+      try {
+        const settings = track.getSettings() as MediaTrackSettings & { zoom?: number };
+        if (settings.zoom != null && this.calibratedZoom != null) {
+          const diff = Math.abs(settings.zoom - this.calibratedZoom);
+          if (diff > 0.1) {
+            this.onZoomChange?.(settings.zoom, this.calibratedZoom);
+          }
+        }
+      } catch { /* ignore */ }
+    }, 60_000);
+  }
+
+  /**
+   * Get the current zoom level from the camera.
+   */
+  getCurrentZoom(): number | null {
+    if (!this.videoElement?.srcObject) return null;
+    const stream = this.videoElement.srcObject as MediaStream;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return null;
+    try {
+      const settings = track.getSettings() as MediaTrackSettings & { zoom?: number };
+      return settings.zoom ?? null;
+    } catch { return null; }
   }
 
   async loadCalibration(fieldId: string): Promise<any | null> {
