@@ -57,6 +57,80 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "save_calibration") {
+      const rawPoints = Array.isArray(body.points) ? body.points : [];
+      if (rawPoints.length !== 4) {
+        return new Response(JSON.stringify({ error: "Es müssen genau 4 Eckpunkte gesetzt werden" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const points = rawPoints
+        .map((point) => {
+          if (!point || typeof point !== "object") return null;
+          const candidate = point as { x?: unknown; y?: unknown };
+          const x = Number(candidate.x);
+          const y = Number(candidate.y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+          if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+          return { x, y };
+        })
+        .filter((point): point is { x: number; y: number } => !!point);
+
+      if (points.length !== 4) {
+        return new Response(JSON.stringify({ error: "Ungültige Eckpunkte" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: matchRow, error: matchError } = await supabase
+        .from("matches")
+        .select("field_id")
+        .eq("id", matchId)
+        .maybeSingle();
+
+      if (matchError || !matchRow?.field_id) {
+        return new Response(JSON.stringify({ error: "Kein Platz für dieses Spiel gefunden" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: fieldRow } = await supabase
+        .from("fields")
+        .select("width_m, height_m")
+        .eq("id", matchRow.field_id)
+        .maybeSingle();
+
+      const calibration = {
+        points,
+        width_m: Number(fieldRow?.width_m ?? 105),
+        height_m: Number(fieldRow?.height_m ?? 68),
+        calibrated_at: new Date().toISOString(),
+        coverage: "full",
+        field_rect: { x: 0, y: 0, w: 1, h: 1 },
+      };
+
+      const { error: updateError } = await supabase
+        .from("fields")
+        .update({ calibration })
+        .eq("id", matchRow.field_id);
+
+      if (updateError) {
+        console.error("[camera-ops] save_calibration failed:", updateError);
+        return new Response(JSON.stringify({ error: "Kalibrierung konnte nicht gespeichert werden" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, calibration }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "register_upload") {
       const filePath = String(body.filePath ?? "").trim();
       const framesCount = Number(body.framesCount ?? 0);

@@ -29,6 +29,7 @@ import { toast } from "sonner";
 const CAMERA_ACCESS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-access`;
 const CAMERA_OPS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`;
 const PROCESS_TRACKING_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-tracking`;
+const DETECT_FIELD_CORNERS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/detect-field-corners`;
 
 // Simplified 3-step wizard
 type Phase = "auth" | "camera" | "tracking" | "ended";
@@ -83,6 +84,8 @@ export default function CameraTrackingPage() {
   const [stabilityWarning, setStabilityWarning] = useState<string | null>(null);
   const [showInlineCalibration, setShowInlineCalibration] = useState(false);
   const [calibrationPoints, setCalibrationPoints] = useState<{ x: number; y: number }[]>([]);
+  const [savingCalibration, setSavingCalibration] = useState(false);
+  const [detectingCalibration, setDetectingCalibration] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [highlightClipCount, setHighlightClipCount] = useState(0);
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
@@ -492,70 +495,169 @@ export default function CameraTrackingPage() {
   };
 
   // Inline calibration handlers
-  const handleInlineCalibrationTap = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if (!showInlineCalibration) return;
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    let clientX: number, clientY: number;
-    if ("touches" in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-    const x = (clientX - rect.left) / rect.width;
-    const y = (clientY - rect.top) / rect.height;
+  const handleInlineCalibrationTap = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!showInlineCalibration || savingCalibration) return;
 
-    setCalibrationPoints(prev => {
-      const next = [...prev, { x, y }];
-      if (next.length >= 4) {
-        // Save calibration
-        saveInlineCalibration(next.slice(0, 4));
-        return [];
-      }
-      return next;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = calibrationOverlayRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+    setCalibrationPoints((prev) => {
+      if (prev.length >= 4) return prev;
+      return [...prev, { x, y }];
     });
-  }, [showInlineCalibration]);
+  }, [savingCalibration, showInlineCalibration]);
 
-  const saveInlineCalibration = async (points: { x: number; y: number }[]) => {
-    if (!match?.field_id) return;
-    const calibrationData = {
+  const handleAutoDetectInline = useCallback(async () => {
+    if (!showInlineCalibration || savingCalibration) return;
+
+    const video = trackingVideoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      toast.error("Kein Kamerabild verfügbar — bitte kurz warten");
+      return;
+    }
+
+    setDetectingCalibration(true);
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas-Kontext nicht verfügbar");
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const image = canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
+
+      const response = await fetch(DETECT_FIELD_CORNERS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ image, mimeType: "image/jpeg" }),
+      });
+
+      const data = await response.json().catch(() => ({} as Record<string, unknown>));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Automatische Erkennung fehlgeschlagen");
+      }
+
+      if (data?.isRealPitch === false) {
+        const reason = typeof data.pitchRejectionReason === "string"
+          ? data.pitchRejectionReason
+          : "Kein echter Fußballplatz erkannt";
+        toast.error(reason);
+        return;
+      }
+
+      if (Array.isArray(data?.corners) && data.corners.length === 4) {
+        const points = data.corners
+          .map((corner) => {
+            if (!corner || typeof corner !== "object") return null;
+            const candidate = corner as { x?: number; y?: number };
+            const x = Number(candidate.x);
+            const y = Number(candidate.y);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+            return {
+              x: Math.max(0, Math.min(1, x / 100)),
+              y: Math.max(0, Math.min(1, y / 100)),
+            };
+          })
+          .filter((point): point is { x: number; y: number } => !!point);
+
+        if (points.length === 4) {
+          setCalibrationPoints(points);
+          toast.success("Eckpunkte erkannt — Kalibrierung wird gespeichert…");
+          return;
+        }
+      }
+
+      toast.error("Ecken konnten nicht sicher erkannt werden — bitte manuell tippen");
+    } catch (error) {
+      console.error("[Calibration] Auto-detect failed", error);
+      toast.error(error instanceof Error ? error.message : "Automatische Erkennung fehlgeschlagen");
+    } finally {
+      setDetectingCalibration(false);
+    }
+  }, [savingCalibration, showInlineCalibration]);
+
+  const saveInlineCalibration = useCallback(async (points: { x: number; y: number }[]) => {
+    if (!id || Number.isNaN(cam) || cam < 0 || cam > 4) return;
+
+    const token = sessionToken ?? localStorage.getItem(sessionKey);
+    if (!token) {
+      toast.error("Session abgelaufen — bitte Kamera-Code erneut eingeben");
+      return;
+    }
+
+    const baseCalibration = {
       points,
-      width_m: match.fields?.width_m ?? 105,
-      height_m: match.fields?.height_m ?? 68,
+      width_m: match?.fields?.width_m ?? 105,
+      height_m: match?.fields?.height_m ?? 68,
       calibrated_at: new Date().toISOString(),
       coverage: "full" as const,
       field_rect: { x: 0, y: 0, w: 1, h: 1 },
     };
 
+    setSavingCalibration(true);
     try {
-      await supabase
-        .from("fields")
-        .update({ calibration: calibrationData as any })
-        .eq("id", match.field_id);
+      const response = await fetch(CAMERA_OPS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "x-camera-session-token": token,
+        },
+        body: JSON.stringify({
+          action: "save_calibration",
+          matchId: id,
+          cameraIndex: cam,
+          sessionToken: token,
+          points,
+        }),
+      });
 
-      // Update local state
-      setMatch(prev => prev ? {
+      const payload = await response.json().catch(() => ({} as { error?: string; calibration?: unknown }));
+      if (!response.ok) {
+        throw new Error(payload.error || "Kalibrierung konnte nicht gespeichert werden");
+      }
+
+      const calibrationData = payload.calibration ?? baseCalibration;
+
+      setMatch((prev) => prev ? {
         ...prev,
-        fields: { ...prev.fields, calibration: calibrationData },
+        fields: {
+          ...(prev.fields ?? {}),
+          calibration: calibrationData,
+        },
       } : prev);
 
-      // Reset stability after recalibration
       trackerRef.current?.updateCalibratedZoom();
-
+      setShowInlineCalibration(false);
+      setCalibrationPoints([]);
+      setStabilityWarning(null);
       toast.success("Kalibrierung gespeichert ✓");
 
-      // Auto-start tracking if we're in camera phase and calibration was required
       if (phase === "camera") {
         setTimeout(() => handleStartTracking(), 300);
       }
-    } catch {
-      toast.error("Kalibrierung konnte nicht gespeichert werden");
+    } catch (error) {
+      console.error("[Calibration] Save failed", error);
+      toast.error(error instanceof Error ? error.message : "Kalibrierung konnte nicht gespeichert werden");
+    } finally {
+      setSavingCalibration(false);
     }
+  }, [cam, handleStartTracking, id, match?.fields?.height_m, match?.fields?.width_m, phase, sessionKey, sessionToken]);
 
-    setShowInlineCalibration(false);
-    setStabilityWarning(null);
-  };
+  useEffect(() => {
+    if (!showInlineCalibration || calibrationPoints.length !== 4 || savingCalibration) return;
+    void saveInlineCalibration(calibrationPoints);
+  }, [calibrationPoints, saveInlineCalibration, savingCalibration, showInlineCalibration]);
 
   const cornerLabels = ["Oben links", "Oben rechts", "Unten rechts", "Unten links"];
 
@@ -800,11 +902,15 @@ export default function CameraTrackingPage() {
 
             <div
               className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden"
-              onClick={showInlineCalibration ? handleInlineCalibrationTap as any : undefined}
-              onTouchStart={showInlineCalibration ? handleInlineCalibrationTap as any : undefined}
               ref={calibrationOverlayRef}
             >
-              <video ref={trackingVideoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+              <video
+                ref={trackingVideoRef}
+                className={`absolute inset-0 w-full h-full object-cover ${showInlineCalibration ? "pointer-events-none" : ""}`}
+                playsInline
+                muted
+                autoPlay
+              />
               {!showInlineCalibration && <TrackingOverlay detections={currentDetections} />}
               {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
@@ -814,28 +920,65 @@ export default function CameraTrackingPage() {
 
               {/* Inline calibration overlay */}
               {showInlineCalibration && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
-                  {/* Show placed points */}
+                <div className="absolute inset-0 bg-black/40 z-10">
+                  <button
+                    type="button"
+                    aria-label="Kalibrierungspunkt setzen"
+                    className="absolute inset-0 z-10 cursor-crosshair touch-none bg-transparent"
+                    style={{ touchAction: "none" }}
+                    onPointerDown={handleInlineCalibrationTap}
+                    disabled={savingCalibration}
+                  />
+
                   {calibrationPoints.map((pt, i) => (
                     <div
                       key={i}
-                      className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full border-2 border-primary bg-primary/30 flex items-center justify-center"
+                      className="pointer-events-none absolute z-20 h-6 w-6 -ml-3 -mt-3 rounded-full border-2 border-primary bg-primary/30 flex items-center justify-center"
                       style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%` }}
                     >
                       <span className="text-[9px] font-bold text-primary-foreground">{i + 1}</span>
                     </div>
                   ))}
-                  {/* Corner guide */}
-                  <div className="absolute bottom-3 left-3 right-3 bg-card/90 rounded-lg p-2 text-center">
+
+                  <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-20 rounded-lg bg-card/90 p-2 text-center">
                     <p className="text-xs font-medium text-foreground">
-                      {calibrationPoints.length < 4
-                        ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
-                        : "Wird gespeichert…"}
+                      {savingCalibration
+                        ? "Kalibrierung wird gespeichert…"
+                        : calibrationPoints.length < 4
+                          ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
+                          : "Kalibrierung wird vorbereitet…"}
                     </p>
                   </div>
+
+                  <div className="absolute left-2 top-2 z-30 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      disabled={detectingCalibration || savingCalibration}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleAutoDetectInline();
+                      }}
+                    >
+                      {detectingCalibration ? (
+                        <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Erkenne…</>
+                      ) : (
+                        <><Crosshair className="mr-1 h-3.5 w-3.5" /> Auto erkennen</>
+                      )}
+                    </Button>
+                  </div>
+
                   <button
-                    className="absolute top-2 right-2 bg-card/80 rounded-full p-1.5"
-                    onClick={(e) => { e.stopPropagation(); setShowInlineCalibration(false); setCalibrationPoints([]); }}
+                    type="button"
+                    className="absolute right-2 top-2 z-30 rounded-full bg-card/80 p-1.5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (savingCalibration) return;
+                      setShowInlineCalibration(false);
+                      setCalibrationPoints([]);
+                    }}
                   >
                     <X className="h-4 w-4" />
                   </button>
