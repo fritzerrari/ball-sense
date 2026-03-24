@@ -268,6 +268,25 @@ export default function CameraTrackingPage() {
       }).catch(() => null);
     }
 
+    // Check video highlights module access
+    try {
+      const { data: hasAccess } = await supabase.rpc("can_access_module", {
+        _user_id: "00000000-0000-0000-0000-000000000000", // anon check via plan
+        _club_id: match?.home_club_id ?? "00000000-0000-0000-0000-000000000000",
+        _plan: "club",
+        _module_key: "video_highlights",
+      } as any);
+      if (hasAccess) {
+        trackerRef.current.getHighlightRecorder().setEnabled(true);
+        trackerRef.current.getHighlightRecorder().setOnClipReady(() => {
+          setHighlightClipCount(trackerRef.current?.getHighlightRecorder().getClipCount() ?? 0);
+        });
+        setHighlightsEnabled(true);
+      }
+    } catch {
+      // Module not available, highlights disabled
+    }
+
     // Configure live streaming if selected
     if (uploadMode === "live" && token) {
       trackerRef.current.configureLiveStream({
