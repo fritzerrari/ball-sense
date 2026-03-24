@@ -272,7 +272,7 @@ export default function CameraTrackingPage() {
     try {
       const { data: hasAccess } = await supabase.rpc("can_access_module", {
         _user_id: "00000000-0000-0000-0000-000000000000", // anon check via plan
-        _club_id: match?.home_club_id ?? "00000000-0000-0000-0000-000000000000",
+        _club_id: "00000000-0000-0000-0000-000000000000",
         _plan: "club",
         _module_key: "video_highlights",
       } as any);
