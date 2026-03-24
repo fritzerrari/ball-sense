@@ -528,6 +528,22 @@ export default function CameraTrackingPage() {
                 <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleStartTracking}>
                   Tracking starten <ChevronRight className="ml-2 h-5 w-5" />
                 </Button>
+
+                {/* Upload mode toggle */}
+                <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <Wifi className="h-4 w-4 text-primary shrink-0" />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium">Live-Upload</p>
+                    <p className="text-xs text-muted-foreground">Daten während des Spiels übertragen</p>
+                  </div>
+                  <button
+                    onClick={() => setUploadMode(m => m === "batch" ? "live" : "batch")}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${uploadMode === "live" ? "bg-primary" : "bg-muted-foreground/30"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-background rounded-full transition-transform ${uploadMode === "live" ? "translate-x-5" : ""}`} />
+                  </button>
+                </div>
+
                 <Button variant="outline" size="lg" className="w-full" onClick={handleLiveSnapshot}>
                   <Camera className="mr-2 h-4 w-4" /> Neu kalibrieren
                 </Button>
