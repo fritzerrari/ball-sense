@@ -543,7 +543,13 @@ async function runProcessing(supabase: any, matchId: string) {
 
     const typedLineups = (lineups || []) as LineupEntry[];
     const typedEvents = (matchEvents || []) as MatchEvent[];
-    const trackableLineups = typedLineups.filter((p) => isTrackablePlayer(p, matchContext));
+    let trackableLineups = typedLineups.filter((p) => isTrackablePlayer(p, matchContext));
+
+    // ── Auto-Discovery: wenn keine Lineups vorhanden ──
+    const useAutoDiscovery = trackableLineups.length === 0;
+    if (useAutoDiscovery) {
+      await updateProgress("tracking", 58, "Auto-Erkennung: Spieler werden identifiziert");
+    }
 
     const playerIds = trackableLineups.map((l) => l.player_id).filter(Boolean);
     const uniquePlayerIds = [...new Set(playerIds)] as string[];
@@ -559,6 +565,48 @@ async function runProcessing(supabase: any, matchId: string) {
     const trackProfiles = buildTrackProfiles(sortedTracks);
     if (sessions.length > 1) { for (const tp of trackProfiles) { tp.cameraCount = sessions.length; } }
     await updateProgress("tracking", 55, `${tracks.size} Tracks erkannt`);
+
+    // ── Auto-Discovery Mode ──
+    if (useAutoDiscovery && trackProfiles.length > 0) {
+      // Filter officials (sideline/edge dwellers)
+      const fieldTracks = trackProfiles.filter(t => t.sidelineRatio < 0.45 && t.edgeRatio < 0.4);
+
+      // Filter ball track: smallest avg bounding box area + highest speed variance
+      // Since we only have centroid data, use the track with fewest positions (ball moves fast, hard to track consistently)
+      // Simple heuristic: skip the shortest tracks that could be ball
+      const playerTracks = fieldTracks.filter(t => t.positions.length > 20);
+
+      // Team clustering via median-split on Y-axis
+      const sortedByY = [...playerTracks].sort((a, b) => a.cy - b.cy);
+      const medianIdx = Math.floor(sortedByY.length / 2);
+      const homeGroup = sortedByY.slice(0, medianIdx);
+      const awayGroup = sortedByY.slice(medianIdx);
+
+      // Generate auto-lineups and insert into DB
+      const autoLineups: any[] = [];
+      homeGroup.forEach((t, i) => {
+        autoLineups.push({
+          match_id: matchId, player_id: null, player_name: `Spieler ${i + 1}`,
+          team: "home", starting: true, shirt_number: i + 1, excluded_from_tracking: false,
+        });
+      });
+      awayGroup.forEach((t, i) => {
+        autoLineups.push({
+          match_id: matchId, player_id: null, player_name: `Spieler ${i + 1}`,
+          team: "away", starting: true, shirt_number: i + 1, excluded_from_tracking: false,
+        });
+      });
+
+      if (autoLineups.length > 0) {
+        const { data: inserted } = await supabase.from("match_lineups").insert(autoLineups).select();
+        if (inserted) {
+          trackableLineups = inserted as LineupEntry[];
+        }
+      }
+
+      console.log(`[process-tracking] Auto-Discovery: ${homeGroup.length} home, ${awayGroup.length} away players detected`);
+      await updateProgress("tracking", 60, `Auto-Erkennung: ${homeGroup.length} + ${awayGroup.length} Spieler erkannt`);
+    }
 
     await updateProgress("tracking", 60, "Spieler werden zugeordnet");
     const homePlayers = trackableLineups.filter((l) => l.team === "home");
@@ -597,6 +645,28 @@ async function runProcessing(supabase: any, matchId: string) {
         const stats = computeTrackStats(tc.positions, fieldW, fieldH);
         const confidence = Math.min(1, Math.max(0.1, Math.max(0, 1 - bestScore * 0.8) - (tc.sidelineRatio > 0.45 ? 0.25 : 0) + (expectedZone ? 0.05 : 0)));
         playerStats.push({ player_id: player.player_id || null, player_name: player.player_name, team: player.team, stats, confidence: Math.round(confidence * 100) / 100 });
+      }
+    }
+
+    // Auto-Discovery: infer positions for auto-detected players
+    if (useAutoDiscovery) {
+      for (const ps of playerStats) {
+        const assignedIdx = [...usedTrackIndices].find((idx) => {
+          const tc = trackProfiles[idx];
+          return tc && ps.stats.positions_raw.length > 0 && Math.abs(tc.cx - ps.stats.positions_raw.reduce((s, p) => s + p.x, 0) / ps.stats.positions_raw.length) < 0.01;
+        });
+        if (assignedIdx === undefined) continue;
+        const tc = trackProfiles[assignedIdx];
+        const cx = tc.cx, cy = ps.team === "away" ? 1 - tc.cy : tc.cy;
+        let bestPos = "ZM", bestDist = Infinity;
+        for (const [pos, zone] of Object.entries(POSITION_ZONES)) {
+          const d = Math.sqrt((cx - zone.x) ** 2 + (cy - zone.y) ** 2);
+          if (d < bestDist) { bestDist = d; bestPos = pos; }
+        }
+        // Update the player_name with inferred position
+        if (ps.player_name?.startsWith("Spieler ")) {
+          ps.player_name = `${ps.player_name} (${bestPos})`;
+        }
       }
     }
 

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import {
   ArrowLeft, ArrowRight, Calendar, Users, Camera, Loader2, Check,
   Dumbbell, Swords, ShieldCheck, EyeOff, UserPlus, Copy, Share2,
-  Rocket, SkipForward, Smartphone, Info,
+  Rocket, SkipForward, Smartphone, Info, Sparkles,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { usePlayers } from "@/hooks/use-players";

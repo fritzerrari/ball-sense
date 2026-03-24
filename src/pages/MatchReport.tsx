@@ -238,8 +238,13 @@ export default function MatchReport() {
               const duelPct = p.duels_total > 0 ? Math.round((p.duels_won / p.duels_total) * 100) : null;
               return (
                 <Fragment key={p.id}>
-                  <tr className="cursor-pointer border-b border-border/50 transition-colors hover:bg-muted/20" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
-                    <td className="px-3 py-3 font-medium"><span className="block max-w-[170px] truncate">{p.players?.name ?? "—"}</span></td>
+                    <tr className="cursor-pointer border-b border-border/50 transition-colors hover:bg-muted/20" onClick={() => setExpandedPlayer(expandedPlayer === p.id ? null : p.id)}>
+                     <td className="px-3 py-3 font-medium">
+                       <span className="flex items-center gap-1.5">
+                         <span className="block max-w-[170px] truncate">{p.players?.name ?? p.player_name ?? "—"}</span>
+                         {!p.player_id && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold text-primary uppercase tracking-wider">KI</span>}
+                       </span>
+                     </td>
                     <td className="px-2 py-3"><ConsentStatusBadge status={p.players?.tracking_consent_status} compact /></td>
                     <td className="px-2 py-3 text-muted-foreground">{p.players?.number ?? "—"}</td>
                     <td className="px-3 py-3 font-semibold">{p.distance_km?.toFixed(1) ?? "—"}</td>
