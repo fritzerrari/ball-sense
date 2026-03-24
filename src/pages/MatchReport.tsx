@@ -192,6 +192,12 @@ export default function MatchReport() {
   const homeAgg = aggregatePlayerMetrics(homePlayerStats);
   const awayAgg = aggregatePlayerMetrics(awayPlayerStats);
 
+  // Check if data was extrapolated (partial field coverage)
+  const coverageRatio = homeTeamStats?.raw_metrics && typeof homeTeamStats.raw_metrics === "object"
+    ? (homeTeamStats.raw_metrics as any)?.coverage_ratio ?? 1
+    : 1;
+  const isExtrapolated = coverageRatio < 0.9;
+
   const coachLinks = {
     recoveries: [...homePlayerStats]
       .filter((item) => item.player_id && item.players?.name)
