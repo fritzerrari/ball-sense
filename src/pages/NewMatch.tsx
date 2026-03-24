@@ -41,8 +41,8 @@ export default function NewMatch() {
   const [kickoff, setKickoff] = useState("");
   const [fieldId, setFieldId] = useState("");
   const [awayName, setAwayName] = useState("");
-  const [homeFormation, setHomeFormation] = useState("4-4-2");
-  const [awayFormation, setAwayFormation] = useState("4-4-2");
+  const [homeFormation, setHomeFormation] = useState("");
+  const [awayFormation, setAwayFormation] = useState("");
   const [homeStarters, setHomeStarters] = useState<Set<string>>(new Set());
   const [homeBench, setHomeBench] = useState<Set<string>>(new Set());
   const [shirtNumbers, setShirtNumbers] = useState<Record<string, number>>({});
