@@ -125,6 +125,7 @@ export function useSaveAiReport() {
             report_type: report.report_type,
             content: report.content,
             status: report.status,
+            depth: report.depth ?? "quick",
           } as any)
           .select("id")
           .single();
