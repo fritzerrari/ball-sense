@@ -93,6 +93,7 @@ export default function CameraTrackingPage() {
   const [highlightClipCount, setHighlightClipCount] = useState(0);
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
   const [liveStats, setLiveStats] = useState<LiveSnapshot | null>(null);
+  const [lineupCounts, setLineupCounts] = useState<LineupCounts>({ home: 0, away: 0 });
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const liveEngineRef = useRef<LiveStatsEngine | null>(null);
