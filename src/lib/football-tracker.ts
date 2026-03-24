@@ -3,6 +3,8 @@
  * Currently runs as a scaffold/stub. Real ONNX inference will be plugged in later.
  */
 
+import { HighlightRecorder } from "./highlight-recorder";
+
 export interface Detection {
   id: number;
   x: number; // 0-1 normalized
