@@ -1049,13 +1049,13 @@ export default function CameraTrackingPage() {
               <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-left">
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                 <p className="text-xs text-muted-foreground">
-                  {playerCount} aktuell · {peakDetections} max.
+                  ✅ {homePlayerCount} Heim · {awayPlayerCount} Gast erkannt ({playerCount} gesamt)
                 </p>
               </div>
             ) : (
               <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-left">
                 <Users className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
-                <p className="text-xs text-muted-foreground">Suche Spieler… {playerCount} erkannt</p>
+                <p className="text-xs text-muted-foreground">Suche Spieler… {playerCount} erkannt — warte auf Bestätigung</p>
               </div>
             )}
 
