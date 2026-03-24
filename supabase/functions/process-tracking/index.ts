@@ -757,7 +757,15 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
     }
 
     // Compute coverage ratio for extrapolation
-    const coverageRatio = computeCoverageUnion(uploadCalibrations);
+    let coverageRatio = computeCoverageUnion(uploadCalibrations);
+    // If calibration says full but detections cluster, auto-detect partial
+    if (coverageRatio >= 0.9) {
+      const autoCov = autoDetectCoverage(sessions.flatMap(s => s.frames));
+      if (autoCov.ratio < 0.85) {
+        coverageRatio = autoCov.ratio;
+        console.log(`[process-tracking] Auto-detection overrides: coverage=${Math.round(coverageRatio * 100)}%`);
+      }
+    }
     const needsExtrapolation = coverageRatio < 0.9;
     if (needsExtrapolation) {
       console.log(`[process-tracking] Coverage: ${Math.round(coverageRatio * 100)}% — extrapolation will be applied`);
