@@ -138,7 +138,8 @@ export default function MatchReport() {
       if (error) throw error;
       setNewCode(code);
       toast.success("Neuer Kamera-Code generiert!");
-    } catch {
+    } catch (err) {
+      console.error("Camera code generation error:", err);
       toast.error("Code konnte nicht generiert werden");
     } finally {
       setGeneratingCode(false);
