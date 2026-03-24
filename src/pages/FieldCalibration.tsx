@@ -548,7 +548,7 @@ export default function FieldCalibration() {
             </div>
 
             {points.length >= 2 && (
-              <svg className="pointer-events-none absolute inset-0 h-full w-full">
+            <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full">
                 {points.map((p, i) => {
                   if (i === 0) return null;
                   const prev = points[i - 1];
