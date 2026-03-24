@@ -292,6 +292,12 @@ export default function FieldCalibration() {
     }
   };
 
+  const handleCoverageChange = (value: FieldCoverage) => {
+    setCoverage(value);
+    const opt = COVERAGE_OPTIONS.find(o => o.value === value);
+    if (opt) setFieldRect(opt.rect);
+  };
+
   const handleSave = async () => {
     if (!id || points.length !== 4) return;
     const calibration = {
@@ -299,6 +305,8 @@ export default function FieldCalibration() {
       width_m: parseFloat(width) || 105,
       height_m: parseFloat(height) || 68,
       calibrated_at: new Date().toISOString(),
+      coverage,
+      field_rect: fieldRect,
     };
     await saveCalibration.mutateAsync({ fieldId: id, calibration });
     navigate(backHref);
