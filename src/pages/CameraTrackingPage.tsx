@@ -177,6 +177,9 @@ export default function CameraTrackingPage() {
     if (!resp.ok) throw new Error((await resp.json().catch(() => ({ error: "Session ungültig" }))).error);
     const data = await resp.json();
     setMatch(data.match);
+    if (data.lineupCounts) {
+      setLineupCounts(data.lineupCounts);
+    }
   };
 
   // Auto-restore session
