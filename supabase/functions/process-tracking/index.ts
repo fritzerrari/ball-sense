@@ -866,7 +866,8 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       return 0;
     });
 
-    type PlayerStat = { player_id: string | null; player_name: string | null; team: string; stats: ReturnType<typeof computeTrackStats>; confidence: number; };
+    type TacticalStats = ReturnType<typeof estimateTacticalStats>;
+    type PlayerStat = { player_id: string | null; player_name: string | null; team: string; stats: ReturnType<typeof computeTrackStats>; confidence: number; trackIdx: number; tactical: TacticalStats | null; };
     const playerStats: PlayerStat[] = [];
 
     for (const player of sortedPlayers) {
