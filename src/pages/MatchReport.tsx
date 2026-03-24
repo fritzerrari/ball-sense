@@ -332,7 +332,7 @@ export default function MatchReport() {
           )}
         </div>
 
-        {match.status === "processing" && <ProcessingRoadmap uploadCount={uploads?.length ?? 1} />}
+        {match.status === "processing" && <ProcessingRoadmap matchId={match.id} uploadCount={uploads?.length ?? 1} />}
         {match.status === "live" && <div className="glass-card flex items-center gap-3 p-4 glow-border"><div className="h-2 w-2 animate-pulse rounded-full bg-primary" /><span className="text-sm font-medium font-display">Live-Tracking läuft</span><span className="ml-auto text-xs text-muted-foreground">Daten werden nach Spielende verfügbar</span></div>}
         {uploads && uploads.length > 0 && match.status !== "processing" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
 

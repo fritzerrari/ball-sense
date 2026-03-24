@@ -53,12 +53,12 @@ export function ProcessingRoadmap({ matchId, matchCreatedAt, uploadCount = 1 }: 
     if (!matchId) return;
     const poll = async () => {
       const { data } = await supabase
-        .from("matches" as any)
+        .from("matches")
         .select("processing_progress, status")
         .eq("id", matchId)
         .single();
-      if (data?.processing_progress) {
-        setDbProgress(data.processing_progress as any);
+      if (data && (data as any).processing_progress) {
+        setDbProgress((data as any).processing_progress as ProcessingProgress);
       }
     };
     poll();
