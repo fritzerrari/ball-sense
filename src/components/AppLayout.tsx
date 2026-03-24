@@ -19,6 +19,7 @@ import { useAuth } from "./AuthProvider";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { MobileInstallFab } from "./MobileInstallFab";
+import { NotificationBell } from "./NotificationBell";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useTranslation } from "@/lib/i18n";
 
