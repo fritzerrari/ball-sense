@@ -15,6 +15,11 @@ type LayoutResponse = {
   fieldType: string | null;
   confidence: "high" | "medium" | "low" | null;
   detectedFeatures: string[];
+  isRealPitch: boolean;
+  isPartialView: boolean;
+  visiblePortion: string | null;
+  inferredFullDimensions: SuggestedDimensions | null;
+  pitchRejectionReason: string | null;
 };
 
 const FALLBACK_RESPONSE: LayoutResponse = {
@@ -23,6 +28,11 @@ const FALLBACK_RESPONSE: LayoutResponse = {
   fieldType: null,
   confidence: null,
   detectedFeatures: [],
+  isRealPitch: false,
+  isPartialView: false,
+  visiblePortion: null,
+  inferredFullDimensions: null,
+  pitchRejectionReason: null,
 };
 
 const sanitizeCorner = (corner: unknown): DetectedCorner | null => {
@@ -80,6 +90,11 @@ const normalizeResponse = (value: unknown): LayoutResponse => {
     fieldType: typeof candidate.fieldType === "string" ? candidate.fieldType : null,
     confidence: sanitizeConfidence(candidate.confidence),
     detectedFeatures: sanitizeFeatures(candidate.detectedFeatures),
+    isRealPitch: candidate.isRealPitch === true,
+    isPartialView: candidate.isPartialView === true,
+    visiblePortion: typeof candidate.visiblePortion === "string" ? candidate.visiblePortion : null,
+    inferredFullDimensions: sanitizeDimensions(candidate.inferredFullDimensions),
+    pitchRejectionReason: typeof candidate.pitchRejectionReason === "string" ? candidate.pitchRejectionReason : null,
   };
 };
 
@@ -109,30 +124,53 @@ serve(async (req) => {
             content: [
               {
                 type: "text",
-                text: `Analyze this football / soccer field image taken from an elevated sideline position.
+                text: `Analyze this image. Your primary tasks:
 
-Task 1: identify the 4 field corners where touchline and goal line meet.
-Task 2: estimate the most likely field type and standard dimensions based on visible markings.
-Task 3: list which reference features are visible.
+Task 0 (CRITICAL): Determine if this is a REAL football/soccer pitch.
+- A real pitch has: grass (natural or artificial), painted white lines, goals or goal posts, recognizable field markings (penalty area, center circle, touchlines).
+- If this is NOT a real pitch (e.g. a living room, parking lot, random photo, indoor non-sport area, diagram, screenshot of a game), set isRealPitch=false and pitchRejectionReason to a short explanation (e.g. "No grass or field markings visible", "This appears to be a video game screenshot").
+- If isRealPitch=false, set all other fields to null/empty and return immediately.
 
-Use these rules:
-- Corners must be returned as percentages from 0-100 relative to the image size.
-- Corner order must be: top-left, top-right, bottom-right, bottom-left.
-- Only return corners when all 4 are reasonably visible or inferable from line geometry.
-- Suggested dimensions must reflect the most likely standard template only, not a made-up custom measurement.
+Task 1: Determine if the image shows the FULL pitch or only a PARTIAL view.
+- Full view: all 4 corners (touchline × goal line intersections) are visible or clearly inferable.
+- Partial view: only part of the pitch is visible (e.g. one half, one third, a zoomed section).
+- Set isPartialView=true if partial. Set visiblePortion to describe what's visible (e.g. "left_half", "right_half", "left_third", "penalty_area_only", "center_section").
+
+Task 2: Identify the 4 field corners (touchline × goal line intersections).
+- Return as percentages 0-100 relative to image size, order: top-left, top-right, bottom-right, bottom-left.
+- For PARTIAL views: return the 4 corners of the VISIBLE playing area (not the full pitch corners), so the user can calibrate the visible section.
+- Only return corners when they are reasonably visible or inferable from line geometry.
+
+Task 3: Estimate field dimensions.
+- suggestedDimensions: dimensions of the VISIBLE area in meters.
+- inferredFullDimensions: estimated FULL pitch dimensions based on visible markings.
+  - Use reference measurements: penalty area = 16.5m deep × 40.3m wide, goal area = 5.5m × 18.3m, center circle radius = 9.15m, penalty spot = 11m from goal line.
+  - Example: if only penalty area is visible → inferred full pitch ≈ 105×68m.
+  - For youth/small pitches, scale proportionally.
+- If only a partial view: suggestedDimensions = visible area size, inferredFullDimensions = estimated full pitch.
+- If full view: both should be the same.
+
+Task 4: List visible reference features.
+- detectedFeatures: only these values: goal, penalty_area, goal_area, center_circle, halfway_line, corner_flag, touchline, goal_line.
+
+Rules:
 - Confidence must be one of: high, medium, low.
-- detectedFeatures should include only short strings such as: goal, penalty_area, goal_area, center_circle, halfway_line, corner_flag, touchline, goal_line.
+- fieldType examples: "Full pitch", "Half pitch", "Penalty area", "Small-sided pitch", "Futsal court".
 
 Return ONLY a JSON object with this exact shape:
 {
+  "isRealPitch": true,
+  "pitchRejectionReason": null,
+  "isPartialView": false,
+  "visiblePortion": null,
   "corners": [{"x":0,"y":0},{"x":0,"y":0},{"x":0,"y":0},{"x":0,"y":0}] | null,
   "suggestedDimensions": {"width":105,"height":68} | null,
+  "inferredFullDimensions": {"width":105,"height":68} | null,
   "fieldType": "Full pitch" | null,
   "confidence": "high" | "medium" | "low" | null,
   "detectedFeatures": ["goal", "penalty_area"]
 }
 
-If field dimensions cannot be estimated reliably, set suggestedDimensions, fieldType and confidence to null.
 Do NOT include markdown or any text outside the JSON object.`,
               },
               {
@@ -144,7 +182,7 @@ Do NOT include markdown or any text outside the JSON object.`,
             ],
           },
         ],
-        max_tokens: 500,
+        max_tokens: 800,
       }),
     });
 

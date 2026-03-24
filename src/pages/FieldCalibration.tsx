@@ -44,6 +44,11 @@ type LayoutSuggestion = {
   confidence: DetectionConfidence;
   detectedFeatures: string[];
   suggestedDimensions: { width: number; height: number } | null;
+  isRealPitch: boolean;
+  isPartialView: boolean;
+  visiblePortion: string | null;
+  inferredFullDimensions: { width: number; height: number } | null;
+  pitchRejectionReason: string | null;
 };
 
 const FIELD_PRESETS = [
@@ -58,6 +63,11 @@ const EMPTY_LAYOUT_SUGGESTION: LayoutSuggestion = {
   confidence: null,
   detectedFeatures: [],
   suggestedDimensions: null,
+  isRealPitch: false,
+  isPartialView: false,
+  visiblePortion: null,
+  inferredFullDimensions: null,
+  pitchRejectionReason: null,
 };
 
 const confidenceCopy: Record<Exclude<DetectionConfidence, null>, { label: string; className: string }> = {
@@ -256,14 +266,24 @@ export default function FieldCalibration() {
         confidence: data?.confidence ?? null,
         detectedFeatures: Array.isArray(data?.detectedFeatures) ? data.detectedFeatures : [],
         suggestedDimensions: data?.suggestedDimensions
-          ? {
-              width: Number(data.suggestedDimensions.width),
-              height: Number(data.suggestedDimensions.height),
-            }
+          ? { width: Number(data.suggestedDimensions.width), height: Number(data.suggestedDimensions.height) }
           : null,
+        isRealPitch: data?.isRealPitch === true,
+        isPartialView: data?.isPartialView === true,
+        visiblePortion: data?.visiblePortion ?? null,
+        inferredFullDimensions: data?.inferredFullDimensions
+          ? { width: Number(data.inferredFullDimensions.width), height: Number(data.inferredFullDimensions.height) }
+          : null,
+        pitchRejectionReason: data?.pitchRejectionReason ?? null,
       };
 
       setLayoutSuggestion(nextSuggestion);
+
+      // Not a real pitch → warn and abort
+      if (!nextSuggestion.isRealPitch) {
+        toast.error(nextSuggestion.pitchRejectionReason || "Kein Fußballplatz erkannt. Bitte ein Bild des Spielfelds verwenden.");
+        return;
+      }
 
       if (data?.corners && data.corners.length === 4) {
         setPoints(data.corners);
@@ -272,7 +292,26 @@ export default function FieldCalibration() {
         toast.error("Ecken konnten nicht erkannt werden. Bitte manuell setzen.");
       }
 
-      if (nextSuggestion.suggestedDimensions) {
+      // Auto-set coverage for partial views
+      if (nextSuggestion.isPartialView) {
+        const portion = nextSuggestion.visiblePortion;
+        if (portion === "left_half") {
+          handleCoverageChange("left_half");
+          toast.info("Teilansicht erkannt: Linke Spielfeldhälfte");
+        } else if (portion === "right_half") {
+          handleCoverageChange("right_half");
+          toast.info("Teilansicht erkannt: Rechte Spielfeldhälfte");
+        } else {
+          handleCoverageChange("custom");
+          toast.info(`Teilansicht erkannt: ${portion ?? "Ausschnitt"} — bitte Bereich anpassen`);
+        }
+      }
+
+      // Use inferred full dimensions for the field, visible dimensions as info
+      if (nextSuggestion.inferredFullDimensions) {
+        applySuggestedDimensions(nextSuggestion.inferredFullDimensions);
+        toast.success(`Feldmaße abgeleitet: ${nextSuggestion.inferredFullDimensions.width}×${nextSuggestion.inferredFullDimensions.height}m`);
+      } else if (nextSuggestion.suggestedDimensions) {
         applySuggestedDimensions(nextSuggestion.suggestedDimensions);
         toast.success(`Feldtyp erkannt: ${nextSuggestion.fieldType ?? "Standardfeld"}`);
       }
@@ -392,7 +431,45 @@ export default function FieldCalibration() {
             )}
           </div>
 
-          {layoutSuggestion.suggestedDimensions && (
+          {/* Not a real pitch warning */}
+          {layoutSuggestion.pitchRejectionReason && !layoutSuggestion.isRealPitch && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                Kein Fußballplatz erkannt
+              </div>
+              <p className="text-xs text-muted-foreground">{layoutSuggestion.pitchRejectionReason}</p>
+              <p className="text-xs text-muted-foreground">Bitte lade ein Foto eines echten Spielfelds hoch (Rasen, Linien, Tore).</p>
+            </div>
+          )}
+
+          {/* Partial view info */}
+          {layoutSuggestion.isRealPitch && layoutSuggestion.isPartialView && (
+            <div className="rounded-xl border border-accent/30 bg-accent/10 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-accent-foreground">
+                <Camera className="h-4 w-4" />
+                Teilansicht erkannt
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Die Kamera zeigt nur einen Teil des Spielfelds ({layoutSuggestion.visiblePortion ?? "Ausschnitt"}).
+                Die vollen Feldmaße wurden anhand sichtbarer Markierungen abgeleitet.
+              </p>
+              {layoutSuggestion.inferredFullDimensions && layoutSuggestion.suggestedDimensions && (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg border border-border bg-background/70 p-2">
+                    <div className="text-muted-foreground">Sichtbarer Bereich</div>
+                    <div className="font-medium text-foreground">{layoutSuggestion.suggestedDimensions.width} × {layoutSuggestion.suggestedDimensions.height} m</div>
+                  </div>
+                  <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
+                    <div className="text-muted-foreground">Volles Spielfeld (abgeleitet)</div>
+                    <div className="font-medium text-primary">{layoutSuggestion.inferredFullDimensions.width} × {layoutSuggestion.inferredFullDimensions.height} m</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {layoutSuggestion.isRealPitch && (layoutSuggestion.suggestedDimensions || layoutSuggestion.inferredFullDimensions) && (
             <div className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
@@ -408,9 +485,11 @@ export default function FieldCalibration() {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-border bg-background/70 p-3">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Vorgeschlagene Maße</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {layoutSuggestion.isPartialView ? "Abgeleitete Gesamtmaße" : "Vorgeschlagene Maße"}
+                  </div>
                   <div className="mt-1 text-sm font-medium text-foreground">
-                    {layoutSuggestion.suggestedDimensions.width} × {layoutSuggestion.suggestedDimensions.height} m
+                    {(layoutSuggestion.inferredFullDimensions ?? layoutSuggestion.suggestedDimensions)!.width} × {(layoutSuggestion.inferredFullDimensions ?? layoutSuggestion.suggestedDimensions)!.height} m
                   </div>
                 </div>
                 <div className="rounded-lg border border-border bg-background/70 p-3">
