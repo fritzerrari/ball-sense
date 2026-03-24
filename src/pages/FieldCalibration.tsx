@@ -44,6 +44,11 @@ type LayoutSuggestion = {
   confidence: DetectionConfidence;
   detectedFeatures: string[];
   suggestedDimensions: { width: number; height: number } | null;
+  isRealPitch: boolean;
+  isPartialView: boolean;
+  visiblePortion: string | null;
+  inferredFullDimensions: { width: number; height: number } | null;
+  pitchRejectionReason: string | null;
 };
 
 const FIELD_PRESETS = [
@@ -58,6 +63,11 @@ const EMPTY_LAYOUT_SUGGESTION: LayoutSuggestion = {
   confidence: null,
   detectedFeatures: [],
   suggestedDimensions: null,
+  isRealPitch: false,
+  isPartialView: false,
+  visiblePortion: null,
+  inferredFullDimensions: null,
+  pitchRejectionReason: null,
 };
 
 const confidenceCopy: Record<Exclude<DetectionConfidence, null>, { label: string; className: string }> = {
