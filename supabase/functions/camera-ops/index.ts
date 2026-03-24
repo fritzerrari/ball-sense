@@ -35,7 +35,7 @@ serve(async (req) => {
     if (!UUID_REGEX.test(matchId ?? "")) {
       return new Response(JSON.stringify({ error: "Ungültige Match-ID" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    if (typeof cameraIndex !== "number" || cameraIndex < 0 || cameraIndex > 2) {
+    if (typeof cameraIndex !== "number" || cameraIndex < 0 || cameraIndex > 4) {
       return new Response(JSON.stringify({ error: "Ungültige Kamera" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (typeof sessionToken !== "string" || sessionToken.length < 20) {
@@ -73,6 +73,46 @@ serve(async (req) => {
         duration_sec: Number.isFinite(durationSec) ? durationSec : null,
       });
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Upload tracking data through the edge function (service role bypasses storage RLS)
+    if (action === "upload_tracking") {
+      const trackingData = body.trackingData;
+      const framesCount = Number(body.framesCount ?? 0);
+      const durationSec = Number(body.durationSec ?? 0);
+
+      if (!trackingData || !trackingData.frames) {
+        return new Response(JSON.stringify({ error: "Keine Tracking-Daten" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const objectPath = `${matchId}/cam_${cameraIndex}.json`;
+      const filePath = `tracking/${objectPath}`;
+      const jsonString = JSON.stringify(trackingData);
+      const blob = new Blob([jsonString], { type: "application/json" });
+
+      console.log(`[camera-ops] Uploading tracking data: ${(blob.size / 1024).toFixed(0)} KB, ${framesCount} frames`);
+
+      const { error: uploadErr } = await supabase.storage
+        .from("tracking")
+        .upload(objectPath, blob, { contentType: "application/json", upsert: true });
+
+      if (uploadErr) {
+        console.error("[camera-ops] Storage upload failed:", uploadErr);
+        return new Response(JSON.stringify({ error: "Upload fehlgeschlagen: " + uploadErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Register the upload entry
+      await supabase.from("tracking_uploads").insert({
+        match_id: matchId,
+        camera_index: cameraIndex,
+        file_path: filePath,
+        status: "uploaded",
+        frames_count: Number.isFinite(framesCount) ? framesCount : null,
+        duration_sec: Number.isFinite(durationSec) ? durationSec : null,
+      });
+
+      console.log(`[camera-ops] Upload registered: ${filePath}`);
+      return new Response(JSON.stringify({ success: true, filePath }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: "Ungültige Aktion" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
