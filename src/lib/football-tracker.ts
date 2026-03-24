@@ -3,6 +3,8 @@
  * Currently runs as a scaffold/stub. Real ONNX inference will be plugged in later.
  */
 
+import { HighlightRecorder } from "./highlight-recorder";
+
 export interface Detection {
   id: number;
   x: number; // 0-1 normalized
@@ -83,6 +85,11 @@ export class FootballTracker {
   private onStabilityEvent: StabilityCallback | null = null;
   private stabilityCanvas: HTMLCanvasElement | null = null;
 
+  // Highlight recording
+  private highlightRecorder = new HighlightRecorder();
+  private lastBallZone: "left" | "center" | "right" = "center";
+  private lastBallZoneTime = 0;
+
   setSquadSizes(home: number, away: number) {
     this.homeSquadSize = home;
     this.awaySquadSize = away;
@@ -98,6 +105,10 @@ export class FootballTracker {
 
   getChunkStats() {
     return { sent: this.chunksSent, ok: this.chunksOk, pending: this.pendingChunks.length };
+  }
+
+  getHighlightRecorder(): HighlightRecorder {
+    return this.highlightRecorder;
   }
 
   async loadModel(onProgress?: ProgressCallback): Promise<void> {
@@ -437,6 +448,11 @@ export class FootballTracker {
       this.startLiveInterval();
     }
 
+    // Start highlight recording if enabled
+    if (this.highlightRecorder.isEnabled() && this.videoElement?.srcObject) {
+      this.highlightRecorder.start(this.videoElement.srcObject as MediaStream, this.startTime);
+    }
+
     const loop = () => {
       if (!this.tracking) return;
       if (!this.paused) {
@@ -471,10 +487,45 @@ export class FootballTracker {
           this.liveBuffer.push(frame);
         }
 
+        // Check for highlight events
+        this.detectHighlightEvents(frame);
+
         onDetections?.(frame);
       }
     };
     this.intervalId = window.setInterval(loop, 500);
+  }
+
+  private detectHighlightEvents(frame: TrackingFrame) {
+    if (!this.highlightRecorder.isEnabled()) return;
+
+    const ball = frame.detections.find(d => d.label === "ball");
+    if (!ball) return;
+
+    // Goal detection: ball in end zones
+    const newZone: "left" | "center" | "right" =
+      ball.x < 0.05 ? "left" : ball.x > 0.95 ? "right" : "center";
+
+    if (newZone !== "center" && this.lastBallZone === "center") {
+      // Ball entered goal zone
+      this.lastBallZoneTime = frame.timestamp;
+    } else if (newZone === "center" && this.lastBallZone !== "center") {
+      // Ball left goal zone quickly = possible goal
+      const duration = frame.timestamp - this.lastBallZoneTime;
+      if (duration < 3000 && duration > 200) {
+        this.highlightRecorder.triggerHighlight("goal");
+      }
+    }
+    this.lastBallZone = newZone;
+
+    // Sprint detection: player speed proxy (velocity magnitude)
+    for (const p of this.stablePlayers) {
+      const speed = Math.sqrt(p.vx ** 2 + p.vy ** 2);
+      if (speed > 0.013) { // High speed threshold
+        this.highlightRecorder.triggerHighlight("sprint");
+        break; // One sprint highlight at a time
+      }
+    }
   }
 
   pauseTracking(): void {
@@ -501,6 +552,7 @@ export class FootballTracker {
       this.zoomCheckIntervalId = null;
     }
     this.stopStabilityMonitoring();
+    this.highlightRecorder.stop();
 
     if (this.uploadMode === "live" && this.liveBuffer.length > 0 && this.liveConfig) {
       const chunk = [...this.liveBuffer];

@@ -20,6 +20,7 @@ import {
   Crosshair,
 } from "lucide-react";
 import { FootballTracker, type Detection, type UploadMode, type StabilityEvent } from "@/lib/football-tracker";
+import type { HighlightClip } from "@/lib/highlight-recorder";
 import { TrackingOverlay } from "@/components/TrackingOverlay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -82,6 +83,8 @@ export default function CameraTrackingPage() {
   const [showInlineCalibration, setShowInlineCalibration] = useState(false);
   const [calibrationPoints, setCalibrationPoints] = useState<{ x: number; y: number }[]>([]);
   const [cameraReady, setCameraReady] = useState(false);
+  const [highlightClipCount, setHighlightClipCount] = useState(0);
+  const [highlightsEnabled, setHighlightsEnabled] = useState(false);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -265,6 +268,25 @@ export default function CameraTrackingPage() {
       }).catch(() => null);
     }
 
+    // Check video highlights module access
+    try {
+      const { data: hasAccess } = await supabase.rpc("can_access_module", {
+        _user_id: "00000000-0000-0000-0000-000000000000", // anon check via plan
+        _club_id: "00000000-0000-0000-0000-000000000000",
+        _plan: "club",
+        _module_key: "video_highlights",
+      } as any);
+      if (hasAccess) {
+        trackerRef.current.getHighlightRecorder().setEnabled(true);
+        trackerRef.current.getHighlightRecorder().setOnClipReady(() => {
+          setHighlightClipCount(trackerRef.current?.getHighlightRecorder().getClipCount() ?? 0);
+        });
+        setHighlightsEnabled(true);
+      }
+    } catch {
+      // Module not available, highlights disabled
+    }
+
     // Configure live streaming if selected
     if (uploadMode === "live" && token) {
       trackerRef.current.configureLiveStream({
@@ -370,6 +392,17 @@ export default function CameraTrackingPage() {
         body: JSON.stringify({ matchId: id }),
       });
 
+      // Upload highlight clips if any
+      const recorder = trackerRef.current.getHighlightRecorder();
+      if (recorder.getClipCount() > 0) {
+        await recorder.uploadClips(
+          id, cam,
+          import.meta.env.VITE_SUPABASE_URL,
+          import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        );
+        toast.success(`${recorder.getClipCount()} Highlight-Clips hochgeladen`);
+      }
+
       setUploadDone(true);
       toast.success("Upload erfolgreich! 🎉");
     } catch (error) {
@@ -464,6 +497,11 @@ export default function CameraTrackingPage() {
           {match && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent-foreground border border-accent/20">
               {match.away_club_name || "Spiel"}
+            </span>
+          )}
+          {highlightsEnabled && phase === "tracking" && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              🎬 {highlightClipCount}
             </span>
           )}
         </div>
