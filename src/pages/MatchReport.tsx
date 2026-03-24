@@ -197,6 +197,14 @@ export default function MatchReport() {
     ? (homeTeamStats.raw_metrics as any)?.coverage_ratio ?? 1
     : 1;
   const isExtrapolated = coverageRatio < 0.9;
+  
+  // Check if tactical stats are estimated (not from manual events)
+  const isTacticalEstimated = (playerStats ?? []).some((s: any) => 
+    (s.raw_metrics as any)?.tactical_estimated === true
+  );
+  const hasBallDetections = (playerStats ?? []).some((s: any) => 
+    (s.raw_metrics as any)?.ball_detections_available === true
+  );
 
   // Enrich goals/assists from match events (manual input is more accurate than estimation)
   const homeGoalsFromEvents = (events ?? []).filter((e: any) => e.team === "home" && e.event_type === "goal").length;
@@ -475,7 +483,23 @@ export default function MatchReport() {
           </div>
         )}
 
-        {match.status === "processing" && <ProcessingRoadmap matchId={match.id} uploadCount={uploads?.length ?? 1} />}
+        {/* Estimation info banner */}
+        {isTacticalEstimated && hasStats && !isLive && (
+          <div className="glass-card border-blue-500/20 bg-blue-500/5 p-3">
+            <div className="flex items-start gap-2.5">
+              <Activity className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+              <div>
+                <p className="text-xs font-medium text-blue-700 dark:text-blue-300">Taktische Werte sind Schätzungen</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Pässe, Zweikämpfe und Ballkontakte werden aus Positionsdaten geschätzt. 
+                  Fouls, Karten und Tore stammen ausschließlich aus manuell erfassten Spielereignissen.
+                  {!hasBallDetections && " Ballerkennung nicht verfügbar — taktische Werte eingeschränkt."}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Live Analysis Progress Banner */}
         {(isLive || hasPartialData) && (
           <div className="glass-card glow-border overflow-hidden p-4 space-y-3">

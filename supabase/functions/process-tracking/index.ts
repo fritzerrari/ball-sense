@@ -313,6 +313,13 @@ function computeTrackStats(
  * Uses heuristics: ball proximity → contacts/passes, opposing proximity → duels,
  * zone analysis → shots/recoveries.
  */
+/**
+ * Estimate tactical stats from tracking positions using proximity heuristics.
+ * IMPORTANT: Only estimates what can plausibly be derived from position data.
+ * Stats that require referee decisions (fouls, cards, offsides) are ALWAYS 0
+ * unless provided by manual match events.
+ * All estimated values are conservative — better to undercount than fabricate.
+ */
 function estimateTacticalStats(
   positions: { t: number; x: number; y: number }[],
   team: "home" | "away",
@@ -321,81 +328,112 @@ function estimateTacticalStats(
   opposingTeamIds: string[],
   minutesPlayed: number,
 ) {
-  const empty = { ball_contacts: 0, passes_total: 0, passes_completed: 0, pass_accuracy: null as number | null, duels_total: 0, duels_won: 0, tackles: 0, interceptions: 0, ball_recoveries: 0, shots_total: 0, shots_on_target: 0, goals: 0, assists: 0, crosses: 0, fouls_committed: 0, fouls_drawn: 0, aerial_won: 0 };
+  const empty = { ball_contacts: 0, passes_total: 0, passes_completed: 0, pass_accuracy: null as number | null, duels_total: 0, duels_won: 0, tackles: 0, interceptions: 0, ball_recoveries: 0, shots_total: 0, shots_on_target: 0, goals: 0, assists: 0, crosses: 0, fouls_committed: 0, fouls_drawn: 0, aerial_won: 0, is_estimated: true };
   if (positions.length < 5 || minutesPlayed < 1) return empty;
 
-  const BALL_PROX = 0.06;
-  const DUEL_PROX = 0.04;
+  const BALL_PROX = 0.06;  // ~6m on a 105m pitch
+  const DUEL_PROX = 0.04;  // ~4m
+  const hasBallData = ballPositions.length >= 10;
 
   let ballContacts = 0, passAttempts = 0, passCompleted = 0;
   let duelsTotal = 0, duelsWon = 0, tackles = 0, recoveries = 0;
-  let shots = 0, crosses = 0, aerials = 0;
+  let shots = 0, crosses = 0;
 
-  for (let i = 0; i < positions.length; i += 3) {
-    const pos = positions[i];
-    const ballPos = _nearest(ballPositions, pos.t);
-    if (!ballPos) continue;
-    const ballDist = Math.sqrt((pos.x - ballPos.x) ** 2 + (pos.y - ballPos.y) ** 2);
+  // Only compute proximity-based stats if we have ball position data
+  if (hasBallData) {
+    for (let i = 0; i < positions.length; i += 3) {
+      const pos = positions[i];
+      const ballPos = _nearest(ballPositions, pos.t);
+      if (!ballPos) continue;
+      const ballDist = Math.sqrt((pos.x - ballPos.x) ** 2 + (pos.y - ballPos.y) ** 2);
 
-    if (ballDist < BALL_PROX) {
-      ballContacts++;
-      const nextBall = _nearest(ballPositions, pos.t + 1500);
-      if (nextBall && Math.sqrt((nextBall.x - ballPos.x) ** 2 + (nextBall.y - ballPos.y) ** 2) > 0.05) {
-        passAttempts++;
-        if (_teammateNearBall(nextBall, allPlayerPositions, opposingTeamIds, pos.t + 1500)) passCompleted++;
-      }
-      const inAttack = team === "home" ? pos.y > 0.75 : pos.y < 0.25;
-      if (inAttack && Math.random() < 0.15) shots++;
-      if ((pos.x < 0.2 || pos.x > 0.8) && inAttack) crosses++;
-      const prevBall = _nearest(ballPositions, pos.t - 2000);
-      if (prevBall && Math.sqrt((pos.x - prevBall.x) ** 2 + (pos.y - prevBall.y) ** 2) > BALL_PROX * 3) recoveries++;
-    }
+      if (ballDist < BALL_PROX) {
+        ballContacts++;
 
-    for (const oppId of opposingTeamIds) {
-      const oppPos = _nearest(allPlayerPositions.get(oppId) || [], pos.t);
-      if (!oppPos) continue;
-      if (Math.sqrt((pos.x - oppPos.x) ** 2 + (pos.y - oppPos.y) ** 2) < DUEL_PROX && ballDist < BALL_PROX * 2) {
-        duelsTotal++;
-        if (ballDist < Math.sqrt((oppPos.x - (ballPositions.length ? _nearest(ballPositions, pos.t)!.x : 0.5)) ** 2 + (oppPos.y - (ballPositions.length ? _nearest(ballPositions, pos.t)!.y : 0.5)) ** 2)) {
-          duelsWon++; tackles++;
+        // Pass detection: ball moves away from player toward teammate
+        const nextBall = _nearest(ballPositions, pos.t + 1500);
+        if (nextBall && Math.sqrt((nextBall.x - ballPos.x) ** 2 + (nextBall.y - ballPos.y) ** 2) > 0.05) {
+          passAttempts++;
+          if (_teammateNearBall(nextBall, allPlayerPositions, opposingTeamIds, pos.t + 1500)) {
+            passCompleted++;
+          }
         }
-        break;
+
+        // Shot detection: player near ball in attacking third
+        const inAttackThird = team === "home" ? pos.y > 0.75 : pos.y < 0.25;
+        if (inAttackThird) {
+          // Check if ball moves toward goal after contact
+          const shotBall = _nearest(ballPositions, pos.t + 800);
+          if (shotBall) {
+            const goalY = team === "home" ? 1.0 : 0.0;
+            const movesToGoal = Math.abs(shotBall.y - goalY) < Math.abs(ballPos.y - goalY);
+            if (movesToGoal && Math.abs(shotBall.x - 0.5) < 0.2) shots++;
+          }
+        }
+
+        // Cross detection: wide position + ball enters box
+        if ((pos.x < 0.2 || pos.x > 0.8) && inAttackThird) {
+          const crossBall = _nearest(ballPositions, pos.t + 1200);
+          if (crossBall && Math.abs(crossBall.x - 0.5) < 0.3) crosses++;
+        }
+
+        // Recovery: player gains ball possession after opponent had it
+        const prevBall = _nearest(ballPositions, pos.t - 2000);
+        if (prevBall && Math.sqrt((pos.x - prevBall.x) ** 2 + (pos.y - prevBall.y) ** 2) > BALL_PROX * 3) {
+          recoveries++;
+        }
+      }
+
+      // Duel detection: opposing player nearby while near ball
+      for (const oppId of opposingTeamIds) {
+        const oppPos = _nearest(allPlayerPositions.get(oppId) || [], pos.t);
+        if (!oppPos) continue;
+        const oppDist = Math.sqrt((pos.x - oppPos.x) ** 2 + (pos.y - oppPos.y) ** 2);
+        if (oppDist < DUEL_PROX && ballDist < BALL_PROX * 2) {
+          duelsTotal++;
+          // Win if player is closer to ball than opponent
+          const oppBallDist = ballPos ? Math.sqrt((oppPos.x - ballPos.x) ** 2 + (oppPos.y - ballPos.y) ** 2) : 1;
+          if (ballDist < oppBallDist) {
+            duelsWon++;
+            tackles++;
+          }
+          break;
+        }
       }
     }
+
+    // Normalize from sampling (we sample every 3rd frame)
+    const s = 3;
+    ballContacts = Math.round(ballContacts / s * 2);
+    passAttempts = Math.max(0, Math.round(passAttempts / s));
+    passCompleted = Math.min(passAttempts, Math.round(passCompleted / s));
+    duelsTotal = Math.round(duelsTotal / s / 2);
+    duelsWon = Math.min(duelsTotal, Math.round(duelsWon / s / 2));
+    tackles = Math.min(duelsWon, Math.round(tackles / s / 3));
+    recoveries = Math.round(recoveries / s);
+    shots = Math.round(shots / 2);
+    crosses = Math.round(crosses / s / 2);
   }
 
-  const s = 3;
-  ballContacts = Math.round(ballContacts / s * 2);
-  passAttempts = Math.max(1, Math.round(passAttempts / s));
-  passCompleted = Math.min(passAttempts, Math.round(passCompleted / s));
-  duelsTotal = Math.round(duelsTotal / s / 2);
-  duelsWon = Math.min(duelsTotal, Math.round(duelsWon / s / 2));
-  tackles = Math.min(duelsWon, Math.round(tackles / s / 3));
-  recoveries = Math.round(recoveries / s);
-  shots = Math.round(shots / 2);
-  crosses = Math.round(crosses / s / 2);
-
-  const ms = Math.max(0.2, minutesPlayed / 90);
-  if (ballContacts < 5) ballContacts = Math.round(15 * ms + Math.random() * 10);
-  if (passAttempts < 3) passAttempts = Math.round(8 * ms + Math.random() * 5);
-  if (passCompleted < 1) passCompleted = Math.round(passAttempts * (0.6 + Math.random() * 0.25));
-  passCompleted = Math.min(passCompleted, passAttempts);
-  if (!duelsTotal) duelsTotal = Math.round(3 * ms + Math.random() * 4);
-  if (!duelsWon) duelsWon = Math.round(duelsTotal * (0.4 + Math.random() * 0.3));
-  duelsWon = Math.min(duelsWon, duelsTotal);
-
   return {
-    ball_contacts: ballContacts, passes_total: passAttempts, passes_completed: passCompleted,
+    ball_contacts: ballContacts,
+    passes_total: passAttempts,
+    passes_completed: passCompleted,
     pass_accuracy: passAttempts > 0 ? Math.round((passCompleted / passAttempts) * 100) : null,
-    duels_total: duelsTotal, duels_won: duelsWon,
-    tackles: tackles || Math.round(1.5 * ms + Math.random() * 2),
-    interceptions: Math.round(recoveries / 3) || Math.round(ms + Math.random() * 2),
-    ball_recoveries: recoveries || Math.round(2 * ms + Math.random() * 3),
-    shots_total: shots, shots_on_target: Math.round(shots * (0.3 + Math.random() * 0.3)),
-    goals: 0, assists: 0, crosses,
-    fouls_committed: Math.round(0.5 * ms + Math.random() * 1.5),
-    fouls_drawn: Math.round(0.5 * ms + Math.random() * 1.5),
-    aerial_won: Math.round(aerials / s / 4),
+    duels_total: duelsTotal,
+    duels_won: duelsWon,
+    tackles: tackles,
+    interceptions: Math.round(recoveries / 3),
+    ball_recoveries: recoveries,
+    shots_total: shots,
+    shots_on_target: Math.round(shots * 0.4),  // conservative estimate
+    goals: 0,     // NEVER estimate - must come from manual events
+    assists: 0,   // NEVER estimate - must come from manual events
+    crosses,
+    fouls_committed: 0,  // CANNOT be detected from position tracking
+    fouls_drawn: 0,      // CANNOT be detected from position tracking
+    aerial_won: 0,
+    is_estimated: true,
   };
 }
 
@@ -900,16 +938,10 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         if (det.label === "ball") ballPositions.push({ t: frame.timestamp, x: det.x, y: det.y });
       }
     }
-    // If no ball detected, synthesize from center of player cluster
-    if (ballPositions.length < 5) {
-      for (let fi = 0; fi < mergedFrames.length; fi += 3) {
-        const persons = mergedFrames[fi].detections.filter(d => d.label === "person");
-        if (persons.length > 0) {
-          const cx = persons.reduce((s, p) => s + p.x, 0) / persons.length;
-          const cy = persons.reduce((s, p) => s + p.y, 0) / persons.length;
-          ballPositions.push({ t: mergedFrames[fi].timestamp, x: cx + (Math.random() - 0.5) * 0.1, y: cy + (Math.random() - 0.5) * 0.1 });
-        }
-      }
+    // If no ball detected, DON'T fabricate ball positions
+    // Tactical stats will return zeros when ball data is insufficient
+    if (ballPositions.length < 10) {
+      console.log(`[process-tracking] Insufficient ball detections (${ballPositions.length}), tactical stats will be limited`);
     }
     ballPositions.sort((a, b) => a.t - b.t);
 
@@ -932,7 +964,41 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       );
     }
 
-    // Auto-Discovery: infer positions for auto-detected players
+    // Override tactical stats with manually recorded match events (ground truth)
+    for (const ps of playerStats) {
+      if (!ps.tactical || !ps.player_id) continue;
+      const playerEvents = typedEvents.filter(e => e.player_id === ps.player_id);
+      const relatedEvents = typedEvents.filter(e => e.related_player_id === ps.player_id);
+      
+      // Goals: count from events (ground truth)
+      const goalCount = playerEvents.filter(e => e.event_type === "goal").length;
+      if (goalCount > 0) ps.tactical.goals = goalCount;
+      
+      // Assists: count from events
+      const assistCount = relatedEvents.filter(e => e.event_type === "goal").length 
+        + playerEvents.filter(e => e.event_type === "assist").length;
+      if (assistCount > 0) ps.tactical.assists = assistCount;
+      
+      // Fouls: only from events, NEVER estimated
+      ps.tactical.fouls_committed = playerEvents.filter(e => e.event_type === "foul").length;
+      ps.tactical.fouls_drawn = relatedEvents.filter(e => e.event_type === "foul").length;
+      
+      // Cards: only from events
+      const yellowCards = playerEvents.filter(e => e.event_type === "yellow_card").length;
+      const redCards = playerEvents.filter(e => ["red_card", "yellow_red_card"].includes(e.event_type)).length;
+      
+      // Shots: override if manual events exist
+      const shotEvents = playerEvents.filter(e => ["shot", "shot_on_target"].includes(e.event_type)).length;
+      const onTargetEvents = playerEvents.filter(e => e.event_type === "shot_on_target").length;
+      if (shotEvents > 0) {
+        ps.tactical.shots_total = shotEvents + goalCount;
+        ps.tactical.shots_on_target = onTargetEvents + goalCount;
+      }
+      
+      // Store card data for insert
+      (ps as any)._yellowCards = yellowCards;
+      (ps as any)._redCards = redCards;
+    }
     if (useAutoDiscovery) {
       for (const ps of playerStats) {
         const assignedIdx = [...usedTrackIndices].find((idx) => {
@@ -1013,12 +1079,16 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         crosses: t?.crosses ?? 0,
         fouls_committed: t?.fouls_committed ?? 0,
         fouls_drawn: t?.fouls_drawn ?? 0,
+        yellow_cards: (ps as any)._yellowCards ?? 0,
+        red_cards: (ps as any)._redCards ?? 0,
         aerial_won: t?.aerial_won ?? 0,
         data_source: "fieldiq", raw_metrics: {
           assignment_confidence: ps.confidence, cameras_used: sessions.length, player_name: ps.player_name,
           auto_discovered: useAutoDiscovery && !ps.player_id,
           coverage_ratio: needsExtrapolation ? coverageRatio : 1,
           extrapolated: needsExtrapolation,
+          tactical_estimated: t?.is_estimated ?? true,
+          ball_detections_available: ballPositions.length >= 10,
         },
       };
     });
@@ -1049,7 +1119,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       teamInserts.push({
         match_id: matchId, team, total_distance_km: Math.round(totalDist * 100) / 100,
         avg_distance_km: Math.round((totalDist / players.length) * 100) / 100,
-        top_speed_kmh: Math.round(topSpeed * 10) / 10, possession_pct: team === "home" ? 52 : 48,
+        top_speed_kmh: Math.round(topSpeed * 10) / 10, possession_pct: null, // Cannot be reliably estimated from position tracking alone
         formation_heatmap: mergedHeatmap, data_source: "fieldiq",
         raw_metrics: {
           tracked_player_count: players.length, cameras_used: sessions.length,
