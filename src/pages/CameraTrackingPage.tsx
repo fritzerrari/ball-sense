@@ -499,6 +499,11 @@ export default function CameraTrackingPage() {
               {match.away_club_name || "Spiel"}
             </span>
           )}
+          {highlightsEnabled && phase === "tracking" && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              🎬 {highlightClipCount}
+            </span>
+          )}
         </div>
       </div>
 
