@@ -120,6 +120,31 @@ export default function MatchReport() {
   const [newCode, setNewCode] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
 
+  const handleGenerateCode = async () => {
+    if (!clubId || !session?.user?.id || !id) return;
+    setGeneratingCode(true);
+    try {
+      const values = new Uint32Array(1);
+      crypto.getRandomValues(values);
+      const code = String(values[0] % 1_000_000).padStart(6, "0");
+      const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
+      const hash = Array.from(new Uint8Array(buffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      const { error } = await supabase.from("camera_access_codes").insert({
+        club_id: clubId,
+        code_hash: hash,
+        label: `Kamera – ${match?.away_club_name || "Spiel"} ${match?.date || ""}`,
+        created_by_user_id: session.user.id,
+      });
+      if (error) throw error;
+      setNewCode(code);
+      toast.success("Neuer Kamera-Code generiert!");
+    } catch {
+      toast.error("Code konnte nicht generiert werden");
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
   const homeTeamStats = teamStats?.find((t) => t.team === "home");
   const awayTeamStats = teamStats?.find((t) => t.team === "away");
   const homePlayerStats = (playerStats ?? []).filter((s) => s.team === "home");
