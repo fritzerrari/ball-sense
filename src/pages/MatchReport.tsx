@@ -111,8 +111,8 @@ export default function MatchReport() {
   const { id } = useParams();
   const { clubName, clubId, session } = useAuth();
   const { data: match, isLoading } = useMatch(id);
-  const { data: playerStats } = usePlayerMatchStats(id);
-  const { data: teamStats } = useTeamMatchStats(id);
+  const { data: playerStats, refetch: refetchPlayerStats } = usePlayerMatchStats(id);
+  const { data: teamStats, refetch: refetchTeamStats } = useTeamMatchStats(id);
   const { data: uploads } = useTrackingUploads(id);
   const { data: apiStats } = useApiFootballStats(id);
   const { data: events } = useMatchEvents(id);
@@ -122,6 +122,25 @@ export default function MatchReport() {
   const [sortAsc, setSortAsc] = useState(false);
   const [newCode, setNewCode] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
+
+  // Realtime subscription for live stats updates
+  const isLive = match?.status === "live" || match?.status === "processing";
+  const hasPartialData = (playerStats ?? []).some((s: any) => s.period === "partial");
+
+  useEffect(() => {
+    if (!id || !isLive) return;
+    const channel = supabase
+      .channel(`live-stats-${id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "player_match_stats", filter: `match_id=eq.${id}` }, () => {
+        refetchPlayerStats();
+        refetchTeamStats();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_match_stats", filter: `match_id=eq.${id}` }, () => {
+        refetchTeamStats();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, isLive, refetchPlayerStats, refetchTeamStats]);
 
   const handleGenerateCode = async () => {
     if (!clubId || !session?.user?.id || !id) return;
