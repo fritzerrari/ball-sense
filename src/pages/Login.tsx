@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useState, useRef, useMemo } from "react";
-import { ArrowLeft, Mail, Lock, Eye, EyeOff, Building2, Loader2, ShieldCheck, Camera } from "lucide-react";
+import { ArrowLeft, Mail, Lock, Eye, EyeOff, Building2, Loader2, ShieldCheck, Camera, Download, Share, Smartphone, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -33,7 +34,26 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const { isStandalone, isIos, install, deferredPrompt } = usePwaInstall();
   const redirectTarget = searchParams.get("redirect") || "/dashboard";
+
+  const [installSkipped, setInstallSkipped] = useState(() => {
+    return sessionStorage.getItem("pwa-install-skipped") === "true";
+  });
+
+  const showInstallScreen = isMobile && !isStandalone && !installSkipped;
+
+  const handleSkipInstall = () => {
+    setInstallSkipped(true);
+    sessionStorage.setItem("pwa-install-skipped", "true");
+  };
+
+  const handleInstallClick = async () => {
+    const result = await install();
+    if (result === "accepted") {
+      // PWA installed, screen will auto-hide on next render via isStandalone
+    }
+  };
 
   const initialMode = useMemo(() => {
     const paramMode = searchParams.get("mode");
@@ -209,6 +229,103 @@ export default function Login() {
       setCameraSubmitting(false);
     }
   };
+
+  if (showInstallScreen) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="absolute inset-0 field-grid opacity-20" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px]" />
+
+        <div className="w-full max-w-sm relative z-10 space-y-8 text-center">
+          {/* Logo */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground text-2xl font-black font-display shadow-lg">
+              F
+            </div>
+            <div className="font-display text-2xl font-bold flex items-center gap-1.5">
+              <span className="text-foreground">Field</span>
+              <span className="gradient-text">IQ</span>
+            </div>
+          </div>
+
+          {/* Install card */}
+          <div className="glass-card glow-border p-6 space-y-5">
+            <div className="space-y-2">
+              <div className="flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Download className="h-6 w-6 text-primary" />
+                </div>
+              </div>
+              <h1 className="text-xl font-semibold font-display">App installieren</h1>
+              <p className="text-sm text-muted-foreground">
+                Installiere FieldIQ für das beste Erlebnis — schneller Start, Vollbild und Offline-Zugriff.
+              </p>
+            </div>
+
+            {isIos ? (
+              /* iOS: 3-step guide */
+              <div className="space-y-3 text-left">
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Share className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">1. Teilen-Button tippen</p>
+                    <p className="text-xs text-muted-foreground">Unten in der Safari-Leiste</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Smartphone className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">2. „Zum Home-Bildschirm"</p>
+                    <p className="text-xs text-muted-foreground">Im Menü nach unten scrollen</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Download className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">3. „Hinzufügen" bestätigen</p>
+                    <p className="text-xs text-muted-foreground">Die App erscheint auf deinem Homescreen</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Android: direct install button */
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full text-base"
+                onClick={handleInstallClick}
+                disabled={!deferredPrompt}
+              >
+                <Download className="mr-2 h-5 w-5" />
+                App jetzt installieren
+              </Button>
+            )}
+
+            {!isIos && !deferredPrompt && (
+              <p className="text-xs text-muted-foreground">
+                Tipp: Öffne das Browser-Menü (⋮) und wähle „App installieren".
+              </p>
+            )}
+          </div>
+
+          {/* Skip link */}
+          <button
+            onClick={handleSkipInstall}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Ohne App weiter
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
