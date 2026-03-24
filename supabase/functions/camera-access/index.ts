@@ -44,17 +44,31 @@ serve(async (req) => {
       }
 
       const codeHash = await sha256(code);
+      console.log("lookup: code_hash =", codeHash.substring(0, 12) + "...");
 
       // Find the active access code
-      const { data: accessCode } = await supabase
+      const { data: accessCode, error: codeError } = await supabase
         .from("camera_access_codes")
         .select("id, club_id")
         .eq("code_hash", codeHash)
         .eq("active", true)
         .maybeSingle();
 
+      if (codeError) console.error("lookup code query error:", codeError);
+
       if (!accessCode) {
-        return jsonResp({ error: "Code ungültig oder deaktiviert" }, 401);
+        // Debug: check if code exists but inactive
+        const { data: anyCode } = await supabase
+          .from("camera_access_codes")
+          .select("id, active")
+          .eq("code_hash", codeHash)
+          .maybeSingle();
+        if (anyCode && !anyCode.active) {
+          console.log("lookup: code exists but inactive", anyCode.id);
+          return jsonResp({ error: "Dieser Code wurde deaktiviert. Bitte den Trainer kontaktieren." }, 401);
+        }
+        console.log("lookup: no matching code found");
+        return jsonResp({ error: "Code ungültig. Bitte prüfe den 6-stelligen Code und versuche es erneut." }, 401);
       }
 
       // Find the most recent match for this club that is not 'completed'
