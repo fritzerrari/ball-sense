@@ -26,8 +26,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import type { FieldCoverage, FieldRect } from "@/lib/types";
+
 type CornerPoint = { x: number; y: number };
 type DetectionConfidence = "high" | "medium" | "low" | null;
+
+const COVERAGE_OPTIONS: { value: FieldCoverage; label: string; desc: string; rect: FieldRect }[] = [
+  { value: "full", label: "Ganzes Feld", desc: "Alle 4 Ecken sichtbar", rect: { x: 0, y: 0, w: 1, h: 1 } },
+  { value: "left_half", label: "Linke Hälfte", desc: "Bis zur Mittellinie", rect: { x: 0, y: 0, w: 0.5, h: 1 } },
+  { value: "right_half", label: "Rechte Hälfte", desc: "Ab der Mittellinie", rect: { x: 0.5, y: 0, w: 0.5, h: 1 } },
+  { value: "custom", label: "Eigener Bereich", desc: "Freier Ausschnitt", rect: { x: 0, y: 0, w: 1, h: 1 } },
+];
 
 type LayoutSuggestion = {
   fieldType: string | null;
