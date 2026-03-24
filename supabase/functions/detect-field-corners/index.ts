@@ -15,6 +15,11 @@ type LayoutResponse = {
   fieldType: string | null;
   confidence: "high" | "medium" | "low" | null;
   detectedFeatures: string[];
+  isRealPitch: boolean;
+  isPartialView: boolean;
+  visiblePortion: string | null;
+  inferredFullDimensions: SuggestedDimensions | null;
+  pitchRejectionReason: string | null;
 };
 
 const FALLBACK_RESPONSE: LayoutResponse = {
