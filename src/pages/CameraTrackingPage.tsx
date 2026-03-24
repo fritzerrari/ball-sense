@@ -20,6 +20,7 @@ import {
   Crosshair,
 } from "lucide-react";
 import { FootballTracker, type Detection, type UploadMode, type StabilityEvent } from "@/lib/football-tracker";
+import { LiveStatsEngine, type LiveSnapshot } from "@/lib/live-stats-engine";
 import type { HighlightClip } from "@/lib/highlight-recorder";
 import { TrackingOverlay } from "@/components/TrackingOverlay";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,8 +86,10 @@ export default function CameraTrackingPage() {
   const [cameraReady, setCameraReady] = useState(false);
   const [highlightClipCount, setHighlightClipCount] = useState(0);
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
+  const [liveStats, setLiveStats] = useState<LiveSnapshot | null>(null);
 
   const trackerRef = useRef<FootballTracker | null>(null);
+  const liveEngineRef = useRef<LiveStatsEngine | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackingVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -190,22 +193,23 @@ export default function CameraTrackingPage() {
     }
   }, [phase]);
 
-  // Incremental chunk upload every 5 minutes during tracking
+  // 30-second micro-batch sync during tracking
   useEffect(() => {
     if (phase !== "tracking") return;
-    const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-    const uploadIncrementalChunk = async () => {
+    const SYNC_INTERVAL_MS = 30_000; // 30 seconds
+    const syncMicroBatch = async () => {
       const token = localStorage.getItem(sessionKey);
-      if (!trackerRef.current || !id || !token) return;
+      if (!liveEngineRef.current || !trackerRef.current || !id || !token) return;
       try {
+        const syncData = liveEngineRef.current.getStatsForSync();
+        if (syncData.totalFrames < 5) return; // Not enough data yet
         const frames = trackerRef.current.getRecentFrames?.() ?? [];
-        if (frames.length < 10) return; // Not enough data yet
         const durationSec = trackerRef.current.getElapsedSeconds();
         const trackingData = {
           matchId: id, cameraIndex: cam, frames, framesCount: frames.length,
           durationSec, createdAt: new Date().toISOString(),
         };
-        // Upload chunk via camera-ops
+        // Upload tracking data chunk
         await fetch(CAMERA_OPS_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -220,12 +224,12 @@ export default function CameraTrackingPage() {
           headers: { "Content-Type": "application/json", "x-camera-session-token": token },
           body: JSON.stringify({ matchId: id, action: "incremental" }),
         });
-        console.log(`[Incremental] Uploaded ${frames.length} frames chunk`);
+        console.log(`[MicroBatch] Synced ${syncData.totalFrames} frames, ${syncData.playerStats.length} players`);
       } catch (err) {
-        console.warn("[Incremental] Chunk upload failed:", err);
+        console.warn("[MicroBatch] Sync failed:", err);
       }
     };
-    const interval = setInterval(uploadIncrementalChunk, INTERVAL_MS);
+    const interval = setInterval(syncMicroBatch, SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [phase, id, cam, sessionKey]);
 
@@ -358,8 +362,17 @@ export default function CameraTrackingPage() {
     });
     trackerRef.current.startZoomMonitoring();
 
+    // Initialize LiveStatsEngine
+    const fieldW = match?.fields?.width_m ?? 105;
+    const fieldH = match?.fields?.height_m ?? 68;
+    const engine = new LiveStatsEngine(fieldW, fieldH);
+    engine.setOnUpdate((snapshot) => setLiveStats(snapshot));
+    liveEngineRef.current = engine;
+
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
+      // Feed frame to LiveStatsEngine for instant computation
+      engine.processFrame(frame);
       const pCount = frame.detections.filter(d => d.label === "person").length;
       setPeakDetections((prev) => Math.max(prev, pCount));
       if (pCount >= 2 && !detectionConfirmed) {
@@ -853,6 +866,38 @@ export default function CameraTrackingPage() {
                   <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Suche Spieler…</p>
                   <p className="text-xs text-muted-foreground">{playerCount} erkannt — warte auf Bestätigung</p>
                 </div>
+              </div>
+            )}
+
+            {/* Live Stats Dashboard */}
+            {liveStats && liveStats.teams.length > 0 && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-primary">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  Live-Statistiken
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {liveStats.teams.map(team => (
+                    <div key={team.team} className="rounded-lg bg-card/60 border border-border p-2 space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        {team.team === "home" ? "Heim" : "Gast"} ({team.playerCount})
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+                        <span className="text-muted-foreground">Distanz</span>
+                        <span className="font-mono font-semibold text-right">{team.totalDistanceKm} km</span>
+                        <span className="text-muted-foreground">Top Speed</span>
+                        <span className="font-mono font-semibold text-right">{team.topSpeedKmh} km/h</span>
+                        <span className="text-muted-foreground">Sprints</span>
+                        <span className="font-mono font-semibold text-right">{team.totalSprints}</span>
+                        <span className="text-muted-foreground">Ø Distanz</span>
+                        <span className="font-mono font-semibold text-right">{team.avgDistanceKm} km</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  {liveStats.totalFrames} Frames · Sync alle 30s
+                </p>
               </div>
             )}
 
