@@ -34,7 +34,26 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const { isStandalone, isIos, install, deferredPrompt } = usePwaInstall();
   const redirectTarget = searchParams.get("redirect") || "/dashboard";
+
+  const [installSkipped, setInstallSkipped] = useState(() => {
+    return sessionStorage.getItem("pwa-install-skipped") === "true";
+  });
+
+  const showInstallScreen = isMobile && !isStandalone && !installSkipped;
+
+  const handleSkipInstall = () => {
+    setInstallSkipped(true);
+    sessionStorage.setItem("pwa-install-skipped", "true");
+  };
+
+  const handleInstallClick = async () => {
+    const result = await install();
+    if (result === "accepted") {
+      // PWA installed, screen will auto-hide on next render via isStandalone
+    }
+  };
 
   const initialMode = useMemo(() => {
     const paramMode = searchParams.get("mode");
