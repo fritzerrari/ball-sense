@@ -75,6 +75,8 @@ export default function CameraTrackingPage() {
   const [peakDetections, setPeakDetections] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [liveEvents, setLiveEvents] = useState<MatchEvent[]>([]);
+  const [uploadMode, setUploadMode] = useState<UploadMode>("batch");
+  const [chunkStats, setChunkStats] = useState({ sent: 0, ok: 0, pending: 0 });
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
