@@ -83,6 +83,8 @@ export default function CameraTrackingPage() {
   const [showInlineCalibration, setShowInlineCalibration] = useState(false);
   const [calibrationPoints, setCalibrationPoints] = useState<{ x: number; y: number }[]>([]);
   const [cameraReady, setCameraReady] = useState(false);
+  const [highlightClipCount, setHighlightClipCount] = useState(0);
+  const [highlightsEnabled, setHighlightsEnabled] = useState(false);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
