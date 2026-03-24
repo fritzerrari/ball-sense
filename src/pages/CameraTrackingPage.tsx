@@ -17,7 +17,7 @@ import {
   WifiOff,
   Bell,
 } from "lucide-react";
-import { FootballTracker, type Detection } from "@/lib/football-tracker";
+import { FootballTracker, type Detection, type UploadMode } from "@/lib/football-tracker";
 import { TrackingOverlay } from "@/components/TrackingOverlay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -75,6 +75,8 @@ export default function CameraTrackingPage() {
   const [peakDetections, setPeakDetections] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [liveEvents, setLiveEvents] = useState<MatchEvent[]>([]);
+  const [uploadMode, setUploadMode] = useState<UploadMode>("batch");
+  const [chunkStats, setChunkStats] = useState({ sent: 0, ok: 0, pending: 0 });
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -245,6 +247,20 @@ export default function CameraTrackingPage() {
         body: JSON.stringify({ action: "update_status", matchId: id, cameraIndex: cam, sessionToken: token, status: "live" }),
       }).catch(() => null);
     }
+
+    // Configure live streaming if selected
+    if (uploadMode === "live" && token) {
+      trackerRef.current.configureLiveStream({
+        matchId: id,
+        cameraIndex: cam,
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+        sessionToken: token,
+        onChunkSent: () => {
+          setChunkStats(trackerRef.current?.getChunkStats() ?? { sent: 0, ok: 0, pending: 0 });
+        },
+      });
+    }
+
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
       const pCount = frame.detections.filter(d => d.label === "person").length;
@@ -512,6 +528,22 @@ export default function CameraTrackingPage() {
                 <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleStartTracking}>
                   Tracking starten <ChevronRight className="ml-2 h-5 w-5" />
                 </Button>
+
+                {/* Upload mode toggle */}
+                <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <Wifi className="h-4 w-4 text-primary shrink-0" />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium">Live-Upload</p>
+                    <p className="text-xs text-muted-foreground">Daten während des Spiels übertragen</p>
+                  </div>
+                  <button
+                    onClick={() => setUploadMode(m => m === "batch" ? "live" : "batch")}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${uploadMode === "live" ? "bg-primary" : "bg-muted-foreground/30"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-background rounded-full transition-transform ${uploadMode === "live" ? "translate-x-5" : ""}`} />
+                  </button>
+                </div>
+
                 <Button variant="outline" size="lg" className="w-full" onClick={handleLiveSnapshot}>
                   <Camera className="mr-2 h-4 w-4" /> Neu kalibrieren
                 </Button>
@@ -548,9 +580,18 @@ export default function CameraTrackingPage() {
             {/* Timer */}
             <div className="text-center">
               <div className="text-5xl sm:text-6xl font-bold font-display tracking-tight gradient-text">{formatTime(elapsedSec)}</div>
+              {uploadMode === "live" && (
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <Wifi className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs text-muted-foreground">
+                    Chunks: {chunkStats.ok}/{chunkStats.sent}
+                    {chunkStats.pending > 0 && <span className="text-amber-500 ml-1">({chunkStats.pending} ausstehend)</span>}
+                    {chunkStats.sent > 0 && chunkStats.ok === chunkStats.sent && " ✓"}
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Camera preview with overlay */}
             <div className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden">
               <video ref={trackingVideoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
               <TrackingOverlay detections={currentDetections} />

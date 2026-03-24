@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          depth: string
           id: string
           match_id: string | null
           player_id: string | null
@@ -29,6 +30,7 @@ export type Database = {
         Insert: {
           content?: string
           created_at?: string
+          depth?: string
           id?: string
           match_id?: string | null
           player_id?: string | null
@@ -40,6 +42,7 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          depth?: string
           id?: string
           match_id?: string | null
           player_id?: string | null
@@ -1383,32 +1386,41 @@ export type Database = {
       tracking_uploads: {
         Row: {
           camera_index: number
+          chunks_received: number | null
           duration_sec: number | null
           file_path: string | null
           frames_count: number | null
           id: string
+          last_chunk_at: string | null
           match_id: string
           status: string
+          upload_mode: string
           uploaded_at: string
         }
         Insert: {
           camera_index?: number
+          chunks_received?: number | null
           duration_sec?: number | null
           file_path?: string | null
           frames_count?: number | null
           id?: string
+          last_chunk_at?: string | null
           match_id: string
           status?: string
+          upload_mode?: string
           uploaded_at?: string
         }
         Update: {
           camera_index?: number
+          chunks_received?: number | null
           duration_sec?: number | null
           file_path?: string | null
           frames_count?: number | null
           id?: string
+          last_chunk_at?: string | null
           match_id?: string
           status?: string
+          upload_mode?: string
           uploaded_at?: string
         }
         Relationships: [

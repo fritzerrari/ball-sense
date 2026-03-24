@@ -31,6 +31,16 @@ interface StablePlayer {
   team: "home" | "away";
 }
 
+export type UploadMode = "batch" | "live";
+
+interface LiveStreamConfig {
+  matchId: string;
+  cameraIndex: number;
+  supabaseUrl: string;
+  sessionToken: string;
+  onChunkSent?: (seq: number, ok: boolean) => void;
+}
+
 export class FootballTracker {
   private modelLoaded = false;
   private tracking = false;
@@ -45,19 +55,35 @@ export class FootballTracker {
   private ballVx = 0.01;
   private ballVy = 0.005;
   private homeSquadSize = 11;
-  private awaySquadSize = 0; // 0 = don't track away
+  private awaySquadSize = 0;
 
-  /**
-   * Configure the number of players to simulate.
-   */
+  // Live streaming state
+  private uploadMode: UploadMode = "batch";
+  private liveConfig: LiveStreamConfig | null = null;
+  private liveBuffer: TrackingFrame[] = [];
+  private liveSequence = 0;
+  private liveIntervalId: number | null = null;
+  private chunksSent = 0;
+  private chunksOk = 0;
+  private pendingChunks: { seq: number; frames: TrackingFrame[] }[] = [];
+
   setSquadSizes(home: number, away: number) {
     this.homeSquadSize = home;
     this.awaySquadSize = away;
   }
 
-  /**
-   * Load the YOLO model. Currently simulates download progress.
-   */
+  setUploadMode(mode: UploadMode) {
+    this.uploadMode = mode;
+  }
+
+  getUploadMode(): UploadMode {
+    return this.uploadMode;
+  }
+
+  getChunkStats() {
+    return { sent: this.chunksSent, ok: this.chunksOk, pending: this.pendingChunks.length };
+  }
+
   async loadModel(onProgress?: ProgressCallback): Promise<void> {
     for (let i = 0; i <= 100; i += 2) {
       await new Promise(r => setTimeout(r, 30));
@@ -66,9 +92,6 @@ export class FootballTracker {
     this.modelLoaded = true;
   }
 
-  /**
-   * Start camera and attach to video element.
-   */
   async startCamera(videoElement: HTMLVideoElement, cameraIndex = 0): Promise<void> {
     this.videoElement = videoElement;
     try {
@@ -81,7 +104,6 @@ export class FootballTracker {
         audio: false,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
       const track = stream.getVideoTracks()[0];
       if (track) {
         try {
@@ -89,21 +111,15 @@ export class FootballTracker {
           if (caps?.zoom) {
             await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min } as any] });
           }
-        } catch {
-          // zoom constraint not supported
-        }
+        } catch { /* zoom not supported */ }
       }
-
       videoElement.srcObject = stream;
       await videoElement.play();
-    } catch (err) {
+    } catch {
       console.warn("Kamera nicht verfügbar, nutze Platzhalter-Modus");
     }
   }
 
-  /**
-   * Load calibration data for a field.
-   */
   async loadCalibration(fieldId: string): Promise<any | null> {
     const cached = localStorage.getItem(`calibration_${fieldId}`);
     if (cached) {
@@ -115,8 +131,6 @@ export class FootballTracker {
   private initStablePlayers() {
     this.stablePlayers = [];
     let id = 0;
-
-    // Home team — lower half (y: 0.1–0.5)
     for (let i = 0; i < this.homeSquadSize; i++) {
       this.stablePlayers.push({
         id: id++,
@@ -127,8 +141,6 @@ export class FootballTracker {
         team: "home",
       });
     }
-
-    // Away team — upper half (y: 0.5–0.9)
     for (let i = 0; i < this.awaySquadSize; i++) {
       this.stablePlayers.push({
         id: id++,
@@ -139,8 +151,6 @@ export class FootballTracker {
         team: "away",
       });
     }
-
-    // Init ball
     this.ballX = 0.5;
     this.ballY = 0.5;
     this.ballVx = (Math.random() - 0.5) * 0.02;
@@ -149,28 +159,20 @@ export class FootballTracker {
 
   private updateStablePlayers() {
     for (const p of this.stablePlayers) {
-      // Small random walk with drift
       p.vx += (Math.random() - 0.5) * 0.004;
       p.vy += (Math.random() - 0.5) * 0.003;
-      // Dampen velocity
       p.vx *= 0.92;
       p.vy *= 0.92;
-      // Clamp speed
       const maxV = 0.015;
       p.vx = Math.max(-maxV, Math.min(maxV, p.vx));
       p.vy = Math.max(-maxV, Math.min(maxV, p.vy));
-
       p.x += p.vx;
       p.y += p.vy;
-
-      // Bounce off edges
       if (p.x < 0.05) { p.x = 0.05; p.vx = Math.abs(p.vx); }
       if (p.x > 0.95) { p.x = 0.95; p.vx = -Math.abs(p.vx); }
       if (p.y < 0.05) { p.y = 0.05; p.vy = Math.abs(p.vy); }
       if (p.y > 0.95) { p.y = 0.95; p.vy = -Math.abs(p.vy); }
     }
-
-    // Update ball
     this.ballVx += (Math.random() - 0.5) * 0.006;
     this.ballVy += (Math.random() - 0.5) * 0.006;
     this.ballVx *= 0.9;
@@ -184,8 +186,69 @@ export class FootballTracker {
   }
 
   /**
-   * Start tracking loop with realistic mock detections.
+   * Configure live streaming to send chunks during tracking.
    */
+  configureLiveStream(config: LiveStreamConfig) {
+    this.uploadMode = "live";
+    this.liveConfig = config;
+    this.liveBuffer = [];
+    this.liveSequence = 0;
+    this.chunksSent = 0;
+    this.chunksOk = 0;
+    this.pendingChunks = [];
+  }
+
+  private async sendChunk(seq: number, frames: TrackingFrame[]) {
+    if (!this.liveConfig) return;
+    const { matchId, cameraIndex, supabaseUrl, sessionToken, onChunkSent } = this.liveConfig;
+    const url = `${supabaseUrl}/functions/v1/stream-tracking`;
+
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId, cameraIndex, sequence: seq, frames, sessionToken }),
+      });
+
+      if (resp.ok) {
+        this.chunksOk++;
+        // Remove from pending
+        this.pendingChunks = this.pendingChunks.filter(c => c.seq !== seq);
+        onChunkSent?.(seq, true);
+      } else {
+        console.warn(`Chunk ${seq} failed: ${resp.status}`);
+        onChunkSent?.(seq, false);
+      }
+    } catch {
+      console.warn(`Chunk ${seq} network error, will retry`);
+      onChunkSent?.(seq, false);
+    }
+  }
+
+  private startLiveInterval() {
+    if (this.liveIntervalId) return;
+    // Send chunks every 30 seconds
+    this.liveIntervalId = window.setInterval(() => {
+      if (this.liveBuffer.length === 0) return;
+      const chunk = [...this.liveBuffer];
+      this.liveBuffer = [];
+      const seq = this.liveSequence++;
+      this.chunksSent++;
+      this.pendingChunks.push({ seq, frames: chunk });
+      this.sendChunk(seq, chunk);
+    }, 30_000);
+  }
+
+  /**
+   * Retry any failed chunks.
+   */
+  async retryPendingChunks() {
+    const pending = [...this.pendingChunks];
+    for (const chunk of pending) {
+      await this.sendChunk(chunk.seq, chunk.frames);
+    }
+  }
+
   startTracking(canvasElement: HTMLCanvasElement | null, matchId: string, onDetections?: DetectionCallback): void {
     if (!this.modelLoaded) throw new Error("Modell nicht geladen");
     this.tracking = true;
@@ -193,6 +256,11 @@ export class FootballTracker {
     this.startTime = Date.now();
     this.frames = [];
     this.initStablePlayers();
+
+    // Start live streaming if configured
+    if (this.uploadMode === "live" && this.liveConfig) {
+      this.startLiveInterval();
+    }
 
     const loop = () => {
       if (!this.tracking) return;
@@ -211,7 +279,6 @@ export class FootballTracker {
           team: p.team,
         }));
 
-        // Add ball detection
         detections.push({
           id: 999,
           x: this.ballX,
@@ -224,6 +291,12 @@ export class FootballTracker {
 
         const frame: TrackingFrame = { timestamp: now - this.startTime, detections };
         this.frames.push(frame);
+
+        // Buffer for live streaming
+        if (this.uploadMode === "live") {
+          this.liveBuffer.push(frame);
+        }
+
         onDetections?.(frame);
       }
     };
@@ -244,6 +317,20 @@ export class FootballTracker {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    // Stop live streaming interval
+    if (this.liveIntervalId) {
+      clearInterval(this.liveIntervalId);
+      this.liveIntervalId = null;
+    }
+    // Send remaining buffer as final chunk
+    if (this.uploadMode === "live" && this.liveBuffer.length > 0 && this.liveConfig) {
+      const chunk = [...this.liveBuffer];
+      this.liveBuffer = [];
+      const seq = this.liveSequence++;
+      this.chunksSent++;
+      this.pendingChunks.push({ seq, frames: chunk });
+      this.sendChunk(seq, chunk);
     }
     if (this.videoElement?.srcObject) {
       const stream = this.videoElement.srcObject as MediaStream;
@@ -270,9 +357,7 @@ export class FootballTracker {
   }
 
   /**
-   * Upload tracking session data to storage.
-   * Uses XMLHttpRequest for real upload progress reporting.
-   * Includes retry logic (up to 5 attempts) and timeout (120s per attempt).
+   * Upload tracking session data to storage (batch mode).
    */
   async uploadMatch(
     matchId: string,
@@ -281,6 +366,17 @@ export class FootballTracker {
     supabaseAnonKey: string,
     onProgress?: (stage: string, pct: number) => void,
   ): Promise<{ filePath: string; framesCount: number; durationSec: number }> {
+    // For live mode, just flush remaining chunks
+    if (this.uploadMode === "live") {
+      await this.retryPendingChunks();
+      onProgress?.("upload", 100);
+      return {
+        filePath: `tracking/${matchId}/cam_${cameraIndex}/`,
+        framesCount: this.frames.length,
+        durationSec: this.getElapsedSeconds(),
+      };
+    }
+
     onProgress?.("compress", 0);
     const sessionData = {
       matchId,

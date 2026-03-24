@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.detect-field-corners]
 verify_jwt = false
+
+[functions.stream-tracking]
+verify_jwt = false
