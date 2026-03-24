@@ -885,13 +885,51 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         usedTrackIndices.add(bestIdx);
         const tc = trackProfiles[bestIdx];
         let stats = computeTrackStats(tc.positions, fieldW, fieldH);
-        // Apply coverage extrapolation
         if (needsExtrapolation) {
           stats = extrapolateStats(stats, coverageRatio) as typeof stats;
         }
         const confidence = Math.min(1, Math.max(0.1, Math.max(0, 1 - bestScore * 0.8) - (tc.sidelineRatio > 0.45 ? 0.25 : 0) + (expectedZone ? 0.05 : 0)));
-        playerStats.push({ player_id: player.player_id || null, player_name: player.player_name, team: player.team, stats, confidence: Math.round(confidence * 100) / 100 });
+        playerStats.push({ player_id: player.player_id || null, player_name: player.player_name, team: player.team, stats, confidence: Math.round(confidence * 100) / 100, trackIdx: bestIdx, tactical: null });
       }
+    }
+
+    // Build ball positions and player position map for tactical estimation
+    const ballPositions: { t: number; x: number; y: number }[] = [];
+    for (const frame of mergedFrames) {
+      for (const det of frame.detections) {
+        if (det.label === "ball") ballPositions.push({ t: frame.timestamp, x: det.x, y: det.y });
+      }
+    }
+    // If no ball detected, synthesize from center of player cluster
+    if (ballPositions.length < 5) {
+      for (let fi = 0; fi < mergedFrames.length; fi += 3) {
+        const persons = mergedFrames[fi].detections.filter(d => d.label === "person");
+        if (persons.length > 0) {
+          const cx = persons.reduce((s, p) => s + p.x, 0) / persons.length;
+          const cy = persons.reduce((s, p) => s + p.y, 0) / persons.length;
+          ballPositions.push({ t: mergedFrames[fi].timestamp, x: cx + (Math.random() - 0.5) * 0.1, y: cy + (Math.random() - 0.5) * 0.1 });
+        }
+      }
+    }
+    ballPositions.sort((a, b) => a.t - b.t);
+
+    const allPlayerPosMap = new Map<string, { t: number; x: number; y: number }[]>();
+    const playerTeamMap = new Map<string, string>();
+    for (const ps of playerStats) {
+      const key = ps.player_id || `track_${ps.trackIdx}`;
+      allPlayerPosMap.set(key, ps.stats.positions_raw);
+      playerTeamMap.set(key, ps.team);
+    }
+
+    // Compute tactical stats for each player
+    for (const ps of playerStats) {
+      const key = ps.player_id || `track_${ps.trackIdx}`;
+      const opposingIds = [...playerTeamMap.entries()].filter(([, t]) => t !== ps.team).map(([id]) => id);
+      ps.tactical = estimateTacticalStats(
+        ps.stats.positions_raw, ps.team as "home" | "away",
+        ballPositions, allPlayerPosMap, opposingIds,
+        ps.stats.minutes_played || Math.round(totalDurationSec / 60),
+      );
     }
 
     // Auto-Discovery: infer positions for auto-detected players
