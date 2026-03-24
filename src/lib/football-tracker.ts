@@ -67,6 +67,11 @@ export class FootballTracker {
   private chunksOk = 0;
   private pendingChunks: { seq: number; frames: TrackingFrame[] }[] = [];
 
+  // Zoom monitoring
+  private calibratedZoom: number | null = null;
+  private zoomCheckIntervalId: number | null = null;
+  private onZoomChange: ((currentZoom: number, calibratedZoom: number) => void) | null = null;
+
   setSquadSizes(home: number, away: number) {
     this.homeSquadSize = home;
     this.awaySquadSize = away;

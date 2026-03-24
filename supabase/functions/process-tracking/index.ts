@@ -513,7 +513,16 @@ async function runProcessing(supabase: any, matchId: string) {
     }
 
     await updateProgress("detection", 35, "Frames werden zusammengeführt");
-    const { mergedFrames, totalDurationSec, cameraContributions } = mergeMultiCameraFrames(sessions);
+
+    // Load per-camera calibrations for coordinate transformation
+    const uploadCalibrations: Record<number, any> = {};
+    for (const upload of uploads) {
+      if (upload.calibration) {
+        uploadCalibrations[upload.camera_index] = upload.calibration;
+      }
+    }
+
+    const { mergedFrames, totalDurationSec, cameraContributions } = mergeMultiCameraFrames(sessions, uploadCalibrations);
     await updateProgress("detection", 40, `${mergedFrames.length} Frames zusammengeführt`);
 
     const { data: match } = await supabase.from("matches")
