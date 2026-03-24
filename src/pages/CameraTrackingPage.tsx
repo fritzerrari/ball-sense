@@ -590,8 +590,8 @@ export default function CameraTrackingPage() {
                   </span>
                 </div>
               )}
+            </div>
 
-            {/* Camera preview with overlay */}
             <div className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden">
               <video ref={trackingVideoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
               <TrackingOverlay detections={currentDetections} />
