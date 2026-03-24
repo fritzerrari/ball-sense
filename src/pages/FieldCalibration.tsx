@@ -431,7 +431,45 @@ export default function FieldCalibration() {
             )}
           </div>
 
-          {layoutSuggestion.suggestedDimensions && (
+          {/* Not a real pitch warning */}
+          {layoutSuggestion.pitchRejectionReason && !layoutSuggestion.isRealPitch && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                Kein Fußballplatz erkannt
+              </div>
+              <p className="text-xs text-muted-foreground">{layoutSuggestion.pitchRejectionReason}</p>
+              <p className="text-xs text-muted-foreground">Bitte lade ein Foto eines echten Spielfelds hoch (Rasen, Linien, Tore).</p>
+            </div>
+          )}
+
+          {/* Partial view info */}
+          {layoutSuggestion.isRealPitch && layoutSuggestion.isPartialView && (
+            <div className="rounded-xl border border-accent/30 bg-accent/10 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-accent-foreground">
+                <Camera className="h-4 w-4" />
+                Teilansicht erkannt
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Die Kamera zeigt nur einen Teil des Spielfelds ({layoutSuggestion.visiblePortion ?? "Ausschnitt"}).
+                Die vollen Feldmaße wurden anhand sichtbarer Markierungen abgeleitet.
+              </p>
+              {layoutSuggestion.inferredFullDimensions && layoutSuggestion.suggestedDimensions && (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg border border-border bg-background/70 p-2">
+                    <div className="text-muted-foreground">Sichtbarer Bereich</div>
+                    <div className="font-medium text-foreground">{layoutSuggestion.suggestedDimensions.width} × {layoutSuggestion.suggestedDimensions.height} m</div>
+                  </div>
+                  <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
+                    <div className="text-muted-foreground">Volles Spielfeld (abgeleitet)</div>
+                    <div className="font-medium text-primary">{layoutSuggestion.inferredFullDimensions.width} × {layoutSuggestion.inferredFullDimensions.height} m</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {layoutSuggestion.isRealPitch && (layoutSuggestion.suggestedDimensions || layoutSuggestion.inferredFullDimensions) && (
             <div className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
@@ -447,9 +485,11 @@ export default function FieldCalibration() {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-border bg-background/70 p-3">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Vorgeschlagene Maße</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {layoutSuggestion.isPartialView ? "Abgeleitete Gesamtmaße" : "Vorgeschlagene Maße"}
+                  </div>
                   <div className="mt-1 text-sm font-medium text-foreground">
-                    {layoutSuggestion.suggestedDimensions.width} × {layoutSuggestion.suggestedDimensions.height} m
+                    {(layoutSuggestion.inferredFullDimensions ?? layoutSuggestion.suggestedDimensions)!.width} × {(layoutSuggestion.inferredFullDimensions ?? layoutSuggestion.suggestedDimensions)!.height} m
                   </div>
                 </div>
                 <div className="rounded-lg border border-border bg-background/70 p-3">
