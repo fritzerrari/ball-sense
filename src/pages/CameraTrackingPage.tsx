@@ -316,6 +316,10 @@ export default function CameraTrackingPage() {
 
   const handleStartTracking = async () => {
     if (!trackerRef.current || !id) return;
+
+    // Set squad sizes from lineup data so simulation matches reality
+    trackerRef.current.setSquadSizes(lineupCounts.home, lineupCounts.away);
+
     const token = localStorage.getItem(sessionKey);
     if (token) {
       await fetch(CAMERA_OPS_URL, {
