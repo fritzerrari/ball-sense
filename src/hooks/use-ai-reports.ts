@@ -102,6 +102,7 @@ export function useSaveAiReport() {
       report_type: string;
       content: string;
       status: string;
+      depth?: string;
     }) => {
       if (report.id) {
         const { error } = await supabase
