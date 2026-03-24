@@ -189,7 +189,7 @@ export default function FieldCalibration() {
   }, []);
 
   const handlePointInput = useCallback((clientX: number, clientY: number) => {
-    const pos = getRelativePos(e.clientX, e.clientY);
+    const pos = getRelativePos(clientX, clientY);
     if (!pos) return;
     const now = Date.now();
     const last = lastInputRef.current;
