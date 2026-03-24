@@ -173,6 +173,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               {clubName && <p className="truncate text-sm font-medium font-display">{clubName}</p>}
             </div>
             <div className="ml-auto flex items-center gap-2">
+              <NotificationBell />
               <LanguageToggle />
               <ThemeToggle />
               <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{planLabel}</span>
