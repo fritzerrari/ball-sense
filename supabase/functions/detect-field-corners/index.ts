@@ -90,6 +90,11 @@ const normalizeResponse = (value: unknown): LayoutResponse => {
     fieldType: typeof candidate.fieldType === "string" ? candidate.fieldType : null,
     confidence: sanitizeConfidence(candidate.confidence),
     detectedFeatures: sanitizeFeatures(candidate.detectedFeatures),
+    isRealPitch: candidate.isRealPitch === true,
+    isPartialView: candidate.isPartialView === true,
+    visiblePortion: typeof candidate.visiblePortion === "string" ? candidate.visiblePortion : null,
+    inferredFullDimensions: sanitizeDimensions(candidate.inferredFullDimensions),
+    pitchRejectionReason: typeof candidate.pitchRejectionReason === "string" ? candidate.pitchRejectionReason : null,
   };
 };
 
