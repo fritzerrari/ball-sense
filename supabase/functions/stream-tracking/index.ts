@@ -81,7 +81,7 @@ serve(async (req) => {
         .update({
           chunks_received: (existing[0].chunks_received ?? 0) + 1,
           last_chunk_at: new Date().toISOString(),
-          frames_count: sequence * frames.length, // approximate
+          frames_count: sequence * frames.length,
         })
         .eq("id", existing[0].id);
     } else {
@@ -94,6 +94,49 @@ serve(async (req) => {
         frames_count: frames.length,
         status: "streaming",
       });
+    }
+
+    // === Halftime auto-trigger ===
+    // Check if ~42+ minutes have elapsed since first chunk
+    const { data: firstUpload } = await supabase
+      .from("tracking_uploads")
+      .select("uploaded_at")
+      .eq("match_id", matchId)
+      .eq("upload_mode", "live")
+      .order("uploaded_at", { ascending: true })
+      .limit(1);
+
+    if (firstUpload?.length) {
+      const elapsedMs = Date.now() - new Date(firstUpload[0].uploaded_at).getTime();
+      const elapsedMinutes = elapsedMs / 60_000;
+
+      if (elapsedMinutes >= 42) {
+        // Check if halftime processing already triggered
+        const { data: halftimeStats } = await supabase
+          .from("player_match_stats")
+          .select("id")
+          .eq("match_id", matchId)
+          .eq("period", "first_half")
+          .limit(1);
+
+        if (!halftimeStats?.length) {
+          console.log(`Match ${matchId}: Triggering halftime processing at ${Math.round(elapsedMinutes)} min`);
+          // Trigger process-tracking for first half
+          try {
+            const processUrl = `${supabaseUrl}/functions/v1/process-tracking`;
+            await fetch(processUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${supabaseKey}`,
+              },
+              body: JSON.stringify({ matchId, period: "first_half" }),
+            });
+          } catch (e) {
+            console.error("Halftime trigger failed:", e);
+          }
+        }
+      }
     }
 
     return new Response(JSON.stringify({ ok: true, sequence, stored: objectPath }), {
