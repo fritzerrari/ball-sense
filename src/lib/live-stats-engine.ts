@@ -93,7 +93,8 @@ export class LiveStatsEngine {
     const matched = new Set<number>();
 
     // Match existing tracks to detections (nearest neighbor)
-    for (const [tid, pos] of this.activePositions) {
+    const activeEntries = Array.from(this.activePositions.entries());
+    for (const [tid, pos] of activeEntries) {
       let bestIdx = -1;
       let bestDist = TRACK_THRESHOLD;
       for (let i = 0; i < personDetections.length; i++) {
