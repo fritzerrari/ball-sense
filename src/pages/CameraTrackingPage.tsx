@@ -869,6 +869,38 @@ export default function CameraTrackingPage() {
               </div>
             )}
 
+            {/* Live Stats Dashboard */}
+            {liveStats && liveStats.teams.length > 0 && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-primary">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  Live-Statistiken
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {liveStats.teams.map(team => (
+                    <div key={team.team} className="rounded-lg bg-card/60 border border-border p-2 space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        {team.team === "home" ? "Heim" : "Gast"} ({team.playerCount})
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+                        <span className="text-muted-foreground">Distanz</span>
+                        <span className="font-mono font-semibold text-right">{team.totalDistanceKm} km</span>
+                        <span className="text-muted-foreground">Top Speed</span>
+                        <span className="font-mono font-semibold text-right">{team.topSpeedKmh} km/h</span>
+                        <span className="text-muted-foreground">Sprints</span>
+                        <span className="font-mono font-semibold text-right">{team.totalSprints}</span>
+                        <span className="text-muted-foreground">Ø Distanz</span>
+                        <span className="font-mono font-semibold text-right">{team.avgDistanceKm} km</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  {liveStats.totalFrames} Frames · Sync alle 30s
+                </p>
+              </div>
+            )}
+
             {/* Stability warning */}
             {stabilityWarning && (
               <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
