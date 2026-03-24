@@ -982,7 +982,7 @@ export default function CameraTrackingPage() {
 
         {/* Phase: Tracking */}
         {phase === "tracking" && (
-          <div className="w-full max-w-lg space-y-4">
+          <div className="w-full max-w-lg flex flex-col h-full max-h-[calc(100dvh-7rem)]">
             {/* Timer */}
             <div className="text-center">
               <div className="text-5xl sm:text-6xl font-bold font-display tracking-tight gradient-text">{formatTime(elapsedSec)}</div>
