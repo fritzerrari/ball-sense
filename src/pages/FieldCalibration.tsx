@@ -513,6 +513,47 @@ export default function FieldCalibration() {
             </div>
           )}
 
+          {/* Coverage Selection */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-foreground">Sichtbarer Bereich</label>
+            <div className="grid grid-cols-2 gap-2">
+              {COVERAGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleCoverageChange(opt.value)}
+                  className={`relative rounded-xl border-2 p-3 text-left transition-all ${
+                    coverage === opt.value
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-card/50 hover:border-muted-foreground/40"
+                  }`}
+                >
+                  {/* Mini field preview */}
+                  <div className="mb-2 h-8 w-full rounded border border-border bg-muted/50 relative overflow-hidden">
+                    <div
+                      className="absolute bg-primary/30 border border-primary/50"
+                      style={{
+                        left: `${opt.rect.x * 100}%`,
+                        top: `${opt.rect.y * 100}%`,
+                        width: `${opt.rect.w * 100}%`,
+                        height: `${opt.rect.h * 100}%`,
+                      }}
+                    />
+                    {/* Halfway line */}
+                    <div className="absolute left-1/2 top-0 h-full w-px bg-muted-foreground/30" />
+                  </div>
+                  <p className="text-sm font-medium">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+            {coverage !== "full" && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Teilfeld-Kalibrierung: Das Backend transformiert die Koordinaten automatisch auf das Gesamtfeld.
+              </p>
+            )}
+          </div>
+
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">Spielfeld-Vorlage</label>
