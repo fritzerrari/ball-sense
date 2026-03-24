@@ -198,10 +198,24 @@ export default function MatchReport() {
     : 1;
   const isExtrapolated = coverageRatio < 0.9;
 
+  // Enrich goals/assists from match events (manual input is more accurate than estimation)
+  const homeGoalsFromEvents = (events ?? []).filter((e: any) => e.team === "home" && e.event_type === "goal").length;
+  const awayGoalsFromEvents = (events ?? []).filter((e: any) => e.team === "away" && e.event_type === "goal").length;
+  const homeAssistsFromEvents = (events ?? []).filter((e: any) => e.team === "home" && e.event_type === "assist").length;
+  const awayAssistsFromEvents = (events ?? []).filter((e: any) => e.team === "away" && e.event_type === "assist").length;
+
+  // Override aggregated goals/assists with event data when available
+  if (homeGoalsFromEvents > 0 || awayGoalsFromEvents > 0) {
+    homeAgg.goals = homeGoalsFromEvents;
+    homeAgg.assists = homeAssistsFromEvents;
+    awayAgg.goals = awayGoalsFromEvents;
+    awayAgg.assists = awayAssistsFromEvents;
+  }
+
   const coachLinks = {
     recoveries: [...homePlayerStats]
-      .filter((item) => item.player_id && item.players?.name)
-      .sort((a, b) => (b.ball_recoveries ?? 0) - (a.ball_recoveries ?? 0))
+      .filter((item: any) => item.player_id && item.players?.name)
+      .sort((a: any, b: any) => (b.ball_recoveries ?? 0) - (a.ball_recoveries ?? 0))
       .slice(0, 3),
     passing: [...homePlayerStats]
       .filter((item) => item.player_id && item.players?.name)
