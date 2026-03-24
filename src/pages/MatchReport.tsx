@@ -106,7 +106,7 @@ function SectionHeader({ eyebrow, title, description }: { eyebrow: string; title
 
 export default function MatchReport() {
   const { id } = useParams();
-  const { clubName } = useAuth();
+  const { clubName, clubId, session } = useAuth();
   const { data: match, isLoading } = useMatch(id);
   const { data: playerStats } = usePlayerMatchStats(id);
   const { data: teamStats } = useTeamMatchStats(id);
@@ -117,6 +117,8 @@ export default function MatchReport() {
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string>("distance_km");
   const [sortAsc, setSortAsc] = useState(false);
+  const [newCode, setNewCode] = useState<string | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   const homeTeamStats = teamStats?.find((t) => t.team === "home");
   const awayTeamStats = teamStats?.find((t) => t.team === "away");
