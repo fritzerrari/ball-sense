@@ -63,7 +63,7 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
     } catch { /* ignore trigger errors */ }
   }, []);
 
-  const generate = async (genMode: "analysis" | "training" = "analysis", depth: "quick" | "deep" = "quick") => {
+  const generate = async (genMode: "analysis" | "training" = "analysis", depth: "instant" | "quick" | "deep" = "quick") => {
     if (!user) { toast.error("Bitte erneut anmelden."); return; }
 
     setIsOpen(true);
@@ -82,9 +82,9 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
         depth,
       });
       setActiveReportId(id);
-      toast.success(depth === "quick" ? "Schnell-Analyse gestartet" : "Tiefenanalyse in die Warteschlange eingereiht");
+      const labels: Record<string, string> = { instant: "Sofort-Fazit gestartet", quick: "Schnell-Analyse gestartet", deep: "Tiefenanalyse in die Warteschlange eingereiht" };
+      toast.success(labels[depth] ?? "Analyse gestartet");
 
-      // Trigger background processing
       triggerQueueProcessing();
     } catch {
       toast.error("Konnte Analyse nicht starten");
