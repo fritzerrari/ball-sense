@@ -12,7 +12,7 @@ import { usePlayers } from "@/hooks/use-players";
 import { useFields } from "@/hooks/use-fields";
 import { useCreateMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
-import { FORMATIONS } from "@/lib/constants";
+import { FORMATIONS, FORMATIONS_BY_SIZE, SQUAD_FORMATS } from "@/lib/constants";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
