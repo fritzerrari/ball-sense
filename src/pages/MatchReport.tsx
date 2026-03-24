@@ -197,6 +197,14 @@ export default function MatchReport() {
     ? (homeTeamStats.raw_metrics as any)?.coverage_ratio ?? 1
     : 1;
   const isExtrapolated = coverageRatio < 0.9;
+  
+  // Check if tactical stats are estimated (not from manual events)
+  const isTacticalEstimated = (playerStats ?? []).some((s: any) => 
+    (s.raw_metrics as any)?.tactical_estimated === true
+  );
+  const hasBallDetections = (playerStats ?? []).some((s: any) => 
+    (s.raw_metrics as any)?.ball_detections_available === true
+  );
 
   // Enrich goals/assists from match events (manual input is more accurate than estimation)
   const homeGoalsFromEvents = (events ?? []).filter((e: any) => e.team === "home" && e.event_type === "goal").length;
