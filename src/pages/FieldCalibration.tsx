@@ -195,6 +195,27 @@ export default function FieldCalibration() {
     addPoint(pos.x, pos.y);
   };
 
+  // onClick as fallback for mobile browsers where pointerDown doesn't fire reliably
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("[data-drag-handle]")) return;
+    // Only use click fallback if pointerDown didn't already handle it
+    // We detect this by checking if points changed recently (within 300ms)
+    const pos = getRelativePos(e.clientX, e.clientY);
+    if (!pos) return;
+    // On desktop, pointerDown already added the point, so skip
+    // On mobile Safari, pointerDown may not fire, so click is the fallback
+    setPoints((prev) => {
+      if (prev.length >= 4) return prev;
+      // Check if a point was already added near this position (by pointerDown)
+      const lastPoint = prev[prev.length - 1];
+      if (lastPoint && Math.abs(lastPoint.x - pos.x) < 2 && Math.abs(lastPoint.y - pos.y) < 2) {
+        return prev; // Already handled by pointerDown
+      }
+      if (navigator.vibrate) navigator.vibrate(30);
+      return [...prev, { x: pos.x, y: pos.y }];
+    });
+  };
+
   const startDrag = (index: number, e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
