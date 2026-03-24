@@ -902,11 +902,15 @@ export default function CameraTrackingPage() {
 
             <div
               className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden"
-              onClick={showInlineCalibration ? handleInlineCalibrationTap as any : undefined}
-              onTouchStart={showInlineCalibration ? handleInlineCalibrationTap as any : undefined}
               ref={calibrationOverlayRef}
             >
-              <video ref={trackingVideoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+              <video
+                ref={trackingVideoRef}
+                className={`absolute inset-0 w-full h-full object-cover ${showInlineCalibration ? "pointer-events-none" : ""}`}
+                playsInline
+                muted
+                autoPlay
+              />
               {!showInlineCalibration && <TrackingOverlay detections={currentDetections} />}
               {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
@@ -916,28 +920,65 @@ export default function CameraTrackingPage() {
 
               {/* Inline calibration overlay */}
               {showInlineCalibration && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
-                  {/* Show placed points */}
+                <div className="absolute inset-0 bg-black/40 z-10">
+                  <button
+                    type="button"
+                    aria-label="Kalibrierungspunkt setzen"
+                    className="absolute inset-0 z-10 cursor-crosshair touch-none bg-transparent"
+                    style={{ touchAction: "none" }}
+                    onPointerDown={handleInlineCalibrationTap}
+                    disabled={savingCalibration}
+                  />
+
                   {calibrationPoints.map((pt, i) => (
                     <div
                       key={i}
-                      className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full border-2 border-primary bg-primary/30 flex items-center justify-center"
+                      className="pointer-events-none absolute z-20 h-6 w-6 -ml-3 -mt-3 rounded-full border-2 border-primary bg-primary/30 flex items-center justify-center"
                       style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%` }}
                     >
                       <span className="text-[9px] font-bold text-primary-foreground">{i + 1}</span>
                     </div>
                   ))}
-                  {/* Corner guide */}
-                  <div className="absolute bottom-3 left-3 right-3 bg-card/90 rounded-lg p-2 text-center">
+
+                  <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-20 rounded-lg bg-card/90 p-2 text-center">
                     <p className="text-xs font-medium text-foreground">
-                      {calibrationPoints.length < 4
-                        ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
-                        : "Wird gespeichert…"}
+                      {savingCalibration
+                        ? "Kalibrierung wird gespeichert…"
+                        : calibrationPoints.length < 4
+                          ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
+                          : "Kalibrierung wird vorbereitet…"}
                     </p>
                   </div>
+
+                  <div className="absolute left-2 top-2 z-30 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      disabled={detectingCalibration || savingCalibration}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleAutoDetectInline();
+                      }}
+                    >
+                      {detectingCalibration ? (
+                        <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Erkenne…</>
+                      ) : (
+                        <><Crosshair className="mr-1 h-3.5 w-3.5" /> Auto erkennen</>
+                      )}
+                    </Button>
+                  </div>
+
                   <button
-                    className="absolute top-2 right-2 bg-card/80 rounded-full p-1.5"
-                    onClick={(e) => { e.stopPropagation(); setShowInlineCalibration(false); setCalibrationPoints([]); }}
+                    type="button"
+                    className="absolute right-2 top-2 z-30 rounded-full bg-card/80 p-1.5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (savingCalibration) return;
+                      setShowInlineCalibration(false);
+                      setCalibrationPoints([]);
+                    }}
                   >
                     <X className="h-4 w-4" />
                   </button>
