@@ -392,6 +392,17 @@ export default function CameraTrackingPage() {
         body: JSON.stringify({ matchId: id }),
       });
 
+      // Upload highlight clips if any
+      const recorder = trackerRef.current.getHighlightRecorder();
+      if (recorder.getClipCount() > 0) {
+        await recorder.uploadClips(
+          id, cam,
+          import.meta.env.VITE_SUPABASE_URL,
+          import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        );
+        toast.success(`${recorder.getClipCount()} Highlight-Clips hochgeladen`);
+      }
+
       setUploadDone(true);
       toast.success("Upload erfolgreich! 🎉");
     } catch (error) {
