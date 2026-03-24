@@ -353,9 +353,40 @@ export default function MatchReport() {
             <h1 className="break-words text-2xl font-bold font-display sm:text-3xl">{clubName} vs {match.away_club_name || "TBD"}</h1>
             <p className="text-sm text-muted-foreground">{new Date(match.date).toLocaleDateString("de-DE")}{match.kickoff && ` · ${match.kickoff}`}{match.fields && ` · ${(match.fields as any).name}`}</p>
           </div>
-          {match.status === "setup" && (
+          {(match.status === "setup" || match.status === "ready") && (
             <div className="relative mt-4 space-y-3">
               <Button variant="tracking" className="w-full" asChild><Link to={`/matches/${id}/track?cam=0`}><Camera className="mr-2 h-5 w-5" /> Tracking starten</Link></Button>
+              
+              {/* Generate new camera code */}
+              {newCode ? (
+                <div className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
+                  <p className="text-sm font-medium text-foreground">Neuer Kamera-Code:</p>
+                  <div className="text-center py-3 bg-muted rounded-xl">
+                    <span className="text-3xl font-mono font-bold tracking-[0.3em] text-foreground">{newCode}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => { navigator.clipboard.writeText(newCode); toast.success("Code kopiert!"); }}>
+                      <Copy className="mr-1.5 h-3.5 w-3.5" /> Kopieren
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                      const text = `FieldIQ Kamera-Code: ${newCode}`;
+                      if (navigator.share) navigator.share({ title: "Kamera-Code", text }).catch(() => {});
+                      else { navigator.clipboard.writeText(text); toast.success("Code kopiert!"); }
+                    }}>
+                      <Share2 className="mr-1.5 h-3.5 w-3.5" /> Teilen
+                    </Button>
+                  </div>
+                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setNewCode(null); }}>
+                    <KeyRound className="mr-1 h-3.5 w-3.5" /> Weiteren Code generieren
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="outline" className="w-full" onClick={handleGenerateCode} disabled={generatingCode}>
+                  {generatingCode ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                  Neuen Kamera-Code generieren
+                </Button>
+              )}
+
               <details className="group">
                 <summary className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"><ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" /> Weitere Kameras hinzufügen (Multi-Kamera)</summary>
                 <div className="mt-2 space-y-2 rounded-lg border border-border bg-muted/30 p-3">
