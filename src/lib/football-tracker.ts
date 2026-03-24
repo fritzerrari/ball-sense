@@ -378,6 +378,7 @@ export class FootballTracker {
     if (this.zoomCheckIntervalId) {
       clearInterval(this.zoomCheckIntervalId);
       this.zoomCheckIntervalId = null;
+    }
     // Send remaining buffer as final chunk
     if (this.uploadMode === "live" && this.liveBuffer.length > 0 && this.liveConfig) {
       const chunk = [...this.liveBuffer];
