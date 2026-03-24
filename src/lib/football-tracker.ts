@@ -552,6 +552,7 @@ export class FootballTracker {
       this.zoomCheckIntervalId = null;
     }
     this.stopStabilityMonitoring();
+    this.highlightRecorder.stop();
 
     if (this.uploadMode === "live" && this.liveBuffer.length > 0 && this.liveConfig) {
       const chunk = [...this.liveBuffer];

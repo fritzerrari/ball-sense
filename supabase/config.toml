@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.stream-tracking]
 verify_jwt = false
+
+[functions.cleanup-highlights]
+verify_jwt = false
