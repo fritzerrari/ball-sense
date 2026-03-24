@@ -1,8 +1,12 @@
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useState, useEffect } from "react";
-import { ArrowLeft, ArrowRight, Calendar, Users, Camera, Loader2, Check, Dumbbell, Swords, ShieldCheck, EyeOff, UserPlus, Copy, Share2 } from "lucide-react";
+import {
+  ArrowLeft, ArrowRight, Calendar, Users, Camera, Loader2, Check,
+  Dumbbell, Swords, ShieldCheck, EyeOff, UserPlus, Copy, Share2,
+  Rocket, SkipForward, Smartphone, Info,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { usePlayers } from "@/hooks/use-players";
 import { useFields } from "@/hooks/use-fields";
@@ -51,10 +55,8 @@ export default function NewMatch() {
     Array.from({ length: 11 }, (_, i) => ({ name: "", number: String(i + 1), position: "" })),
   );
   const [cameras, setCameras] = useState(3);
-  const [consentPlayersConfirmed, setConsentPlayersConfirmed] = useState(false);
-  const [consentMinorsConfirmed, setConsentMinorsConfirmed] = useState(false);
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
   const [trackOpponent, setTrackOpponent] = useState(false);
-  const [opponentConsentConfirmed, setOpponentConsentConfirmed] = useState(false);
 
   // Post-creation state
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
@@ -64,20 +66,20 @@ export default function NewMatch() {
   const activePlayers = (players ?? []).filter((player) => player.active);
   const isTraining = matchType === "training";
 
-  // Simplified 3-step wizard
-  const steps = isTraining
+  // 4-step wizard
+  const wizardSteps = isTraining
     ? [
         { label: "Details", icon: Dumbbell },
         { label: "Spieler", icon: Users },
         { label: "Kameras", icon: Camera },
+        { label: "Fertig", icon: Rocket },
       ]
     : [
         { label: "Details", icon: Calendar },
         { label: "Aufstellung", icon: Users },
         { label: "Kameras", icon: Camera },
+        { label: "Fertig", icon: Rocket },
       ];
-
-  const lastStep = steps.length - 1;
 
   useEffect(() => {
     if (fields && fields.length > 0 && !fieldId) {
@@ -179,9 +181,7 @@ export default function NewMatch() {
   };
 
   const canProceed = () => {
-    if (step === 0) {
-      return Boolean(date && fieldId && consentPlayersConfirmed && consentMinorsConfirmed && (!trackOpponent || opponentConsentConfirmed));
-    }
+    if (step === 0) return Boolean(date && fieldId && consentConfirmed);
     if (step === 1 && isTraining) return trainingPlayers.size >= 1;
     return true;
   };
@@ -193,10 +193,6 @@ export default function NewMatch() {
   const handleCreate = async () => {
     if (!fieldId) {
       toast.error("Bitte wähle einen Platz");
-      return;
-    }
-    if (!consentPlayersConfirmed || !consentMinorsConfirmed || (trackOpponent && !opponentConsentConfirmed)) {
-      toast.error("Bitte bestätige zuerst die Einwilligungen");
       return;
     }
 
@@ -261,10 +257,10 @@ export default function NewMatch() {
       home_formation: isTraining ? undefined : homeFormation,
       away_formation: isTraining ? undefined : awayFormation,
       match_type: matchType,
-      consent_players_confirmed: consentPlayersConfirmed,
-      consent_minors_confirmed: consentMinorsConfirmed,
+      consent_players_confirmed: consentConfirmed,
+      consent_minors_confirmed: consentConfirmed,
       track_opponent: trackOpponent,
-      opponent_consent_confirmed: trackOpponent ? opponentConsentConfirmed : false,
+      opponent_consent_confirmed: trackOpponent ? consentConfirmed : false,
       lineups,
     });
 
@@ -277,7 +273,6 @@ export default function NewMatch() {
       for (let i = 0; i < cameras; i++) {
         const codeStr = generateCameraCode();
         codes.push(codeStr);
-        // Hash and store the code
         const encoder = new TextEncoder();
         const data = encoder.encode(codeStr);
         const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -296,6 +291,9 @@ export default function NewMatch() {
       toast.error("Codes konnten nicht generiert werden");
     }
     setGeneratingCodes(false);
+
+    // Move to step 4 (Fertig)
+    setStep(3);
   };
 
   const copyCode = (codeStr: string, index: number) => {
@@ -308,7 +306,7 @@ export default function NewMatch() {
 
   const shareCode = (codeStr: string, index: number) => {
     const url = `${window.location.origin}/camera/${createdMatchId}/track?cam=${index}`;
-    const text = `Kamera ${index + 1} Code: ${codeStr}\nLink: ${url}`;
+    const text = `FieldIQ Kamera ${index + 1}\nCode: ${codeStr}\nLink: ${url}`;
     if (navigator.share) {
       navigator.share({ title: `Kamera ${index + 1}`, text }).catch(() => {});
     } else {
@@ -316,102 +314,71 @@ export default function NewMatch() {
     }
   };
 
+  const shareAllCodes = () => {
+    const text = generatedCodes.map((c, i) => {
+      const url = `${window.location.origin}/camera/${createdMatchId}/track?cam=${i}`;
+      return `Kamera ${i + 1}: ${c}\n${url}`;
+    }).join("\n\n");
+    const fullText = `FieldIQ Kamera-Codes\n${awayName ? `${clubName} vs ${awayName}` : isTraining ? "Training" : "Spiel"} · ${new Date(date).toLocaleDateString("de-DE")}\n\n${text}`;
+
+    if (navigator.share) {
+      navigator.share({ title: "FieldIQ Kamera-Codes", text: fullText }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(fullText).then(() => toast.success("Alle Codes kopiert!"));
+    }
+  };
+
   const selectedHomeCount = homeStarters.size + homeBench.size;
-
-  // If match was created, show codes screen
-  if (createdMatchId) {
-    return (
-      <AppLayout>
-        <div className="mx-auto max-w-3xl space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
-              <Check className="h-8 w-8 text-emerald-400" />
-            </div>
-            <h1 className="text-2xl font-bold font-display">{isTraining ? "Training erstellt!" : "Spiel erstellt!"}</h1>
-            <p className="text-sm text-muted-foreground">Teile die Kamera-Codes mit deinen Helfern.</p>
-          </div>
-
-          {generatingCodes ? (
-            <div className="flex items-center justify-center gap-2 py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Codes werden generiert…</span>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {generatedCodes.map((codeStr, i) => (
-                <div key={i} className="glass-card p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Camera className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-semibold font-display">Kamera {i + 1}</p>
-                        <p className="text-xs text-muted-foreground">Kamera-Code</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-center py-3 bg-muted rounded-xl">
-                    <span className="text-3xl font-mono font-bold tracking-[0.3em] text-foreground">{codeStr}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1" onClick={() => copyCode(codeStr, i)}>
-                      <Copy className="mr-2 h-4 w-4" /> Kopieren
-                    </Button>
-                    <Button variant="outline" className="flex-1" onClick={() => shareCode(codeStr, i)}>
-                      <Share2 className="mr-2 h-4 w-4" /> Teilen
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <Button variant="hero" size="lg" className="flex-1" onClick={() => navigate(`/matches/${createdMatchId}`)}>
-              Zum Spiel <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="lg" onClick={() => navigate("/matches")}>
-              Übersicht
-            </Button>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
 
   return (
     <AppLayout>
       <div className="mx-auto max-w-3xl space-y-6">
+        {/* Header */}
         <div className="flex items-center gap-3">
           <Link to="/matches" className="rounded-lg p-2 transition-colors hover:bg-muted">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-2xl font-bold font-display">
-            {step === 0 ? "Neues Spiel / Training" : isTraining ? "Neues Training" : "Neues Spiel"}
-          </h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold font-display truncate">
+              {isTraining ? "Neues Training" : "Neues Spiel"}
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              {step === 0 && "Was, wann, wo?"}
+              {step === 1 && (isTraining ? "Wer macht mit?" : "Wer spielt?")}
+              {step === 2 && "Wie viele Kameras?"}
+              {step === 3 && "Codes verteilen & loslegen!"}
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          {steps.map((currentStep, index) => (
-            <div key={currentStep.label} className="flex flex-1 items-center gap-1 sm:gap-2">
+        {/* Stepper */}
+        <div className="flex items-center gap-1">
+          {wizardSteps.map((ws, index) => (
+            <div key={ws.label} className="flex flex-1 items-center gap-1">
               <button
-                onClick={() => index < step && setStep(index)}
-                disabled={index >= step}
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold font-display transition-colors ${
-                  index === step ? "bg-primary text-primary-foreground" : index < step ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30" : "bg-muted text-muted-foreground"
+                onClick={() => index < step && !createdMatchId && setStep(index)}
+                disabled={index >= step || !!createdMatchId}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold font-display transition-all ${
+                  index === step
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    : index < step
+                      ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30"
+                      : "bg-muted text-muted-foreground"
                 }`}
               >
-                {index < step ? <Check className="h-4 w-4" /> : <currentStep.icon className="h-4 w-4 sm:hidden" />}
+                {index < step ? <Check className="h-4 w-4" /> : index + 1}
               </button>
-              <span className="hidden text-xs text-muted-foreground sm:block">{currentStep.label}</span>
-              {index < steps.length - 1 && <div className={`h-px flex-1 ${index < step ? "bg-primary/30" : "bg-border"}`} />}
+              <span className="hidden text-[11px] text-muted-foreground sm:block">{ws.label}</span>
+              {index < wizardSteps.length - 1 && (
+                <div className={`h-px flex-1 transition-colors ${index < step ? "bg-primary/40" : "bg-border"}`} />
+              )}
             </div>
           ))}
         </div>
 
+        {/* Step Content */}
         <div className="glass-card space-y-5 p-6">
-          {/* Step 0: Type + Details combined */}
+          {/* ─── Step 0: Details ─── */}
           {step === 0 && (
             <>
               {/* Type toggle */}
@@ -433,17 +400,17 @@ export default function NewMatch() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm text-muted-foreground">Datum *</label>
-                  <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground" />
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground" />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm text-muted-foreground">{isTraining ? "Uhrzeit" : "Anstoß"}</label>
-                  <input type="time" value={kickoff} onChange={(event) => setKickoff(event.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground" />
+                  <input type="time" value={kickoff} onChange={(e) => setKickoff(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground" />
                 </div>
               </div>
 
               <div>
                 <label className="mb-1 block text-sm text-muted-foreground">Platz *</label>
-                <select value={fieldId} onChange={(event) => setFieldId(event.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
+                <select value={fieldId} onChange={(e) => setFieldId(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
                   {!fields?.length && <option value="">Kein Platz verfügbar</option>}
                   {(fields ?? []).map((field) => (
                     <option key={field.id} value={field.id}>{field.name} ({field.width_m}×{field.height_m}m)</option>
@@ -461,61 +428,50 @@ export default function NewMatch() {
                     </div>
                     <div>
                       <label className="mb-1 block text-sm text-muted-foreground">Gegner</label>
-                      <input type="text" value={awayName} onChange={(event) => setAwayName(event.target.value)} placeholder="Vereinsname eingeben..." className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
+                      <input type="text" value={awayName} onChange={(e) => setAwayName(e.target.value)} placeholder="Vereinsname..." className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
                     </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm text-muted-foreground">Formation Heim</label>
-                      <select value={homeFormation} onChange={(event) => setHomeFormation(event.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
-                        {FORMATIONS.map((formation) => <option key={formation}>{formation}</option>)}
+                      <select value={homeFormation} onChange={(e) => setHomeFormation(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
+                        {FORMATIONS.map((f) => <option key={f}>{f}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm text-muted-foreground">Formation Gast</label>
-                      <select value={awayFormation} onChange={(event) => setAwayFormation(event.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
-                        {FORMATIONS.map((formation) => <option key={formation}>{formation}</option>)}
+                      <select value={awayFormation} onChange={(e) => setAwayFormation(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
+                        {FORMATIONS.map((f) => <option key={f}>{f}</option>)}
                       </select>
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">Gegner auch tracken</span>
+                    </div>
+                    <Switch checked={trackOpponent} onCheckedChange={setTrackOpponent} />
                   </div>
                 </>
               )}
 
-              {/* Compact consent section */}
-              <div className="space-y-2 rounded-xl border border-border bg-card/60 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <ShieldCheck className="h-4 w-4 text-primary" /> Einwilligungen
+              {/* Simplified single consent */}
+              <label className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 cursor-pointer">
+                <Switch checked={consentConfirmed} onCheckedChange={setConsentConfirmed} className="mt-0.5" />
+                <div>
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <ShieldCheck className="h-4 w-4 text-primary" /> Einwilligungen bestätigt
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground leading-relaxed">
+                    Alle getrackten Spieler (inkl. Minderjährige mit Eltern-Einwilligung{trackOpponent ? " und Gegner" : ""}) haben dem Tracking zugestimmt.
+                  </span>
                 </div>
-
-                <label className="flex items-start gap-3 text-xs text-foreground">
-                  <Checkbox checked={consentPlayersConfirmed} onCheckedChange={(value) => setConsentPlayersConfirmed(Boolean(value))} />
-                  <span>Alle getrackten Spieler haben eingewilligt.</span>
-                </label>
-
-                <label className="flex items-start gap-3 text-xs text-foreground">
-                  <Checkbox checked={consentMinorsConfirmed} onCheckedChange={(value) => setConsentMinorsConfirmed(Boolean(value))} />
-                  <span>Alle Spieler sind volljährig oder haben Eltern-Einwilligung.</span>
-                </label>
-
-                {!isTraining && (
-                  <>
-                    <label className="flex items-start gap-3 text-xs text-foreground">
-                      <Checkbox checked={trackOpponent} onCheckedChange={(value) => setTrackOpponent(Boolean(value))} />
-                      <span>Gegner auch tracken</span>
-                    </label>
-                    {trackOpponent && (
-                      <label className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-2 text-xs text-foreground">
-                        <Checkbox checked={opponentConsentConfirmed} onCheckedChange={(value) => setOpponentConsentConfirmed(Boolean(value))} />
-                        <span>Einwilligung des Gegners liegt vor.</span>
-                      </label>
-                    )}
-                  </>
-                )}
-              </div>
+              </label>
             </>
           )}
 
-          {/* Step 1: Players (Heim + Gast combined for match, or training players) */}
+          {/* ─── Step 1: Players ─── */}
           {step === 1 && isTraining && (
             <>
               <div className="flex items-center justify-between">
@@ -527,13 +483,13 @@ export default function NewMatch() {
                   {trainingPlayers.size === activePlayers.length ? "Alle abwählen" : "Alle auswählen"}
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground">Wähle mindestens 1 Spieler. {trainingPlayers.size} ausgewählt.</p>
+              <p className="text-sm text-muted-foreground">{trainingPlayers.size} Spieler ausgewählt.</p>
               <div className="space-y-2 max-h-[420px] overflow-y-auto">
                 {activePlayers.map((player) => {
                   const isSelected = trainingPlayers.has(player.id);
                   const isExcluded = excludedPlayers.has(player.id);
                   return (
-                    <div key={player.id} className={`rounded-lg border p-3 ${isSelected ? "border-primary/30 bg-primary/5" : "border-border/50"}`}>
+                    <div key={player.id} className={`rounded-lg border p-3 transition-all ${isSelected ? "border-primary/30 bg-primary/5" : "border-border/50"}`}>
                       <div className="flex items-center gap-3">
                         <button onClick={() => toggleTrainingPlayer(player.id)} className="flex flex-1 items-center gap-3 text-left">
                           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
@@ -560,7 +516,6 @@ export default function NewMatch() {
 
           {step === 1 && !isTraining && (
             <>
-              {/* Home team */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h2 className="text-lg font-semibold font-display flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" /> Aufstellung
@@ -570,9 +525,7 @@ export default function NewMatch() {
                     <UserPlus className="mr-1 h-4 w-4" /> Alle als Starter
                   </Button>
                   {homeStarters.size > 0 && (
-                    <Button variant="ghost" size="sm" onClick={handleClearStarters}>
-                      Auswahl löschen
-                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleClearStarters}>Löschen</Button>
                   )}
                 </div>
               </div>
@@ -585,24 +538,17 @@ export default function NewMatch() {
                       {size}er
                     </button>
                   ))}
-                  <input
-                    type="number"
-                    min={1}
-                    max={15}
-                    value={squadSize}
-                    onChange={(e) => setSquadSize(Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 11)))}
-                    className="w-16 rounded-lg border border-border bg-muted px-2 py-1.5 text-center text-sm text-foreground"
-                    title="Eigene Anzahl"
-                  />
+                  <input type="number" min={1} max={15} value={squadSize} onChange={(e) => setSquadSize(Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 11)))} className="w-16 rounded-lg border border-border bg-muted px-2 py-1.5 text-center text-sm text-foreground" title="Eigene Anzahl" />
                 </div>
               </div>
 
               <p className="text-sm text-muted-foreground">Startelf: {homeStarters.size}/{squadSize} · Bank: {homeBench.size}/7</p>
 
               <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
-                <span className="text-primary font-bold text-sm">💡</span>
-                <span><strong>Aufstellung optional.</strong> Falls du die Aufstellung nicht kennst, kannst du diesen Schritt überspringen – die KI erkennt Spieler automatisch.</span>
+                <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+                <span><strong>Aufstellung optional.</strong> Die KI erkennt Spieler auch automatisch. Du kannst diesen Schritt überspringen.</span>
               </div>
+
               <div className="space-y-2 max-h-[350px] overflow-y-auto">
                 {activePlayers.map((player) => {
                   const isStarter = homeStarters.has(player.id);
@@ -611,19 +557,15 @@ export default function NewMatch() {
                   const isExcluded = excludedPlayers.has(player.id);
                   const currentPos = matchPositions[player.id] ?? player.position ?? "";
                   return (
-                    <div key={player.id} className={`rounded-lg border p-3 ${isStarter ? "border-primary/30 bg-primary/5" : isBench ? "border-border bg-muted/30" : "border-border/50"}`}>
+                    <div key={player.id} className={`rounded-lg border p-3 transition-all ${isStarter ? "border-primary/30 bg-primary/5" : isBench ? "border-border bg-muted/30" : "border-border/50"}`}>
                       <div className="flex items-center gap-3">
                         <div className="w-10">
-                          <input type="number" value={getShirtNumber(player.id)} onChange={(event) => setShirtNumbers({ ...shirtNumbers, [player.id]: parseInt(event.target.value, 10) || 0 })} className="w-full bg-transparent text-center text-sm text-foreground outline-none" />
+                          <input type="number" value={getShirtNumber(player.id)} onChange={(e) => setShirtNumbers({ ...shirtNumbers, [player.id]: parseInt(e.target.value, 10) || 0 })} className="w-full bg-transparent text-center text-sm text-foreground outline-none" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium">{player.name}</div>
                           {isSelected ? (
-                            <select
-                              value={currentPos}
-                              onChange={(e) => setMatchPositions({ ...matchPositions, [player.id]: e.target.value })}
-                              className="mt-0.5 w-20 rounded border border-border/50 bg-transparent px-1 py-0.5 text-[10px] text-muted-foreground outline-none"
-                            >
+                            <select value={currentPos} onChange={(e) => setMatchPositions({ ...matchPositions, [player.id]: e.target.value })} className="mt-0.5 w-20 rounded border border-border/50 bg-transparent px-1 py-0.5 text-[10px] text-muted-foreground outline-none">
                               <option value="">Auto (KI)</option>
                               {MATCH_POSITIONS.filter(p => p).map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
@@ -648,75 +590,76 @@ export default function NewMatch() {
 
               {/* Guest section inline */}
               {trackOpponent && (
-                <>
-                  <div className="border-t border-border pt-4 mt-4">
-                    <h3 className="text-base font-semibold font-display flex items-center gap-2 mb-3">
-                      <Users className="h-4 w-4 text-primary" /> Gast {awayName && `— ${awayName}`}
-                    </h3>
+                <div className="border-t border-border pt-4 mt-4">
+                  <h3 className="text-base font-semibold font-display flex items-center gap-2 mb-3">
+                    <Users className="h-4 w-4 text-primary" /> Gast {awayName && `— ${awayName}`}
+                  </h3>
 
-                    <div className="mb-3">
-                      <label className="mb-1.5 block text-sm text-muted-foreground">Spieleranzahl Gegner</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[5, 7, 9, 11].map((size) => (
-                          <button key={size} onClick={() => setAwaySquadSize(size)} className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${awaySquadSize === size ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-                            {size}er
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-primary/10 bg-primary/5 p-2 text-xs text-muted-foreground flex items-start gap-2 mb-3">
-                      <span className="text-primary font-bold">🤖</span>
-                      <span><strong>KI-Erkennung aktiv.</strong> Gegnerdaten sind optional.</span>
-                    </div>
-
-                    <div className="space-y-2 max-h-[250px] overflow-y-auto">
-                      {guestPlayers.map((guestPlayer, index) => (
-                        <div key={index} className="flex gap-2">
-                          <input type="number" placeholder="#" value={guestPlayer.number} onChange={(event) => updateGuestPlayer(index, "number", event.target.value)} className="w-14 rounded-lg border border-border bg-muted px-2 py-2 text-center text-sm text-foreground" />
-                          <input type="text" placeholder={`Spieler ${index + 1}`} value={guestPlayer.name} onChange={(event) => updateGuestPlayer(index, "name", event.target.value)} className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
-                          <input type="text" placeholder="Pos" value={guestPlayer.position} onChange={(event) => updateGuestPlayer(index, "position", event.target.value)} className="w-16 rounded-lg border border-border bg-muted px-2 py-2 text-center text-sm text-foreground placeholder:text-muted-foreground" />
-                        </div>
+                  <div className="mb-3">
+                    <label className="mb-1.5 block text-sm text-muted-foreground">Spieleranzahl Gegner</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[5, 7, 9, 11].map((size) => (
+                        <button key={size} onClick={() => setAwaySquadSize(size)} className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${awaySquadSize === size ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+                          {size}er
+                        </button>
                       ))}
                     </div>
-                    <Button variant="ghost" size="sm" onClick={addGuestRow} className="mt-2">+ Weiteren Spieler</Button>
                   </div>
-                </>
+
+                  <div className="rounded-lg border border-primary/10 bg-primary/5 p-2 text-xs text-muted-foreground flex items-start gap-2 mb-3">
+                    <span className="text-primary font-bold">🤖</span>
+                    <span><strong>KI-Erkennung aktiv.</strong> Gegnerdaten sind optional.</span>
+                  </div>
+
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                    {guestPlayers.map((guestPlayer, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input type="number" placeholder="#" value={guestPlayer.number} onChange={(e) => updateGuestPlayer(index, "number", e.target.value)} className="w-14 rounded-lg border border-border bg-muted px-2 py-2 text-center text-sm text-foreground" />
+                        <input type="text" placeholder={`Spieler ${index + 1}`} value={guestPlayer.name} onChange={(e) => updateGuestPlayer(index, "name", e.target.value)} className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
+                        <input type="text" placeholder="Pos" value={guestPlayer.position} onChange={(e) => updateGuestPlayer(index, "position", e.target.value)} className="w-16 rounded-lg border border-border bg-muted px-2 py-2 text-center text-sm text-foreground placeholder:text-muted-foreground" />
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={addGuestRow} className="mt-2">+ Weiteren Spieler</Button>
+                </div>
               )}
 
               {!trackOpponent && !isTraining && (
                 <div className="rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-                  Gegner-Tracking ist deaktiviert. Aktiviere es bei den Einwilligungen im Schritt "Details".
+                  Gegner-Tracking ist deaktiviert. Aktiviere es im Schritt "Details".
                 </div>
               )}
             </>
           )}
 
-          {/* Step 2: Cameras */}
-          {step === lastStep && (
+          {/* ─── Step 2: Cameras ─── */}
+          {step === 2 && (
             <>
               <h2 className="text-lg font-semibold font-display flex items-center gap-2">
                 <Camera className="h-5 w-5 text-primary" /> Kamera-Setup
               </h2>
+
               <div>
-                <label className="mb-2 block text-sm text-muted-foreground">Anzahl Kameras</label>
+                <label className="mb-2 block text-sm text-muted-foreground">Wie viele Smartphones nutzt du?</label>
                 <div className="flex gap-2">
                   {[1, 2, 3].map((count) => (
-                    <button key={count} onClick={() => setCameras(count)} className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${cameras === count ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-                      {count} Kamera{count > 1 ? "s" : ""}
+                    <button key={count} onClick={() => setCameras(count)} className={`flex-1 rounded-xl p-4 text-center transition-all border ${cameras === count ? "border-primary bg-primary/10 shadow-sm shadow-primary/10" : "border-border bg-muted hover:bg-muted/80"}`}>
+                      <Smartphone className={`mx-auto mb-1 h-6 w-6 ${cameras === count ? "text-primary" : "text-muted-foreground"}`} />
+                      <span className={`block text-sm font-medium ${cameras === count ? "text-foreground" : "text-muted-foreground"}`}>{count}</span>
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        {count === 1 ? "Basis" : count === 2 ? "Empfohlen" : "Optimal"}
+                      </span>
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="glass-card flex items-start gap-2 p-4 text-sm text-muted-foreground">
-                <Camera className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <span>{isTraining ? "1 Kamera reicht für Trainingseinheiten." : "Empfehlung: 3 Kameras für vollständige Abdeckung."}</span>
-              </div>
-              <div className="rounded-lg bg-muted/50 p-4">
-                <div className="relative aspect-[105/68] rounded border-2 border-primary/20">
+
+              {/* Field visualization */}
+              <div className="rounded-xl bg-muted/50 p-4">
+                <div className="relative aspect-[105/68] rounded-lg border-2 border-primary/20 overflow-hidden">
                   <div className="absolute inset-0 flex">
                     {Array.from({ length: cameras }).map((_, index) => (
-                      <div key={index} className="flex flex-1 items-center justify-center border-r border-primary/20 last:border-r-0">
+                      <div key={index} className="flex flex-1 items-center justify-center border-r border-primary/10 last:border-r-0">
                         <div className="text-center">
                           <Camera className="mx-auto mb-1 h-5 w-5 text-primary" />
                           <span className="text-xs text-muted-foreground">Kamera {index + 1}</span>
@@ -726,26 +669,109 @@ export default function NewMatch() {
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Die Kamera-Codes werden nach dem Erstellen automatisch generiert und angezeigt.
-              </p>
+
+              <div className="flex items-start gap-2 rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground">
+                <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+                <span>Die Kamera-Codes werden im nächsten Schritt automatisch generiert. Teile sie per Nachricht mit deinen Helfern.</span>
+              </div>
+            </>
+          )}
+
+          {/* ─── Step 3: Fertig ─── */}
+          {step === 3 && (
+            <>
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <Check className="h-8 w-8 text-emerald-400" />
+                </div>
+                <h2 className="text-xl font-bold font-display">{isTraining ? "Training erstellt!" : "Spiel erstellt!"}</h2>
+                <p className="text-sm text-muted-foreground">Teile die Kamera-Codes mit deinen Helfern — fertig.</p>
+              </div>
+
+              {generatingCodes ? (
+                <div className="flex items-center justify-center gap-2 py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">Codes werden generiert…</span>
+                </div>
+              ) : (
+                <>
+                  {/* All codes sharing */}
+                  {generatedCodes.length > 1 && (
+                    <Button variant="outline" className="w-full" onClick={shareAllCodes}>
+                      <Share2 className="mr-2 h-4 w-4" /> Alle Codes auf einmal teilen
+                    </Button>
+                  )}
+
+                  <div className="space-y-3">
+                    {generatedCodes.map((codeStr, i) => (
+                      <div key={i} className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                            <Camera className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-semibold font-display text-sm">Kamera {i + 1}</p>
+                            <p className="text-[11px] text-muted-foreground">Helfer öffnet den Link und gibt den Code ein</p>
+                          </div>
+                        </div>
+                        <div className="text-center py-3 bg-muted rounded-xl">
+                          <span className="text-3xl font-mono font-bold tracking-[0.3em] text-foreground">{codeStr}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" className="flex-1" onClick={() => copyCode(codeStr, i)}>
+                            <Copy className="mr-1.5 h-3.5 w-3.5" /> Kopieren
+                          </Button>
+                          <Button variant="outline" size="sm" className="flex-1" onClick={() => shareCode(codeStr, i)}>
+                            <Share2 className="mr-1.5 h-3.5 w-3.5" /> Teilen
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
 
-        <div className="flex justify-between">
-          <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
-            <ArrowLeft className="mr-1 h-4 w-4" /> Zurück
-          </Button>
-          {step < lastStep ? (
-            <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
-              Weiter <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
+        {/* Navigation */}
+        <div className="flex justify-between gap-3">
+          {step < 3 ? (
+            <>
+              <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
+                <ArrowLeft className="mr-1 h-4 w-4" /> Zurück
+              </Button>
+
+              <div className="flex gap-2">
+                {/* Skip button for step 1 */}
+                {step === 1 && !isTraining && (
+                  <Button variant="ghost" onClick={() => setStep(2)}>
+                    <SkipForward className="mr-1 h-4 w-4" /> Überspringen
+                  </Button>
+                )}
+
+                {step < 2 ? (
+                  <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
+                    Weiter <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button variant="hero" onClick={() => void handleCreate()} disabled={createMatch.isPending || !canProceed()}>
+                    {createMatch.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                    {isTraining ? "Training erstellen" : "Spiel erstellen"} <Rocket className="ml-1 h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </>
           ) : (
-            <Button variant="hero" onClick={() => void handleCreate()} disabled={createMatch.isPending}>
-              {createMatch.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              {isTraining ? "Training erstellen" : "Spiel erstellen"}
-            </Button>
+            /* Step 3 navigation */
+            <div className="flex w-full gap-3">
+              <Button variant="hero" size="lg" className="flex-1" onClick={() => navigate(`/matches/${createdMatchId}/track?cam=0`)}>
+                <Camera className="mr-2 h-5 w-5" /> Selbst tracken
+              </Button>
+              <Button variant="outline" size="lg" onClick={() => navigate(`/matches/${createdMatchId}`)}>
+                Zum Spiel
+              </Button>
+            </div>
           )}
         </div>
       </div>
