@@ -679,6 +679,84 @@ export default function CameraTrackingPage() {
 
   const cornerLabels = ["Oben links", "Oben rechts", "Unten rechts", "Unten links"];
 
+  const inlineCalibrationOverlay = showInlineCalibration ? (
+    <div className="absolute inset-0 bg-black/40 z-10">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Kalibrierungspunkt setzen"
+        className="absolute inset-0 z-10 cursor-crosshair touch-none bg-transparent"
+        style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+        onPointerDown={handleInlineCalibrationTap}
+        onClick={handleInlineCalibrationClick}
+        onTouchStart={(e) => {
+          if (savingCalibration) return;
+          e.preventDefault();
+        }}
+        onTouchEnd={handleInlineCalibrationTouchEnd}
+        onContextMenu={(e) => e.preventDefault()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+          }
+        }}
+      />
+
+      {calibrationPoints.map((pt, i) => (
+        <div
+          key={i}
+          className="pointer-events-none absolute z-20 h-6 w-6 -ml-3 -mt-3 rounded-full border-2 border-primary bg-primary/30 flex items-center justify-center"
+          style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%` }}
+        >
+          <span className="text-[9px] font-bold text-primary-foreground">{i + 1}</span>
+        </div>
+      ))}
+
+      <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-20 rounded-lg bg-card/90 p-2 text-center">
+        <p className="text-xs font-medium text-foreground">
+          {savingCalibration
+            ? "Kalibrierung wird gespeichert…"
+            : calibrationPoints.length < 4
+              ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
+              : "Kalibrierung wird vorbereitet…"}
+        </p>
+      </div>
+
+      <div className="absolute left-2 top-2 z-30 flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8"
+          disabled={detectingCalibration || savingCalibration}
+          onClick={(e) => {
+            e.stopPropagation();
+            void handleAutoDetectInline();
+          }}
+        >
+          {detectingCalibration ? (
+            <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Erkenne…</>
+          ) : (
+            <><Crosshair className="mr-1 h-3.5 w-3.5" /> Auto erkennen</>
+          )}
+        </Button>
+      </div>
+
+      <button
+        type="button"
+        className="absolute right-2 top-2 z-30 rounded-full bg-card/80 p-1.5"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (savingCalibration) return;
+          setShowInlineCalibration(false);
+          setCalibrationPoints([]);
+        }}
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className="min-h-screen bg-background flex flex-col landscape:min-h-[100dvh]">
       {/* Top bar */}
@@ -800,10 +878,11 @@ export default function CameraTrackingPage() {
             )}
 
             {/* Camera preview */}
-            <div className="w-full aspect-video rounded-xl bg-muted/30 border border-border overflow-hidden relative">
+            <div className="w-full aspect-video rounded-xl bg-muted/30 border border-border overflow-hidden relative" ref={calibrationOverlayRef}>
               {cameraReady && streamRef.current ? (
                 <video
                   ref={(el) => {
+                    trackingVideoRef.current = el;
                     if (el && streamRef.current) {
                       el.srcObject = streamRef.current;
                       el.play().catch(() => {});
@@ -817,6 +896,7 @@ export default function CameraTrackingPage() {
                   <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
                 </div>
               )}
+              {inlineCalibrationOverlay}
             </div>
 
             {/* Calibration status */}
@@ -936,84 +1016,7 @@ export default function CameraTrackingPage() {
                 </div>
               )}
 
-              {/* Inline calibration overlay */}
-              {showInlineCalibration && (
-                <div className="absolute inset-0 bg-black/40 z-10">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Kalibrierungspunkt setzen"
-                    className="absolute inset-0 z-10 cursor-crosshair touch-none bg-transparent"
-                    style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
-                    onPointerDown={handleInlineCalibrationTap}
-                    onClick={handleInlineCalibrationClick}
-                    onTouchStart={(e) => {
-                      if (savingCalibration) return;
-                      e.preventDefault();
-                    }}
-                    onTouchEnd={handleInlineCalibrationTouchEnd}
-                    onContextMenu={(e) => e.preventDefault()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                      }
-                    }}
-                  />
-
-                  {calibrationPoints.map((pt, i) => (
-                    <div
-                      key={i}
-                      className="pointer-events-none absolute z-20 h-6 w-6 -ml-3 -mt-3 rounded-full border-2 border-primary bg-primary/30 flex items-center justify-center"
-                      style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%` }}
-                    >
-                      <span className="text-[9px] font-bold text-primary-foreground">{i + 1}</span>
-                    </div>
-                  ))}
-
-                  <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-20 rounded-lg bg-card/90 p-2 text-center">
-                    <p className="text-xs font-medium text-foreground">
-                      {savingCalibration
-                        ? "Kalibrierung wird gespeichert…"
-                        : calibrationPoints.length < 4
-                          ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
-                          : "Kalibrierung wird vorbereitet…"}
-                    </p>
-                  </div>
-
-                  <div className="absolute left-2 top-2 z-30 flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8"
-                      disabled={detectingCalibration || savingCalibration}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleAutoDetectInline();
-                      }}
-                    >
-                      {detectingCalibration ? (
-                        <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Erkenne…</>
-                      ) : (
-                        <><Crosshair className="mr-1 h-3.5 w-3.5" /> Auto erkennen</>
-                      )}
-                    </Button>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="absolute right-2 top-2 z-30 rounded-full bg-card/80 p-1.5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (savingCalibration) return;
-                      setShowInlineCalibration(false);
-                      setCalibrationPoints([]);
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
+              {inlineCalibrationOverlay}
 
               <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
                 <Users className="h-4 w-4 text-primary" />
