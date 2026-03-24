@@ -1429,6 +1429,7 @@ export type Database = {
       }
       tracking_uploads: {
         Row: {
+          calibration: Json | null
           camera_index: number
           chunks_received: number | null
           duration_sec: number | null
@@ -1442,6 +1443,7 @@ export type Database = {
           uploaded_at: string
         }
         Insert: {
+          calibration?: Json | null
           camera_index?: number
           chunks_received?: number | null
           duration_sec?: number | null
@@ -1455,6 +1457,7 @@ export type Database = {
           uploaded_at?: string
         }
         Update: {
+          calibration?: Json | null
           camera_index?: number
           chunks_received?: number | null
           duration_sec?: number | null

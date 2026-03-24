@@ -1,0 +1,1 @@
+ALTER TABLE tracking_uploads ADD COLUMN calibration jsonb DEFAULT NULL;

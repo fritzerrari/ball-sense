@@ -77,6 +77,7 @@ export default function CameraTrackingPage() {
   const [liveEvents, setLiveEvents] = useState<MatchEvent[]>([]);
   const [uploadMode, setUploadMode] = useState<UploadMode>("batch");
   const [chunkStats, setChunkStats] = useState({ sent: 0, ok: 0, pending: 0 });
+  const [zoomWarning, setZoomWarning] = useState(false);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -260,6 +261,13 @@ export default function CameraTrackingPage() {
         },
       });
     }
+
+    // Setup zoom monitoring
+    trackerRef.current.setZoomChangeCallback((current, calibrated) => {
+      setZoomWarning(true);
+      toast.warning(`⚠️ Zoom verändert (${current.toFixed(1)}x → kalibriert: ${calibrated.toFixed(1)}x). Neu kalibrieren empfohlen.`, { duration: 10000 });
+    });
+    trackerRef.current.startZoomMonitoring();
 
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
@@ -624,6 +632,20 @@ export default function CameraTrackingPage() {
                   <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Suche Spieler…</p>
                   <p className="text-xs text-muted-foreground">{playerCount} erkannt — warte auf Bestätigung</p>
                 </div>
+              </div>
+            )}
+
+            {/* Zoom warning */}
+            {zoomWarning && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Zoom verändert</p>
+                  <p className="text-xs text-muted-foreground">Neu kalibrieren für genaue Daten</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setZoomWarning(false); handleLiveSnapshot(); }}>
+                  Kalibrieren
+                </Button>
               </div>
             )}
 

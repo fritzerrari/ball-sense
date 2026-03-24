@@ -34,11 +34,23 @@ export interface Field {
   created_at: string;
 }
 
+export type FieldCoverage = "full" | "left_half" | "right_half" | "custom";
+
+export interface FieldRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface CalibrationData {
   points: { x: number; y: number }[];
   width_m: number;
   height_m: number;
   calibrated_at: string;
+  coverage?: FieldCoverage;
+  field_rect?: FieldRect;
+  zoom_level?: number;
 }
 
 export interface Match {

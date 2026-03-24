@@ -19,6 +19,7 @@ import {
   CircleDot,
   CornerDownRight,
   LineChart,
+  AlertTriangle,
 } from "lucide-react";
 import { useField, useSaveCalibration } from "@/hooks/use-fields";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -26,8 +27,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import type { FieldCoverage, FieldRect } from "@/lib/types";
+
 type CornerPoint = { x: number; y: number };
 type DetectionConfidence = "high" | "medium" | "low" | null;
+
+const COVERAGE_OPTIONS: { value: FieldCoverage; label: string; desc: string; rect: FieldRect }[] = [
+  { value: "full", label: "Ganzes Feld", desc: "Alle 4 Ecken sichtbar", rect: { x: 0, y: 0, w: 1, h: 1 } },
+  { value: "left_half", label: "Linke Hälfte", desc: "Bis zur Mittellinie", rect: { x: 0, y: 0, w: 0.5, h: 1 } },
+  { value: "right_half", label: "Rechte Hälfte", desc: "Ab der Mittellinie", rect: { x: 0.5, y: 0, w: 0.5, h: 1 } },
+  { value: "custom", label: "Eigener Bereich", desc: "Freier Ausschnitt", rect: { x: 0, y: 0, w: 1, h: 1 } },
+];
 
 type LayoutSuggestion = {
   fieldType: string | null;
@@ -93,7 +103,8 @@ export default function FieldCalibration() {
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [layoutSuggestion, setLayoutSuggestion] = useState<LayoutSuggestion>(EMPTY_LAYOUT_SUGGESTION);
-
+  const [coverage, setCoverage] = useState<FieldCoverage>("full");
+  const [fieldRect, setFieldRect] = useState<FieldRect>({ x: 0, y: 0, w: 1, h: 1 });
   const cornerLabels = ["Links-Oben", "Rechts-Oben", "Rechts-Unten", "Links-Unten"];
   const canSave = points.length === 4;
   const returnTo = searchParams.get("returnTo");
@@ -282,6 +293,12 @@ export default function FieldCalibration() {
     }
   };
 
+  const handleCoverageChange = (value: FieldCoverage) => {
+    setCoverage(value);
+    const opt = COVERAGE_OPTIONS.find(o => o.value === value);
+    if (opt) setFieldRect(opt.rect);
+  };
+
   const handleSave = async () => {
     if (!id || points.length !== 4) return;
     const calibration = {
@@ -289,6 +306,8 @@ export default function FieldCalibration() {
       width_m: parseFloat(width) || 105,
       height_m: parseFloat(height) || 68,
       calibrated_at: new Date().toISOString(),
+      coverage,
+      field_rect: fieldRect,
     };
     await saveCalibration.mutateAsync({ fieldId: id, calibration });
     navigate(backHref);
@@ -494,6 +513,47 @@ export default function FieldCalibration() {
               <Crosshair className="h-4 w-4" /> Kalibrierung bereit — alle 4 Ecken gesetzt.
             </div>
           )}
+
+          {/* Coverage Selection */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-foreground">Sichtbarer Bereich</label>
+            <div className="grid grid-cols-2 gap-2">
+              {COVERAGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleCoverageChange(opt.value)}
+                  className={`relative rounded-xl border-2 p-3 text-left transition-all ${
+                    coverage === opt.value
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-card/50 hover:border-muted-foreground/40"
+                  }`}
+                >
+                  {/* Mini field preview */}
+                  <div className="mb-2 h-8 w-full rounded border border-border bg-muted/50 relative overflow-hidden">
+                    <div
+                      className="absolute bg-primary/30 border border-primary/50"
+                      style={{
+                        left: `${opt.rect.x * 100}%`,
+                        top: `${opt.rect.y * 100}%`,
+                        width: `${opt.rect.w * 100}%`,
+                        height: `${opt.rect.h * 100}%`,
+                      }}
+                    />
+                    {/* Halfway line */}
+                    <div className="absolute left-1/2 top-0 h-full w-px bg-muted-foreground/30" />
+                  </div>
+                  <p className="text-sm font-medium">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+            {coverage !== "full" && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Teilfeld-Kalibrierung: Das Backend transformiert die Koordinaten automatisch auf das Gesamtfeld.
+              </p>
+            )}
+          </div>
 
           <div className="space-y-3">
             <div>
