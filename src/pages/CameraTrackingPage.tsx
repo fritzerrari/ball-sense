@@ -495,70 +495,169 @@ export default function CameraTrackingPage() {
   };
 
   // Inline calibration handlers
-  const handleInlineCalibrationTap = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if (!showInlineCalibration) return;
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    let clientX: number, clientY: number;
-    if ("touches" in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-    const x = (clientX - rect.left) / rect.width;
-    const y = (clientY - rect.top) / rect.height;
+  const handleInlineCalibrationTap = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!showInlineCalibration || savingCalibration) return;
 
-    setCalibrationPoints(prev => {
-      const next = [...prev, { x, y }];
-      if (next.length >= 4) {
-        // Save calibration
-        saveInlineCalibration(next.slice(0, 4));
-        return [];
-      }
-      return next;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = calibrationOverlayRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+    setCalibrationPoints((prev) => {
+      if (prev.length >= 4) return prev;
+      return [...prev, { x, y }];
     });
-  }, [showInlineCalibration]);
+  }, [savingCalibration, showInlineCalibration]);
 
-  const saveInlineCalibration = async (points: { x: number; y: number }[]) => {
-    if (!match?.field_id) return;
-    const calibrationData = {
+  const handleAutoDetectInline = useCallback(async () => {
+    if (!showInlineCalibration || savingCalibration) return;
+
+    const video = trackingVideoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      toast.error("Kein Kamerabild verfügbar — bitte kurz warten");
+      return;
+    }
+
+    setDetectingCalibration(true);
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas-Kontext nicht verfügbar");
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const image = canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
+
+      const response = await fetch(DETECT_FIELD_CORNERS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ image, mimeType: "image/jpeg" }),
+      });
+
+      const data = await response.json().catch(() => ({} as Record<string, unknown>));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Automatische Erkennung fehlgeschlagen");
+      }
+
+      if (data?.isRealPitch === false) {
+        const reason = typeof data.pitchRejectionReason === "string"
+          ? data.pitchRejectionReason
+          : "Kein echter Fußballplatz erkannt";
+        toast.error(reason);
+        return;
+      }
+
+      if (Array.isArray(data?.corners) && data.corners.length === 4) {
+        const points = data.corners
+          .map((corner) => {
+            if (!corner || typeof corner !== "object") return null;
+            const candidate = corner as { x?: number; y?: number };
+            const x = Number(candidate.x);
+            const y = Number(candidate.y);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+            return {
+              x: Math.max(0, Math.min(1, x / 100)),
+              y: Math.max(0, Math.min(1, y / 100)),
+            };
+          })
+          .filter((point): point is { x: number; y: number } => !!point);
+
+        if (points.length === 4) {
+          setCalibrationPoints(points);
+          toast.success("Eckpunkte erkannt — Kalibrierung wird gespeichert…");
+          return;
+        }
+      }
+
+      toast.error("Ecken konnten nicht sicher erkannt werden — bitte manuell tippen");
+    } catch (error) {
+      console.error("[Calibration] Auto-detect failed", error);
+      toast.error(error instanceof Error ? error.message : "Automatische Erkennung fehlgeschlagen");
+    } finally {
+      setDetectingCalibration(false);
+    }
+  }, [savingCalibration, showInlineCalibration]);
+
+  const saveInlineCalibration = useCallback(async (points: { x: number; y: number }[]) => {
+    if (!id || Number.isNaN(cam) || cam < 0 || cam > 4) return;
+
+    const token = sessionToken ?? localStorage.getItem(sessionKey);
+    if (!token) {
+      toast.error("Session abgelaufen — bitte Kamera-Code erneut eingeben");
+      return;
+    }
+
+    const baseCalibration = {
       points,
-      width_m: match.fields?.width_m ?? 105,
-      height_m: match.fields?.height_m ?? 68,
+      width_m: match?.fields?.width_m ?? 105,
+      height_m: match?.fields?.height_m ?? 68,
       calibrated_at: new Date().toISOString(),
       coverage: "full" as const,
       field_rect: { x: 0, y: 0, w: 1, h: 1 },
     };
 
+    setSavingCalibration(true);
     try {
-      await supabase
-        .from("fields")
-        .update({ calibration: calibrationData as any })
-        .eq("id", match.field_id);
+      const response = await fetch(CAMERA_OPS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "x-camera-session-token": token,
+        },
+        body: JSON.stringify({
+          action: "save_calibration",
+          matchId: id,
+          cameraIndex: cam,
+          sessionToken: token,
+          points,
+        }),
+      });
 
-      // Update local state
-      setMatch(prev => prev ? {
+      const payload = await response.json().catch(() => ({} as { error?: string; calibration?: unknown }));
+      if (!response.ok) {
+        throw new Error(payload.error || "Kalibrierung konnte nicht gespeichert werden");
+      }
+
+      const calibrationData = payload.calibration ?? baseCalibration;
+
+      setMatch((prev) => prev ? {
         ...prev,
-        fields: { ...prev.fields, calibration: calibrationData },
+        fields: {
+          ...(prev.fields ?? {}),
+          calibration: calibrationData,
+        },
       } : prev);
 
-      // Reset stability after recalibration
       trackerRef.current?.updateCalibratedZoom();
-
+      setShowInlineCalibration(false);
+      setCalibrationPoints([]);
+      setStabilityWarning(null);
       toast.success("Kalibrierung gespeichert ✓");
 
-      // Auto-start tracking if we're in camera phase and calibration was required
       if (phase === "camera") {
         setTimeout(() => handleStartTracking(), 300);
       }
-    } catch {
-      toast.error("Kalibrierung konnte nicht gespeichert werden");
+    } catch (error) {
+      console.error("[Calibration] Save failed", error);
+      toast.error(error instanceof Error ? error.message : "Kalibrierung konnte nicht gespeichert werden");
+    } finally {
+      setSavingCalibration(false);
     }
+  }, [cam, handleStartTracking, id, match?.fields?.height_m, match?.fields?.width_m, phase, sessionKey, sessionToken]);
 
-    setShowInlineCalibration(false);
-    setStabilityWarning(null);
-  };
+  useEffect(() => {
+    if (!showInlineCalibration || calibrationPoints.length !== 4 || savingCalibration) return;
+    void saveInlineCalibration(calibrationPoints);
+  }, [calibrationPoints, saveInlineCalibration, savingCalibration, showInlineCalibration]);
 
   const cornerLabels = ["Oben links", "Oben rechts", "Unten rechts", "Unten links"];
 
