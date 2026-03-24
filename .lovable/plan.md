@@ -1,97 +1,108 @@
 
 
-## Performance-Analyse und Lösungsplan
+## Veo-inspirierte Optimierung: Gestaffelte Analyse-Pakete & Halbzeit-Analyse
 
-### Identifizierte Engpässe
+### Veo-Referenz: Was Veo richtig macht
 
-**1. Tracking-Verarbeitung (`process-tracking`)**: Synchron in einem Request -- Download aller Kamera-JSONs, Frame-Merging, Track-Building, Stats-Berechnung, DB-Writes. Bei 90 Minuten Spieldaten mit 3 Kameras = tausende Frames in einem Edge Function Call.
+Veo liefert Analysen nicht als ein monolithisches Paket, sondern in gestaffelten Ebenen:
+1. **Sofort** nach Spielende: Basis-Statistiken (Distanz, Sprints, Heatmaps) — rein algorithmisch, keine KI
+2. **Innerhalb von Minuten**: Automatisches Highlight-Tagging und Schlüsselszenen
+3. **Hintergrund**: Tiefere taktische Analyse als Premium-Feature
 
-**2. KI-Analyse (`process-ai-queue`)**: Nutzt `google/gemini-2.5-pro` -- das langsamste und teuerste Modell. Sequenziell: nur ein Report gleichzeitig. Bei 11 Spielern = 11 Reports nacheinander.
-
-**3. Kein Live-Upload**: Alle Tracking-Daten werden erst nach Spielende als ein großer JSON-Blob hochgeladen.
+Das aktuelle System macht alles in einem KI-Call — das ist der Kernfehler.
 
 ---
 
-### Lösungskonzept: 3-Stufen-Architektur
+### Plan: 3-Paket-Architektur + Halbzeit-Analyse
 
 ```text
-┌──────────────────────────────────────────────────┐
-│  STUFE 1: Live-Streaming (während des Spiels)    │
-│  Kamera sendet Frames alle 30s in Micro-Batches  │
-│  → Sofortige Speicherung + inkrementelle Stats   │
-├──────────────────────────────────────────────────┤
-│  STUFE 2: Schnell-Analyse (sofort nach Abpfiff)  │
-│  Stats bereits vorberechnet → gemini-3-flash     │
-│  → Kurzfazit in <30 Sekunden pro Spieler         │
-├──────────────────────────────────────────────────┤
-│  STUFE 3: Tiefenanalyse (Hintergrund-Queue)      │
-│  gemini-2.5-pro für detaillierte Reports         │
-│  → Parallel: bis zu 3 Reports gleichzeitig       │
-└──────────────────────────────────────────────────┘
+PAKET 1: "Sofort-Stats" (0 Sekunden Wartezeit)
+├── Rein algorithmisch, KEINE KI nötig
+├── Distanz, Speed, Sprints, Heatmaps
+├── Pass-/Duell-/Schuss-Statistiken
+└── Verfügbar: sofort nach Tracking-Ende
+
+PAKET 2: "Schnell-Fazit" (~15-30 Sekunden)
+├── gemini-3-flash-preview / gemini-2.5-flash-lite
+├── 3-5 Kernerkenntnisse pro Spieler
+├── Kompakter Team-Überblick
+└── Benachrichtigung: "Erste Analyse verfügbar!"
+
+PAKET 3: "Tiefenanalyse" (Hintergrund, ~2-5 Min)
+├── gemini-2.5-pro
+├── Vollständige Trendanalyse + Trainingsableitungen
+├── Taktische Bewertung + Belastungssteuerung
+└── Benachrichtigung: "Komplette Analyse fertig!"
 ```
 
 ---
 
-### Teil 1: Live-Streaming der Tracking-Daten
+### Teil 1: Paket 1 — Sofort-Stats (algorithmisch)
 
-Der User wählt beim Tracking-Start: **"Live-Upload"** oder **"Upload nach Spielende"**.
+Die `process-tracking` Edge Function berechnet bereits Stats (Distanz, Sprints etc.) — diese sind sofort verfügbar, ohne KI. Das Frontend soll diese Stats direkt anzeigen, ohne auf einen KI-Report zu warten.
 
-**Live-Upload-Modus**:
-- `FootballTracker` sendet alle 30 Sekunden einen Micro-Batch (ca. 60 Frames) an eine neue Edge Function `stream-tracking`
-- Jeder Batch wird als separater Chunk in Storage gespeichert: `tracking/{matchId}/cam_{idx}/chunk_{seq}.json`
-- Bei Verbindungsabbruch: Chunks werden lokal gepuffert und beim Reconnect nachgesendet
-- `tracking_uploads` bekommt neue Spalten: `upload_mode` (live/batch), `chunks_received`, `last_chunk_at`
+- `PerformanceAnalysis` zeigt bei Status `done` sofort die Stats-Karten aus `player_match_stats`
+- Kein Spinner, keine Wartezeit für Basis-Daten
+- KI-Analyse wird als optionales Upgrade darunter angeboten
 
-**Vorteile**: Stats können inkrementell berechnet werden. Bei Abpfiff sind 95% der Daten bereits verarbeitet.
+**Dateien**: `src/components/PerformanceAnalysis.tsx`, `src/pages/MatchReport.tsx`
 
-**Dateien**: `src/lib/football-tracker.ts`, neue Edge Function `supabase/functions/stream-tracking/index.ts`, DB-Migration
+### Teil 2: Paket 2 — Auto-Schnell-Fazit
 
-#### Teil 2: Schnelleres KI-Modell + Zwei-Tier-System
+Nach `process-tracking` werden automatisch Quick-Reports für alle Spieler + Team erstellt — aber mit dem schnellsten Modell (`gemini-2.5-flash-lite` statt `gemini-3-flash-preview`).
 
-- **Schnell-Analyse**: `google/gemini-3-flash-preview` statt `gemini-2.5-pro` -- 5-10x schneller, ausreichend für Standardanalysen
-- **Tiefenanalyse**: `gemini-2.5-pro` nur auf explizite Anforderung ("Detaillierte Analyse anfordern")
-- `ai_reports` bekommt neue Spalte `depth` (`quick` | `deep`)
-- Quick-Reports: Kompakter Prompt, weniger Struktur-Pflicht, ~15-30 Sekunden
-- Deep-Reports: Voller Prompt wie bisher, aber als optionales Upgrade
+- Prompt wird radikal gekürzt: max 200 Wörter, 3-5 Bullet Points
+- Kein Trend-Block, keine Historie — nur das aktuelle Spiel
+- `process-ai-queue` bekommt neuen Depth-Level `instant` neben `quick` und `deep`
+- MAX_PARALLEL von 3 auf 5 für `instant`-Reports
 
-**Dateien**: `supabase/functions/process-ai-queue/index.ts`, `src/components/PerformanceAnalysis.tsx`, DB-Migration
+**Dateien**: `supabase/functions/process-ai-queue/index.ts`, DB-Migration (`depth` um `instant` erweitern)
 
-#### Teil 3: Parallele KI-Verarbeitung
+### Teil 3: Halbzeit-Analyse
 
-- Statt sequenziell 1 Report: bis zu 3 Reports gleichzeitig verarbeiten
-- `process-ai-queue` prüft: weniger als 3 aktive `generating`-Reports? Dann nächsten starten
-- Automatischer Trigger: Nach `process-tracking` werden alle Spieler-Reports als `queued` angelegt und die Queue gestartet
+Bei Live-Upload-Modus: Nach ~45 Minuten Spielzeit automatisch Paket 1 + 2 für die erste Halbzeit generieren.
+
+- `stream-tracking` Edge Function trackt die Spielzeit über Chunk-Timestamps
+- Wenn `elapsed_minutes >= 42` und kein Halbzeit-Report existiert: automatisch `process-tracking` für bisherige Chunks triggern
+- Halbzeit-Stats werden als separate Zeilen in `player_match_stats` gespeichert (neues Feld `period`: `first_half` / `second_half` / `full`)
+- Frontend zeigt: "Halbzeit-Analyse verfügbar" als Badge
+
+**Dateien**: `supabase/functions/stream-tracking/index.ts`, `src/components/ProcessingRoadmap.tsx`, DB-Migration
+
+### Teil 4: Benachrichtigungssystem
+
+Zwei In-App-Benachrichtigungen:
+
+1. **"Erste Analyse verfügbar"** — wenn Paket 2 (Schnell-Fazit) fertig ist
+2. **"Komplette Analyse fertig"** — wenn Paket 3 (Tiefenanalyse) abgeschlossen ist
+
+Umsetzung:
+- Neue Tabelle `notifications` (user_id, match_id, type, read, created_at)
+- `process-ai-queue` schreibt bei Report-Completion eine Notification
+- Frontend: Glocken-Icon im Header mit Unread-Count + Realtime-Subscription
+- Toast-Notification wenn User gerade online ist
+
+**Dateien**: DB-Migration, `src/components/AppLayout.tsx` (Notification-Bell), neues `src/components/NotificationBell.tsx`, `supabase/functions/process-ai-queue/index.ts`
+
+### Teil 5: Robustheit & Fehlerresilienz
+
+- `process-ai-queue`: Timeout-Guard pro Report (max 120s für instant, 300s für deep)
+- Automatischer Retry bei Fehler (max 2 Versuche, dann `error` Status)
+- Stuck-Detection: Reports die >10 Min im Status `generating` sind, werden automatisch auf `error` gesetzt
+- Rate-Limit-Handling: Bei 429 → exponentielles Backoff, nicht sofort `error`
 
 **Dateien**: `supabase/functions/process-ai-queue/index.ts`
 
-#### Teil 4: Inkrementelle Stats-Berechnung
+### Teil 6: UI-Anpassungen
 
-- Neue Edge Function `process-tracking-chunk`: Verarbeitet einzelne Live-Chunks sofort
-- Berechnet Delta-Stats (Distanz seit letztem Chunk, neue Sprints) und akkumuliert in `player_match_stats`
-- Bei Spielende: Nur noch finaler Merge + Qualitätscheck statt Komplett-Neuberechnung
-- `process-tracking` wird zum "Finalizer": Liest vorberechnete Stats, korrigiert Anomalien, schreibt Endergebnis
+- `PerformanceAnalysis` wird umstrukturiert:
+  - Oben: Sofort-Stats (immer sichtbar wenn Daten vorhanden)
+  - Mitte: Schnell-Fazit (mit "Wird geladen..." oder fertig)
+  - Unten: Button "Tiefenanalyse anfordern"
+- `ProcessingRoadmap` zeigt die 3 Pakete als separate Fortschritts-Tracks
+- Neues Paket-Badge: "Basis ✓ | Schnell-Fazit ✓ | Tiefenanalyse ⏳"
 
-**Dateien**: Neue Edge Function `supabase/functions/process-tracking-chunk/index.ts`, Anpassung `process-tracking`
-
-#### Teil 5: Unterbrechungsschutz
-
-- Live-Modus: Chunks haben Sequenznummern. Bei Reconnect sendet der Client fehlende Chunks nach
-- localStorage-Fallback bleibt bestehen für Offline-Phasen
-- Neuer Status `partial` in `tracking_uploads` für unvollständige Streams
-- UI zeigt: "12 von 15 Chunks empfangen -- 3 ausstehend"
-- Manueller "Retry fehlende Chunks"-Button
-
-**Dateien**: `src/lib/football-tracker.ts`, `src/pages/CameraTrackingPage.tsx`
-
-#### Teil 6: UI-Anpassungen
-
-- Upload-Modus-Auswahl im Tracking-Wizard (Schritt 2): Toggle "Live-Übertragung" / "Nach Spielende"
-- Bei Live: Echtzeit-Badge "Chunks: 45/45 ✓" im Tracking-Screen
-- Nach Spielende: Sofort Quick-Analyse verfügbar (statt Minuten warten)
-- Button "Tiefenanalyse anfordern" für detaillierte Reports
-- Parallele Fortschrittsanzeige: "3 von 11 Analysen fertig"
-
-**Dateien**: `src/pages/CameraTrackingPage.tsx`, `src/components/PerformanceAnalysis.tsx`, `src/components/ProcessingRoadmap.tsx`
+**Dateien**: `src/components/PerformanceAnalysis.tsx`, `src/components/ProcessingRoadmap.tsx`
 
 ---
 
@@ -99,23 +110,39 @@ Der User wählt beim Tracking-Start: **"Live-Upload"** oder **"Upload nach Spiel
 
 **DB-Migration**:
 ```sql
-ALTER TABLE tracking_uploads 
-  ADD COLUMN upload_mode text NOT NULL DEFAULT 'batch',
-  ADD COLUMN chunks_received integer DEFAULT 0,
-  ADD COLUMN last_chunk_at timestamptz;
+-- Notifications table
+CREATE TABLE public.notifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  match_id uuid,
+  type text NOT NULL, -- 'quick_analysis_ready', 'deep_analysis_ready', 'halftime_ready'
+  title text NOT NULL,
+  body text,
+  read boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE ai_reports 
-  ADD COLUMN depth text NOT NULL DEFAULT 'quick';
+-- Halftime support
+ALTER TABLE player_match_stats ADD COLUMN period text NOT NULL DEFAULT 'full';
+
+-- Enable realtime for notifications
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 ```
 
-**Geschwindigkeitsvergleich**:
-- Aktuell: Upload (60s) + Processing (30-60s) + KI pro Spieler (60-120s) = **~25 Min für 11 Spieler**
-- Neu: Live-Upload (0s Wartezeit) + Quick-KI parallel (10s pro 3) = **~40 Sekunden für 11 Spieler**
+**Performance-Vergleich**:
+- Aktuell: Alles blockiert hinter KI → 5-25 Min Wartezeit
+- Neu: Stats sofort (0s) → Schnell-Fazit (15-30s) → Deep optional (2-5 Min)
 
-**Prioritätsreihenfolge**:
-1. KI-Modell auf `gemini-3-flash-preview` umstellen + Zwei-Tier-System (sofortiger Effekt)
-2. Parallele KI-Verarbeitung (3 gleichzeitig)
-3. Live-Streaming der Tracking-Daten
-4. Inkrementelle Stats-Berechnung
-5. Unterbrechungsschutz + UI
+**Halbzeit-Machbarkeit**: Ja, funktioniert. Bei Live-Upload sind nach 45 Min alle Chunks der 1. Halbzeit vorhanden. `process-tracking` kann diese separat verarbeiten (algorithmisch ~5-10s), dann wird ein `instant`-Report automatisch getriggert (~15s). Gesamtzeit: ~25 Sekunden nach Halbzeitpfiff.
+
+---
+
+### Prioritätsreihenfolge
+
+1. Sofort-Stats ohne KI-Wartezeit anzeigen (größter UX-Gewinn)
+2. `instant` Depth-Level mit ultra-kurzem Prompt
+3. Benachrichtigungssystem
+4. Halbzeit-Analyse bei Live-Upload
+5. Robustheit (Timeout, Retry, Stuck-Detection)
 
