@@ -448,6 +448,11 @@ export class FootballTracker {
       this.startLiveInterval();
     }
 
+    // Start highlight recording if enabled
+    if (this.highlightRecorder.isEnabled() && this.videoElement?.srcObject) {
+      this.highlightRecorder.start(this.videoElement.srcObject as MediaStream, this.startTime);
+    }
+
     const loop = () => {
       if (!this.tracking) return;
       if (!this.paused) {
@@ -481,6 +486,9 @@ export class FootballTracker {
         if (this.uploadMode === "live") {
           this.liveBuffer.push(frame);
         }
+
+        // Check for highlight events
+        this.detectHighlightEvents(frame);
 
         onDetections?.(frame);
       }
