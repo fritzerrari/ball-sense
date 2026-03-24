@@ -108,7 +108,10 @@ export default function CameraTrackingPage() {
   const sessionToken = useMemo(() => localStorage.getItem(sessionKey), [sessionKey]);
   const isCalibrated = Boolean(match?.fields?.calibration);
   const currentStepIdx = WIZARD_STEPS.findIndex((s) => s.key === (phase === "ended" ? "tracking" : phase));
-  const playerCount = currentDetections.filter(d => d.label === "person").length;
+  const personDetections = currentDetections.filter(d => d.label === "person");
+  const playerCount = personDetections.length;
+  const homePlayerCount = personDetections.filter(d => d.team === "home").length;
+  const awayPlayerCount = personDetections.filter(d => d.team === "away").length;
 
   const formatTime = (sec: number) =>
     `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
