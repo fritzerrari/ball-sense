@@ -421,31 +421,73 @@ export default function NewMatch() {
 
               {!isTraining && (
                 <>
-                  {/* Squad format selector */}
+                  {/* Squad format: presets + custom inputs */}
                   <div>
-                    <label className="mb-1 block text-sm text-muted-foreground">Spielformat *</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {SQUAD_FORMATS.map((fmt) => (
-                        <button
-                          key={fmt.size}
-                          type="button"
-                          onClick={() => {
-                            setSquadSize(fmt.size);
-                            setAwaySquadSize(fmt.size);
-                            const fmts = FORMATIONS_BY_SIZE[fmt.size] ?? FORMATIONS;
-                            if (!fmts.includes(homeFormation)) setHomeFormation(fmts[0]);
-                            if (!fmts.includes(awayFormation)) setAwayFormation(fmts[0]);
-                          }}
-                          className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
-                            squadSize === fmt.size
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border text-muted-foreground hover:border-primary/40"
-                          }`}
-                        >
-                          {fmt.label}
-                        </button>
-                      ))}
+                    <label className="mb-2 block text-sm text-muted-foreground">Spielformat *</label>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {SQUAD_FORMATS.map((fmt) => {
+                        const isPreset = squadSize === fmt.size && awaySquadSize === fmt.size;
+                        return (
+                          <button
+                            key={fmt.size}
+                            type="button"
+                            onClick={() => {
+                              setSquadSize(fmt.size);
+                              setAwaySquadSize(fmt.size);
+                              const fmts = FORMATIONS_BY_SIZE[fmt.size] ?? FORMATIONS;
+                              if (!fmts.includes(homeFormation)) setHomeFormation("");
+                              if (!fmts.includes(awayFormation)) setAwayFormation("");
+                            }}
+                            className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
+                              isPreset
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border text-muted-foreground hover:border-primary/40"
+                            }`}
+                          >
+                            {fmt.label}
+                          </button>
+                        );
+                      })}
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs text-muted-foreground">Heim-Spieler</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={squadSize}
+                          onChange={(e) => {
+                            const v = Math.max(1, Math.min(15, parseInt(e.target.value) || 1));
+                            setSquadSize(v);
+                            const fmts = FORMATIONS_BY_SIZE[v] ?? [];
+                            if (fmts.length && !fmts.includes(homeFormation)) setHomeFormation("");
+                          }}
+                          className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-muted-foreground">Gast-Spieler</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={awaySquadSize}
+                          onChange={(e) => {
+                            const v = Math.max(1, Math.min(15, parseInt(e.target.value) || 1));
+                            setAwaySquadSize(v);
+                            const fmts = FORMATIONS_BY_SIZE[v] ?? [];
+                            if (fmts.length && !fmts.includes(awayFormation)) setAwayFormation("");
+                          }}
+                          className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground"
+                        />
+                      </div>
+                    </div>
+                    {squadSize !== awaySquadSize && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Asymmetrisches Format: {squadSize} vs {awaySquadSize}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -464,14 +506,14 @@ export default function NewMatch() {
                       <label className="mb-1 block text-sm text-muted-foreground">Formation Heim</label>
                       <select value={homeFormation} onChange={(e) => setHomeFormation(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
                         <option value="">Auto (KI)</option>
-                        {(FORMATIONS_BY_SIZE[squadSize] ?? FORMATIONS).map((f) => <option key={f}>{f}</option>)}
+                        {(FORMATIONS_BY_SIZE[squadSize] ?? []).map((f) => <option key={f}>{f}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm text-muted-foreground">Formation Gast</label>
                       <select value={awayFormation} onChange={(e) => setAwayFormation(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
                         <option value="">Auto (KI)</option>
-                        {(FORMATIONS_BY_SIZE[squadSize] ?? FORMATIONS).map((f) => <option key={f}>{f}</option>)}
+                        {(FORMATIONS_BY_SIZE[awaySquadSize] ?? []).map((f) => <option key={f}>{f}</option>)}
                       </select>
                     </div>
                   </div>
