@@ -1079,12 +1079,16 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         crosses: t?.crosses ?? 0,
         fouls_committed: t?.fouls_committed ?? 0,
         fouls_drawn: t?.fouls_drawn ?? 0,
+        yellow_cards: (ps as any)._yellowCards ?? 0,
+        red_cards: (ps as any)._redCards ?? 0,
         aerial_won: t?.aerial_won ?? 0,
         data_source: "fieldiq", raw_metrics: {
           assignment_confidence: ps.confidence, cameras_used: sessions.length, player_name: ps.player_name,
           auto_discovered: useAutoDiscovery && !ps.player_id,
           coverage_ratio: needsExtrapolation ? coverageRatio : 1,
           extrapolated: needsExtrapolation,
+          tactical_estimated: t?.is_estimated ?? true,
+          ball_detections_available: ballPositions.length >= 10,
         },
       };
     });
