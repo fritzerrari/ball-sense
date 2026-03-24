@@ -39,8 +39,11 @@ type MatchData = {
   away_club_name: string | null;
   status: string;
   field_id: string | null;
+  match_type?: string;
   fields?: { name?: string; width_m?: number; height_m?: number; calibration?: unknown } | null;
 };
+
+type LineupCounts = { home: number; away: number };
 
 interface MatchEvent {
   event_type: string;
