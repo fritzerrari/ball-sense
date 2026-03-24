@@ -1035,6 +1035,47 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          match_id: string | null
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          match_id?: string | null
+          read?: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          match_id?: string | null
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_match_stats: {
         Row: {
           aerial_won: number | null
@@ -1063,6 +1104,7 @@ export type Database = {
           pass_accuracy: number | null
           passes_completed: number | null
           passes_total: number | null
+          period: string
           player_id: string | null
           positions_raw: Json | null
           quality_score: number | null
@@ -1106,6 +1148,7 @@ export type Database = {
           pass_accuracy?: number | null
           passes_completed?: number | null
           passes_total?: number | null
+          period?: string
           player_id?: string | null
           positions_raw?: Json | null
           quality_score?: number | null
@@ -1149,6 +1192,7 @@ export type Database = {
           pass_accuracy?: number | null
           passes_completed?: number | null
           passes_total?: number | null
+          period?: string
           player_id?: string | null
           positions_raw?: Json | null
           quality_score?: number | null
