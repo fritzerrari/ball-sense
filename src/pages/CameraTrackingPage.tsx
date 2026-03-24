@@ -479,6 +479,11 @@ export default function CameraTrackingPage() {
       trackerRef.current?.updateCalibratedZoom();
 
       toast.success("Kalibrierung gespeichert ✓");
+
+      // Auto-start tracking if we're in camera phase and calibration was required
+      if (phase === "camera") {
+        setTimeout(() => handleStartTracking(), 300);
+      }
     } catch {
       toast.error("Kalibrierung konnte nicht gespeichert werden");
     }
