@@ -635,6 +635,20 @@ export default function CameraTrackingPage() {
               </div>
             )}
 
+            {/* Zoom warning */}
+            {zoomWarning && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Zoom verändert</p>
+                  <p className="text-xs text-muted-foreground">Neu kalibrieren für genaue Daten</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setZoomWarning(false); handleLiveSnapshot(); }}>
+                  Kalibrieren
+                </Button>
+              </div>
+            )}
+
             {/* Live events from coach */}
             {liveEvents.length > 0 && (
               <div className="rounded-xl border border-border bg-card/50 p-3 max-h-24 overflow-y-auto space-y-1">
