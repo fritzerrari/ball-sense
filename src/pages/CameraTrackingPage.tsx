@@ -99,6 +99,7 @@ export default function CameraTrackingPage() {
   const timerRef = useRef<number | null>(null);
   const confirmSoundPlayed = useRef(false);
   const calibrationOverlayRef = useRef<HTMLDivElement>(null);
+  const lastCalibrationInputRef = useRef<{ x: number; y: number; ts: number } | null>(null);
 
   const sessionToken = useMemo(() => localStorage.getItem(sessionKey), [sessionKey]);
   const isCalibrated = Boolean(match?.fields?.calibration);
@@ -495,23 +496,47 @@ export default function CameraTrackingPage() {
   };
 
   // Inline calibration handlers
-  const handleInlineCalibrationTap = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+  const addInlineCalibrationPoint = useCallback((clientX: number, clientY: number) => {
     if (!showInlineCalibration || savingCalibration) return;
-
-    e.preventDefault();
-    e.stopPropagation();
 
     const rect = calibrationOverlayRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return;
 
-    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+
+    const now = Date.now();
+    const last = lastCalibrationInputRef.current;
+    if (last && now - last.ts < 350 && Math.abs(last.x - x) < 0.01 && Math.abs(last.y - y) < 0.01) {
+      return;
+    }
+    lastCalibrationInputRef.current = { x, y, ts: now };
 
     setCalibrationPoints((prev) => {
       if (prev.length >= 4) return prev;
       return [...prev, { x, y }];
     });
   }, [savingCalibration, showInlineCalibration]);
+
+  const handleInlineCalibrationTap = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addInlineCalibrationPoint(e.clientX, e.clientY);
+  }, [addInlineCalibrationPoint]);
+
+  const handleInlineCalibrationClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addInlineCalibrationPoint(e.clientX, e.clientY);
+  }, [addInlineCalibrationPoint]);
+
+  const handleInlineCalibrationTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    e.preventDefault();
+    e.stopPropagation();
+    addInlineCalibrationPoint(touch.clientX, touch.clientY);
+  }, [addInlineCalibrationPoint]);
 
   const handleAutoDetectInline = useCallback(async () => {
     if (!showInlineCalibration || savingCalibration) return;
@@ -533,18 +558,11 @@ export default function CameraTrackingPage() {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const image = canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
 
-      const response = await fetch(DETECT_FIELD_CORNERS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ image, mimeType: "image/jpeg" }),
+      const { data, error } = await supabase.functions.invoke("detect-field-corners", {
+        body: { image, mimeType: "image/jpeg" },
       });
-
-      const data = await response.json().catch(() => ({} as Record<string, unknown>));
-      if (!response.ok) {
-        throw new Error(typeof data.error === "string" ? data.error : "Automatische Erkennung fehlgeschlagen");
+      if (error) {
+        throw new Error(error.message || "Automatische Erkennung fehlgeschlagen");
       }
 
       if (data?.isRealPitch === false) {
@@ -921,13 +939,25 @@ export default function CameraTrackingPage() {
               {/* Inline calibration overlay */}
               {showInlineCalibration && (
                 <div className="absolute inset-0 bg-black/40 z-10">
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     aria-label="Kalibrierungspunkt setzen"
                     className="absolute inset-0 z-10 cursor-crosshair touch-none bg-transparent"
-                    style={{ touchAction: "none" }}
+                    style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
                     onPointerDown={handleInlineCalibrationTap}
-                    disabled={savingCalibration}
+                    onClick={handleInlineCalibrationClick}
+                    onTouchStart={(e) => {
+                      if (savingCalibration) return;
+                      e.preventDefault();
+                    }}
+                    onTouchEnd={handleInlineCalibrationTouchEnd}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                      }
+                    }}
                   />
 
                   {calibrationPoints.map((pt, i) => (
