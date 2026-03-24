@@ -247,6 +247,20 @@ export default function CameraTrackingPage() {
         body: JSON.stringify({ action: "update_status", matchId: id, cameraIndex: cam, sessionToken: token, status: "live" }),
       }).catch(() => null);
     }
+
+    // Configure live streaming if selected
+    if (uploadMode === "live" && token) {
+      trackerRef.current.configureLiveStream({
+        matchId: id,
+        cameraIndex: cam,
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+        sessionToken: token,
+        onChunkSent: () => {
+          setChunkStats(trackerRef.current?.getChunkStats() ?? { sent: 0, ok: 0, pending: 0 });
+        },
+      });
+    }
+
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
       const pCount = frame.detections.filter(d => d.label === "person").length;
