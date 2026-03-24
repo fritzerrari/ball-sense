@@ -473,7 +473,46 @@ async function sha256(value: string) {
   return Array.from(new Uint8Array(buffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function runProcessing(supabase: any, matchId: string) {
+/**
+ * Compute union coverage of multiple camera field_rects (axis-aligned rectangles).
+ */
+function computeCoverageUnion(calibrations: Record<number, any>): number {
+  const rects = Object.values(calibrations)
+    .map(c => c?.field_rect)
+    .filter(r => r && typeof r.x === "number");
+  if (rects.length === 0) return 1; // assume full coverage
+
+  if (rects.length === 1) return rects[0].w * rects[0].h;
+
+  // Union of axis-aligned rects
+  let totalArea = 0;
+  for (const r of rects) totalArea += r.w * r.h;
+  // Subtract pairwise overlaps (simplified for 2-3 cameras)
+  for (let i = 0; i < rects.length; i++) {
+    for (let j = i + 1; j < rects.length; j++) {
+      const overlapX = Math.max(0, Math.min(rects[i].x + rects[i].w, rects[j].x + rects[j].w) - Math.max(rects[i].x, rects[j].x));
+      const overlapY = Math.max(0, Math.min(rects[i].y + rects[i].h, rects[j].y + rects[j].h) - Math.max(rects[i].y, rects[j].y));
+      totalArea -= overlapX * overlapY;
+    }
+  }
+  return Math.min(1, Math.max(0.01, totalArea));
+}
+
+/**
+ * Apply coverage extrapolation to stats if field coverage < 90%.
+ */
+function extrapolateStats(stats: ReturnType<typeof computeTrackStats>, coverageRatio: number) {
+  if (coverageRatio >= 0.9) return stats;
+  return {
+    ...stats,
+    distance_km: Math.round((stats.distance_km / coverageRatio) * 100) / 100,
+    sprint_count: Math.round(stats.sprint_count / coverageRatio),
+    sprint_distance_m: Math.round(stats.sprint_distance_m / coverageRatio),
+    // top_speed and avg_speed are NOT extrapolated (they're observed maximums)
+  };
+}
+
+async function runProcessing(supabase: any, matchId: string, mode: "full" | "incremental" = "full") {
   const updateProgress = async (phase: string, progress: number, detail?: string) => {
     await supabase.from("matches").update({
       processing_progress: { phase, progress: Math.round(progress), detail: detail || null, updated_at: new Date().toISOString() },
@@ -484,11 +523,13 @@ async function runProcessing(supabase: any, matchId: string) {
     await updateProgress("upload", 10, "Uploads werden geladen");
 
     const { data: uploads, error: uplErr } = await supabase
-      .from("tracking_uploads").select("*").eq("match_id", matchId).eq("status", "uploaded");
+      .from("tracking_uploads").select("*").eq("match_id", matchId).eq("status", mode === "incremental" ? "uploaded" : "uploaded");
     if (uplErr) throw uplErr;
     if (!uploads || uploads.length === 0) {
-      await updateProgress("error", 0, "Keine Uploads gefunden");
-      await supabase.from("matches").update({ status: "done" }).eq("id", matchId);
+      if (mode === "full") {
+        await updateProgress("error", 0, "Keine Uploads gefunden");
+        await supabase.from("matches").update({ status: "done" }).eq("id", matchId);
+      }
       return;
     }
 
@@ -507,8 +548,10 @@ async function runProcessing(supabase: any, matchId: string) {
     }
 
     if (sessions.length === 0) {
-      await updateProgress("error", 0, "Keine Tracking-Daten herunterladbar");
-      await supabase.from("matches").update({ status: "error" }).eq("id", matchId);
+      if (mode === "full") {
+        await updateProgress("error", 0, "Keine Tracking-Daten herunterladbar");
+        await supabase.from("matches").update({ status: "error" }).eq("id", matchId);
+      }
       return;
     }
 
@@ -520,6 +563,13 @@ async function runProcessing(supabase: any, matchId: string) {
       if (upload.calibration) {
         uploadCalibrations[upload.camera_index] = upload.calibration;
       }
+    }
+
+    // Compute coverage ratio for extrapolation
+    const coverageRatio = computeCoverageUnion(uploadCalibrations);
+    const needsExtrapolation = coverageRatio < 0.9;
+    if (needsExtrapolation) {
+      console.log(`[process-tracking] Coverage: ${Math.round(coverageRatio * 100)}% — extrapolation will be applied`);
     }
 
     const { mergedFrames, totalDurationSec, cameraContributions } = mergeMultiCameraFrames(sessions, uploadCalibrations);
@@ -568,21 +618,13 @@ async function runProcessing(supabase: any, matchId: string) {
 
     // ── Auto-Discovery Mode ──
     if (useAutoDiscovery && trackProfiles.length > 0) {
-      // Filter officials (sideline/edge dwellers)
       const fieldTracks = trackProfiles.filter(t => t.sidelineRatio < 0.45 && t.edgeRatio < 0.4);
-
-      // Filter ball track: smallest avg bounding box area + highest speed variance
-      // Since we only have centroid data, use the track with fewest positions (ball moves fast, hard to track consistently)
-      // Simple heuristic: skip the shortest tracks that could be ball
       const playerTracks = fieldTracks.filter(t => t.positions.length > 20);
-
-      // Team clustering via median-split on Y-axis
       const sortedByY = [...playerTracks].sort((a, b) => a.cy - b.cy);
       const medianIdx = Math.floor(sortedByY.length / 2);
       const homeGroup = sortedByY.slice(0, medianIdx);
       const awayGroup = sortedByY.slice(medianIdx);
 
-      // Generate auto-lineups and insert into DB
       const autoLineups: any[] = [];
       homeGroup.forEach((t, i) => {
         autoLineups.push({
@@ -642,7 +684,11 @@ async function runProcessing(supabase: any, matchId: string) {
       if (bestIdx >= 0) {
         usedTrackIndices.add(bestIdx);
         const tc = trackProfiles[bestIdx];
-        const stats = computeTrackStats(tc.positions, fieldW, fieldH);
+        let stats = computeTrackStats(tc.positions, fieldW, fieldH);
+        // Apply coverage extrapolation
+        if (needsExtrapolation) {
+          stats = extrapolateStats(stats, coverageRatio) as typeof stats;
+        }
         const confidence = Math.min(1, Math.max(0.1, Math.max(0, 1 - bestScore * 0.8) - (tc.sidelineRatio > 0.45 ? 0.25 : 0) + (expectedZone ? 0.05 : 0)));
         playerStats.push({ player_id: player.player_id || null, player_name: player.player_name, team: player.team, stats, confidence: Math.round(confidence * 100) / 100 });
       }
@@ -663,7 +709,6 @@ async function runProcessing(supabase: any, matchId: string) {
           const d = Math.sqrt((cx - zone.x) ** 2 + (cy - zone.y) ** 2);
           if (d < bestDist) { bestDist = d; bestPos = pos; }
         }
-        // Update the player_name with inferred position
         if (ps.player_name?.startsWith("Spieler ")) {
           ps.player_name = `${ps.player_name} (${bestPos})`;
         }
@@ -692,15 +737,31 @@ async function runProcessing(supabase: any, matchId: string) {
       await supabase.from("players").update({ position: bestPos }).eq("id", ps.player_id).is("position", null);
     }
 
+    // Determine period based on mode
+    const period = mode === "incremental" ? "partial" : "full";
+
     await updateProgress("stats", 75, "Statistiken werden gespeichert");
-    await supabase.from("player_match_stats").delete().eq("match_id", matchId);
+
+    if (mode === "full") {
+      // Full mode: delete all existing and re-insert
+      await supabase.from("player_match_stats").delete().eq("match_id", matchId);
+    } else {
+      // Incremental: delete only partial records, keep full
+      await supabase.from("player_match_stats").delete().eq("match_id", matchId).eq("period", "partial");
+    }
+
     const playerInserts = playerStats.map((ps) => ({
-      match_id: matchId, player_id: ps.player_id, team: ps.team,
+      match_id: matchId, player_id: ps.player_id, team: ps.team, period,
       distance_km: ps.stats.distance_km, top_speed_kmh: ps.stats.top_speed_kmh, avg_speed_kmh: ps.stats.avg_speed_kmh,
       sprint_count: ps.stats.sprint_count, sprint_distance_m: ps.stats.sprint_distance_m,
       heatmap_grid: ps.stats.heatmap_grid, positions_raw: ps.stats.positions_raw,
       minutes_played: ps.stats.minutes_played || Math.round(totalDurationSec / 60),
-      data_source: "fieldiq", raw_metrics: { assignment_confidence: ps.confidence, cameras_used: sessions.length, player_name: ps.player_name, auto_discovered: useAutoDiscovery && !ps.player_id },
+      data_source: "fieldiq", raw_metrics: {
+        assignment_confidence: ps.confidence, cameras_used: sessions.length, player_name: ps.player_name,
+        auto_discovered: useAutoDiscovery && !ps.player_id,
+        coverage_ratio: needsExtrapolation ? coverageRatio : 1,
+        extrapolated: needsExtrapolation,
+      },
     }));
     if (playerInserts.length > 0) {
       const { error: insertErr } = await supabase.from("player_match_stats").insert(playerInserts);
@@ -708,7 +769,13 @@ async function runProcessing(supabase: any, matchId: string) {
     }
 
     await updateProgress("heatmaps", 85, "Heatmaps werden generiert");
-    await supabase.from("team_match_stats").delete().eq("match_id", matchId);
+
+    if (mode === "full") {
+      await supabase.from("team_match_stats").delete().eq("match_id", matchId);
+    } else {
+      await supabase.from("team_match_stats").delete().eq("match_id", matchId);
+    }
+
     const teamGroups = { home: [] as PlayerStat[], away: [] as PlayerStat[] };
     for (const ps of playerStats) { if (ps.team === "home") teamGroups.home.push(ps); else if (ps.team === "away") teamGroups.away.push(ps); }
     const teamInserts = [];
@@ -725,7 +792,14 @@ async function runProcessing(supabase: any, matchId: string) {
         avg_distance_km: Math.round((totalDist / players.length) * 100) / 100,
         top_speed_kmh: Math.round(topSpeed * 10) / 10, possession_pct: team === "home" ? 52 : 48,
         formation_heatmap: mergedHeatmap, data_source: "fieldiq",
-        raw_metrics: { tracked_player_count: players.length, cameras_used: sessions.length, camera_indices: [...cameraContributions.keys()], opponent_tracking_enabled: shouldTrackTeam(matchContext, "away"), likely_official_tracks_ignored: likelyOfficials.length },
+        raw_metrics: {
+          tracked_player_count: players.length, cameras_used: sessions.length,
+          camera_indices: [...cameraContributions.keys()],
+          opponent_tracking_enabled: shouldTrackTeam(matchContext, "away"),
+          likely_official_tracks_ignored: likelyOfficials.length,
+          coverage_ratio: coverageRatio,
+          extrapolated: needsExtrapolation,
+        },
       });
     }
     if (teamInserts.length > 0) {
@@ -733,8 +807,46 @@ async function runProcessing(supabase: any, matchId: string) {
       if (teamErr) throw teamErr;
     }
 
+    if (mode === "incremental") {
+      // Incremental: update progress but don't finalize
+      await updateProgress("live", 80, `Live-Update: ${playerStats.length} Spieler · ${Math.round(totalDurationSec / 60)} Min`);
+
+      // Auto-trigger halftime analysis if >40 min of data
+      if (totalDurationSec > 40 * 60) {
+        const { data: existingHalftime } = await supabase.from("ai_reports")
+          .select("id").eq("match_id", matchId).eq("depth", "instant").eq("report_type", "halftime").maybeSingle();
+        if (!existingHalftime && matchContext?.home_club_id) {
+          // Find a user for this club to attribute the report
+          const { data: profile } = await supabase.from("profiles").select("user_id").eq("club_id", matchContext.home_club_id).limit(1).maybeSingle();
+          if (profile) {
+            await supabase.from("ai_reports").insert({
+              user_id: profile.user_id, match_id: matchId, report_type: "halftime",
+              depth: "instant", status: "queued",
+            });
+            console.log(`[process-tracking] Halftime analysis triggered at ${Math.round(totalDurationSec / 60)} min`);
+          }
+        }
+      }
+
+      console.log(`[process-tracking] ✅ Incremental complete: ${playerStats.length} players`);
+      return;
+    }
+
+    // Full mode: finalize
     await updateProgress("finalize", 92, "Uploads werden finalisiert");
     for (const upload of uploads) { await supabase.from("tracking_uploads").update({ status: "done" }).eq("id", upload.id); }
+
+    // Auto-trigger instant analysis
+    if (matchContext?.home_club_id) {
+      const { data: profile } = await supabase.from("profiles").select("user_id").eq("club_id", matchContext.home_club_id).limit(1).maybeSingle();
+      if (profile) {
+        await supabase.from("ai_reports").insert({
+          user_id: profile.user_id, match_id: matchId, report_type: "analysis",
+          depth: "instant", status: "queued",
+        });
+        console.log(`[process-tracking] Auto-triggered instant analysis`);
+      }
+    }
 
     await supabase.from("matches").update({
       status: "done",
@@ -744,7 +856,9 @@ async function runProcessing(supabase: any, matchId: string) {
   } catch (err) {
     console.error("[process-tracking] Error:", err);
     await updateProgress("error", 0, err instanceof Error ? err.message : "Verarbeitung fehlgeschlagen");
-    await supabase.from("matches").update({ status: "error" }).eq("id", matchId);
+    if (mode === "full") {
+      await supabase.from("matches").update({ status: "error" }).eq("id", matchId);
+    }
   }
 }
 
@@ -815,10 +929,11 @@ Deno.serve(async (req) => {
       await supabase.from("tracking_uploads").update({ status: "uploaded" }).eq("match_id", matchId).in("status", ["done", "error"]);
     }
 
-    console.log(`[process-tracking] Starting for match ${matchId}`);
+    const mode = action === "incremental" ? "incremental" : "full";
+    console.log(`[process-tracking] Starting ${mode} for match ${matchId}`);
 
     // Run processing in background
-    const processingPromise = runProcessing(supabase, matchId);
+    const processingPromise = runProcessing(supabase, matchId, mode);
     try {
       (globalThis as any).EdgeRuntime?.waitUntil?.(processingPromise);
     } catch {

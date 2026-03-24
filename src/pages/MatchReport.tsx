@@ -1,12 +1,13 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
-import { useState, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import {
   Activity,
   ArrowLeft,
   ArrowRight,
   ArrowUpDown,
   Camera,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -15,8 +16,10 @@ import {
   FileText,
   KeyRound,
   Loader2,
+  Radio,
   Share2,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
 import { ProcessingRoadmap } from "@/components/ProcessingRoadmap";
@@ -108,8 +111,8 @@ export default function MatchReport() {
   const { id } = useParams();
   const { clubName, clubId, session } = useAuth();
   const { data: match, isLoading } = useMatch(id);
-  const { data: playerStats } = usePlayerMatchStats(id);
-  const { data: teamStats } = useTeamMatchStats(id);
+  const { data: playerStats, refetch: refetchPlayerStats } = usePlayerMatchStats(id);
+  const { data: teamStats, refetch: refetchTeamStats } = useTeamMatchStats(id);
   const { data: uploads } = useTrackingUploads(id);
   const { data: apiStats } = useApiFootballStats(id);
   const { data: events } = useMatchEvents(id);
@@ -119,6 +122,25 @@ export default function MatchReport() {
   const [sortAsc, setSortAsc] = useState(false);
   const [newCode, setNewCode] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
+
+  // Realtime subscription for live stats updates
+  const isLive = match?.status === "live" || match?.status === "processing";
+  const hasPartialData = (playerStats ?? []).some((s: any) => s.period === "partial");
+
+  useEffect(() => {
+    if (!id || !isLive) return;
+    const channel = supabase
+      .channel(`live-stats-${id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "player_match_stats", filter: `match_id=eq.${id}` }, () => {
+        refetchPlayerStats();
+        refetchTeamStats();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_match_stats", filter: `match_id=eq.${id}` }, () => {
+        refetchTeamStats();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, isLive, refetchPlayerStats, refetchTeamStats]);
 
   const handleGenerateCode = async () => {
     if (!clubId || !session?.user?.id || !id) return;
@@ -416,8 +438,50 @@ export default function MatchReport() {
         </div>
 
         {match.status === "processing" && <ProcessingRoadmap matchId={match.id} uploadCount={uploads?.length ?? 1} />}
-        {match.status === "live" && <div className="glass-card flex items-center gap-3 p-4 glow-border"><div className="h-2 w-2 animate-pulse rounded-full bg-primary" /><span className="text-sm font-medium font-display">Live-Tracking läuft</span><span className="ml-auto text-xs text-muted-foreground">Daten werden nach Spielende verfügbar</span></div>}
-        {uploads && uploads.length > 0 && match.status !== "processing" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
+        {/* Live Analysis Progress Banner */}
+        {(isLive || hasPartialData) && (
+          <div className="glass-card glow-border overflow-hidden p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="relative flex items-center justify-center">
+                  <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary" />
+                  <div className="absolute h-2.5 w-2.5 animate-ping rounded-full bg-primary/50" />
+                </div>
+                <span className="text-sm font-semibold font-display flex items-center gap-1.5">
+                  <Zap className="h-4 w-4 text-primary" /> Live-Analyse
+                </span>
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">LIVE</span>
+              </div>
+              <span className="text-xs text-muted-foreground">Aktualisiert sich automatisch</span>
+            </div>
+            {/* Module progress grid */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {[
+                { label: "Physis", hasData: (playerStats?.length ?? 0) > 0, icon: "🏃" },
+                { label: "Pässe", hasData: (playerStats ?? []).some((s: any) => (s.passes_total ?? 0) > 0), icon: "⚽" },
+                { label: "Duelle", hasData: (playerStats ?? []).some((s: any) => (s.duels_total ?? 0) > 0), icon: "💪" },
+                { label: "Tore", hasData: (playerStats ?? []).some((s: any) => (s.goals ?? 0) > 0), icon: "🎯" },
+                { label: "Heatmaps", hasData: (playerStats ?? []).some((s: any) => s.heatmap_grid), icon: "🗺️" },
+                { label: "KI", hasData: false, icon: "🤖" },
+              ].map((mod) => (
+                <div key={mod.label} className={`rounded-lg border px-2 py-1.5 text-center text-[11px] transition-all ${
+                  mod.hasData ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border bg-muted/30 text-muted-foreground"
+                }`}>
+                  <span className="block text-sm">{mod.hasData ? <CheckCircle2 className="inline h-3.5 w-3.5" /> : mod.icon}</span>
+                  <span className="block mt-0.5 font-medium">{mod.label}</span>
+                </div>
+              ))}
+            </div>
+            {/* Coverage warning */}
+            {(playerStats ?? []).some((s: any) => (s.raw_metrics as any)?.extrapolated) && (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                <Radio className="h-3.5 w-3.5 shrink-0" />
+                Daten basieren auf ~{Math.round(((playerStats?.[0] as any)?.raw_metrics?.coverage_ratio ?? 1) * 100)}% Feldabdeckung — Werte wurden hochgerechnet
+              </div>
+            )}
+          </div>
+        )}
+        {uploads && uploads.length > 0 && match.status !== "processing" && !isLive && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList data-testid="match-report-tabs" className="scrollbar-none flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg bg-muted/30 p-1">

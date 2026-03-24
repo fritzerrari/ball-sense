@@ -578,6 +578,11 @@ export class FootballTracker {
     return this.frames.length;
   }
 
+  /** Return a copy of all frames collected so far (non-destructive, for incremental uploads) */
+  getRecentFrames(): TrackingFrame[] {
+    return [...this.frames];
+  }
+
   isTracking(): boolean {
     return this.tracking;
   }
