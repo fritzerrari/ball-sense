@@ -182,7 +182,7 @@ Do NOT include markdown or any text outside the JSON object.`,
             ],
           },
         ],
-        max_tokens: 500,
+        max_tokens: 800,
       }),
     });
 
