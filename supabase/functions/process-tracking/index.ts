@@ -988,19 +988,40 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       await supabase.from("player_match_stats").delete().eq("match_id", matchId).eq("period", "partial");
     }
 
-    const playerInserts = playerStats.map((ps) => ({
-      match_id: matchId, player_id: ps.player_id, team: ps.team, period,
-      distance_km: ps.stats.distance_km, top_speed_kmh: ps.stats.top_speed_kmh, avg_speed_kmh: ps.stats.avg_speed_kmh,
-      sprint_count: ps.stats.sprint_count, sprint_distance_m: ps.stats.sprint_distance_m,
-      heatmap_grid: ps.stats.heatmap_grid, positions_raw: ps.stats.positions_raw,
-      minutes_played: ps.stats.minutes_played || Math.round(totalDurationSec / 60),
-      data_source: "fieldiq", raw_metrics: {
-        assignment_confidence: ps.confidence, cameras_used: sessions.length, player_name: ps.player_name,
-        auto_discovered: useAutoDiscovery && !ps.player_id,
-        coverage_ratio: needsExtrapolation ? coverageRatio : 1,
-        extrapolated: needsExtrapolation,
-      },
-    }));
+    const playerInserts = playerStats.map((ps) => {
+      const t = ps.tactical;
+      return {
+        match_id: matchId, player_id: ps.player_id, team: ps.team, period,
+        distance_km: ps.stats.distance_km, top_speed_kmh: ps.stats.top_speed_kmh, avg_speed_kmh: ps.stats.avg_speed_kmh,
+        sprint_count: ps.stats.sprint_count, sprint_distance_m: ps.stats.sprint_distance_m,
+        heatmap_grid: ps.stats.heatmap_grid, positions_raw: ps.stats.positions_raw,
+        minutes_played: ps.stats.minutes_played || Math.round(totalDurationSec / 60),
+        // Tactical stats
+        ball_contacts: t?.ball_contacts ?? 0,
+        passes_total: t?.passes_total ?? 0,
+        passes_completed: t?.passes_completed ?? 0,
+        pass_accuracy: t?.pass_accuracy ?? null,
+        duels_total: t?.duels_total ?? 0,
+        duels_won: t?.duels_won ?? 0,
+        tackles: t?.tackles ?? 0,
+        interceptions: t?.interceptions ?? 0,
+        ball_recoveries: t?.ball_recoveries ?? 0,
+        shots_total: t?.shots_total ?? 0,
+        shots_on_target: t?.shots_on_target ?? 0,
+        goals: t?.goals ?? 0,
+        assists: t?.assists ?? 0,
+        crosses: t?.crosses ?? 0,
+        fouls_committed: t?.fouls_committed ?? 0,
+        fouls_drawn: t?.fouls_drawn ?? 0,
+        aerial_won: t?.aerial_won ?? 0,
+        data_source: "fieldiq", raw_metrics: {
+          assignment_confidence: ps.confidence, cameras_used: sessions.length, player_name: ps.player_name,
+          auto_discovered: useAutoDiscovery && !ps.player_id,
+          coverage_ratio: needsExtrapolation ? coverageRatio : 1,
+          extrapolated: needsExtrapolation,
+        },
+      };
+    });
     if (playerInserts.length > 0) {
       const { error: insertErr } = await supabase.from("player_match_stats").insert(playerInserts);
       if (insertErr) throw insertErr;
