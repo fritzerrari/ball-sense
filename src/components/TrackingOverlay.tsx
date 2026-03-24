@@ -31,7 +31,11 @@ export function TrackingOverlay({ detections, width = 1280, height = 720, classN
 
     ctx.clearRect(0, 0, w, h);
 
-    for (const det of detections) {
+    // Only draw persons and ball — filter out other labels
+    const validDetections = detections.filter(d => d.label === "person" || d.label === "ball");
+    let playerIndex = 0;
+
+    for (const det of validDetections) {
       const cx = det.x * w;
       const cy = det.y * h;
 
