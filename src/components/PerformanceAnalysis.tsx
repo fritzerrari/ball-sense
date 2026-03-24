@@ -135,12 +135,16 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
     <div>
       {!isOpen ? (
         <div className="flex gap-2 flex-wrap">
-          <Button variant="heroOutline" size="sm" onClick={() => generate("analysis", "quick")} disabled={isProcessing}>
+          <Button variant="heroOutline" size="sm" onClick={() => generate("analysis", "instant")} disabled={isProcessing}>
             <Sparkles className="h-4 w-4 mr-1" />
-            Schnell-Analyse {playerName ? `für ${playerName}` : ""}
+            Sofort-Fazit {playerName ? `für ${playerName}` : ""}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => generate("analysis", "quick")} disabled={isProcessing}>
+            <Activity className="h-4 w-4 mr-1" />
+            Schnell-Analyse
           </Button>
           <Button variant="outline" size="sm" onClick={() => generate("analysis", "deep")} disabled={isProcessing}>
-            <Activity className="h-4 w-4 mr-1" />
+            <Sparkles className="h-4 w-4 mr-1" />
             Tiefenanalyse
           </Button>
           {type === "player" && (
