@@ -1,12 +1,13 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
-import { useState, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import {
   Activity,
   ArrowLeft,
   ArrowRight,
   ArrowUpDown,
   Camera,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -15,8 +16,10 @@ import {
   FileText,
   KeyRound,
   Loader2,
+  Radio,
   Share2,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import ReportGenerator from "@/components/ReportGenerator";
 import { ProcessingRoadmap } from "@/components/ProcessingRoadmap";
