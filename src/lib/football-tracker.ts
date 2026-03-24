@@ -107,6 +107,10 @@ export class FootballTracker {
     return { sent: this.chunksSent, ok: this.chunksOk, pending: this.pendingChunks.length };
   }
 
+  getHighlightRecorder(): HighlightRecorder {
+    return this.highlightRecorder;
+  }
+
   async loadModel(onProgress?: ProgressCallback): Promise<void> {
     for (let i = 0; i <= 100; i += 2) {
       await new Promise(r => setTimeout(r, 30));
