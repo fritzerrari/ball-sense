@@ -41,6 +41,9 @@ interface LiveStreamConfig {
   onChunkSent?: (seq: number, ok: boolean) => void;
 }
 
+export type StabilityEvent = "bump" | "drift" | "zoom_change";
+export type StabilityCallback = (event: StabilityEvent, detail?: string) => void;
+
 export class FootballTracker {
   private modelLoaded = false;
   private tracking = false;
@@ -71,6 +74,14 @@ export class FootballTracker {
   private calibratedZoom: number | null = null;
   private zoomCheckIntervalId: number | null = null;
   private onZoomChange: ((currentZoom: number, calibratedZoom: number) => void) | null = null;
+
+  // Stability monitoring
+  private stabilityIntervalId: number | null = null;
+  private referenceImageData: ImageData | null = null;
+  private highDiffCount = 0;
+  private motionListenerActive = false;
+  private onStabilityEvent: StabilityCallback | null = null;
+  private stabilityCanvas: HTMLCanvasElement | null = null;
 
   setSquadSizes(home: number, away: number) {
     this.homeSquadSize = home;
@@ -115,7 +126,6 @@ export class FootballTracker {
           const caps = track.getCapabilities?.() as MediaTrackCapabilities & { zoom?: { min: number; max: number } };
           if (caps?.zoom) {
             await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min } as any] });
-            // Store calibrated zoom level
             const settings = track.getSettings() as MediaTrackSettings & { zoom?: number };
             this.calibratedZoom = settings.zoom ?? caps.zoom.min;
           }
@@ -128,18 +138,13 @@ export class FootballTracker {
     }
   }
 
-  /**
-   * Set callback for zoom change detection.
-   */
   setZoomChangeCallback(cb: ((currentZoom: number, calibratedZoom: number) => void) | null) {
     this.onZoomChange = cb;
   }
 
-  /**
-   * Start periodic zoom monitoring (every 60s).
-   */
   startZoomMonitoring() {
     if (this.zoomCheckIntervalId) return;
+    // Check every 10s instead of 60s
     this.zoomCheckIntervalId = window.setInterval(() => {
       if (!this.videoElement?.srcObject) return;
       const stream = this.videoElement.srcObject as MediaStream;
@@ -154,12 +159,9 @@ export class FootballTracker {
           }
         }
       } catch { /* ignore */ }
-    }, 60_000);
+    }, 10_000);
   }
 
-  /**
-   * Get the current zoom level from the camera.
-   */
   getCurrentZoom(): number | null {
     if (!this.videoElement?.srcObject) return null;
     const stream = this.videoElement.srcObject as MediaStream;
@@ -178,6 +180,137 @@ export class FootballTracker {
     }
     return null;
   }
+
+  // ── Stability Monitoring ──
+
+  setStabilityCallback(cb: StabilityCallback | null) {
+    this.onStabilityEvent = cb;
+  }
+
+  startStabilityMonitoring() {
+    if (this.stabilityIntervalId) return;
+
+    // Frame-difference analysis every 5s
+    this.stabilityCanvas = document.createElement("canvas");
+    this.stabilityCanvas.width = 40; // small sampling grid
+    this.stabilityCanvas.height = 30;
+
+    this.stabilityIntervalId = window.setInterval(() => {
+      this.checkFrameDifference();
+    }, 5_000);
+
+    // DeviceMotion for bump detection
+    this.startDeviceMotionMonitoring();
+  }
+
+  stopStabilityMonitoring() {
+    if (this.stabilityIntervalId) {
+      clearInterval(this.stabilityIntervalId);
+      this.stabilityIntervalId = null;
+    }
+    this.stopDeviceMotionMonitoring();
+    this.referenceImageData = null;
+    this.highDiffCount = 0;
+    this.stabilityCanvas = null;
+  }
+
+  private checkFrameDifference() {
+    if (!this.videoElement || !this.videoElement.videoWidth || !this.stabilityCanvas) return;
+
+    const ctx = this.stabilityCanvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(this.videoElement, 0, 0, this.stabilityCanvas.width, this.stabilityCanvas.height);
+    const currentData = ctx.getImageData(0, 0, this.stabilityCanvas.width, this.stabilityCanvas.height);
+
+    if (!this.referenceImageData) {
+      this.referenceImageData = currentData;
+      return;
+    }
+
+    // Calculate pixel difference
+    let totalDiff = 0;
+    const pixels = currentData.data.length / 4;
+    for (let i = 0; i < currentData.data.length; i += 4) {
+      const dr = Math.abs(currentData.data[i] - this.referenceImageData.data[i]);
+      const dg = Math.abs(currentData.data[i + 1] - this.referenceImageData.data[i + 1]);
+      const db = Math.abs(currentData.data[i + 2] - this.referenceImageData.data[i + 2]);
+      totalDiff += (dr + dg + db) / (3 * 255);
+    }
+    const avgDiff = totalDiff / pixels;
+
+    if (avgDiff > 0.15) {
+      this.highDiffCount++;
+      if (this.highDiffCount === 1) {
+        // Single spike = bump
+        this.onStabilityEvent?.("bump", `Bewegung erkannt (${(avgDiff * 100).toFixed(0)}%)`);
+      } else if (this.highDiffCount >= 3) {
+        // Continuous = drift/pan
+        this.onStabilityEvent?.("drift", "Kamera-Position hat sich verändert");
+      }
+    } else {
+      // Reset if stable again
+      if (this.highDiffCount > 0) {
+        this.highDiffCount = 0;
+      }
+      // Update reference frame periodically when stable
+      this.referenceImageData = currentData;
+    }
+  }
+
+  private startDeviceMotionMonitoring() {
+    if (this.motionListenerActive) return;
+    if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) return;
+
+    const handler = (e: DeviceMotionEvent) => {
+      const acc = e.acceleration;
+      if (!acc) return;
+      const magnitude = Math.sqrt((acc.x ?? 0) ** 2 + (acc.y ?? 0) ** 2 + (acc.z ?? 0) ** 2);
+      if (magnitude > 20) { // ~2g
+        this.onStabilityEvent?.("bump", `Starker Stoß erkannt (${magnitude.toFixed(1)} m/s²)`);
+        // Trigger immediate zoom check
+        this.checkZoomNow();
+      }
+    };
+
+    window.addEventListener("devicemotion", handler);
+    this.motionListenerActive = true;
+    (this as any)._motionHandler = handler;
+  }
+
+  private stopDeviceMotionMonitoring() {
+    if (!this.motionListenerActive) return;
+    window.removeEventListener("devicemotion", (this as any)._motionHandler);
+    this.motionListenerActive = false;
+  }
+
+  private checkZoomNow() {
+    if (!this.videoElement?.srcObject) return;
+    const stream = this.videoElement.srcObject as MediaStream;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      const settings = track.getSettings() as MediaTrackSettings & { zoom?: number };
+      if (settings.zoom != null && this.calibratedZoom != null) {
+        const diff = Math.abs(settings.zoom - this.calibratedZoom);
+        if (diff > 0.1) {
+          this.onStabilityEvent?.("zoom_change");
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  /**
+   * Update the calibrated zoom after a recalibration.
+   */
+  updateCalibratedZoom() {
+    const zoom = this.getCurrentZoom();
+    if (zoom != null) this.calibratedZoom = zoom;
+    this.highDiffCount = 0;
+    this.referenceImageData = null; // Reset reference frame
+  }
+
+  // ── Tracking simulation ──
 
   private initStablePlayers() {
     this.stablePlayers = [];
@@ -236,9 +369,6 @@ export class FootballTracker {
     this.ballY = Math.max(0.02, Math.min(0.98, this.ballY));
   }
 
-  /**
-   * Configure live streaming to send chunks during tracking.
-   */
   configureLiveStream(config: LiveStreamConfig) {
     this.uploadMode = "live";
     this.liveConfig = config;
@@ -263,7 +393,6 @@ export class FootballTracker {
 
       if (resp.ok) {
         this.chunksOk++;
-        // Remove from pending
         this.pendingChunks = this.pendingChunks.filter(c => c.seq !== seq);
         onChunkSent?.(seq, true);
       } else {
@@ -278,7 +407,6 @@ export class FootballTracker {
 
   private startLiveInterval() {
     if (this.liveIntervalId) return;
-    // Send chunks every 30 seconds
     this.liveIntervalId = window.setInterval(() => {
       if (this.liveBuffer.length === 0) return;
       const chunk = [...this.liveBuffer];
@@ -290,9 +418,6 @@ export class FootballTracker {
     }, 30_000);
   }
 
-  /**
-   * Retry any failed chunks.
-   */
   async retryPendingChunks() {
     const pending = [...this.pendingChunks];
     for (const chunk of pending) {
@@ -308,7 +433,6 @@ export class FootballTracker {
     this.frames = [];
     this.initStablePlayers();
 
-    // Start live streaming if configured
     if (this.uploadMode === "live" && this.liveConfig) {
       this.startLiveInterval();
     }
@@ -343,7 +467,6 @@ export class FootballTracker {
         const frame: TrackingFrame = { timestamp: now - this.startTime, detections };
         this.frames.push(frame);
 
-        // Buffer for live streaming
         if (this.uploadMode === "live") {
           this.liveBuffer.push(frame);
         }
@@ -369,17 +492,16 @@ export class FootballTracker {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    // Stop live streaming interval
     if (this.liveIntervalId) {
       clearInterval(this.liveIntervalId);
       this.liveIntervalId = null;
     }
-    // Stop zoom monitoring
     if (this.zoomCheckIntervalId) {
       clearInterval(this.zoomCheckIntervalId);
       this.zoomCheckIntervalId = null;
     }
-    // Send remaining buffer as final chunk
+    this.stopStabilityMonitoring();
+
     if (this.uploadMode === "live" && this.liveBuffer.length > 0 && this.liveConfig) {
       const chunk = [...this.liveBuffer];
       this.liveBuffer = [];
@@ -412,9 +534,6 @@ export class FootballTracker {
     return this.paused;
   }
 
-  /**
-   * Upload tracking session data to storage (batch mode).
-   */
   async uploadMatch(
     matchId: string,
     cameraIndex: number,
@@ -422,7 +541,6 @@ export class FootballTracker {
     supabaseAnonKey: string,
     onProgress?: (stage: string, pct: number) => void,
   ): Promise<{ filePath: string; framesCount: number; durationSec: number }> {
-    // For live mode, just flush remaining chunks
     if (this.uploadMode === "live") {
       await this.retryPendingChunks();
       onProgress?.("upload", 100);

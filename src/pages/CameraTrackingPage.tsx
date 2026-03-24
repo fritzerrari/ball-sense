@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,8 +16,10 @@ import {
   Wifi,
   WifiOff,
   Bell,
+  X,
+  Crosshair,
 } from "lucide-react";
-import { FootballTracker, type Detection, type UploadMode } from "@/lib/football-tracker";
+import { FootballTracker, type Detection, type UploadMode, type StabilityEvent } from "@/lib/football-tracker";
 import { TrackingOverlay } from "@/components/TrackingOverlay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -26,7 +28,8 @@ const CAMERA_ACCESS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cam
 const CAMERA_OPS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`;
 const PROCESS_TRACKING_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-tracking`;
 
-type Phase = "auth" | "loading" | "camera" | "calibration" | "tracking" | "ended";
+// Simplified 3-step wizard
+type Phase = "auth" | "camera" | "tracking" | "ended";
 type MatchData = {
   id: string;
   date: string;
@@ -48,12 +51,9 @@ const SESSION_PREFIX = "camera_session";
 const CODE_REGEX = /^\d{6}$/;
 
 const WIZARD_STEPS: { key: Phase; label: string }[] = [
-  { key: "auth", label: "Anmelden" },
-  { key: "loading", label: "KI laden" },
+  { key: "auth", label: "Code" },
   { key: "camera", label: "Kamera" },
-  { key: "calibration", label: "Prüfung" },
   { key: "tracking", label: "Tracking" },
-  { key: "ended", label: "Upload" },
 ];
 
 export default function CameraTrackingPage() {
@@ -67,6 +67,7 @@ export default function CameraTrackingPage() {
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [match, setMatch] = useState<MatchData | null>(null);
   const [progress, setProgress] = useState(0);
+  const [modelLoaded, setModelLoaded] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [currentDetections, setCurrentDetections] = useState<Detection[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -77,7 +78,10 @@ export default function CameraTrackingPage() {
   const [liveEvents, setLiveEvents] = useState<MatchEvent[]>([]);
   const [uploadMode, setUploadMode] = useState<UploadMode>("batch");
   const [chunkStats, setChunkStats] = useState({ sent: 0, ok: 0, pending: 0 });
-  const [zoomWarning, setZoomWarning] = useState(false);
+  const [stabilityWarning, setStabilityWarning] = useState<string | null>(null);
+  const [showInlineCalibration, setShowInlineCalibration] = useState(false);
+  const [calibrationPoints, setCalibrationPoints] = useState<{ x: number; y: number }[]>([]);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -85,10 +89,11 @@ export default function CameraTrackingPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
   const confirmSoundPlayed = useRef(false);
+  const calibrationOverlayRef = useRef<HTMLDivElement>(null);
 
   const sessionToken = useMemo(() => localStorage.getItem(sessionKey), [sessionKey]);
   const isCalibrated = Boolean(match?.fields?.calibration);
-  const currentStepIdx = WIZARD_STEPS.findIndex((s) => s.key === phase);
+  const currentStepIdx = WIZARD_STEPS.findIndex((s) => s.key === (phase === "ended" ? "tracking" : phase));
   const playerCount = currentDetections.filter(d => d.label === "person").length;
 
   const formatTime = (sec: number) =>
@@ -106,7 +111,7 @@ export default function CameraTrackingPage() {
     };
   }, []);
 
-  // Realtime match events subscription for operator notifications
+  // Realtime match events subscription
   useEffect(() => {
     if (!id || phase !== "tracking") return;
     const channel = supabase
@@ -118,7 +123,6 @@ export default function CameraTrackingPage() {
           const evt = payload.new as MatchEvent;
           setLiveEvents(prev => [evt, ...prev].slice(0, 10));
 
-          // Show notification banner
           if (evt.event_type === "substitution") {
             toast.info(`⚡ Wechsel: ${evt.player_name ?? "?"} raus, ${evt.related_player_name ?? "?"} rein (${evt.minute}')`, { duration: 8000 });
             playNotificationSound(520);
@@ -159,14 +163,16 @@ export default function CameraTrackingPage() {
     if (!resp.ok) throw new Error((await resp.json().catch(() => ({ error: "Session ungültig" }))).error);
     const data = await resp.json();
     setMatch(data.match);
-    setPhase("loading");
   };
 
   // Auto-restore session
   useEffect(() => {
     if (!id || Number.isNaN(cam) || cam < 0 || cam > 4) return;
     if (sessionToken) {
-      void fetchSession(sessionToken).catch(() => {
+      void fetchSession(sessionToken).then(() => {
+        // Session restored, go to camera phase and start loading model in parallel
+        setPhase("camera");
+      }).catch(() => {
         localStorage.removeItem(sessionKey);
         setPhase("auth");
       });
@@ -181,16 +187,38 @@ export default function CameraTrackingPage() {
     }
   }, [phase]);
 
-  // Auto-load model
+  // Auto-load model when entering camera phase
   useEffect(() => {
-    if (phase !== "loading") return;
+    if (phase !== "camera" || modelLoaded) return;
     const tracker = new FootballTracker();
     trackerRef.current = tracker;
     void tracker
       .loadModel((pct) => setProgress(pct))
-      .then(() => setPhase("camera"))
+      .then(() => setModelLoaded(true))
       .catch(() => toast.error("Modell konnte nicht geladen werden"));
-  }, [phase]);
+  }, [phase, modelLoaded]);
+
+  // Auto-start camera when entering camera phase
+  useEffect(() => {
+    if (phase !== "camera" || !trackerRef.current) return;
+    if (cameraReady) return; // Already started
+    const startCam = async () => {
+      if (!videoRef.current) return;
+      try {
+        await trackerRef.current!.startCamera(videoRef.current, cam);
+        if (videoRef.current.srcObject) {
+          streamRef.current = videoRef.current.srcObject as MediaStream;
+        }
+        setCameraReady(true);
+      } catch {
+        // Camera unavailable — still allow to proceed
+        setCameraReady(true);
+      }
+    };
+    // Small delay to ensure tracker is initialized
+    const t = setTimeout(startCam, 300);
+    return () => clearTimeout(t);
+  }, [phase, cam, modelLoaded]);
 
   // Attach stream to tracking video
   useEffect(() => {
@@ -217,25 +245,13 @@ export default function CameraTrackingPage() {
       localStorage.setItem(sessionKey, data.sessionToken);
       setCode("");
       await fetchSession(data.sessionToken);
+      setPhase("camera");
       toast.success("Kamera angemeldet");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Anmeldung fehlgeschlagen");
     } finally {
       setIsAuthorizing(false);
     }
-  };
-
-  const handleStartCamera = async () => {
-    if (!trackerRef.current || !videoRef.current) return;
-    try {
-      await trackerRef.current.startCamera(videoRef.current, cam);
-      if (videoRef.current.srcObject) {
-        streamRef.current = videoRef.current.srcObject as MediaStream;
-      }
-    } catch {
-      // Camera unavailable
-    }
-    setPhase("calibration");
   };
 
   const handleStartTracking = async () => {
@@ -262,10 +278,22 @@ export default function CameraTrackingPage() {
       });
     }
 
+    // Setup stability monitoring
+    trackerRef.current.setStabilityCallback((event: StabilityEvent, detail?: string) => {
+      if (event === "bump") {
+        setStabilityWarning(detail || "Kamera wurde bewegt");
+        playNotificationSound(440);
+      } else if (event === "drift") {
+        setStabilityWarning("Kamera-Position hat sich verändert — neu kalibrieren empfohlen");
+      } else if (event === "zoom_change") {
+        setStabilityWarning("Zoom hat sich verändert — neu kalibrieren empfohlen");
+      }
+    });
+    trackerRef.current.startStabilityMonitoring();
+
     // Setup zoom monitoring
     trackerRef.current.setZoomChangeCallback((current, calibrated) => {
-      setZoomWarning(true);
-      toast.warning(`⚠️ Zoom verändert (${current.toFixed(1)}x → kalibriert: ${calibrated.toFixed(1)}x). Neu kalibrieren empfohlen.`, { duration: 10000 });
+      setStabilityWarning(`Zoom verändert (${current.toFixed(1)}x → kalibriert: ${calibrated.toFixed(1)}x)`);
     });
     trackerRef.current.startZoomMonitoring();
 
@@ -287,18 +315,14 @@ export default function CameraTrackingPage() {
   };
 
   const handleGoBack = () => {
-    const phases: Phase[] = ["auth", "loading", "camera", "calibration", "tracking", "ended"];
-    const idx = phases.indexOf(phase);
-    if (idx > 0) {
-      if (phase === "tracking") {
-        trackerRef.current?.stopTracking();
-        setDetectionConfirmed(false);
-        setPeakDetections(0);
-        setCurrentDetections([]);
-        setElapsedSec(0);
-        confirmSoundPlayed.current = false;
-      }
-      setPhase(phases[idx - 1]);
+    if (phase === "camera") {
+      setPhase("auth");
+    } else if (phase === "tracking") {
+      // Pause instead of stop
+      trackerRef.current?.pauseTracking();
+      setPhase("camera");
+    } else if (phase === "ended") {
+      setPhase("tracking");
     }
   };
 
@@ -308,6 +332,8 @@ export default function CameraTrackingPage() {
       streamRef.current.getTracks().forEach((t) => t.stop());
     }
     setPhase("ended");
+    // Auto-start upload
+    setTimeout(() => handleUpload(), 500);
   };
 
   const handleUpload = async () => {
@@ -353,40 +379,75 @@ export default function CameraTrackingPage() {
     }
   };
 
-  const handleLiveSnapshot = () => {
-    const video = videoRef.current;
-    if (!video || !video.videoWidth) {
-      toast.error("Kamera noch nicht bereit");
-      return;
+  // Inline calibration handlers
+  const handleInlineCalibrationTap = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (!showInlineCalibration) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    let clientX: number, clientY: number;
+    if ("touches" in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
     }
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          sessionStorage.setItem("calibration_snapshot", reader.result as string);
-          const returnPath = `/camera/${id}/track?cam=${cam}`;
-          window.location.href = `/fields/${match?.field_id}/calibrate?returnTo=${encodeURIComponent(returnPath)}&fromSnapshot=1`;
-        };
-        reader.readAsDataURL(blob);
-      },
-      "image/jpeg",
-      0.92,
-    );
+    const x = (clientX - rect.left) / rect.width;
+    const y = (clientY - rect.top) / rect.height;
+
+    setCalibrationPoints(prev => {
+      const next = [...prev, { x, y }];
+      if (next.length >= 4) {
+        // Save calibration
+        saveInlineCalibration(next.slice(0, 4));
+        return [];
+      }
+      return next;
+    });
+  }, [showInlineCalibration]);
+
+  const saveInlineCalibration = async (points: { x: number; y: number }[]) => {
+    if (!match?.field_id) return;
+    const calibrationData = {
+      points,
+      width_m: match.fields?.width_m ?? 105,
+      height_m: match.fields?.height_m ?? 68,
+      calibrated_at: new Date().toISOString(),
+      coverage: "full" as const,
+      field_rect: { x: 0, y: 0, w: 1, h: 1 },
+    };
+
+    try {
+      await supabase
+        .from("fields")
+        .update({ calibration: calibrationData as any })
+        .eq("id", match.field_id);
+
+      // Update local state
+      setMatch(prev => prev ? {
+        ...prev,
+        fields: { ...prev.fields, calibration: calibrationData },
+      } : prev);
+
+      // Reset stability after recalibration
+      trackerRef.current?.updateCalibratedZoom();
+
+      toast.success("Kalibrierung gespeichert ✓");
+    } catch {
+      toast.error("Kalibrierung konnte nicht gespeichert werden");
+    }
+
+    setShowInlineCalibration(false);
+    setStabilityWarning(null);
   };
+
+  const cornerLabels = ["Oben links", "Oben rechts", "Unten rechts", "Unten links"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col landscape:min-h-[100dvh]">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="flex items-center gap-3">
-          {phase !== "auth" && phase !== "loading" && (
+          {phase !== "auth" && (
             <button onClick={handleGoBack} className="rounded-lg p-1.5 transition-colors hover:bg-muted">
               <ArrowLeft className="h-4 w-4" />
             </button>
@@ -416,8 +477,8 @@ export default function CameraTrackingPage() {
         style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
       />
 
-      {/* Wizard Stepper */}
-      <div className="px-4 py-3 border-b border-border bg-card/30">
+      {/* Wizard Stepper - simplified 3 steps */}
+      <div className="px-4 py-2 border-b border-border bg-card/30">
         <div className="flex items-center gap-1 max-w-lg mx-auto">
           {WIZARD_STEPS.map((step, i) => {
             const isDone = i < currentStepIdx;
@@ -433,7 +494,7 @@ export default function CameraTrackingPage() {
                 >
                   {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
                 </div>
-                <span className={`text-[10px] font-medium hidden sm:inline truncate ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                <span className={`text-[10px] font-medium truncate ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
                   {step.label}
                 </span>
                 {i < WIZARD_STEPS.length - 1 && (
@@ -443,14 +504,11 @@ export default function CameraTrackingPage() {
             );
           })}
         </div>
-        <p className="text-xs text-muted-foreground text-center mt-2">
-          Schritt {currentStepIdx + 1} von {WIZARD_STEPS.length} — {WIZARD_STEPS[currentStepIdx]?.label}
-        </p>
       </div>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
-        {/* Phase: Auth */}
+        {/* Phase: Auth — Code + auto model loading */}
         {phase === "auth" && (
           <div className="w-full max-w-sm space-y-6 text-center">
             <div className="w-20 h-20 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -483,102 +541,110 @@ export default function CameraTrackingPage() {
           </div>
         )}
 
-        {/* Phase: Loading */}
-        {phase === "loading" && (
-          <div className="w-full max-w-sm space-y-6 text-center">
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
-              <Camera className="h-10 w-10 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold font-display mb-2">KI-Modell wird geladen…</h2>
-              <p className="text-sm text-muted-foreground">Einmalig ~20 MB. Danach offline verfügbar.</p>
-            </div>
-            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-              <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="text-sm text-muted-foreground">{progress}%</p>
-          </div>
-        )}
-
-        {/* Phase: Camera */}
+        {/* Phase: Camera — combined camera + calibration + model loading */}
         {phase === "camera" && (
-          <div className="w-full max-w-sm space-y-6 text-center">
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Camera className="h-10 w-10 text-primary" />
+          <div className="w-full max-w-sm space-y-4 text-center">
+            {/* Model loading indicator */}
+            {!modelLoaded && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 justify-center text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  KI-Modell wird geladen… {progress}%
+                </div>
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                  <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+            )}
+
+            {/* Camera preview */}
+            <div className="w-full aspect-video rounded-xl bg-muted/30 border border-border overflow-hidden relative">
+              {cameraReady && streamRef.current ? (
+                <video
+                  ref={(el) => {
+                    if (el && streamRef.current) {
+                      el.srcObject = streamRef.current;
+                      el.play().catch(() => {});
+                    }
+                  }}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  playsInline muted autoPlay
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+                </div>
+              )}
             </div>
-            <div>
-              <h2 className="text-xl font-bold font-display mb-2">Kamera aktivieren</h2>
-              <p className="text-sm text-muted-foreground">Erlaube den Kamerazugriff, damit das Tracking funktioniert.</p>
+
+            {/* Calibration status */}
+            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left ${
+              isCalibrated ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"
+            }`}>
+              {isCalibrated ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Platz kalibriert ✓</p>
+                    <p className="text-xs text-muted-foreground">{match?.fields?.name ?? "Platz"}</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => { setShowInlineCalibration(true); setCalibrationPoints([]); }}>
+                    <Crosshair className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Nicht kalibriert</p>
+                    <p className="text-xs text-muted-foreground">Tippe auf Kalibrieren für genaue Daten</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => { setShowInlineCalibration(true); setCalibrationPoints([]); }}>
+                    <Crosshair className="mr-1 h-4 w-4" /> Kalibrieren
+                  </Button>
+                </>
+              )}
             </div>
-            <div className="w-full aspect-video rounded-xl bg-muted/30 border border-border overflow-hidden" />
-            <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleStartCamera}>
-              Kamera starten <ChevronRight className="ml-2 h-5 w-5" />
+
+            {/* Upload mode toggle */}
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+              <Wifi className="h-4 w-4 text-primary shrink-0" />
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium">Live-Upload</p>
+                <p className="text-xs text-muted-foreground">Daten während des Spiels übertragen</p>
+              </div>
+              <button
+                onClick={() => setUploadMode(m => m === "batch" ? "live" : "batch")}
+                className={`relative w-11 h-6 rounded-full transition-colors ${uploadMode === "live" ? "bg-primary" : "bg-muted-foreground/30"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-background rounded-full transition-transform ${uploadMode === "live" ? "translate-x-5" : ""}`} />
+              </button>
+            </div>
+
+            {/* Start tracking button */}
+            <Button
+              variant="hero"
+              size="xl"
+              className="w-full min-h-[56px]"
+              onClick={handleStartTracking}
+              disabled={!modelLoaded || !cameraReady}
+            >
+              {!modelLoaded ? (
+                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Modell wird geladen…</>
+              ) : (
+                <>Tracking starten <ChevronRight className="ml-2 h-5 w-5" /></>
+              )}
             </Button>
+
+            {!isCalibrated && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                ⚠️ Ohne Kalibrierung sind die Tracking-Daten weniger genau.
+              </p>
+            )}
+
             <Button variant="ghost" size="sm" onClick={handleGoBack}>
               <ArrowLeft className="mr-1 h-4 w-4" /> Zurück
             </Button>
-          </div>
-        )}
-
-        {/* Phase: Calibration */}
-        {phase === "calibration" && (
-          <div className="w-full max-w-sm space-y-6 text-center">
-            {isCalibrated ? (
-              <>
-                <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <Check className="h-8 w-8 text-emerald-400" />
-                </div>
-                <h2 className="text-xl font-bold font-display">Platz ist kalibriert ✓</h2>
-                <p className="text-sm text-muted-foreground">
-                  {match?.fields?.name || "Platz"}
-                  {match?.fields?.width_m && match?.fields?.height_m ? ` — ${match.fields.width_m}×${match.fields.height_m}m` : ""}
-                </p>
-                <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleStartTracking}>
-                  Tracking starten <ChevronRight className="ml-2 h-5 w-5" />
-                </Button>
-
-                {/* Upload mode toggle */}
-                <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
-                  <Wifi className="h-4 w-4 text-primary shrink-0" />
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-medium">Live-Upload</p>
-                    <p className="text-xs text-muted-foreground">Daten während des Spiels übertragen</p>
-                  </div>
-                  <button
-                    onClick={() => setUploadMode(m => m === "batch" ? "live" : "batch")}
-                    className={`relative w-11 h-6 rounded-full transition-colors ${uploadMode === "live" ? "bg-primary" : "bg-muted-foreground/30"}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-background rounded-full transition-transform ${uploadMode === "live" ? "translate-x-5" : ""}`} />
-                  </button>
-                </div>
-
-                <Button variant="outline" size="lg" className="w-full" onClick={handleLiveSnapshot}>
-                  <Camera className="mr-2 h-4 w-4" /> Neu kalibrieren
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleGoBack}>
-                  <ArrowLeft className="mr-1 h-4 w-4" /> Zurück
-                </Button>
-              </>
-            ) : (
-              <>
-                <AlertTriangle className="h-16 w-16 text-yellow-400 mx-auto" />
-                <h2 className="text-xl font-bold font-display">Platz nicht kalibriert</h2>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Wichtig:</strong> Kalibriere den Platz zuerst für genaue Tracking-Daten. Nutze den „Live-Foto"-Button.
-                </p>
-                {match?.field_id && (
-                  <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleLiveSnapshot}>
-                    <Camera className="mr-2 h-5 w-5" /> Live-Foto & Kalibrieren
-                  </Button>
-                )}
-                <Button variant="heroOutline" size="xl" className="w-full min-h-[56px]" onClick={handleStartTracking}>
-                  Trotzdem starten <ChevronRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleGoBack}>
-                  <ArrowLeft className="mr-1 h-4 w-4" /> Zurück
-                </Button>
-              </>
-            )}
           </div>
         )}
 
@@ -600,14 +666,50 @@ export default function CameraTrackingPage() {
               )}
             </div>
 
-            <div className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden">
+            <div
+              className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden"
+              onClick={showInlineCalibration ? handleInlineCalibrationTap as any : undefined}
+              onTouchStart={showInlineCalibration ? handleInlineCalibrationTap as any : undefined}
+              ref={calibrationOverlayRef}
+            >
               <video ref={trackingVideoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
-              <TrackingOverlay detections={currentDetections} />
+              {!showInlineCalibration && <TrackingOverlay detections={currentDetections} />}
               {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
                   <Camera className="h-12 w-12" />
                 </div>
               )}
+
+              {/* Inline calibration overlay */}
+              {showInlineCalibration && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+                  {/* Show placed points */}
+                  {calibrationPoints.map((pt, i) => (
+                    <div
+                      key={i}
+                      className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full border-2 border-primary bg-primary/30 flex items-center justify-center"
+                      style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%` }}
+                    >
+                      <span className="text-[9px] font-bold text-primary-foreground">{i + 1}</span>
+                    </div>
+                  ))}
+                  {/* Corner guide */}
+                  <div className="absolute bottom-3 left-3 right-3 bg-card/90 rounded-lg p-2 text-center">
+                    <p className="text-xs font-medium text-foreground">
+                      {calibrationPoints.length < 4
+                        ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
+                        : "Wird gespeichert…"}
+                    </p>
+                  </div>
+                  <button
+                    className="absolute top-2 right-2 bg-card/80 rounded-full p-1.5"
+                    onClick={(e) => { e.stopPropagation(); setShowInlineCalibration(false); setCalibrationPoints([]); }}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
                 <Users className="h-4 w-4 text-primary" />
                 <span className="font-medium">{playerCount} Spieler</span>
@@ -635,17 +737,23 @@ export default function CameraTrackingPage() {
               </div>
             )}
 
-            {/* Zoom warning */}
-            {zoomWarning && (
+            {/* Stability warning */}
+            {stabilityWarning && (
               <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
                 <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Zoom verändert</p>
-                  <p className="text-xs text-muted-foreground">Neu kalibrieren für genaue Daten</p>
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">📱 {stabilityWarning}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => { setZoomWarning(false); handleLiveSnapshot(); }}>
-                  Kalibrieren
-                </Button>
+                <div className="flex gap-1.5">
+                  <Button variant="ghost" size="sm" onClick={() => setStabilityWarning(null)}>OK</Button>
+                  <Button variant="outline" size="sm" onClick={() => {
+                    setStabilityWarning(null);
+                    setShowInlineCalibration(true);
+                    setCalibrationPoints([]);
+                  }}>
+                    <Crosshair className="mr-1 h-3.5 w-3.5" /> Kalibrieren
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -666,8 +774,11 @@ export default function CameraTrackingPage() {
             )}
 
             <div className="flex gap-2">
-              <Button variant="outline" size="lg" className="flex-1" onClick={handleLiveSnapshot}>
-                <Camera className="mr-2 h-4 w-4" /> Neu kalibrieren
+              <Button variant="outline" size="lg" className="flex-1" onClick={() => {
+                setShowInlineCalibration(true);
+                setCalibrationPoints([]);
+              }}>
+                <Crosshair className="mr-2 h-4 w-4" /> Kalibrieren
               </Button>
               <Button variant="destructive" size="lg" className="flex-1" onClick={handleEnd}>
                 <Flag className="mr-2 h-4 w-4" /> Beenden
@@ -676,14 +787,16 @@ export default function CameraTrackingPage() {
           </div>
         )}
 
-        {/* Phase: Ended */}
+        {/* Phase: Ended — auto-upload */}
         {phase === "ended" && (
           <div className="w-full max-w-sm space-y-6 text-center">
             <div className="w-20 h-20 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Flag className="h-10 w-10 text-primary" />
+              {uploadDone ? <Check className="h-10 w-10 text-emerald-400" /> : <Upload className="h-10 w-10 text-primary" />}
             </div>
             <div>
-              <h2 className="text-xl font-bold font-display mb-2">Tracking beendet</h2>
+              <h2 className="text-xl font-bold font-display mb-2">
+                {uploadDone ? "Upload erfolgreich! 🎉" : uploading ? "Wird hochgeladen…" : "Tracking beendet"}
+              </h2>
               <p className="text-sm text-muted-foreground">
                 {formatTime(elapsedSec)} · {trackerRef.current?.getFrameCount() ?? 0} Frames · {peakDetections} max. Spieler
               </p>
@@ -692,25 +805,21 @@ export default function CameraTrackingPage() {
             {uploadDone ? (
               <div className="space-y-4">
                 <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-                  <Check className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
-                  <p className="font-semibold font-display">Upload erfolgreich! 🎉</p>
                   <p className="text-sm text-muted-foreground">Die Daten werden jetzt verarbeitet.</p>
                 </div>
                 <Button variant="hero" size="xl" className="w-full min-h-[56px]" asChild>
                   <Link to="/">Fertig</Link>
                 </Button>
               </div>
+            ) : uploading ? (
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Upload läuft…</span>
+              </div>
             ) : (
               <div className="space-y-3">
-                <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleUpload} disabled={uploading}>
-                  {uploading ? (
-                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Wird hochgeladen…</>
-                  ) : (
-                    <><Upload className="mr-2 h-5 w-5" /> Daten hochladen</>
-                  )}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => { setPhase("tracking"); setElapsedSec(0); confirmSoundPlayed.current = false; }}>
-                  <ArrowLeft className="mr-1 h-4 w-4" /> Nochmal tracken
+                <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleUpload}>
+                  <Upload className="mr-2 h-5 w-5" /> Nochmal versuchen
                 </Button>
                 <Button variant="ghost" size="sm" asChild className="w-full">
                   <Link to="/">Später hochladen</Link>
