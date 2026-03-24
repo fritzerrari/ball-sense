@@ -59,7 +59,7 @@ export class FootballTracker {
   private ballY = 0.5;
   private ballVx = 0.01;
   private ballVy = 0.005;
-  private homeSquadSize = 11;
+  private homeSquadSize = 0;
   private awaySquadSize = 0;
 
   // Live streaming state

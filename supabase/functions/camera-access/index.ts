@@ -183,11 +183,20 @@ serve(async (req) => {
 
       const { data: match } = await supabase
         .from("matches")
-        .select("id, date, kickoff, away_club_name, status, field_id, fields(name, width_m, height_m, calibration)")
+        .select("id, date, kickoff, away_club_name, status, field_id, match_type, fields(name, width_m, height_m, calibration)")
         .eq("id", matchId)
         .single();
 
-      return jsonResp({ match });
+      // Fetch lineup counts for squad sizing
+      const { data: lineups } = await supabase
+        .from("match_lineups")
+        .select("team")
+        .eq("match_id", matchId);
+
+      const homeCount = lineups?.filter(l => l.team === "home").length ?? 0;
+      const awayCount = lineups?.filter(l => l.team === "away").length ?? 0;
+
+      return jsonResp({ match, lineupCounts: { home: homeCount, away: awayCount } });
     }
 
     return jsonResp({ error: "Ungültige Aktion" }, 400);
