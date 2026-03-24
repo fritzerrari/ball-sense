@@ -63,7 +63,7 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
     } catch { /* ignore trigger errors */ }
   }, []);
 
-  const generate = async (genMode: "analysis" | "training" = "analysis", depth: "quick" | "deep" = "quick") => {
+  const generate = async (genMode: "analysis" | "training" = "analysis", depth: "instant" | "quick" | "deep" = "quick") => {
     if (!user) { toast.error("Bitte erneut anmelden."); return; }
 
     setIsOpen(true);
@@ -82,9 +82,9 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
         depth,
       });
       setActiveReportId(id);
-      toast.success(depth === "quick" ? "Schnell-Analyse gestartet" : "Tiefenanalyse in die Warteschlange eingereiht");
+      const labels: Record<string, string> = { instant: "Sofort-Fazit gestartet", quick: "Schnell-Analyse gestartet", deep: "Tiefenanalyse in die Warteschlange eingereiht" };
+      toast.success(labels[depth] ?? "Analyse gestartet");
 
-      // Trigger background processing
       triggerQueueProcessing();
     } catch {
       toast.error("Konnte Analyse nicht starten");
@@ -135,12 +135,16 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
     <div>
       {!isOpen ? (
         <div className="flex gap-2 flex-wrap">
-          <Button variant="heroOutline" size="sm" onClick={() => generate("analysis", "quick")} disabled={isProcessing}>
+          <Button variant="heroOutline" size="sm" onClick={() => generate("analysis", "instant")} disabled={isProcessing}>
             <Sparkles className="h-4 w-4 mr-1" />
-            Schnell-Analyse {playerName ? `für ${playerName}` : ""}
+            Sofort-Fazit {playerName ? `für ${playerName}` : ""}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => generate("analysis", "quick")} disabled={isProcessing}>
+            <Activity className="h-4 w-4 mr-1" />
+            Schnell-Analyse
           </Button>
           <Button variant="outline" size="sm" onClick={() => generate("analysis", "deep")} disabled={isProcessing}>
-            <Activity className="h-4 w-4 mr-1" />
+            <Sparkles className="h-4 w-4 mr-1" />
             Tiefenanalyse
           </Button>
           {type === "player" && (
@@ -266,11 +270,14 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
 
           {!isProcessing && status !== "error" && status !== "cancelled" && content && (
             <div className="relative flex gap-2 flex-wrap">
-              <Button variant="heroOutline" size="sm" onClick={() => generate(mode, "quick")}>
-                <Sparkles className="h-4 w-4 mr-1" /> Schnell-Analyse
+              <Button variant="heroOutline" size="sm" onClick={() => generate(mode, "instant")}>
+                <Sparkles className="h-4 w-4 mr-1" /> Sofort-Fazit
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => generate(mode, "quick")}>
+                <Activity className="h-4 w-4 mr-1" /> Schnell-Analyse
               </Button>
               <Button variant="outline" size="sm" onClick={() => generate(mode, "deep")}>
-                <Activity className="h-4 w-4 mr-1" /> Tiefenanalyse
+                <Sparkles className="h-4 w-4 mr-1" /> Tiefenanalyse
               </Button>
               {type === "player" && mode === "analysis" && (
                 <Button variant="heroOutline" size="sm" onClick={() => generate("training", "quick")}>
@@ -278,7 +285,7 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
                 </Button>
               )}
               {type === "player" && mode === "training" && (
-                <Button variant="heroOutline" size="sm" onClick={() => generate("analysis", "quick")}>
+                <Button variant="heroOutline" size="sm" onClick={() => generate("analysis", "instant")}>
                   <Sparkles className="h-4 w-4 mr-1" /> Leistungsanalyse
                 </Button>
               )}
