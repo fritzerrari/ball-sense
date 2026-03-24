@@ -85,6 +85,11 @@ export class FootballTracker {
   private onStabilityEvent: StabilityCallback | null = null;
   private stabilityCanvas: HTMLCanvasElement | null = null;
 
+  // Highlight recording
+  private highlightRecorder = new HighlightRecorder();
+  private lastBallZone: "left" | "center" | "right" = "center";
+  private lastBallZoneTime = 0;
+
   setSquadSizes(home: number, away: number) {
     this.homeSquadSize = home;
     this.awaySquadSize = away;
