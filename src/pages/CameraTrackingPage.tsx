@@ -580,7 +580,16 @@ export default function CameraTrackingPage() {
             {/* Timer */}
             <div className="text-center">
               <div className="text-5xl sm:text-6xl font-bold font-display tracking-tight gradient-text">{formatTime(elapsedSec)}</div>
-            </div>
+              {uploadMode === "live" && (
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <Wifi className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs text-muted-foreground">
+                    Chunks: {chunkStats.ok}/{chunkStats.sent}
+                    {chunkStats.pending > 0 && <span className="text-amber-500 ml-1">({chunkStats.pending} ausstehend)</span>}
+                    {chunkStats.sent > 0 && chunkStats.ok === chunkStats.sent && " ✓"}
+                  </span>
+                </div>
+              )}
 
             {/* Camera preview with overlay */}
             <div className="aspect-video bg-muted/30 rounded-xl border border-border relative overflow-hidden">
