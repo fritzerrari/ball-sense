@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const MAX_PARALLEL = 3;
+
 const GENERAL_RULES = `Allgemeine Regeln:
 - Antworte immer auf Deutsch.
 - Schreibe fachlich, präzise, trainerrelevant und ohne Floskeln.
@@ -16,15 +18,19 @@ const GENERAL_RULES = `Allgemeine Regeln:
 - Ballverluste sind aktuell nicht direkt erfasst; erwähne die Datenlücke klar, statt freie Annahmen zu machen.
 - Leite aus den Daten konkrete Maßnahmen für Training, Rollenprofil, Belastungssteuerung und Matchplan ab.`;
 
+const QUICK_RULES = `${GENERAL_RULES}
+Zusatzregeln für Schnell-Analyse:
+- Fasse dich kurz und prägnant (max 800 Wörter).
+- Fokus auf die 3-5 wichtigsten Erkenntnisse.
+- Keine detaillierte Tabellenaufschlüsselung nötig.`;
+
 function round(value: number, decimals = 1) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
 }
-
 function safeNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
-
 function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
@@ -134,7 +140,9 @@ function aggregateTeamBySide(stats: any[], team: "home" | "away") {
 }
 
 async function buildPrompt(supabase: any, report: any): Promise<string> {
-  const { report_type, player_id, match_id } = report;
+  const { report_type, player_id, match_id, depth } = report;
+  const isQuick = depth === "quick";
+  const rules = isQuick ? QUICK_RULES : GENERAL_RULES;
   const isPlayer = report_type === "analysis" || report_type === "training";
 
   if (isPlayer && player_id) {
@@ -144,7 +152,7 @@ async function buildPrompt(supabase: any, report: any): Promise<string> {
       .select("distance_km, top_speed_kmh, avg_speed_kmh, sprint_count, sprint_distance_m, minutes_played, match_id, passes_total, passes_completed, pass_accuracy, duels_total, duels_won, tackles, interceptions, ball_recoveries, shots_total, shots_on_target, goals, assists, ball_contacts, fouls_committed, fouls_drawn, yellow_cards, red_cards, dribbles_success, aerial_won, rating, crosses, matches(date, away_club_name)")
       .eq("player_id", player_id)
       .order("match_id", { ascending: false })
-      .limit(15);
+      .limit(isQuick ? 5 : 15);
 
     if (!stats?.length) throw new Error("Keine Statistiken vorhanden");
 
@@ -167,9 +175,15 @@ async function buildPrompt(supabase: any, report: any): Promise<string> {
     const playerJson = JSON.stringify({ name: player?.name ?? "Unbekannt", number: player?.number ?? null, position: player?.position ?? null }, null, 2);
 
     if (report_type === "training") {
-      return `${GENERAL_RULES}\n\nDu bist ein professioneller Individualcoach im Leistungsfußball.\nErstelle einen hochwertigen, positionsspezifischen Wochentrainingsplan auf Basis realer Leistungsdaten.\n\nSpieler:\n${playerJson}\n\nAggregiertes Leistungsprofil:\n${JSON.stringify(playerSummary, null, 2)}\n\nTrendblock letzte Spiele vs. vorherige Spiele:\n${JSON.stringify(trendBlock, null, 2)}\n\nSpieldaten:\n${JSON.stringify(statsTable, null, 2)}\n\nPflichtstruktur:\n## Kurzdiagnose\n- 4-6 Sätze mit den wichtigsten Fakten aus den Daten\n\n## Leistungsprofil\n### Physis\n### Ballarbeit\n### Verhalten gegen den Ball\n### Offensivbeitrag\n### Disziplin & Datenlücken\n\n## Priorisierte Entwicklungsfelder\n- 3 Felder mit klarer Begründung aus den Daten\n\n## Wochentrainingsplan (Mo-Fr)\nFür jeden Tag:\n- Ziel\n- Inhalt / Übungen\n- Umfang / Dauer\n- Intensität\n- Coachingpunkte\n\n## Individuelle Coachingpunkte\n- 5 klare, positionsbezogene Hinweise\n\n## Belastungssteuerung\n- Risiko, Regeneration und Steuerung der nächsten 7 Tage\n\n## 4-Wochen-Ziele\n- messbar, realistisch und datenbasiert\n\nZusatzregeln:\n- Ballverluste nur als Datenlücke nennen, nicht frei schätzen.\n- Gehe explizit auf Zweikämpfe, Passspiel, Ballgewinne, Fouls, Kopfbälle, Schüsse, Tore und Assists ein.`;
+      if (isQuick) {
+        return `${rules}\n\nDu bist ein Individualcoach im Fußball.\nErstelle einen kompakten Wochentrainingsplan.\n\nSpieler:\n${playerJson}\n\nLeistungsprofil:\n${JSON.stringify(playerSummary, null, 2)}\n\nStruktur:\n## Kurzdiagnose (3 Sätze)\n## 3 Entwicklungsfelder\n## Wochenplan (Mo-Fr, je 2 Zeilen)\n## 3 Coachingpunkte`;
+      }
+      return `${rules}\n\nDu bist ein professioneller Individualcoach im Leistungsfußball.\nErstelle einen hochwertigen, positionsspezifischen Wochentrainingsplan auf Basis realer Leistungsdaten.\n\nSpieler:\n${playerJson}\n\nAggregiertes Leistungsprofil:\n${JSON.stringify(playerSummary, null, 2)}\n\nTrendblock letzte Spiele vs. vorherige Spiele:\n${JSON.stringify(trendBlock, null, 2)}\n\nSpieldaten:\n${JSON.stringify(statsTable, null, 2)}\n\nPflichtstruktur:\n## Kurzdiagnose\n- 4-6 Sätze mit den wichtigsten Fakten aus den Daten\n\n## Leistungsprofil\n### Physis\n### Ballarbeit\n### Verhalten gegen den Ball\n### Offensivbeitrag\n### Disziplin & Datenlücken\n\n## Priorisierte Entwicklungsfelder\n- 3 Felder mit klarer Begründung aus den Daten\n\n## Wochentrainingsplan (Mo-Fr)\nFür jeden Tag:\n- Ziel\n- Inhalt / Übungen\n- Umfang / Dauer\n- Intensität\n- Coachingpunkte\n\n## Individuelle Coachingpunkte\n- 5 klare, positionsbezogene Hinweise\n\n## Belastungssteuerung\n- Risiko, Regeneration und Steuerung der nächsten 7 Tage\n\n## 4-Wochen-Ziele\n- messbar, realistisch und datenbasiert\n\nZusatzregeln:\n- Ballverluste nur als Datenlücke nennen, nicht frei schätzen.\n- Gehe explizit auf Zweikämpfe, Passspiel, Ballgewinne, Fouls, Kopfbälle, Schüsse, Tore und Assists ein.`;
     } else {
-      return `${GENERAL_RULES}\n\nDu bist ein leitender Individualanalyst im Profifußball.\nAnalysiere die Leistungsentwicklung dieses Spielers tiefgehend, trainerrelevant und positionsbezogen.\n\nSpieler:\n${playerJson}\n\nAggregiertes Leistungsprofil:\n${JSON.stringify(playerSummary, null, 2)}\n\nTrendblock letzte Spiele vs. vorherige Spiele:\n${JSON.stringify(trendBlock, null, 2)}\n\nSpieldaten:\n${JSON.stringify(statsTable, null, 2)}\n\nPflichtstruktur:\n## Kurzfazit\n## Leistungsprofil nach Modulen\n### Physis\n### Ballarbeit\n### Duell- und Defensivverhalten\n### Offensivwirkung\n### Disziplin & Datenqualität\n## Trendanalyse\n## Stärkenprofil\n## Verbesserungsfelder\n## Taktische Einordnung nach Position/Rolle\n## Belastungsmanagement\n## Konkrete Trainingsmaßnahmen\n\nZusatzregeln:\n- Nicht nur Werte aufzählen, sondern sauber einordnen.\n- Zweikampf-, Pass-, Lauf-, Abschluss- und Kontaktprofile zusammenführen.\n- Gehe explizit auf Tackles, Interceptions, Ballgewinne, Pässe, Assists, Tore, Fouls, Kopfballduelle und Schüsse ein.\n- Falls Werte unplausibel wirken, separat als Datenrisiko markieren.`;
+      if (isQuick) {
+        return `${rules}\n\nDu bist ein Leistungsanalyst im Fußball.\nErstelle eine kompakte Analyse.\n\nSpieler:\n${playerJson}\n\nLeistungsprofil:\n${JSON.stringify(playerSummary, null, 2)}\n\nStruktur:\n## Kurzfazit (3 Sätze)\n## Stärken (3 Punkte)\n## Verbesserungsfelder (3 Punkte)\n## Konkrete Maßnahmen (3 Punkte)`;
+      }
+      return `${rules}\n\nDu bist ein leitender Individualanalyst im Profifußball.\nAnalysiere die Leistungsentwicklung dieses Spielers tiefgehend, trainerrelevant und positionsbezogen.\n\nSpieler:\n${playerJson}\n\nAggregiertes Leistungsprofil:\n${JSON.stringify(playerSummary, null, 2)}\n\nTrendblock letzte Spiele vs. vorherige Spiele:\n${JSON.stringify(trendBlock, null, 2)}\n\nSpieldaten:\n${JSON.stringify(statsTable, null, 2)}\n\nPflichtstruktur:\n## Kurzfazit\n## Leistungsprofil nach Modulen\n### Physis\n### Ballarbeit\n### Duell- und Defensivverhalten\n### Offensivwirkung\n### Disziplin & Datenqualität\n## Trendanalyse\n## Stärkenprofil\n## Verbesserungsfelder\n## Taktische Einordnung nach Position/Rolle\n## Belastungsmanagement\n## Konkrete Trainingsmaßnahmen\n\nZusatzregeln:\n- Nicht nur Werte aufzählen, sondern sauber einordnen.\n- Zweikampf-, Pass-, Lauf-, Abschluss- und Kontaktprofile zusammenführen.\n- Gehe explizit auf Tackles, Interceptions, Ballgewinne, Pässe, Assists, Tore, Fouls, Kopfballduelle und Schüsse ein.\n- Falls Werte unplausibel wirken, separat als Datenrisiko markieren.`;
     }
   } else if (report_type === "team" && match_id) {
     const { data: match } = await supabase.from("matches").select("date, away_club_name, home_club_id, home_formation, away_formation, status").eq("id", match_id).single();
@@ -179,6 +193,15 @@ async function buildPrompt(supabase: any, report: any): Promise<string> {
       .select("distance_km, top_speed_kmh, avg_speed_kmh, sprint_count, sprint_distance_m, minutes_played, team, passes_total, passes_completed, pass_accuracy, duels_total, duels_won, tackles, interceptions, ball_recoveries, goals, assists, shots_total, shots_on_target, ball_contacts, rating, fouls_committed, yellow_cards, red_cards, aerial_won, crosses, players(name, number, position)")
       .eq("match_id", match_id);
     const { data: apiMatchStats } = await supabase.from("api_football_match_stats").select("*").eq("match_id", match_id).maybeSingle();
+
+    if (!playerStats?.length) throw new Error("Keine Spielstatistiken vorhanden");
+
+    const homeAnalysis = aggregateTeamBySide(playerStats, "home");
+    const awayAnalysis = aggregateTeamBySide(playerStats, "away");
+
+    if (isQuick) {
+      return `${rules}\n\nDu bist ein Match-Analyst.\nErstelle eine kompakte Spielanalyse.\n\nGegner: ${match?.away_club_name ?? "Unbekannt"}\nDatum: ${match?.date ?? "?"}\n\nHeimteam:\n${JSON.stringify(homeAnalysis.summary, null, 2)}\n\nGastteam:\n${JSON.stringify(awayAnalysis.summary, null, 2)}\n\nStruktur:\n## Kurzfazit (3 Sätze)\n## Heim-Stärken (3 Punkte)\n## Verbesserungsfelder (3 Punkte)\n## 3 Trainingsableitungen`;
+    }
 
     let recentTeamStats: any[] = [];
     if (match?.home_club_id) {
@@ -196,23 +219,19 @@ async function buildPrompt(supabase: any, report: any): Promise<string> {
       }
     }
 
-    if (!playerStats?.length) throw new Error("Keine Spielstatistiken vorhanden");
-
-    const homeAnalysis = aggregateTeamBySide(playerStats, "home");
-    const awayAnalysis = aggregateTeamBySide(playerStats, "away");
-
-    return `${GENERAL_RULES}\n\nDu bist ein leitender Match-Analyst im Fußball.\nErstelle eine tiefgehende Team- und Spielanalyse aus Match-, Tracking- und Aktionsdaten.\n\nSpielkontext:\n${JSON.stringify({ opponent: match?.away_club_name ?? "Unbekannt", date: match?.date ?? null, status: match?.status ?? null, homeFormation: match?.home_formation ?? null, awayFormation: match?.away_formation ?? null }, null, 2)}\n\nTeam-Statistiken:\n${JSON.stringify(teamStats, null, 2)}\n\nHeimteam – aggregiertes Wirkungsprofil:\n${JSON.stringify(homeAnalysis, null, 2)}\n\nAuswärtsteam – aggregiertes Wirkungsprofil:\n${JSON.stringify(awayAnalysis, null, 2)}\n\nAPI-Matchstats:\n${JSON.stringify(apiMatchStats, null, 2)}\n\nLetzte 5 Heim-Spiele Team-Stats:\n${JSON.stringify(recentTeamStats, null, 2)}\n\nPflichtstruktur:\n## Kurzfazit\n## Belastbare Team-Erkenntnisse nach Modulen\n### Physis & Intensität\n### Ballbesitz & Aufbau\n### Zweikampf- und Defensivverhalten\n### Offensivproduktion\n### Disziplin & Datenqualität\n## Taktische Bewertung\n## Spieler mit Wirkung auf den Spielverlauf\n## Vergleich zu den letzten Spielen\n## Konkrete Trainings- und Matchplan-Ableitungen\n\nZusatzregeln:\n- Explizit auf Pässe, Passquote, Zweikämpfe, Ballgewinne, Tackles, Interceptions, Schüsse, Tore, Assists, Fouls und Kopfballduelle eingehen.\n- Ballverluste als fehlende Rohmetrik kenntlich machen.\n- Nicht nur beschreiben, sondern Ableitungen für Restverteidigung, Gegenpressing, Kontrolle, Chance-Erzeugung und Belastung machen.`;
+    return `${rules}\n\nDu bist ein leitender Match-Analyst im Fußball.\nErstelle eine tiefgehende Team- und Spielanalyse aus Match-, Tracking- und Aktionsdaten.\n\nSpielkontext:\n${JSON.stringify({ opponent: match?.away_club_name ?? "Unbekannt", date: match?.date ?? null, status: match?.status ?? null, homeFormation: match?.home_formation ?? null, awayFormation: match?.away_formation ?? null }, null, 2)}\n\nTeam-Statistiken:\n${JSON.stringify(teamStats, null, 2)}\n\nHeimteam – aggregiertes Wirkungsprofil:\n${JSON.stringify(homeAnalysis, null, 2)}\n\nAuswärtsteam – aggregiertes Wirkungsprofil:\n${JSON.stringify(awayAnalysis, null, 2)}\n\nAPI-Matchstats:\n${JSON.stringify(apiMatchStats, null, 2)}\n\nLetzte 5 Heim-Spiele Team-Stats:\n${JSON.stringify(recentTeamStats, null, 2)}\n\nPflichtstruktur:\n## Kurzfazit\n## Belastbare Team-Erkenntnisse nach Modulen\n### Physis & Intensität\n### Ballbesitz & Aufbau\n### Zweikampf- und Defensivverhalten\n### Offensivproduktion\n### Disziplin & Datenqualität\n## Taktische Bewertung\n## Spieler mit Wirkung auf den Spielverlauf\n## Vergleich zu den letzten Spielen\n## Konkrete Trainings- und Matchplan-Ableitungen\n\nZusatzregeln:\n- Explizit auf Pässe, Passquote, Zweikämpfe, Ballgewinne, Tackles, Interceptions, Schüsse, Tore, Assists, Fouls und Kopfballduelle eingehen.\n- Ballverluste als fehlende Rohmetrik kenntlich machen.\n- Nicht nur beschreiben, sondern Ableitungen für Restverteidigung, Gegenpressing, Kontrolle, Chance-Erzeugung und Belastung machen.`;
   }
 
   throw new Error("Ungültige Report-Parameter");
 }
 
 async function processReport(supabase: any, report: any, apiKey: string) {
-  // Set to generating
   await supabase.from("ai_reports").update({ status: "generating", updated_at: new Date().toISOString() }).eq("id", report.id);
 
   try {
     const prompt = await buildPrompt(supabase, report);
+    const isQuick = report.depth === "quick";
+    const model = isQuick ? "google/gemini-3-flash-preview" : "google/gemini-2.5-pro";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -221,7 +240,7 @@ async function processReport(supabase: any, report: any, apiKey: string) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model,
         messages: [
           { role: "system", content: "Du bist ein Top-Analyst im Fußball mit Fokus auf Matchanalyse, Individualdiagnostik, Trainingssteuerung und belastbare Ableitungen für Trainerteams." },
           { role: "user", content: prompt },
@@ -236,7 +255,6 @@ async function processReport(supabase: any, report: any, apiKey: string) {
       return;
     }
 
-    // Stream and periodically save
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buf = "";
@@ -262,9 +280,7 @@ async function processReport(supabase: any, report: any, apiKey: string) {
         } catch { /* partial */ }
       }
 
-      // Save every 5 seconds
       if (Date.now() - lastSave > 5000 && soFar) {
-        // Check if cancelled
         const { data: check } = await supabase.from("ai_reports").select("status").eq("id", report.id).single();
         if (check?.status === "cancelled") {
           console.log(`Report ${report.id} was cancelled`);
@@ -275,12 +291,53 @@ async function processReport(supabase: any, report: any, apiKey: string) {
       }
     }
 
-    // Final save
     await supabase.from("ai_reports").update({ content: soFar, status: "complete", updated_at: new Date().toISOString() }).eq("id", report.id);
-    console.log(`Report ${report.id} completed`);
+    console.log(`Report ${report.id} completed (${report.depth})`);
   } catch (e) {
     console.error(`Report ${report.id} failed:`, e);
     await supabase.from("ai_reports").update({ status: "error", content: e instanceof Error ? e.message : "Fehler", updated_at: new Date().toISOString() }).eq("id", report.id);
+  }
+}
+
+async function processNextBatch(supabase: any, apiKey: string) {
+  // Count currently generating
+  const { data: active } = await supabase
+    .from("ai_reports")
+    .select("id")
+    .eq("status", "generating");
+
+  const activeCount = active?.length ?? 0;
+  const slotsAvailable = MAX_PARALLEL - activeCount;
+
+  if (slotsAvailable <= 0) {
+    console.log(`All ${MAX_PARALLEL} slots occupied, skipping`);
+    return;
+  }
+
+  // Pick next queued reports to fill available slots
+  const { data: queued } = await supabase
+    .from("ai_reports")
+    .select("*")
+    .eq("status", "queued")
+    .order("created_at", { ascending: true })
+    .limit(slotsAvailable);
+
+  if (!queued?.length) {
+    console.log("No queued reports");
+    return;
+  }
+
+  console.log(`Starting ${queued.length} reports in parallel (${activeCount} already active)`);
+
+  // Start all reports in parallel
+  const promises = queued.map((report: any) => processReport(supabase, report, apiKey));
+  
+  // After each completes, try to start the next one
+  for (const promise of promises) {
+    promise.then(() => {
+      // Trigger next batch processing
+      processNextBatch(supabase, apiKey).catch(console.error);
+    }).catch(console.error);
   }
 }
 
@@ -307,7 +364,7 @@ serve(async (req) => {
     if (body.action === "queue_status") {
       const { data: queue } = await supabase
         .from("ai_reports")
-        .select("id, status, created_at")
+        .select("id, status, created_at, depth")
         .in("status", ["queued", "generating"])
         .order("created_at", { ascending: true });
 
@@ -316,54 +373,23 @@ serve(async (req) => {
       });
     }
 
-    // Check if there's already a report generating
-    const { data: active } = await supabase
-      .from("ai_reports")
-      .select("id")
-      .eq("status", "generating")
-      .limit(1);
+    // Process next batch in background
+    const processingPromise = processNextBatch(supabase, LOVABLE_API_KEY);
 
-    if (active && active.length > 0) {
-      // Already processing, return queue info
-      const { data: queue } = await supabase
-        .from("ai_reports")
-        .select("id, created_at")
-        .in("status", ["queued", "generating"])
-        .order("created_at", { ascending: true });
-
-      return new Response(JSON.stringify({ queued: true, queue: queue ?? [] }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Pick next queued report
-    const { data: next } = await supabase
-      .from("ai_reports")
-      .select("*")
-      .eq("status", "queued")
-      .order("created_at", { ascending: true })
-      .limit(1);
-
-    if (!next?.length) {
-      return new Response(JSON.stringify({ ok: true, message: "Keine Aufträge in der Warteschlange" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const report = next[0];
-
-    // Process in background
-    const processingPromise = processReport(supabase, report, LOVABLE_API_KEY);
-
-    // Use EdgeRuntime.waitUntil if available
     try {
       (globalThis as any).EdgeRuntime?.waitUntil?.(processingPromise);
     } catch {
-      // fallback: await it
       await processingPromise;
     }
 
-    return new Response(JSON.stringify({ ok: true, processing: report.id }), {
+    // Return queue info
+    const { data: queue } = await supabase
+      .from("ai_reports")
+      .select("id, status, created_at, depth")
+      .in("status", ["queued", "generating"])
+      .order("created_at", { ascending: true });
+
+    return new Response(JSON.stringify({ ok: true, queue: queue ?? [] }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
