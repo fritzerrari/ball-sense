@@ -522,19 +522,26 @@ export default function FieldCalibration() {
           <div
             ref={containerRef}
             className="relative aspect-video cursor-crosshair overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/30 select-none"
-            style={{ touchAction: "none" }}
+            style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties}
             onPointerDown={handlePointerDown}
+            onTouchStart={(e) => {
+              // Prevent default to avoid scroll/zoom interference on mobile
+              if (imageUrl && points.length < 4) {
+                e.preventDefault();
+              }
+            }}
           >
             {imageUrl && <img src={imageUrl} alt="Spielfeld" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable={false} />}
 
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            {/* This overlay MUST NOT intercept touches — pointer-events:none on every element */}
+            <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
               {!imageUrl && (
-                <span className="px-4 text-center text-sm text-muted-foreground/50">
+                <span className="pointer-events-none px-4 text-center text-sm text-muted-foreground/50">
                   Lade ein Bild hoch und klicke Ecke {Math.min(points.length + 1, 4)} von 4
                 </span>
               )}
               {imageUrl && points.length < 4 && (
-                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border bg-card/80 px-3 py-1 text-xs text-foreground backdrop-blur-sm">
+                <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border bg-card/80 px-3 py-1 text-xs text-foreground backdrop-blur-sm">
                   Klicke: {cornerLabels[points.length]} (Ecke {points.length + 1}/4)
                 </span>
               )}
