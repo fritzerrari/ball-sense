@@ -9,9 +9,11 @@ import {
   Camera,
   ChevronDown,
   ChevronUp,
+  Copy,
   Download,
   EyeOff,
   FileText,
+  KeyRound,
   Loader2,
   Share2,
   Sparkles,
@@ -35,6 +37,7 @@ import { toast } from "sonner";
 import { ConsentStatusBadge } from "@/components/ConsentStatusBadge";
 import { CoachSummary } from "@/components/CoachSummary";
 import { WhatIfBoard } from "@/components/WhatIfBoard";
+import { supabase } from "@/integrations/supabase/client";
 
 const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich", "Berichte & Presse"];
 
