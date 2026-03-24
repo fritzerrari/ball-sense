@@ -362,8 +362,17 @@ export default function CameraTrackingPage() {
     });
     trackerRef.current.startZoomMonitoring();
 
+    // Initialize LiveStatsEngine
+    const fieldW = match?.fields?.width_m ?? 105;
+    const fieldH = match?.fields?.height_m ?? 68;
+    const engine = new LiveStatsEngine(fieldW, fieldH);
+    engine.setOnUpdate((snapshot) => setLiveStats(snapshot));
+    liveEngineRef.current = engine;
+
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
+      // Feed frame to LiveStatsEngine for instant computation
+      engine.processFrame(frame);
       const pCount = frame.detections.filter(d => d.label === "person").length;
       setPeakDetections((prev) => Math.max(prev, pCount));
       if (pCount >= 2 && !detectionConfirmed) {
