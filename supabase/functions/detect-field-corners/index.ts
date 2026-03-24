@@ -28,6 +28,11 @@ const FALLBACK_RESPONSE: LayoutResponse = {
   fieldType: null,
   confidence: null,
   detectedFeatures: [],
+  isRealPitch: false,
+  isPartialView: false,
+  visiblePortion: null,
+  inferredFullDimensions: null,
+  pitchRejectionReason: null,
 };
 
 const sanitizeCorner = (corner: unknown): DetectedCorner | null => {
