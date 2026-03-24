@@ -964,7 +964,41 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       );
     }
 
-    // Auto-Discovery: infer positions for auto-detected players
+    // Override tactical stats with manually recorded match events (ground truth)
+    for (const ps of playerStats) {
+      if (!ps.tactical || !ps.player_id) continue;
+      const playerEvents = typedEvents.filter(e => e.player_id === ps.player_id);
+      const relatedEvents = typedEvents.filter(e => e.related_player_id === ps.player_id);
+      
+      // Goals: count from events (ground truth)
+      const goalCount = playerEvents.filter(e => e.event_type === "goal").length;
+      if (goalCount > 0) ps.tactical.goals = goalCount;
+      
+      // Assists: count from events
+      const assistCount = relatedEvents.filter(e => e.event_type === "goal").length 
+        + playerEvents.filter(e => e.event_type === "assist").length;
+      if (assistCount > 0) ps.tactical.assists = assistCount;
+      
+      // Fouls: only from events, NEVER estimated
+      ps.tactical.fouls_committed = playerEvents.filter(e => e.event_type === "foul").length;
+      ps.tactical.fouls_drawn = relatedEvents.filter(e => e.event_type === "foul").length;
+      
+      // Cards: only from events
+      const yellowCards = playerEvents.filter(e => e.event_type === "yellow_card").length;
+      const redCards = playerEvents.filter(e => ["red_card", "yellow_red_card"].includes(e.event_type)).length;
+      
+      // Shots: override if manual events exist
+      const shotEvents = playerEvents.filter(e => ["shot", "shot_on_target"].includes(e.event_type)).length;
+      const onTargetEvents = playerEvents.filter(e => e.event_type === "shot_on_target").length;
+      if (shotEvents > 0) {
+        ps.tactical.shots_total = shotEvents + goalCount;
+        ps.tactical.shots_on_target = onTargetEvents + goalCount;
+      }
+      
+      // Store card data for insert
+      (ps as any)._yellowCards = yellowCards;
+      (ps as any)._redCards = redCards;
+    }
     if (useAutoDiscovery) {
       for (const ps of playerStats) {
         const assignedIdx = [...usedTrackIndices].find((idx) => {
