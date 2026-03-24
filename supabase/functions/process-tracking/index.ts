@@ -138,37 +138,62 @@ function buildTracks(frames: TrackingFrame[]) {
  * Detections from different cameras at similar timestamps (±250ms)
  * that are spatially close (<0.05 norm distance) are deduplicated.
  */
-function mergeMultiCameraFrames(sessions: TrackingSession[]): {
+/**
+ * Merge frames from multiple camera sessions by timestamp.
+ * If cameras have calibration with field_rect, transform detections
+ * to global field coordinates before merging.
+ */
+function mergeMultiCameraFrames(sessions: TrackingSession[], uploadCalibrations?: Record<number, any>): {
   mergedFrames: TrackingFrame[];
   totalDurationSec: number;
-  cameraContributions: Map<number, number>; // cameraIndex → frame count
+  cameraContributions: Map<number, number>;
 } {
-  if (sessions.length === 1) {
+  // Transform detections to global coordinates if field_rect is available
+  const transformedSessions = sessions.map(session => {
+    const cal = uploadCalibrations?.[session.cameraIndex];
+    const fieldRect = cal?.field_rect;
+    if (!fieldRect || (fieldRect.x === 0 && fieldRect.y === 0 && fieldRect.w === 1 && fieldRect.h === 1)) {
+      return session; // Full field, no transformation needed
+    }
+    // Transform local coordinates to global
     return {
-      mergedFrames: sessions[0].frames,
-      totalDurationSec: sessions[0].durationSec,
-      cameraContributions: new Map([[sessions[0].cameraIndex, sessions[0].frames.length]]),
+      ...session,
+      frames: session.frames.map(frame => ({
+        ...frame,
+        detections: frame.detections.map(det => ({
+          ...det,
+          x: fieldRect.x + det.x * fieldRect.w,
+          y: fieldRect.y + det.y * fieldRect.h,
+          w: det.w * fieldRect.w,
+          h: det.h * fieldRect.h,
+        })),
+      })),
+    };
+  });
+
+  if (transformedSessions.length === 1) {
+    return {
+      mergedFrames: transformedSessions[0].frames,
+      totalDurationSec: transformedSessions[0].durationSec,
+      cameraContributions: new Map([[transformedSessions[0].cameraIndex, transformedSessions[0].frames.length]]),
     };
   }
 
   const TIME_MERGE_MS = 250;
   const SPATIAL_MERGE_DIST = 0.05;
 
-  // Collect all frames tagged with camera index
   const allTagged: { frame: TrackingFrame; camIdx: number }[] = [];
   const cameraContributions = new Map<number, number>();
 
-  for (const session of sessions) {
+  for (const session of transformedSessions) {
     cameraContributions.set(session.cameraIndex, session.frames.length);
     for (const frame of session.frames) {
       allTagged.push({ frame, camIdx: session.cameraIndex });
     }
   }
 
-  // Sort all frames by timestamp
   allTagged.sort((a, b) => a.frame.timestamp - b.frame.timestamp);
 
-  // Group frames within TIME_MERGE_MS windows
   const mergedFrames: TrackingFrame[] = [];
   let i = 0;
   while (i < allTagged.length) {
@@ -177,7 +202,6 @@ function mergeMultiCameraFrames(sessions: TrackingSession[]): {
     let j = i + 1;
 
     while (j < allTagged.length && allTagged[j].frame.timestamp - windowStart <= TIME_MERGE_MS) {
-      // Merge detections: only add if not spatially close to existing
       for (const det of allTagged[j].frame.detections) {
         const isDuplicate = windowDetections.some(
           (existing) => euclidean(existing, det) < SPATIAL_MERGE_DIST
@@ -189,15 +213,11 @@ function mergeMultiCameraFrames(sessions: TrackingSession[]): {
       j++;
     }
 
-    mergedFrames.push({
-      timestamp: windowStart,
-      detections: windowDetections,
-    });
+    mergedFrames.push({ timestamp: windowStart, detections: windowDetections });
     i = j;
   }
 
-  const totalDurationSec = Math.max(...sessions.map((s) => s.durationSec));
-
+  const totalDurationSec = Math.max(...transformedSessions.map((s) => s.durationSec));
   return { mergedFrames, totalDurationSec, cameraContributions };
 }
 
