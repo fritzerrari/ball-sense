@@ -496,6 +496,38 @@ export class FootballTracker {
     this.intervalId = window.setInterval(loop, 500);
   }
 
+  private detectHighlightEvents(frame: TrackingFrame) {
+    if (!this.highlightRecorder.isEnabled()) return;
+
+    const ball = frame.detections.find(d => d.label === "ball");
+    if (!ball) return;
+
+    // Goal detection: ball in end zones
+    const newZone: "left" | "center" | "right" =
+      ball.x < 0.05 ? "left" : ball.x > 0.95 ? "right" : "center";
+
+    if (newZone !== "center" && this.lastBallZone === "center") {
+      // Ball entered goal zone
+      this.lastBallZoneTime = frame.timestamp;
+    } else if (newZone === "center" && this.lastBallZone !== "center") {
+      // Ball left goal zone quickly = possible goal
+      const duration = frame.timestamp - this.lastBallZoneTime;
+      if (duration < 3000 && duration > 200) {
+        this.highlightRecorder.triggerHighlight("goal");
+      }
+    }
+    this.lastBallZone = newZone;
+
+    // Sprint detection: player speed proxy (velocity magnitude)
+    for (const p of this.stablePlayers) {
+      const speed = Math.sqrt(p.vx ** 2 + p.vy ** 2);
+      if (speed > 0.013) { // High speed threshold
+        this.highlightRecorder.triggerHighlight("sprint");
+        break; // One sprint highlight at a time
+      }
+    }
+  }
+
   pauseTracking(): void {
     this.paused = true;
   }
