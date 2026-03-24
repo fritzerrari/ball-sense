@@ -84,6 +84,8 @@ export default function CameraTrackingPage() {
   const [stabilityWarning, setStabilityWarning] = useState<string | null>(null);
   const [showInlineCalibration, setShowInlineCalibration] = useState(false);
   const [calibrationPoints, setCalibrationPoints] = useState<{ x: number; y: number }[]>([]);
+  const [savingCalibration, setSavingCalibration] = useState(false);
+  const [detectingCalibration, setDetectingCalibration] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [highlightClipCount, setHighlightClipCount] = useState(0);
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
