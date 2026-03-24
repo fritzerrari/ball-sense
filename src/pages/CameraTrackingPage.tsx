@@ -827,7 +827,7 @@ export default function CameraTrackingPage() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className={`flex-1 flex flex-col items-center p-4 sm:p-6 ${phase === "tracking" ? "" : "justify-center"}`}>
         {/* Phase: Auth — Code + auto model loading */}
         {phase === "auth" && (
           <div className="w-full max-w-sm space-y-6 text-center">
