@@ -17,7 +17,7 @@ import {
   WifiOff,
   Bell,
 } from "lucide-react";
-import { FootballTracker, type Detection } from "@/lib/football-tracker";
+import { FootballTracker, type Detection, type UploadMode } from "@/lib/football-tracker";
 import { TrackingOverlay } from "@/components/TrackingOverlay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
