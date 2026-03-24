@@ -293,24 +293,48 @@ export default function Login() {
                   </div>
                 </div>
               </div>
-            ) : (
-              /* Android: direct install button */
+            ) : deferredPrompt ? (
+              /* Android: direct install button when prompt available */
               <Button
                 variant="hero"
                 size="lg"
                 className="w-full text-base"
                 onClick={handleInstallClick}
-                disabled={!deferredPrompt}
               >
                 <Download className="mr-2 h-5 w-5" />
                 App jetzt installieren
               </Button>
-            )}
-
-            {!isIos && !deferredPrompt && (
-              <p className="text-xs text-muted-foreground">
-                Tipp: Öffne das Browser-Menü (⋮) und wähle „App installieren".
-              </p>
+            ) : (
+              /* Android: manual install steps when no prompt */
+              <div className="space-y-3 text-left">
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold text-primary">⋮</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">1. Browser-Menü öffnen</p>
+                    <p className="text-xs text-muted-foreground">Tippe oben rechts auf die drei Punkte (⋮)</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Download className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">2. „App installieren" wählen</p>
+                    <p className="text-xs text-muted-foreground">Oder „Zum Startbildschirm hinzufügen"</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Smartphone className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">3. „Installieren" bestätigen</p>
+                    <p className="text-xs text-muted-foreground">Die App erscheint auf deinem Startbildschirm</p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
