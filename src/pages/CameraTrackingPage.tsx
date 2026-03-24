@@ -89,6 +89,7 @@ export default function CameraTrackingPage() {
   const [liveStats, setLiveStats] = useState<LiveSnapshot | null>(null);
 
   const trackerRef = useRef<FootballTracker | null>(null);
+  const liveEngineRef = useRef<LiveStatsEngine | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackingVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
