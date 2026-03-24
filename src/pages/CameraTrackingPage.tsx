@@ -262,6 +262,13 @@ export default function CameraTrackingPage() {
       });
     }
 
+    // Setup zoom monitoring
+    trackerRef.current.setZoomChangeCallback((current, calibrated) => {
+      setZoomWarning(true);
+      toast.warning(`⚠️ Zoom verändert (${current.toFixed(1)}x → kalibriert: ${calibrated.toFixed(1)}x). Neu kalibrieren empfohlen.`, { duration: 10000 });
+    });
+    trackerRef.current.startZoomMonitoring();
+
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
       const pCount = frame.detections.filter(d => d.label === "person").length;
