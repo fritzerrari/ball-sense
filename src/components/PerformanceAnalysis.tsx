@@ -270,11 +270,14 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
 
           {!isProcessing && status !== "error" && status !== "cancelled" && content && (
             <div className="relative flex gap-2 flex-wrap">
-              <Button variant="heroOutline" size="sm" onClick={() => generate(mode, "quick")}>
-                <Sparkles className="h-4 w-4 mr-1" /> Schnell-Analyse
+              <Button variant="heroOutline" size="sm" onClick={() => generate(mode, "instant")}>
+                <Sparkles className="h-4 w-4 mr-1" /> Sofort-Fazit
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => generate(mode, "quick")}>
+                <Activity className="h-4 w-4 mr-1" /> Schnell-Analyse
               </Button>
               <Button variant="outline" size="sm" onClick={() => generate(mode, "deep")}>
-                <Activity className="h-4 w-4 mr-1" /> Tiefenanalyse
+                <Sparkles className="h-4 w-4 mr-1" /> Tiefenanalyse
               </Button>
               {type === "player" && mode === "analysis" && (
                 <Button variant="heroOutline" size="sm" onClick={() => generate("training", "quick")}>
@@ -282,7 +285,7 @@ export function PerformanceAnalysis({ type, playerId, matchId, playerName }: Pro
                 </Button>
               )}
               {type === "player" && mode === "training" && (
-                <Button variant="heroOutline" size="sm" onClick={() => generate("analysis", "quick")}>
+                <Button variant="heroOutline" size="sm" onClick={() => generate("analysis", "instant")}>
                   <Sparkles className="h-4 w-4 mr-1" /> Leistungsanalyse
                 </Button>
               )}
