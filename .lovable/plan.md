@@ -1,139 +1,140 @@
 
 
-## Zoom & Teilfeld-Kalibrierung: Erweiterte Kamera-Modi
+## Verwacklungs-Erkennung, Auto-Kalibrierung & Workflow-Vereinfachung
 
-### Kernidee
+### Problem-Analyse
 
-Aktuell speichert die Kalibrierung nur 4 Eckpunkte des **gesamten** Feldes. Das bedeutet: Wenn die Kamera nach der Kalibrierung zoomt oder nur einen Teil des Feldes filmt, stimmen die Koordinaten nicht mehr.
+**1. Verwacklung/Stoß/Schwenk**: Aktuell wird nur der Zoom alle 60s geprüft. Wenn jemand die Kamera anstößt, schwenkt oder dreht, erkennt das System nichts — die Tracking-Daten werden unbrauchbar, ohne dass der Kameramann es merkt.
 
-Die Lösung: **Jede Kamera kalibriert ihren eigenen sichtbaren Bereich** — egal ob Vollfeld, Halbfeld oder gezoomter Ausschnitt. Das Backend fusioniert die Teilbereiche automatisch.
+**2. Kamera-Workflow zu komplex**: 6 Wizard-Schritte, manueller Kalibrierungscheck, separate Seite für Kalibrierung mit Navigation weg vom Tracking.
 
-```text
-┌─────────────────────────────────────────┐
-│              Gesamtes Feld              │
-│                                         │
-│  ┌──────────────┐   ┌──────────────┐   │
-│  │   Kamera 1   │   │   Kamera 2   │   │
-│  │  (linke H.)  │   │  (rechte H.) │   │
-│  │  gezoomt     │   │  gezoomt     │   │
-│  └──────────────┘   └──────────────┘   │
-│         ↓                   ↓          │
-│     Teilfeld-            Teilfeld-      │
-│     Kalibrierung         Kalibrierung   │
-│         └───────┬───────────┘          │
-│           Backend-Fusion               │
-│           → Vollfeld-Analyse           │
-└─────────────────────────────────────────┘
-```
+**3. Spiel-Anlegen-Workflow**: Consent-Checkboxen im Details-Schritt blockieren, Kamera-Setup generiert nur Links aber keine Codes direkt, nach Erstellung kein direkter "Code generieren"-Flow.
 
 ---
 
-### Plan
+### Teil 1: Verwacklungs- & Bewegungserkennung
 
-#### Teil 1: Erweitertes Kalibrierungs-Datenmodell
+Drei Mechanismen zur Erkennung von Kamera-Instabilität:
 
-`CalibrationData` bekommt neue Felder:
+**A. Frame-Differenz-Analyse (primär)**
+- Alle 5 Sekunden: Canvas-Snapshot vom Video, Vergleich mit vorherigem Frame
+- Pixel-Differenz berechnen (Durchschnitt der RGB-Abweichung über Sampling-Grid)
+- Schwellenwert: >15% Differenz bei >3 aufeinanderfolgenden Checks = "Instabilität erkannt"
+- Unterscheidung: kurzer Stoß (1 Frame spike) vs. Schwenk (mehrere Frames kontinuierlich)
 
-- `coverage`: `"full"` | `"left_half"` | `"right_half"` | `"custom"` — welcher Feldbereich sichtbar ist
-- `field_rect`: `{ x: number, y: number, w: number, h: number }` — normalisierter Bereich des Gesamtfeldes (0-1), z.B. linke Hälfte = `{ x: 0, y: 0, w: 0.5, h: 1 }`
-- `zoom_level`: Erkannter oder geschätzter Zoom-Faktor
+**B. DeviceMotion-API (ergänzend auf Mobilgeräten)**
+- `window.addEventListener("devicemotion")` — misst Beschleunigung
+- Threshold: >2g plötzliche Beschleunigung = Stoß erkannt
+- Kontinuierliche Neigung >5° über 3s = Schwenk/Kippen
 
-**Dateien**: `src/lib/types.ts`
+**C. Zoom-Monitoring (bestehend, erweitert)**
+- Aktuell 60s Intervall → auf 10s verkürzen
+- Sofortige Prüfung nach erkanntem Stoß
 
-#### Teil 2: Geführter Kalibrierungs-Wizard mit Abdeckungserkennung
+**Reaktion auf Instabilität:**
+- Gelbes Banner: "📱 Kamera wurde bewegt — Bild prüfen!"
+- Nach 10s ohne Korrektur: Orange Banner: "Empfehlung: Neu kalibrieren"
+- Button "Alles OK" zum Wegklicken oder "Neu kalibrieren" für sofortige In-Place-Kalibrierung
+- Bei schwerem Stoß: Akustischer Alarm (kurzer Ton)
 
-Im Kalibrierungsschritt (Phase `calibration`) wird dem User eine **visuelle Auswahl** angeboten:
+**Dateien**: `src/lib/football-tracker.ts` (neue Methoden `startStabilityMonitoring`, `checkFrameDifference`), `src/pages/CameraTrackingPage.tsx`
 
-1. **Auto-Erkennung**: System prüft ob die 4 markierten Ecken das volle Feld oder nur einen Teil abdecken (anhand der Seitenverhältnisse und Position der Punkte relativ zum bekannten Feld)
-2. **Manuelle Auswahl** als Fallback: "Was siehst du im Bild?"
-   - Ganzes Feld
-   - Linke Hälfte (bis Mittellinie)
-   - Rechte Hälfte (ab Mittellinie)
-   - Eigener Bereich (4 Ecken frei markieren + Position auf Miniatur-Feld angeben)
+### Teil 2: Auto-Kalibrierung & Selbstoptimierung
 
-Der User sieht eine **Miniatur-Feldskizze** wo sein sichtbarer Bereich farbig hervorgehoben wird — sofort verständlich, keine technischen Begriffe.
+**Periodische Auto-Kalibrierung (alle 10 Minuten):**
+- System nimmt automatisch einen Frame, sendet ihn an `detect-field-corners`
+- Vergleicht erkannte Ecken mit gespeicherter Kalibrierung
+- Wenn Abweichung >5%: Automatische Korrektur + Info-Banner "Kalibrierung automatisch angepasst"
+- Wenn Abweichung >20%: Warnung + manuelle Bestätigung nötig
 
-**Dateien**: `src/pages/FieldCalibration.tsx`, `src/pages/CameraTrackingPage.tsx`
+**In-Place-Kalibrierung (ohne Seitenwechsel):**
+- Statt Navigation zu `/fields/:id/calibrate`: Inline-Dialog/Overlay direkt im Tracking-Screen
+- Video pausiert kurz, 4-Punkt-Overlay erscheint über dem Live-Bild
+- User tippt 4 Ecken → Speichern → Tracking geht sofort weiter
+- Kein Seitenwechsel, kein Stream-Verlust
 
-#### Teil 3: Pro-Kamera-Kalibrierung statt Feld-Kalibrierung
+**Dateien**: `src/pages/CameraTrackingPage.tsx` (neues Inline-Kalibrierungs-Overlay), `src/lib/football-tracker.ts`
 
-Aktuell wird die Kalibrierung am **Feld** gespeichert. Für Zoom/Teilfeld muss jede Kamera ihre **eigene** Kalibrierung haben.
+### Teil 3: Kamera-Workflow radikal vereinfachen
 
-- Neue DB-Spalte: `tracking_uploads.calibration` (JSONB) — speichert die Kalibrierung pro Kamera pro Match
-- Die Feld-Kalibrierung bleibt als Default/Fallback
-- Bei Neu-Kalibrierung während des Trackings wird die kameraspezifische Kalibrierung aktualisiert
+Aktuell 6 Schritte → **3 Schritte**:
 
-**DB-Migration**: `ALTER TABLE tracking_uploads ADD COLUMN calibration jsonb DEFAULT NULL`
+```text
+Schritt 1: Code eingeben → Auto-Login + Auto-Modell-Laden
+Schritt 2: Kamera + Kalibrierung (kombiniert, inline)
+Schritt 3: Tracking läuft
+```
 
-#### Teil 4: Zoom-Erkennung und Warnung
+Konkrete Änderungen:
+- **Auth + Loading zusammenführen**: Nach Code-Eingabe sofort Modell laden (parallel zur Session-Validierung)
+- **Camera + Calibration zusammenführen**: Kamera startet automatisch. Kalibrierungsstatus wird als Badge angezeigt, nicht als eigener Schritt. Ein großer "Tracking starten"-Button mit Hinweis ob kalibriert oder nicht.
+- **Ended-Phase**: Upload startet automatisch nach Beenden (kein extra Button-Klick)
 
-Beim Tracking-Start und periodisch (alle 60s):
+**Dateien**: `src/pages/CameraTrackingPage.tsx`
 
-- System vergleicht das aktuelle Kamera-FOV mit der Kalibrierung
-- Wenn der Zoom sich verändert hat → **gelbes Banner**: "Zoom hat sich verändert. Neu kalibrieren?"
-- Automatische Erkennung über `MediaStreamTrack.getCapabilities().zoom` und `getSettings().zoom`
+### Teil 4: Spiel-Anlegen-Workflow vereinfachen
 
-**Dateien**: `src/lib/football-tracker.ts`, `src/pages/CameraTrackingPage.tsx`
+Aktuell 4-5 Schritte → **3 Schritte** mit integrierter Code-Generierung:
 
-#### Teil 5: Backend-Fusion für Teilfelder
+```text
+Schritt 1: Typ + Details (kombiniert)
+Schritt 2: Spieler (Heim + optional Gast)
+Schritt 3: Kameras + Codes (auto-generiert, kopierbar)
+```
 
-`process-tracking` erkennt ob Kameras unterschiedliche Feldbereiche abdecken:
+Konkrete Änderungen:
+- **Typ und Details in einem Schritt**: Typ-Auswahl als Toggle oben, Details darunter
+- **Consent inline**: Statt blockierender Checkboxen → kompakter Consent-Banner am Ende von Schritt 1
+- **Kamera-Codes direkt generieren**: Nach Erstellung werden automatisch Codes generiert und als große, kopierbare Kacheln angezeigt. "Code kopieren"-Button + "Per SMS teilen"-Button
+- **Zusammenfassung vor Erstellung**: Letzte Seite zeigt Zusammenfassung + "Spiel erstellen & Codes generieren"
 
-- Liest `calibration.field_rect` pro Kamera
-- Mapped Detections in den Gesamtfeld-Koordinatenraum: `global_x = field_rect.x + detection.x * field_rect.w`
-- Deduplizierung in Überlappungszonen (bestehender Algorithmus, jetzt mit korrekten Koordinaten)
-- Qualitätsbonus: Spieler in Überlappungszonen → höhere Konfidenz
+**Dateien**: `src/pages/NewMatch.tsx`
 
-**Dateien**: `supabase/functions/process-tracking/index.ts`
+### Teil 5: System-Review & Fehlerbehebungen
 
-#### Teil 6: Selbsterklärendes Wizard-UX
+**Erkannte Probleme:**
 
-Der gesamte Kalibrierungsprozess wird mit **visuellen Hilfen** versehen:
+1. **`handleLiveSnapshot` navigiert weg**: Aktuell `window.location.href = /fields/...` — das stoppt den Kamerastream und zerstört den Tracker-State. Muss durch Inline-Kalibrierung ersetzt werden (Teil 2).
 
-- **Animations-Overlay**: Pulsierender Rahmen zeigt wo die 4 Ecken hin sollen
-- **Echtzeit-Vorschau**: Während der Punkt-Markierung zeigt eine kleine Feldskizze sofort den erkannten Bereich
-- **Tipp-Karten**: "Tipp: Zoome rein für genauere Tracking-Daten in deiner Spielhälfte" / "Tipp: Zeige das ganze Feld für eine Gesamtübersicht"
-- **Validierung**: Prüft ob die 4 Punkte plausibel sind (kein Dreieck, Mindestgröße, Seitenverhältnis)
+2. **Kamera 2 Upload**: `camera-ops` Edge Function sollte `cameraIndex` bis 4 akzeptieren (aktuell unklar). Upload-Timeout sollte 120s+ sein.
 
-**Dateien**: `src/pages/FieldCalibration.tsx`
+3. **Session-Restore fragil**: Wenn `fetchSession` fehlschlägt, wird der User auf `auth` zurückgesetzt — aber der localStorage-Token bleibt. Race condition möglich.
+
+4. **Tracking-Overlay ohne Kalibrierungsdaten**: Das Overlay zeigt Detections in normalisierten Koordinaten, aber berücksichtigt nicht die `field_rect` der Kalibrierung. Bei Teilfeld-Kalibrierung wären die Marker falsch positioniert.
+
+5. **`handleGoBack` von Tracking**: Stoppt den Tracker komplett — besser wäre Pausieren statt Stoppen.
 
 ---
 
 ### Technische Details
 
-**CalibrationData-Erweiterung**:
+**Frame-Differenz-Algorithmus:**
 ```typescript
-export interface CalibrationData {
-  points: { x: number; y: number }[];
-  width_m: number;
-  height_m: number;
-  calibrated_at: string;
-  coverage?: "full" | "left_half" | "right_half" | "custom";
-  field_rect?: { x: number; y: number; w: number; h: number };
-  zoom_level?: number;
-}
+// Sampling: 20x15 Grid = 300 Pixel-Proben
+// Differenz = Durchschnitt |R1-R2| + |G1-G2| + |B1-B2| / (3 * 255)
+// Threshold: 0.15 = 15% durchschnittliche Farbänderung
 ```
 
-**Koordinaten-Transformation im Backend**:
+**DeviceMotion:**
 ```typescript
-// Kamera sieht nur rechte Hälfte: field_rect = { x: 0.5, y: 0, w: 0.5, h: 1 }
-const globalX = fieldRect.x + detection.x * fieldRect.w;  // 0.5 + 0.3*0.5 = 0.65
-const globalY = fieldRect.y + detection.y * fieldRect.h;  // 0 + 0.7*1 = 0.7
+window.addEventListener("devicemotion", (e) => {
+  const acc = e.acceleration;
+  if (!acc) return;
+  const magnitude = Math.sqrt((acc.x??0)**2 + (acc.y??0)**2 + (acc.z??0)**2);
+  if (magnitude > 20) onBumpDetected(); // ~2g
+});
 ```
 
-**DB-Migration**:
-```sql
-ALTER TABLE tracking_uploads ADD COLUMN calibration jsonb DEFAULT NULL;
-```
+**Inline-Kalibrierung**: Neues State `showInlineCalibration` in CameraTrackingPage. Bei Aktivierung wird ein transparentes Overlay über dem Video gerendert, in dem der User 4 Punkte tippen kann. Kein Seitenwechsel nötig.
 
 ---
 
 ### Prioritätsreihenfolge
 
-1. Erweitertes CalibrationData-Modell mit Coverage/Field-Rect
-2. Visuelle Abdeckungsauswahl im Kalibrierungs-Wizard
-3. Pro-Kamera-Kalibrierung (DB + Frontend)
-4. Backend-Fusion für Teilfelder
-5. Zoom-Erkennung mit Warnung
-6. UX-Verfeinerung (Animationen, Tipps, Validierung)
+1. Inline-Kalibrierung (ersetzt den kaputten `handleLiveSnapshot`-Navigationsflow)
+2. Kamera-Wizard auf 3 Schritte reduzieren
+3. Frame-Differenz + DeviceMotion Verwacklungserkennung
+4. Auto-Kalibrierung alle 10 Minuten
+5. Spiel-Anlegen auf 3 Schritte mit Code-Generierung
+6. Bug-Fixes (Session-Restore, Overlay-Koordinaten, Upload-Timeout)
 
