@@ -516,6 +516,34 @@ export default function NewMatch() {
 
           {step === 1 && !isTraining && (
             <>
+              {/* KI Auto-Discovery prominent option */}
+              <button
+                onClick={() => setStep(2)}
+                className="w-full rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-5 text-left transition-all hover:border-primary/60 hover:bg-primary/10 group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary group-hover:bg-primary/30 transition-colors">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      KI erkennt Spieler automatisch
+                      <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary uppercase tracking-wider">Empfohlen</span>
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground leading-relaxed">
+                      Die KI erkennt beim Tracking automatisch wie viele Spieler auf dem Feld sind und ordnet sie den Teams zu. Ohne manuelle Eingabe.
+                    </span>
+                  </div>
+                  <ArrowRight className="h-5 w-5 shrink-0 text-primary/60 group-hover:text-primary transition-colors" />
+                </div>
+              </button>
+
+              <div className="relative flex items-center gap-3">
+                <div className="flex-1 border-t border-border" />
+                <span className="text-xs text-muted-foreground">oder manuell aufstellen</span>
+                <div className="flex-1 border-t border-border" />
+              </div>
+
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h2 className="text-lg font-semibold font-display flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" /> Aufstellung
@@ -543,11 +571,6 @@ export default function NewMatch() {
               </div>
 
               <p className="text-sm text-muted-foreground">Startelf: {homeStarters.size}/{squadSize} · Bank: {homeBench.size}/7</p>
-
-              <div className="rounded-lg border border-primary/10 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
-                <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-                <span><strong>Aufstellung optional.</strong> Die KI erkennt Spieler auch automatisch. Du kannst diesen Schritt überspringen.</span>
-              </div>
 
               <div className="space-y-2 max-h-[350px] overflow-y-auto">
                 {activePlayers.map((player) => {
