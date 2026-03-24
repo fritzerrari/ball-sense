@@ -929,10 +929,11 @@ Deno.serve(async (req) => {
       await supabase.from("tracking_uploads").update({ status: "uploaded" }).eq("match_id", matchId).in("status", ["done", "error"]);
     }
 
-    console.log(`[process-tracking] Starting for match ${matchId}`);
+    const mode = action === "incremental" ? "incremental" : "full";
+    console.log(`[process-tracking] Starting ${mode} for match ${matchId}`);
 
     // Run processing in background
-    const processingPromise = runProcessing(supabase, matchId);
+    const processingPromise = runProcessing(supabase, matchId, mode);
     try {
       (globalThis as any).EdgeRuntime?.waitUntil?.(processingPromise);
     } catch {

@@ -190,6 +190,45 @@ export default function CameraTrackingPage() {
     }
   }, [phase]);
 
+  // Incremental chunk upload every 5 minutes during tracking
+  useEffect(() => {
+    if (phase !== "tracking") return;
+    const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+    const uploadIncrementalChunk = async () => {
+      const token = localStorage.getItem(sessionKey);
+      if (!trackerRef.current || !id || !token) return;
+      try {
+        const frames = trackerRef.current.getRecentFrames?.() ?? [];
+        if (frames.length < 10) return; // Not enough data yet
+        const durationSec = trackerRef.current.getElapsedSeconds();
+        const trackingData = {
+          matchId: id, cameraIndex: cam, frames, framesCount: frames.length,
+          durationSec, createdAt: new Date().toISOString(),
+        };
+        // Upload chunk via camera-ops
+        await fetch(CAMERA_OPS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "upload_tracking", matchId: id, cameraIndex: cam, sessionToken: token,
+            trackingData, framesCount: frames.length, durationSec,
+          }),
+        });
+        // Trigger incremental processing
+        await fetch(PROCESS_TRACKING_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-camera-session-token": token },
+          body: JSON.stringify({ matchId: id, action: "incremental" }),
+        });
+        console.log(`[Incremental] Uploaded ${frames.length} frames chunk`);
+      } catch (err) {
+        console.warn("[Incremental] Chunk upload failed:", err);
+      }
+    };
+    const interval = setInterval(uploadIncrementalChunk, INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [phase, id, cam, sessionKey]);
+
   // Auto-load model when entering camera phase
   useEffect(() => {
     if (phase !== "camera" || modelLoaded) return;
