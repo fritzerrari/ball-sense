@@ -1,73 +1,208 @@
 
-Ziel: System von „funktioniert manchmal“ auf „robust und ehrlich“ bringen, ohne falsche KPI-Nullwerte und ohne Track-Explosionen.
 
-Kurzantwort zu deiner Frage:
-- YOLO „auf dem Handy installieren“ geht in diesem Web-Setup nicht sinnvoll als App-Installation.
-- Gemini Embeddings helfen hier nicht (Embeddings sind für Suche/Ähnlichkeit, nicht für Objekterkennung).
-- Der richtige Hebel ist: Tracking-Pipeline und Zuordnungslogik stabilisieren + harte Qualitäts-Gates + saubere Upload-Logik.
+# FieldIQ Rebuild: Von Tracking-App zu Match Intelligence Platform
 
-Was aktuell konkret kaputt ist (aus Logs/DB):
-1) Doppelpfad aktiv: derselbe Lauf erzeugt `batch` + `live` Uploads.
-2) Auto-Discovery eskaliert: dein letztes Match wurde mit 63 Auto-Spielern gespeichert (statt realistischer Kadergröße).
-3) KPI-Qualität wird überschätzt: `data_quality_score` bleibt hoch trotz unplausibler Spieleranzahl.
-4) UI zeigt daraus irreführende Werte („63 Spieler erkannt“, 0%-Karten etc.).
+## Analyse des Ist-Zustands
 
-Umsetzungsplan (kompakt, aber vollständig)
+**Was funktioniert und bleibt:**
+- Auth, Clubs, Profiles, User Roles → stabil, wiederverwendbar
+- Landing Page, AppLayout, Navigation → gutes Design, bleibt
+- Matches-Tabelle, Fields, Players → Grundstruktur passt
+- Supabase Storage, Edge Functions Infrastruktur → bleibt
+- i18n, ThemeToggle, UI-Komponenten → bleiben
 
-1) Ingestion hart entkoppeln (Batch vs Live)
-- `CameraTrackingPage`: Micro-Batch nur im Batch-Modus; Live-Modus nur Chunk-Stream.
-- `camera-ops`: `upload_mode` korrekt aus Request übernehmen (nicht immer „batch“).
-- `process-tracking`: nach Full-Run nicht verwendete Quelle auf `ignored` statt `streaming` lassen.
+**Was raus muss (kaputte Tracking-Schicht):**
+- `football-tracker.ts` (765 Zeilen Echtzeit-Frame-Analyse) → **löschen**
+- `analyze-frame` Edge Function → **löschen**
+- `stream-tracking` Edge Function → **löschen**
+- `CameraTrackingPage.tsx` (1370 Zeilen) → **radikal vereinfachen** zu reinem Video-Recorder/Uploader
+- `TrackingPage.tsx` → **entfernen**
+- `TrackingOverlay.tsx`, `PitchVisualization.tsx` → **entfernen**
+- `live-stats-engine.ts`, `highlight-recorder.ts` → **entfernen**
+- Alle "63 Spieler erkannt"-Logik in `process-tracking` → **komplett neu**
 
-2) Auto-Discovery neu aufsetzen (keine DB-Vermüllung)
-- `process-tracking`: keine dauerhafte Speicherung von Auto-Spielern in `match_lineups`.
-- Auto-Discovery nur als temporäre Zuordnung für diesen Lauf.
-- Harte Obergrenze für Kandidaten (z. B. 11–16 pro Team je nach Modus), sonst Team-Only-Auswertung.
-- Migration: bestehende „Spieler X“-Auto-Lineups aus betroffenen Matches bereinigen (ohne echte Kaderdaten anzutasten).
+## Neues Produktmodell
 
-3) Track-Qualitäts-Gates erzwingen
-- Mindest-Tracklänge, Mindest-Framezahl, Mindest-Confidence für Spielerstatistik.
-- Schlechte Tracks nur als „unassigned track“ intern führen, nicht als Spieler in Reports.
-- `tracked_player_count` neu definieren: nur qualifizierte, nicht alle Tracks.
+```text
+┌─────────┐    ┌──────────┐    ┌───────────────┐    ┌────────────┐
+│ CAPTURE  │───▶│  ANALYZE  │───▶│  INTERPRET    │───▶│   ACTION   │
+│          │    │           │    │               │    │            │
+│ Video +  │    │ Gemini    │    │ GPT/Gemini    │    │ Training   │
+│ Matchinfo│    │ Vision    │    │ Coaching AI   │    │ Empfehlung │
+└─────────┘    └──────────┘    └───────────────┘    └────────────┘
+```
 
-4) KPI-Wahrheit statt Scheinpräzision
-- Taktikmetriken nur bei echtem Ballsignal + ausreichender Dichte; sonst `null`.
-- Team-`data_quality_score` um Negative-Penalty erweitern:
-  - unrealistische Spielerzahl
-  - niedrige Assignment-Confidence
-  - niedrige Ball-Proximity-Rate
-- Ergebnis: Score fällt bei schlechten Daten sichtbar ab, statt fälschlich ~70 zu zeigen.
+**Analyse fokussiert auf Match-Level:**
+- Angriffsrichtungen & Gefährdungszonen
+- Druckphasen & Momentum
+- Ballverlust-Muster
+- Chancen & Abschlüsse
+- Taktische Grundordnung (Formation-Erkennung)
 
-5) UI-Klarheit (Trust Mode)
-- `AnalysisStatusBanner`: Spielerchip aus qualifiziertem Wert (nicht `playerStats.length`).
-- `CoachSummary`/`MatchCharts`: wenn taktische Daten fehlen → „Nicht belastbar“ überall konsistent.
-- Zusatzhinweis im Report: „Erfasste Tracks“ vs „zugeordnete Spieler“ klar trennen.
+**Keine fake Spieler-Metriken mehr.** Stattdessen: verständliche Coaching-Insights.
 
-6) Doppelcodebasis reduzieren
-- `/matches/:id/track` und `/camera/:id/track` auf gemeinsame Tracking-Core-Logik bringen.
-- Ziel: ein Runtime-Verhalten für Mobile + Desktop, keine divergierenden Bugpfade.
+## Umsetzung in 5 Phasen
 
-7) Abnahmetests (Pflicht)
-- 20s Test (Batch): keine Auto-Player-Explosion, kein 0%-Fake, saubere Statusanzeige.
-- 10–15min Test (Live): kein paralleler Batch-Datensatz, keine „streaming“-Leichen.
-- Reprocess-Test: nach Retry stabile, konsistente Spieleranzahl.
-- Mobile Test: KI-Status steigt, Frames steigen, Report zeigt plausible Counts.
-- DB-Checks:
-  - `tracking_uploads`: pro `(match,camera,mode)` konsistent
-  - `match_lineups`: keine Auto-Discovery-Massenzeilen
-  - `player_match_stats`: nur qualifizierte Spielerzeilen
+### Phase A — Aufräumen & neue Seitenstruktur
+**Dateien löschen/entfernen:**
+- `src/lib/football-tracker.ts`
+- `src/lib/live-stats-engine.ts`
+- `src/lib/highlight-recorder.ts`
+- `src/components/TrackingOverlay.tsx`
+- `src/components/PitchVisualization.tsx`
+- `src/pages/TrackingPage.tsx`
+- `supabase/functions/analyze-frame/`
+- `supabase/functions/stream-tracking/`
 
-Technische Umsetzung (Dateien)
-- `src/pages/CameraTrackingPage.tsx`: Modus-Trennung, Micro-Batch-Gating
-- `src/pages/TrackingPage.tsx`: auf gleiche Core-Logik wie Kamera-Route ziehen
-- `supabase/functions/camera-ops/index.ts`: korrektes `upload_mode`, Statuspflege
-- `supabase/functions/process-tracking/index.ts`: Auto-Discovery ohne Persistenz, Caps, Quality-Gates, Score-Neugewichtung
-- `src/pages/MatchReport.tsx`: Banner-Count auf qualifizierte Spieler
-- `src/components/CoachSummary.tsx` + `src/components/MatchCharts.tsx`: harte „Nicht belastbar“-States
-- `supabase/migrations/*`: Bereinigung bestehender Auto-Lineups + Statusnormalisierung
+**Seiten anpassen:**
+- `CameraTrackingPage.tsx` → wird zu `RecordMatchPage.tsx` (nur Video aufnehmen + hochladen)
+- `NewMatch.tsx` → vereinfachen (Team, Gegner, Datum, Altersklasse — fertig in 30 Sekunden)
+- Neue Seite: `ProcessingPage.tsx` (Premium-Wartescreen mit Roadmap)
+- `MatchReport.tsx` → komplett neu als Coaching-Report (keine Spieler-Tracking-KPIs)
 
-Erwartetes Ergebnis
-- Keine 63-Spieler-Ausreißer mehr.
-- Keine irreführenden 0%-KPIs mehr.
-- Live/Batch sauber getrennt.
-- Sichtbar robustere, nachvollziehbare Reports statt „gefühlt kaputt“.
+**Navigation aktualisieren:**
+- Hauptnav: Dashboard, Spiele, Neues Spiel, Verlauf
+- Entfernen: Fields-Kalibrierung, Camera-Tracking-Komplexität
+
+### Phase B — Neues Datenmodell (Migration)
+
+Neue Tabellen:
+```sql
+-- Video-Uploads (ersetzt das komplizierte tracking_uploads)
+CREATE TABLE match_videos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id uuid NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  club_id uuid NOT NULL,
+  file_path text NOT NULL,
+  duration_sec integer,
+  file_size_bytes bigint,
+  status text NOT NULL DEFAULT 'uploaded', -- uploaded, processing, ready, error
+  created_at timestamptz DEFAULT now()
+);
+
+-- Analyse-Jobs
+CREATE TABLE analysis_jobs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id uuid NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  video_id uuid REFERENCES match_videos(id),
+  status text NOT NULL DEFAULT 'queued', -- queued, analyzing, interpreting, complete, failed
+  progress integer DEFAULT 0,
+  started_at timestamptz,
+  completed_at timestamptz,
+  error_message text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Analyse-Ergebnisse (strukturiert, nicht rohe Detections)
+CREATE TABLE analysis_results (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id uuid NOT NULL REFERENCES analysis_jobs(id) ON DELETE CASCADE,
+  match_id uuid NOT NULL,
+  result_type text NOT NULL, -- 'match_structure', 'danger_zones', 'momentum', 'chances'
+  data jsonb NOT NULL DEFAULT '{}',
+  confidence numeric, -- 0-1
+  created_at timestamptz DEFAULT now()
+);
+
+-- Report-Sektionen (AI-generiert)
+CREATE TABLE report_sections (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id uuid NOT NULL,
+  section_type text NOT NULL, -- 'summary', 'insights', 'patterns', 'coaching', 'training'
+  title text NOT NULL,
+  content text NOT NULL,
+  confidence text DEFAULT 'high', -- high, medium, estimated
+  sort_order integer DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Trainingsempfehlungen
+CREATE TABLE training_recommendations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id uuid NOT NULL,
+  club_id uuid NOT NULL,
+  title text NOT NULL,
+  description text NOT NULL,
+  priority integer DEFAULT 1, -- 1=hoch, 3=niedrig
+  category text, -- 'offense', 'defense', 'transition', 'set_piece'
+  linked_pattern text, -- Referenz auf erkanntes Muster
+  created_at timestamptz DEFAULT now()
+);
+```
+
+RLS-Policies für alle neuen Tabellen (Club-basiert wie bestehende Tabellen).
+
+### Phase C — Upload & Analyse-Flow
+
+**Neuer Upload-Flow (simpel):**
+1. Match anlegen (30 Sekunden: Team, Gegner, Datum)
+2. Video hochladen ODER mit Handy aufnehmen → Supabase Storage `match-videos` Bucket
+3. `match_videos` Eintrag erstellen
+4. `analysis_jobs` Job erstellen → Status `queued`
+
+**Neue Edge Function: `analyze-match`**
+- Nimmt Video aus Storage
+- Sampelt 1 Frame alle 30 Sekunden (statt 2.5s Echtzeit)
+- Sendet Batch an Gemini 2.5 Flash mit strukturiertem Tool Calling
+- Prompt fokussiert auf Match-Struktur, nicht Spieler-IDs:
+  - "Wo wird angegriffen?"
+  - "Wo entstehen Chancen?"
+  - "Wo gehen Bälle verloren?"
+  - "Momentum-Verlauf?"
+- Speichert `analysis_results` nach Typ
+
+**Neue Edge Function: `generate-insights`**
+- Liest `analysis_results`
+- Sendet an GPT-5 / Gemini Pro mit Coaching-Prompt
+- Generiert: Executive Summary, 3-5 Key Insights, Coaching Conclusions, Training Recommendations
+- Speichert in `report_sections` + `training_recommendations`
+
+### Phase D — Neuer Match Report
+
+**Report-Seite komplett neu:**
+1. **Match-Header** (Teams, Datum, Ergebnis)
+2. **Executive Summary** (1 Absatz, AI-generiert)
+3. **Key Insights** (3-5 Karten mit Icons)
+4. **Visuelle Muster** (Angriffsrichtung-Grafik, Gefährdungszonen-Heatmap — einfach, nicht fake-präzise)
+5. **Coaching-Schlussfolgerungen** (was bedeutet das für den Trainer?)
+6. **Trainingsempfehlungen** (konkrete Übungen/Schwerpunkte)
+7. **Confidence-Hinweis** (transparent: "Analyse basiert auf Video-Sampling, nicht GPS-Tracking")
+
+Jede Sektion zeigt Confidence-Level. Bei niedrigem Vertrauen: "Geschätzt" Badge.
+
+### Phase E — Dashboard & B2B
+
+**Dashboard neu:**
+- Willkommen + Quick Action "Neues Spiel"
+- Letzte 3 Matches mit Status
+- Aktuelle Trainingsempfehlungen (aggregiert)
+- Trend über letzte 5 Spiele (einfacher Fortschritts-Indikator)
+
+**Club Admin (bestehend, anpassen):**
+- Team-Verwaltung bleibt
+- Matches-Übersicht mit Analyse-Status
+- Abo-Verwaltung (Pricing-Seite existiert bereits)
+
+## Betroffene Dateien (Zusammenfassung)
+
+| Aktion | Dateien |
+|--------|---------|
+| Löschen | `football-tracker.ts`, `live-stats-engine.ts`, `highlight-recorder.ts`, `TrackingOverlay.tsx`, `PitchVisualization.tsx`, `TrackingPage.tsx`, `analyze-frame/`, `stream-tracking/` |
+| Stark vereinfachen | `CameraTrackingPage.tsx` → `RecordMatchPage.tsx`, `NewMatch.tsx`, `MatchReport.tsx` |
+| Neu erstellen | `ProcessingPage.tsx`, `analyze-match/index.ts`, `generate-insights/index.ts` |
+| Anpassen | `Dashboard.tsx`, `AppLayout.tsx`, `App.tsx` (Routen), `CoachSummary.tsx`, `MatchCharts.tsx` |
+| Migration | 1 SQL-Migration für neue Tabellen + RLS |
+| Entfernen (Edge Fn) | `analyze-frame`, `stream-tracking`, `process-tracking` (ersetzt durch `analyze-match`) |
+
+## Erwartetes Ergebnis
+
+- **30 Sekunden** bis zum gestarteten Upload
+- **Keine fake Spieler-Tracking-Metriken**
+- **Vertrauenswürdige Match-Level-Insights**
+- **Sofort nützliche Trainingsempfehlungen**
+- **Premium-Look, brutal einfach**
+
+## Empfehlung zur Umsetzung
+
+Ich empfehle **Phase A + B zusammen** (Aufräumen + neues Datenmodell), dann **Phase C** (Upload-Flow), dann **Phase D** (Report). Das gibt nach 3 Runden ein funktionierendes MVP.
+
