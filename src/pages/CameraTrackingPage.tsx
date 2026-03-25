@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock } from "lucide-react";
+import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
@@ -198,9 +198,15 @@ export default function CameraTrackingPage() {
               <span className="text-xs text-white font-medium">{frameCount} Frames</span>
             </div>
             {halftimeSent && (
-              <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-primary/90 rounded-full px-3 py-1.5">
-                <CheckCircle2 className="h-3 w-3 text-white" />
-                <span className="text-xs text-white font-medium">HZ-Analyse läuft</span>
+              <div className="absolute bottom-4 left-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2 bg-primary/90 rounded-full px-3 py-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-white" />
+                  <span className="text-xs text-white font-medium">HZ-Analyse läuft</span>
+                </div>
+                <Link to={`/matches/${matchId}/report`} className="flex items-center gap-2 bg-white/90 rounded-full px-3 py-1.5">
+                  <Eye className="h-3 w-3 text-primary" />
+                  <span className="text-xs text-primary font-medium">Ergebnisse ansehen</span>
+                </Link>
               </div>
             )}
           </>
@@ -253,9 +259,16 @@ export default function CameraTrackingPage() {
           </div>
         )}
         {phase === "done" && (
-          <Button onClick={() => { setFrameCount(0); setHalftimeSent(false); setPhase("ready"); }} size="lg" variant="outline" className="w-full gap-2 h-14 text-base">
-            <Video className="h-5 w-5" /> Weitere Aufnahme
-          </Button>
+          <div className="space-y-2">
+            <Link to={`/matches/${matchId}/processing`}>
+              <Button size="lg" className="w-full gap-2 h-14 text-base">
+                <FileText className="h-5 w-5" /> Zur Analyse
+              </Button>
+            </Link>
+            <Button onClick={() => { setFrameCount(0); setHalftimeSent(false); setPhase("ready"); }} size="lg" variant="outline" className="w-full gap-2 h-12 text-sm">
+              <Video className="h-4 w-4" /> Weitere Aufnahme
+            </Button>
+          </div>
         )}
       </div>
     </div>

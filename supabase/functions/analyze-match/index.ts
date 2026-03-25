@@ -274,7 +274,15 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
     });
   } catch (error) {
     console.error("analyze-match error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+    const errMsg = error instanceof Error ? error.message : "Unbekannter Fehler bei der Analyse";
+    // Always mark job as failed so UI shows retry
+    if (job_id) {
+      await supabase.from("analysis_jobs").update({
+        status: "failed",
+        error_message: errMsg,
+      }).eq("id", job_id);
+    }
+    return new Response(JSON.stringify({ error: errMsg }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -27,7 +27,7 @@ export default function NewMatch() {
   const [kickoff, setKickoff] = useState("");
   const [fieldId, setFieldId] = useState("");
   const [awayName, setAwayName] = useState("");
-  const [ageGroup, setAgeGroup] = useState("");
+  
   const [creating, setCreating] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
 
@@ -359,22 +359,6 @@ export default function NewMatch() {
                   onChange={(e) => setKickoff(e.target.value)}
                   className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground"
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">Altersklasse</label>
-                <select
-                  value={ageGroup}
-                  onChange={(e) => setAgeGroup(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground"
-                >
-                  <option value="">Optional</option>
-                  <option value="U19">U19</option>
-                  <option value="U17">U17</option>
-                  <option value="U15">U15</option>
-                  <option value="U13">U13</option>
-                  <option value="Herren">Herren</option>
-                  <option value="Frauen">Frauen</option>
-                </select>
               </div>
             </div>
 

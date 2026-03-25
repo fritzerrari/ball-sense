@@ -225,7 +225,7 @@ export default function Matches() {
           (statusFilter === "all" || match.status === statusFilter) &&
           (typeFilter === "all" || type === typeFilter) &&
           (timelineFilter === "all" || timeline === timelineFilter) &&
-          (!query || searchValues.includes(query))
+          (!query || searchValues.indexOf(query) >= 0)
         );
       })
       .sort((a, b) => {
