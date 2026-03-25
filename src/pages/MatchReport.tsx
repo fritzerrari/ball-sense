@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import {
   ArrowLeft, Brain, Lightbulb, Target, Shield, Zap,
   ClipboardList, AlertTriangle, TrendingUp, Calendar,
@@ -14,6 +14,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
 
 const CATEGORY_ICONS: Record<string, typeof Target> = {
   offense: Target,
