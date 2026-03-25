@@ -606,6 +606,22 @@ export default function MatchReport() {
           </div>
         )}
 
+        {/* Missing events hint */}
+        {hasStats && (!events || events.length === 0) && (
+          <div className="glass-card border-amber-500/20 bg-amber-500/5 p-3">
+            <div className="flex items-start gap-2.5">
+              <Radio className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
+              <div>
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-300">Keine Spielereignisse erfasst</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Tore, Karten, Fouls und Assists werden nur angezeigt, wenn sie während des Spiels über den Event-Ticker erfasst wurden. 
+                  Physische Daten (Distanz, Speed, Sprints) sind davon unabhängig und weiterhin verfügbar.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {uploads && uploads.length > 0 && match.status !== "processing" && !isLive && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
