@@ -11,7 +11,7 @@ import {
   Shield,
   Users,
   Swords,
-  Camera,
+  TrendingUp,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,6 +50,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.dashboard"), icon: Home, href: "/dashboard" },
     { label: t("nav.matches"), icon: Swords, href: "/matches" },
     { label: t("nav.squad"), icon: Users, href: "/players" },
+    { label: language === "de" ? "Trends" : "Trends", icon: TrendingUp, href: "/trends" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
   ];
 
