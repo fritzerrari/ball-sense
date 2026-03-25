@@ -475,26 +475,19 @@ export default function MatchReport() {
           )}
         </div>
 
-        {/* Partial field coverage warning */}
-        {isExtrapolated && hasStats && (
-          <div className="glass-card border-amber-500/30 bg-amber-500/5 p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                <EyeOff className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Teilfeld erkannt – {Math.round(coverageRatio * 100)}% Abdeckung</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Die Kamera hat nicht das gesamte Spielfeld erfasst. Physische Metriken (Distanz, Sprints) wurden automatisch auf das volle Spielfeld hochgerechnet. 
-                  Die Genauigkeit verbessert sich mit zusätzlichen Kameras oder besserer Platzierung.
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* Unified Analysis Status Banner */}
+        {hasStats && (
+          <AnalysisStatusBanner
+            stage={analysisStage}
+            coverageRatio={coverageRatio}
+            isExtrapolated={isExtrapolated}
+            playerCount={(playerStats ?? []).length}
+            matchStatus={match.status}
+          />
         )}
 
-        {/* Estimation info banner */}
-        {isTacticalEstimated && hasStats && !isLive && (
+        {/* Estimation disclaimer for tactical stats */}
+        {isTacticalEstimated && hasStats && analysisStage !== "prognose" && (
           <div className="glass-card border-blue-500/20 bg-blue-500/5 p-3">
             <div className="flex items-start gap-2.5">
               <Activity className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
@@ -510,49 +503,6 @@ export default function MatchReport() {
           </div>
         )}
 
-        {/* Live Analysis Progress Banner */}
-        {(isLive || hasPartialData) && (
-          <div className="glass-card glow-border overflow-hidden p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="relative flex items-center justify-center">
-                  <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary" />
-                  <div className="absolute h-2.5 w-2.5 animate-ping rounded-full bg-primary/50" />
-                </div>
-                <span className="text-sm font-semibold font-display flex items-center gap-1.5">
-                  <Zap className="h-4 w-4 text-primary" /> Live-Analyse
-                </span>
-                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">LIVE</span>
-              </div>
-              <span className="text-xs text-muted-foreground">Aktualisiert sich automatisch</span>
-            </div>
-            {/* Module progress grid */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {[
-                { label: "Physis", hasData: (playerStats?.length ?? 0) > 0, icon: "🏃" },
-                { label: "Pässe", hasData: (playerStats ?? []).some((s: any) => (s.passes_total ?? 0) > 0), icon: "⚽" },
-                { label: "Duelle", hasData: (playerStats ?? []).some((s: any) => (s.duels_total ?? 0) > 0), icon: "💪" },
-                { label: "Tore", hasData: (playerStats ?? []).some((s: any) => (s.goals ?? 0) > 0), icon: "🎯" },
-                { label: "Heatmaps", hasData: (playerStats ?? []).some((s: any) => s.heatmap_grid), icon: "🗺️" },
-                { label: "KI", hasData: false, icon: "🤖" },
-              ].map((mod) => (
-                <div key={mod.label} className={`rounded-lg border px-2 py-1.5 text-center text-[11px] transition-all ${
-                  mod.hasData ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border bg-muted/30 text-muted-foreground"
-                }`}>
-                  <span className="block text-sm">{mod.hasData ? <CheckCircle2 className="inline h-3.5 w-3.5" /> : mod.icon}</span>
-                  <span className="block mt-0.5 font-medium">{mod.label}</span>
-                </div>
-              ))}
-            </div>
-            {/* Coverage warning */}
-            {(playerStats ?? []).some((s: any) => (s.raw_metrics as any)?.extrapolated) && (
-              <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-                <Radio className="h-3.5 w-3.5 shrink-0" />
-                Daten basieren auf ~{Math.round(((playerStats?.[0] as any)?.raw_metrics?.coverage_ratio ?? 1) * 100)}% Feldabdeckung — Werte wurden hochgerechnet
-              </div>
-            )}
-          </div>
-        )}
         {uploads && uploads.length > 0 && match.status !== "processing" && !isLive && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{uploads.map((u: any) => <div key={u.id} className="glass-card min-w-[160px] p-3"><div className="text-xs text-muted-foreground">Kamera {u.camera_index + 1}</div><StatusBadge status={u.status} /></div>)}</div>}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
