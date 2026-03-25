@@ -703,12 +703,15 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     let uploads: any[] = [];
+    const acceptableStatuses = mode === "incremental"
+      ? ["uploaded", "streaming"]
+      : ["uploaded", "streaming", "done", "error"];
     for (let attempt = 1; attempt <= 8; attempt++) {
       const { data: candidateUploads, error: uplErr } = await supabase
         .from("tracking_uploads")
         .select("*")
         .eq("match_id", matchId)
-        .in("status", ["uploaded", "streaming"]);
+        .in("status", acceptableStatuses);
 
       if (uplErr) throw uplErr;
       uploads = candidateUploads ?? [];
@@ -719,7 +722,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
     }
 
     if (uploads.length === 0) {
-      await updateProgress("error", 0, "Keine Uploads gefunden — bitte Neuverarbeitung starten");
+      await updateProgress("error", 0, "Keine verwertbaren Uploads gefunden — bitte Upload prüfen oder Neuverarbeitung starten");
       if (mode === "full") {
         await supabase.from("matches").update({ status: "error" }).eq("id", matchId);
       }
