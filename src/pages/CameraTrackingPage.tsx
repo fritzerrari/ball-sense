@@ -40,6 +40,7 @@ export default function CameraTrackingPage() {
   const [frameCount, setFrameCount] = useState(0);
   const [syncedFrames, setSyncedFrames] = useState(0);
   const [halfNumber, setHalfNumber] = useState(1);
+  const [transferAuthorized, setTransferAuthorized] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
