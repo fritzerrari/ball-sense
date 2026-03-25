@@ -6,7 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
  * Check if the current user's club has access to a specific app module.
  */
 export function useModuleAccess(moduleKey: string) {
-  const { session, clubId, plan } = useAuth();
+  const { session, clubId, clubPlan } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
