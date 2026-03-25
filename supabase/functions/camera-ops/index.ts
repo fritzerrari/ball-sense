@@ -131,16 +131,20 @@ Deno.serve(async (req) => {
 
     // ── ACTION: heartbeat ──
     if (action === "heartbeat") {
-      const { phase, frame_count } = payload;
+      const { phase, frame_count, thumbnail } = payload;
+      const statusUpdate: any = {
+        phase: phase ?? "unknown",
+        frame_count: frame_count ?? 0,
+        updated_at: new Date().toISOString(),
+      };
+      // Include thumbnail if provided (small base64 JPEG ~10KB)
+      if (thumbnail) statusUpdate.thumbnail = thumbnail;
+
       await supabaseAdmin
         .from("camera_access_sessions")
         .update({
           last_used_at: new Date().toISOString(),
-          status_data: {
-            phase: phase ?? "unknown",
-            frame_count: frame_count ?? 0,
-            updated_at: new Date().toISOString(),
-          },
+          status_data: statusUpdate,
         })
         .eq("id", session.id);
 
@@ -276,6 +280,46 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── ACTION: append-frames (incremental upload during recording) ──
+    if (action === "append-frames") {
+      const { frames, chunk_index } = payload;
+
+      if (!frames || !Array.isArray(frames) || frames.length === 0) {
+        return new Response(JSON.stringify({ error: "No frames provided" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const filePath = `${match_id}_chunk_${chunk_index ?? 0}.json`;
+      const framesJson = JSON.stringify({
+        frames,
+        chunk_index: chunk_index ?? 0,
+        captured_at: new Date().toISOString(),
+      });
+
+      console.log(`Appending ${frames.length} frames (${(framesJson.length / 1024 / 1024).toFixed(2)} MB) as chunk ${chunk_index ?? 0}`);
+
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from("match-frames")
+        .upload(filePath, new Blob([framesJson], { type: "application/json" }), {
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Chunk upload error:", uploadError);
+        return new Response(JSON.stringify({ error: "Chunk upload failed", detail: uploadError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, chunk_index: chunk_index ?? 0, frames_in_chunk: frames.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

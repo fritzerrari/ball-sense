@@ -158,5 +158,7 @@ export function startLiveCapture(videoEl: HTMLVideoElement) {
     },
     getFrameCount: () => frames.length,
     getSkippedCount: () => skippedFrames,
+    /** Returns new frames since the given index (for delta uploads) */
+    getNewFramesSince: (startIndex: number): string[] => frames.slice(startIndex),
   };
 }

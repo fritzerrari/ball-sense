@@ -402,8 +402,20 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
       });
     }
 
-    // Set status to interpreting — ProcessingPage will trigger generate-insights from client side
+    // Set status to interpreting and trigger generate-insights SERVER-SIDE
     await supabase.from("analysis_jobs").update({ progress: 85, status: "interpreting" }).eq("id", job_id);
+
+    // Fire-and-forget: trigger generate-insights from server (no client dependency)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    fetch(`${supabaseUrl}/functions/v1/generate-insights`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ match_id, job_id }),
+    }).catch((err) => console.error("generate-insights server trigger error:", err));
 
     return new Response(JSON.stringify({
       success: true,

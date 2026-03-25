@@ -48,6 +48,9 @@ export default function CameraTrackingPage() {
   const [uploading, setUploading] = useState(false);
   const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const deltaUploadRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastUploadedIndexRef = useRef(0);
+  const chunkIndexRef = useRef(0);
 
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
@@ -58,10 +61,26 @@ export default function CameraTrackingPage() {
     setPhase("setup");
   }, []);
 
+  // ── Capture a small thumbnail for heartbeat ──
+  const captureThumbnail = useCallback((): string | null => {
+    if (!videoRef.current || videoRef.current.videoWidth === 0) return null;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 160;
+      canvas.height = 90;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(videoRef.current, 0, 0, 160, 90);
+      return canvas.toDataURL("image/jpeg", 0.3).split(",")[1];
+    } catch {
+      return null;
+    }
+  }, []);
+
   // ── Heartbeat for helpers (sends status + receives commands) ──
   const sendHeartbeat = useCallback(async (currentPhase: string, currentFrameCount: number) => {
     if (!isHelper || !matchId || !sessionToken) return;
     try {
+      const thumbnail = currentPhase === "recording" ? captureThumbnail() : null;
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
         {
@@ -76,6 +95,7 @@ export default function CameraTrackingPage() {
             match_id: matchId,
             phase: currentPhase,
             frame_count: currentFrameCount,
+            ...(thumbnail ? { thumbnail } : {}),
           }),
         },
       );
@@ -87,7 +107,40 @@ export default function CameraTrackingPage() {
       // Heartbeat failure is non-critical
     }
     return null;
-  }, [isHelper, matchId, sessionToken]);
+  }, [isHelper, matchId, sessionToken, captureThumbnail]);
+
+  // ── Incremental delta upload during recording ──
+  const uploadDelta = useCallback(async () => {
+    if (!liveCaptureRef.current || !matchId || !isHelper || !sessionToken) return;
+    const newFrames = liveCaptureRef.current.getNewFramesSince(lastUploadedIndexRef.current);
+    if (newFrames.length === 0) return;
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            action: "append-frames",
+            session_token: sessionToken,
+            match_id: matchId,
+            frames: newFrames,
+            chunk_index: chunkIndexRef.current,
+          }),
+        },
+      );
+      if (res.ok) {
+        lastUploadedIndexRef.current += newFrames.length;
+        chunkIndexRef.current += 1;
+      }
+    } catch {
+      // Non-critical, will retry next interval
+    }
+  }, [matchId, isHelper, sessionToken]);
 
   // Heartbeat interval during recording/halftime
   useEffect(() => {
@@ -143,13 +196,22 @@ export default function CameraTrackingPage() {
     setPhase("recording");
     setRecordingStartTime(Date.now());
     setFrameCount(0);
+    lastUploadedIndexRef.current = 0;
+    chunkIndexRef.current = 0;
     if (navigator.vibrate) navigator.vibrate(50);
 
     const countInterval = setInterval(() => {
       setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
-  }, [hasHighlights, isHelper]);
+
+    // Incremental delta upload every ~2.5 min (5 frames at 30s interval)
+    if (isHelper) {
+      deltaUploadRef.current = setInterval(() => {
+        uploadDelta();
+      }, 150000); // 2.5 minutes
+    }
+  }, [hasHighlights, isHelper, uploadDelta]);
 
   const handleSetupComplete = useCallback(async () => {
     await initCamera();
@@ -311,6 +373,7 @@ export default function CameraTrackingPage() {
     if (videoRef.current) videoRef.current.srcObject = null;
     if ((streamRef as any)._countInterval) clearInterval((streamRef as any)._countInterval);
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+    if (deltaUploadRef.current) clearInterval(deltaUploadRef.current);
 
     if (!captureResult || captureResult.frames.length === 0) {
       toast.error("Keine Frames aufgenommen");
