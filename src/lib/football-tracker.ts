@@ -353,7 +353,10 @@ export class FootballTracker {
 
       const resp = await fetch(ANALYZE_FRAME_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": (typeof import.meta !== "undefined" ? import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY : "") ?? "",
+        },
         body: JSON.stringify({
           imageBase64: base64,
           matchId: this.matchId,

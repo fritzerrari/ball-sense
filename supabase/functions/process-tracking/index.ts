@@ -304,7 +304,7 @@ function computeTrackStats(
     sprint_distance_m: Math.round(sprintDist),
     heatmap_grid: grid,
     positions_raw: positions.map((p) => ({ t: p.t, x: p.x, y: p.y })),
-    minutes_played: Math.round(durationMs / 60000),
+    minutes_played: Math.max(1, Math.round(durationMs / 60000)),
   };
 }
 
@@ -329,7 +329,7 @@ function estimateTacticalStats(
   minutesPlayed: number,
 ) {
   const empty = { ball_contacts: 0, passes_total: 0, passes_completed: 0, pass_accuracy: null as number | null, duels_total: 0, duels_won: 0, tackles: 0, interceptions: 0, ball_recoveries: 0, shots_total: 0, shots_on_target: 0, goals: 0, assists: 0, crosses: 0, fouls_committed: 0, fouls_drawn: 0, aerial_won: 0, is_estimated: true };
-  if (positions.length < 5 || minutesPlayed < 1) return empty;
+  if (positions.length < 5) return empty;
 
   const BALL_PROX = 0.06;  // ~6m on a 105m pitch
   const DUEL_PROX = 0.04;  // ~4m
