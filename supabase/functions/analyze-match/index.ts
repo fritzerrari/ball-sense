@@ -204,10 +204,43 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                       required: ["zone", "frequency", "description"],
                     },
                   },
+                  frame_positions: {
+                    type: "array",
+                    description: "For each analyzed frame, estimate approximate player and ball positions on the pitch (0-100 coordinate system). Only include players you can clearly see.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        frame_index: { type: "integer", description: "0-based index of the frame" },
+                        label: { type: "string", description: "Short description of what happens in this frame, e.g. 'Angriff über links'" },
+                        ball: {
+                          type: "object",
+                          properties: {
+                            x: { type: "number", description: "0=left goal line, 100=right goal line" },
+                            y: { type: "number", description: "0=top touchline, 100=bottom touchline" },
+                          },
+                          required: ["x", "y"],
+                        },
+                        players: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              team: { type: "string", enum: ["home", "away"] },
+                              x: { type: "number" },
+                              y: { type: "number" },
+                              role: { type: "string", description: "Optional: GK, DEF, MID, FWD if identifiable" },
+                            },
+                            required: ["team", "x", "y"],
+                          },
+                        },
+                      },
+                      required: ["frame_index", "ball", "players"],
+                    },
+                  },
                   visual_quality: { type: "string", enum: ["good", "moderate", "poor"] },
                   confidence: { type: "number" },
                 },
-                required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "visual_quality", "confidence"],
+                required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "frame_positions", "visual_quality", "confidence"],
               },
             },
           },
@@ -251,6 +284,7 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
       { type: "danger_zones", data: analysis.danger_zones },
       { type: "chances", data: analysis.chances },
       { type: "ball_loss_patterns", data: analysis.ball_loss_patterns },
+      ...(analysis.frame_positions?.length ? [{ type: "frame_positions", data: { frames: analysis.frame_positions, interval_sec: Math.round((duration_sec ?? 0) / selectedFrames.length) } }] : []),
     ];
 
     for (const result of resultTypes) {
