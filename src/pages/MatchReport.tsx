@@ -14,8 +14,10 @@ import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useModuleAccess } from "@/hooks/use-module-access";
 
 const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
+const HighlightGallery = lazy(() => import("@/components/HighlightGallery"));
 
 const CATEGORY_ICONS: Record<string, typeof Target> = {
   offense: Target,

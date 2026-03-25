@@ -6,9 +6,12 @@ import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileTex
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
+import { startVideoRecorder, type VideoRecorderHandle } from "@/lib/video-recorder";
 import RecordingGuard, { canStopRecording } from "@/components/RecordingGuard";
 import CameraSetupOverlay from "@/components/CameraSetupOverlay";
 import StopConfirmDialog from "@/components/StopConfirmDialog";
+import MatchEventQuickBar from "@/components/MatchEventQuickBar";
+import { useModuleAccess } from "@/hooks/use-module-access";
 
 type Phase = "setup" | "ready" | "recording" | "analyzing" | "done";
 
