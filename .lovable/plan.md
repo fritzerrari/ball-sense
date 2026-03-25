@@ -1,88 +1,86 @@
 
 
-# Fix: Analyse haengt bei 85% + Geschwindigkeitsoptimierung
+# Stabileres Kamera-System: Live-Sync, Thumbnail & Optimierung
 
-## Diagnose
+## Probleme identifiziert
 
-### 1. Analyse bleibt bei 85% haengen — ROOT CAUSE gefunden
-`analyze-match` setzt bei Zeile 406 den Status auf `"interpreting"` mit `progress: 85`. Danach ist die Edge Function FERTIG und gibt Response zurueck.
+1. **Thumbnail erst nach Spielende sichtbar**: Der Heartbeat sendet Thumbnails nur alle 15 Sekunden, aber die `CameraRemotePanel`-Komponente zeigt "unknown" als Status. Das `status_data`-Feld wird korrekt aktualisiert, ABER der Heartbeat laeuft nur waehrend `recording`, `halftime_pause` und `ready` — nicht waehrend `setup`. Ausserdem: Das erste Thumbnail kommt erst nach 15s Recording-Delay.
 
-Die `generate-insights` Funktion wird NICHT vom Server aufgerufen, sondern vom **Client** in `ProcessingPage.tsx` (Zeile 46-50): Wenn der Polling-Interval `status === "interpreting"` erkennt, ruft er `supabase.functions.invoke("generate-insights")` auf.
+2. **Delta-Upload viel zu langsam**: Aktuell alle 150 Sekunden (2.5 Min) — das ist praktisch nutzlos. Frames kommen alle 30s, der Delta-Upload sollte nach jedem neuen Frame passieren.
 
-**Problem**: `generate-insights` hat KEINE Logs — wurde nie aufgerufen. Moegliche Gruende:
-- Der Kamera-Helfer sieht die ProcessingPage nie (er ist auf der CameraTrackingPage)
-- Der Trainer hat die ProcessingPage vielleicht nicht offen
-- Der Client-seitige Trigger ist fragil (Browser-Tab geschlossen, Navigation weg, etc.)
+3. **Kein visuelles Feedback** auf dem Handy, dass Daten live synchronisiert werden.
 
-### 2. Analyse dauert zu lange fuer 45-Minuten-Spiele
-Aktueller Flow: ALLE Frames werden NACH dem Stoppen in einem Batch hochgeladen und analysiert. Bei 45 Min = ~90 Frames → Upload von ~4.5MB + ein grosser AI-Call mit 20 Bildern + ein zweiter AI-Call fuer Insights = potenziell 5-10 Minuten Wartezeit.
+4. **Zu viele manuelle Schritte**: Setup-Overlay → Ready → "Aufnahme starten" Button → Recording. Der Helfer muss 3x klicken. Besser: Trainer gibt beim Code-Erstellen die Aufnahme frei, Helfer muss nur Kamera positionieren.
 
-### 3. Wenige Daten (1 Minute = 2-3 Frames)
-Bei nur 2-3 Frames ist die AI-Analyse trotzdem moeglich, aber der Payload ist winzig. Das Problem ist eher, dass `generate-insights` nie getriggert wird (siehe Punkt 1).
+5. **Analyse-Pipeline langsam**: Alle Frames werden erst am Ende analysiert. Mit inkrementellen Chunks koennte die Analyse schon waehrend der Aufnahme starten.
 
-## Loesung
+## Plan
 
-### A. KRITISCH: Server-seitige Verkettung (Fix 85%-Bug)
+### A. Sofortiges Thumbnail ab Kamera-Start
 
-**`analyze-match/index.ts`** — Am Ende (nach dem Speichern der Ergebnisse) direkt `generate-insights` server-seitig aufrufen statt auf den Client zu warten:
+**`CameraTrackingPage.tsx`**:
+- Heartbeat sofort nach `initCamera()` starten (nicht erst bei Recording)
+- Erstes Thumbnail direkt nach Kamera-Bereitschaft senden (Phase "ready")
+- Heartbeat-Intervall von 15s auf **10s** reduzieren fuer schnelleres Feedback
+- Thumbnail auch in `ready`-Phase senden (nicht nur `recording`)
 
-```
-// Statt: status = "interpreting" setzen und auf Client warten
-// Neu: Direkt generate-insights aufrufen (fire-and-forget via fetch)
-fetch(`${supabaseUrl}/functions/v1/generate-insights`, {
-  method: "POST",
-  headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
-  body: JSON.stringify({ match_id, job_id }),
-}).catch(err => console.error("generate-insights trigger error:", err));
-```
+### B. Echtzeit Delta-Sync mit Status-Anzeige
 
-Status-Flow wird: `queued → analyzing → interpreting → complete` (alles server-seitig).
+**`CameraTrackingPage.tsx`**:
+- Delta-Upload-Intervall von 150s auf **45s** reduzieren (nach jedem neuen Frame + Puffer)
+- Delta-Upload auch fuer authentifizierte Trainer aktivieren (nicht nur Helper)
+- Neuer State `syncedFrames` — zeigt an wie viele Frames bereits synchronisiert sind
+- Visuelles Feedback auf dem Handy-Bildschirm: gruener Sync-Indikator mit "3/5 synchronisiert"
 
-**`ProcessingPage.tsx`** — Client-seitigen Trigger als Fallback beibehalten, aber nicht mehr als primaeren Mechanismus.
+**`camera-ops/index.ts`** — `append-frames` Action:
+- Nach erfolgreichem Chunk-Upload: `status_data.synced_frames` aktualisieren
+- Trainer sieht in `CameraRemotePanel` den Sync-Fortschritt
 
-### B. Inkrementeller Frame-Upload waehrend der Aufnahme
+### C. Vereinfachter Kamera-Flow (weniger Klicks)
 
-Statt alle Frames am Ende hochzuladen, werden Frames waehrend der Aufnahme in Batches gesendet:
+**`CameraTrackingPage.tsx`**:
+- Nach Code-Eingabe: Kamera-Setup-Overlay zeigen, aber Kamera SOFORT initialisieren (parallel)
+- "Aufnahme starten" im Setup-Overlay startet direkt die Aufnahme (kein separater "Ready"-Screen)
+- Ready-Phase wird uebersprungen wenn Trainer den Start-Befehl remote sendet
+- Setup-Phase merged mit Ready: Kamera laeuft im Hintergrund, Tipps werden als Overlay gezeigt
 
-**`CameraTrackingPage.tsx`** — Neuer Interval (alle 5 Frames / ~2.5 Min):
-- Snapshot der neuen Frames seit letztem Upload
-- Upload via `camera-ops` mit `action: "append-frames"` (neue Action)
-- Server haengt Frames an bestehende Datei an oder erstellt Chunk-Dateien
+### D. Live-Sync Anzeige auf Trainer-Dashboard
 
-**`camera-ops/index.ts`** — Neue Action `"append-frames"`:
-- Empfaengt nur die NEUEN Frames seit letztem Upload (Delta)
-- Speichert als `{matchId}_chunk_{n}.json` im Storage
-- Aktualisiert Session-Status mit aktuellem Frame-Count
+**`CameraRemotePanel.tsx`**:
+- Sync-Status anzeigen: "5 Frames synchronisiert" mit Fortschrittsbalken
+- Thumbnail automatisch alle 10s aktualisieren (Realtime-Subscription existiert bereits)
+- Status-Text verbessern: "Aufnahme · 12 Frames · 5 synchronisiert"
+- Wenn Thumbnail vorhanden: automatisch anzeigen (auch in Ready-Phase)
 
-**Vorteil**: Am Ende der Aufnahme muessen nur die letzten paar Frames hochgeladen werden statt aller 90. Upload-Zeit sinkt von Minuten auf Sekunden.
+### E. Live-Daten-Verarbeitung waehrend der Aufnahme
 
-### C. Schnelle Analyse bei wenigen Frames
+**`camera-ops/index.ts`** — Neue Logik in `append-frames`:
+- Nach dem Speichern eines Chunks: Pruefen ob genug Frames fuer eine Zwischen-Analyse vorhanden sind (>= 5 Frames total)
+- Wenn ja: `analyze-match` fire-and-forget mit den bisherigen Chunk-Dateien triggern
+- Analyse-Job mit `status: "live_partial"` markieren um Teil-Analysen von End-Analysen zu unterscheiden
+- Trainer sieht auf dem Dashboard sofort erste Ergebnisse nach ~3 Minuten
 
-**`analyze-match/index.ts`** — Wenn < 5 Frames:
-- Leichtgewichtigeres Modell verwenden (`gemini-2.5-flash-lite` statt `gemini-2.5-flash`)
-- Reduzierter Prompt (keine Pressing-/Transitions-Analyse, nur Grundstruktur)
-- Ergebnis in < 30 Sekunden statt Minuten
+**`analyze-match/index.ts`**:
+- Wenn `phase === "live_partial"`: Chunk-Dateien aus Storage zusammenfuehren
+- Leichteres Modell (`gemini-2.5-flash-lite`) fuer Zwischen-Analysen
+- Reduzierter Prompt (nur Grundstruktur + Formationserkennung, kein vollstaendiger Report)
 
-### D. Live-Thumbnail fuer Trainer (leichtgewichtig)
+### F. Robustere Fehlerbehandlung
 
-Kein volles Video-Streaming (zu teuer/komplex), sondern ein aktuelles Standbild alle 30 Sekunden:
-
-**`CameraTrackingPage.tsx`** — Im Heartbeat den aktuellsten Frame als Base64-Thumbnail mitsenden (stark komprimiert, ~10KB).
-
-**`camera-ops/index.ts`** — Heartbeat speichert Thumbnail in `status_data.thumbnail`.
-
-**`CameraRemotePanel.tsx`** — Zeigt das letzte Thumbnail als Live-Vorschau an.
+**`CameraTrackingPage.tsx`**:
+- Bei Upload-Fehler: Automatischer Retry nach 30s (max 3 Versuche)
+- Wenn Helfer offline geht: Frames lokal puffern, bei Reconnect automatisch nachsenden
+- Toast-Nachrichten klarer: "Frame 5 synchronisiert" statt generischer Fehler
 
 ## Betroffene Dateien
 
 | Datei | Aenderung |
 |---|---|
-| `supabase/functions/analyze-match/index.ts` | Server-seitig generate-insights aufrufen statt Client-Trigger; leichtgewichtiger Modus fuer < 5 Frames |
-| `supabase/functions/camera-ops/index.ts` | Neue Action `append-frames`; Thumbnail im Heartbeat speichern |
-| `src/pages/CameraTrackingPage.tsx` | Inkrementeller Frame-Upload alle 5 Frames; Thumbnail im Heartbeat |
-| `src/pages/ProcessingPage.tsx` | Client-Trigger als Fallback beibehalten, nicht primaer |
-| `src/components/CameraRemotePanel.tsx` | Live-Thumbnail-Vorschau anzeigen |
-| `src/lib/frame-capture.ts` | `getNewFramesSince(index)` Methode hinzufuegen fuer Delta-Upload |
+| `src/pages/CameraTrackingPage.tsx` | Sofortiger Heartbeat, schnellerer Delta-Sync (45s), Sync-Indikator UI, vereinfachter Flow, Retry-Logik |
+| `src/components/CameraRemotePanel.tsx` | Sync-Fortschritt anzeigen, Thumbnail in Ready-Phase, bessere Status-Texte |
+| `src/components/CameraSetupOverlay.tsx` | Kamera parallel starten, direkter Aufnahme-Start |
+| `supabase/functions/camera-ops/index.ts` | append-frames: synced_frames tracken, optionale Live-Analyse triggern |
+| `supabase/functions/analyze-match/index.ts` | live_partial Modus: Chunks zusammenfuehren, leichtes Modell |
 
-Keine DB-Migration noetig — `status_data` (jsonb) kann Thumbnail direkt speichern.
+Keine DB-Migration noetig — alle Daten passen in bestehende `status_data` (jsonb) und `match-frames` Storage.
 
