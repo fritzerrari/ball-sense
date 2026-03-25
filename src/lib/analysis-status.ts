@@ -52,7 +52,7 @@ export function getAnalysisStatusInfo(stage: AnalysisStage): AnalysisStatus {
       return {
         stage,
         label: "Vorläufig",
-        description: "Erste vollständige Berechnung. Automatische Nachkorrektur und Qualitätsprüfung laufen noch.",
+        description: "Erste vollständige Berechnung aus den vorliegenden Tracking-Daten. Werte sind stabil, können aber bei neuer Datenlage nachberechnet werden.",
         color: "blue",
         icon: "refresh",
         progress: 70,
