@@ -1284,16 +1284,22 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       }
     }
 
+    // Count total stats generated (including fallback track stats)
+    const totalStatsCount = playerStats.length || trackProfiles.filter(t => t.sidelineRatio < 0.45 && t.edgeRatio < 0.4 && t.positions.length >= 2).length;
+    
     await supabase.from("matches").update({
       status: "done",
       processing_progress: {
         phase: "complete", progress: 100,
-        detail: `${stageLabel} · ${playerStats.length} Spieler · ${sessions.length} Kamera(s)`,
+        detail: `${stageLabel} · ${totalStatsCount} Spieler · ${sessions.length} Kamera(s)`,
         analysis_stage: analysisStage,
+        total_tracks: trackProfiles.length,
+        field_tracks: trackProfiles.filter(t => t.sidelineRatio < 0.45).length,
+        assigned_players: playerStats.length,
         updated_at: new Date().toISOString(),
       },
     }).eq("id", matchId);
-    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${playerStats.length} players, ${sessions.length} camera(s)`);
+    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${totalStatsCount} stats (${playerStats.length} assigned + fallback), ${sessions.length} camera(s), ${trackProfiles.length} tracks`);
   } catch (err) {
     console.error("[process-tracking] Error:", err);
     await updateProgress("error", 0, err instanceof Error ? err.message : "Verarbeitung fehlgeschlagen");
