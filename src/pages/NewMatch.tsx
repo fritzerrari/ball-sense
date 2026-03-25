@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft, Calendar, Upload, Video, Square, Loader2, Check,
-  Swords, ArrowRight, Sparkles, FileVideo, ImageIcon,
+  Swords, ArrowRight, Sparkles, FileVideo, ImageIcon, Clock,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useFields } from "@/hooks/use-fields";
@@ -45,6 +45,8 @@ export default function NewMatch() {
   const streamRef = useRef<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
+  const [halftimeSent, setHalftimeSent] = useState(false);
+  const [halftimeSending, setHalftimeSending] = useState(false);
 
   useEffect(() => {
     if (fields?.length && !fieldId) setFieldId(fields[0].id);
@@ -229,6 +231,62 @@ export default function NewMatch() {
 
     await analyzeFrames(captureResult);
   }, [analyzeFrames]);
+
+  /** Send frames captured so far for halftime analysis WITHOUT stopping recording */
+  const triggerHalftimeAnalysis = useCallback(async () => {
+    if (!matchId || !liveCaptureRef.current) return;
+
+    const snapshot = liveCaptureRef.current.getSnapshot();
+    if (snapshot.frames.length < 3) {
+      toast.error("Noch zu wenige Frames für eine Analyse");
+      return;
+    }
+
+    setHalftimeSending(true);
+    try {
+      // Persist halftime frames
+      const framesJson = JSON.stringify({
+        frames: snapshot.frames,
+        duration_sec: snapshot.durationSec,
+        phase: "halftime",
+        captured_at: new Date().toISOString(),
+      });
+      await supabase.storage
+        .from("match-frames")
+        .upload(`${matchId}.json`, new Blob([framesJson], { type: "application/json" }), { upsert: true });
+
+      // Create halftime analysis job
+      const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
+        match_id: matchId,
+        status: "queued",
+        progress: 0,
+      }).select().single();
+      if (jobError) throw jobError;
+
+      await supabase.from("matches").update({ status: "processing" }).eq("id", matchId);
+
+      // Fire and forget
+      supabase.functions.invoke("analyze-match", {
+        body: {
+          match_id: matchId,
+          job_id: job.id,
+          frames: snapshot.frames,
+          duration_sec: snapshot.durationSec,
+          phase: "halftime",
+        },
+      });
+
+      setHalftimeSent(true);
+      if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+      toast.success("Halbzeit-Analyse gestartet! Aufnahme läuft weiter.");
+    } catch (err: any) {
+      toast.error(err.message ?? "Halbzeit-Analyse fehlgeschlagen");
+    } finally {
+      setHalftimeSending(false);
+    }
+  }, [matchId]);
+
+  const showHalftimeButton = isRecording && frameCount >= 3 && !halftimeSent;
 
   const canProceed = Boolean(date && fieldId);
 
@@ -417,15 +475,39 @@ export default function NewMatch() {
                     </>
                   )}
                 </div>
-                <div className="p-4">
+                <div className="p-4 space-y-2">
                   {!isRecording ? (
                     <Button onClick={startRecording} size="lg" className="w-full gap-2 h-14 text-base">
                       <Video className="h-5 w-5" /> Aufnahme starten
                     </Button>
                   ) : (
-                    <Button onClick={stopAndAnalyze} size="lg" variant="destructive" className="w-full gap-2 h-14 text-base">
-                      <Square className="h-5 w-5" /> Stoppen & Analysieren
-                    </Button>
+                    <>
+                      {showHalftimeButton && (
+                        <Button
+                          onClick={triggerHalftimeAnalysis}
+                          disabled={halftimeSending}
+                          size="lg"
+                          variant="secondary"
+                          className="w-full gap-2 h-12 text-base border border-primary/30 bg-primary/10 hover:bg-primary/20"
+                        >
+                          {halftimeSending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Clock className="h-5 w-5 text-primary" />
+                          )}
+                          ⚽ Halbzeit-Analyse starten
+                        </Button>
+                      )}
+                      {halftimeSent && (
+                        <div className="flex items-center justify-center gap-2 py-1 text-xs text-primary">
+                          <Check className="h-3 w-3" />
+                          <span>HZ-Analyse läuft im Hintergrund</span>
+                        </div>
+                      )}
+                      <Button onClick={stopAndAnalyze} size="lg" variant="destructive" className="w-full gap-2 h-14 text-base">
+                        <Square className="h-5 w-5" /> Stoppen & Endanalyse
+                      </Button>
+                    </>
                   )}
                   <p className="text-xs text-muted-foreground text-center mt-2">
                     <ImageIcon className="inline h-3 w-3 mr-1" />

@@ -101,6 +101,11 @@ export function startLiveCapture(videoEl: HTMLVideoElement) {
       const durationSec = Math.round((Date.now() - startTime) / 1000);
       return { frames, durationSec };
     },
+    /** Returns a snapshot of frames captured so far WITHOUT stopping the capture */
+    getSnapshot: (): FrameCaptureResult => {
+      const durationSec = Math.round((Date.now() - startTime) / 1000);
+      return { frames: [...frames], durationSec };
+    },
     getFrameCount: () => frames.length,
   };
 }
