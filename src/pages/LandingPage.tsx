@@ -14,6 +14,8 @@ import { KeyNumbers } from "@/components/landing/KeyNumbers";
 import { TrustSection } from "@/components/landing/TrustSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
+import { WhyFieldIQ } from "@/components/landing/WhyFieldIQ";
+import { TransparencySection } from "@/components/landing/TransparencySection";
 import { Footer } from "@/components/landing/Footer";
 
 export default function LandingPage() {
@@ -159,6 +161,8 @@ export default function LandingPage() {
       </section>
 
       <KeyNumbers />
+      <WhyFieldIQ />
+      <TransparencySection />
       <DemoSection />
       <HowItWorks />
       <AnalyticsShowcase />

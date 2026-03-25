@@ -14,6 +14,8 @@ const faqKeys = [
   { q: "landing.faq4q", a: "landing.faq4a" },
   { q: "landing.faq5q", a: "landing.faq5a" },
   { q: "landing.faq6q", a: "landing.faq6a" },
+  { q: "landing.faq7q", a: "landing.faq7a" },
+  { q: "landing.faq8q", a: "landing.faq8a" },
 ];
 
 export function FAQSection() {

@@ -73,8 +73,8 @@ export function FeatureCards() {
       icon: FileText,
       title: language === "de" ? "KI-Berichte in 3 Stilen" : "AI reports in 3 styles",
       desc: language === "de"
-        ? "Vorbericht, Halbzeitanalyse und Nachbericht — als analytischer Report, Social-Media-Post oder Zeitungsartikel."
-        : "Pre-match, halftime and post-match — as analytical report, social media post or newspaper article.",
+        ? "Vorbericht, Halbzeitanalyse und Nachbericht — als analytischer Report, Social-Media-Post oder Zeitungsartikel. Content-Generierung für Vereinswebsite und Presse — exportierbar als PDF, teilbar per WhatsApp, E-Mail und X."
+        : "Pre-match, halftime and post-match — as analytical report, social media post or newspaper article. Content generation for club website and press — exportable as PDF, shareable via WhatsApp, email and X.",
       span: "sm:col-span-2",
       accent: "from-accent/15 to-transparent",
     },
@@ -139,8 +139,8 @@ export function FeatureCards() {
       icon: Eye,
       title: language === "de" ? "Gegner-Scouting" : "Opponent scouting",
       desc: language === "de"
-        ? "Automatischer Scouting-Report: Bevorzugte Angriffsseite, Schwachstellen und empfohlene Gegenstrategie."
-        : "Auto scouting report: Preferred attack side, weaknesses and recommended counter-strategy.",
+        ? "Analysiere den Gegner aus früheren Spielen: Bevorzugte Angriffsseite, Pressing-Verhalten, Schwachstellen — automatischer Scouting-Report mit Taktik-Empfehlung."
+        : "Analyze opponents from previous matches: Preferred attack side, pressing behavior, weaknesses — automatic scouting report with tactical recommendations.",
       span: "sm:col-span-2",
       accent: "from-primary/20 to-primary/5",
     },

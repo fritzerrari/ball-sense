@@ -541,6 +541,10 @@ const de: TranslationDict = {
   "landing.faq5a": "1 Smartphone genügt. Einfach am Spielfeldrand aufstellen und das gesamte Feld filmen.",
   "landing.faq6q": "Funktioniert es auch bei Regen oder Dämmerung?",
   "landing.faq6a": "Ja, solange die Kamera ausreichend Kontrast hat. Bei Dunkelheit empfehlen wir Flutlicht.",
+  "landing.faq7q": "Kann ich FieldIQ für Pressearbeit nutzen?",
+  "landing.faq7a": "Ja! Generiere Vor-, Halbzeit- und Nachberichte in 3 Stilen: analytisch, als Social-Media-Post oder als Zeitungsartikel. Perfekt für Vereinswebsite, Instagram, WhatsApp-Gruppen oder lokale Presse.",
+  "landing.faq8q": "Was muss ich während des Spiels manuell machen?",
+  "landing.faq8a": "Fast nichts. Vor dem Spiel stellst du das Smartphone auf und wählst die Aufstellung (2 Min). Während des Spiels kannst du optional Events antippen (Tor, Karte). Die KI analysiert automatisch — nach dem Spiel ist der Report in ~2 Min fertig.",
 
   // Testimonials
   "landing.testimonial1": "Mit FieldIQ haben wir endlich Profi-Daten — ohne Profi-Budget. Unsere Spieler lieben die Heatmaps.",
@@ -1135,6 +1139,10 @@ const en: TranslationDict = {
   "landing.faq5a": "1 smartphone is enough. Simply place it at the sideline and film the entire pitch.",
   "landing.faq6q": "Does it work in rain or twilight?",
   "landing.faq6a": "Yes, as long as the camera has enough contrast. In darkness, we recommend floodlights.",
+  "landing.faq7q": "Can I use FieldIQ for press work?",
+  "landing.faq7a": "Yes! Generate pre-match, halftime and post-match reports in 3 styles: analytical, social media post or newspaper article. Perfect for your club website, Instagram, WhatsApp groups or local press.",
+  "landing.faq8q": "What do I need to do manually during the match?",
+  "landing.faq8a": "Almost nothing. Before the match, set up your smartphone and select the lineup (2 min). During the match, you can optionally tap events (goal, card). The AI analyzes automatically — after the match, the report is ready in ~2 min.",
 
   // Testimonials
   "landing.testimonial1": "With FieldIQ we finally have pro-level data — without a pro budget. Our players love the heatmaps.",
