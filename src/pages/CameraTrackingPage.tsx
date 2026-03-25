@@ -1191,10 +1191,9 @@ export default function CameraTrackingPage() {
 
             {/* AI detection status */}
             {(() => {
-              const aiStats = trackerRef.current?.getAIStats();
-              const hasAI = aiStats && aiStats.successful > 0;
-              const aiErrors = aiStats ? aiStats.errors : 0;
-              if (!aiStats || aiStats.total === 0) return null;
+              const hasAI = aiStatsState.successful > 0;
+              const aiErrors = aiStatsState.errors;
+              if (aiStatsState.total === 0) return null;
               return (
                 <div className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-left ${
                   hasAI
@@ -1208,7 +1207,7 @@ export default function CameraTrackingPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {hasAI
-                        ? `${aiStats.successful} von ${aiStats.total} Frames erfolgreich analysiert · ${playerCount} Spieler erkannt`
+                        ? `${aiStatsState.successful} von ${aiStatsState.total} Frames erfolgreich analysiert · ${playerCount} Spieler erkannt`
                         : aiErrors > 3
                           ? "Bildanalyse fehlgeschlagen — Daten werden trotzdem aufgezeichnet"
                           : "Warte auf erste KI-Analyse…"
