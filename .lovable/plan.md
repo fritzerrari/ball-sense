@@ -1,73 +1,96 @@
 
-Ziel: Das System auf “echte, nachvollziehbare Daten” umstellen, Hänger eliminieren und den Prozess für 20s bis 90min robust machen.
+Ziel: Den echten Hauptfehler beheben (nicht nur Symptome), damit Reports nicht mehr mit „—/0“ hängen bleiben und Tore/KPIs nachvollziehbar entstehen.
 
-1) Harte Ursachen (aus Code + Logs)
-- Der Kamera-Screen zeigt weiterhin “Simulationsmodus aktiv” (`src/pages/CameraTrackingPage.tsx`), obwohl echte Erkennung erwartet wird → Vertrauensbruch.
-- `analyze-frame` hat für reale Läufe keine Logs; damit kommen Live-Detections nicht zuverlässig an.
-- Upload-Pipeline dupliziert Sessions: `camera-ops` schreibt pro Sync immer neue `tracking_uploads`-Rows, `process-tracking` verarbeitet alle Rows und zählt dieselbe Kamera mehrfach (z. B. “3 Kameras” bei nur Cam 0).
-- Kalibrierungs-Metadaten gehen verloren: `camera-ops save_calibration` speichert immer `coverage: full` + `field_rect: {0,0,1,1}` und ignoriert Teilausschnitt.
-- KPI/Status wirken “gleich”: Datenqualität wird aus einer UI-Formel berechnet (oft ~50%), nicht aus echten Pipeline-Kennzahlen; `frames_analyzed` wird nicht konsistent geschrieben.
-- Auto-Discovery erzeugt Platzhalter-Spieler und damit formal “Daten”, obwohl Qualität zu niedrig ist.
+Do I know what the issue is? Ja.
 
-2) Umsetzungsplan (Hotfix + Umbau)
-A. Wahrheitsmodus (sofort)
-- Entferne Simulation-Badge/Banner in Tracking-UI.
-- Zeige stattdessen: “Echt-Erkennung aktiv” / “Keine Echt-Erkennung (Fallback: nur Aufnahme)”.
-- Wenn innerhalb von 8–10s kein erfolgreicher Frame-Call: klarer Fehlerzustand mit Handlung (“Kamera neu starten”, “Licht/Zoom prüfen”), kein stilles Weiterlaufen.
+## 1) Echte Ursachen (aus Code + DB + Logs)
 
-B. Analyze-Frame Aufruf stabilisieren
-- `FootballTracker` Request robust machen: vollständige Header (`apikey` + `Authorization`), explizite Fehlercodes 402/429/500 nach UI durchreichen.
-- Detektions-Telemetrie je Lauf sammeln: `ai_total`, `ai_success`, `ai_fail`, `first_success_at_ms`.
-- Frontend-Guard: Tracking darf nur als “Echtdaten” gelten, wenn success-rate Mindestwert erreicht.
+1. **Tor-Erkennung fehlt nicht wegen Bug, sondern wegen Logik**
+   - In `process-tracking` werden `goals` bewusst **nur** aus `match_events` übernommen.
+   - Für das betroffene Match gibt es `match_events = 0`.
+   - Ergebnis: Tore bleiben 0, selbst wenn im Video ein Tor sichtbar war.
 
-C. Upload-/Processing-Entdoppelung
-- `camera-ops upload_tracking`: pro `match_id + camera_index + upload_mode` upsert/update statt immer insert.
-- `process-tracking`: Uploads vor Verarbeitung deduplizieren (neuester Datensatz je Kamera + Modus), Batch priorisieren gegenüber älteren Zwischenständen.
-- `cameras_used` aus eindeutigen `camera_index` berechnen, nicht aus `sessions.length`.
+2. **Taktische KPIs bleiben 0, obwohl physische Werte da sind**
+   - `passes/duels/shots` hängen an Ball-Proximity-Heuristiken.
+   - Bei den aktuellen Daten sind Ballkontakte extrem niedrig → deshalb fast alles 0.
+   - UI zeigt dann „—“/0 und wirkt wie „keine Analyse“.
 
-D. Kalibrierung korrekt persistieren
-- Frontend sendet bei `save_calibration` zusätzlich `field_rect`, `coverage_percent`, `coverage`, `detected_features`.
-- `camera-ops` speichert genau diese Werte (statt hardcoded full-field).
-- `tracking_uploads` erhält Kalibrierungs-Snapshot pro Upload; `process-tracking` nutzt diesen statt heuristischem Dauer-Override.
+3. **Strukturelles Architekturproblem: zwei Tracking-Pipelines parallel**
+   - `TrackingPage.tsx` (Coach-Route `/matches/:id/track`) nutzt Legacy-Flow (direkte Upload/Insert-Logik).
+   - `CameraTrackingPage.tsx` nutzt neuen Flow (`camera-ops`, Session, etc.).
+   - Dadurch entstehen inkonsistente Datenpfade, unterschiedliche Upload-/Status-Verhalten und schwer reproduzierbare Fehler.
 
-E. KPI-Qualitätsgates statt Scheinwerte
-- In `process-tracking` Mindestqualitätsprüfung:
-  - zu wenige person-detections / zu wenig valide Frames / extrem niedrige assignment confidence → “insufficient_data” statt Fake-KPI.
-- Auto-Discovery nur bei ausreichender Evidenz; sonst keine Platzhalter-Stats.
-- Fouls/Karten/Tore weiterhin ausschließlich aus Match-Events (bereits korrekt), plus deutlicher Hinweis im Report.
+4. **Upload-Dedupe ist nur code-basiert, nicht DB-seitig abgesichert**
+   - `tracking_uploads` hat nur PK auf `id`, **keinen** Unique-Key für `(match_id, camera_index, upload_mode)`.
+   - Rennen/Mehrfachläufe können doppelte Kandidaten erzeugen.
 
-F. Progress/Status korrekt trennen
-- `processing_progress` = technischer Pipeline-Fortschritt.
-- `data_quality` = separater, backend-berechneter Score (Coverage, Detection-Success-Rate, Assignment-Confidence, Frame-Dichte).
-- `MatchReport` und `AnalysisStatusBanner` nur noch backend-gelieferte Werte anzeigen, keine konstante Client-Schätzung.
+5. **`full`-Processing verarbeitet aktuell batch+live zusammen**
+   - Wenn beides für dieselbe Kamera vorhanden ist, wird nicht klar priorisiert (zwar dedupe pro mode, aber nicht pro Kamera auf „beste Quelle“).
+   - Das verschlechtert Datenkonsistenz.
 
-G. 20s- und 90min-Robustheit
-- 20s: keine Mindestminute als K.O.-Kriterium, stattdessen framebasiert.
-- 90min: inkrementelle Verarbeitung in stabilen Blöcken, finaler Run nur auf neuen Daten; keine Mehrfachverarbeitung gleicher Chunks.
+## 2) Umsetzungsplan (konkret)
 
-3) Betroffene Dateien
-- `src/pages/CameraTrackingPage.tsx`
-- `src/lib/football-tracker.ts`
-- `src/pages/MatchReport.tsx`
-- `src/components/AnalysisStatusBanner.tsx`
-- `supabase/functions/camera-ops/index.ts`
-- `supabase/functions/process-tracking/index.ts`
-- optional: `supabase/functions/stream-tracking/index.ts` (Chunk-Zähler/Konsistenz)
+### A. Pipeline vereinheitlichen (höchste Priorität)
+- **Eine** ingest-Route für alle Clients:
+  - Coach-Tracking (`TrackingPage`) und Kamera-Tracking (`CameraTrackingPage`) sollen denselben Backend-Weg nutzen.
+- `TrackingPage.tsx` umbauen:
+  - keine direkten `tracking_uploads.insert` mehr,
+  - Upload/Status nur über `camera-ops` bzw. ein gemeinsames ingest-API mit gleicher Logik.
+- Ergebnis: einheitliche Datenqualität, gleiche Status-Transitions, keine divergierenden Zustände.
 
-4) Technische Details (konkret)
-- Dedupe-Key Uploads: `(match_id, camera_index, upload_mode)`; immer neueste Nutzlast.
-- Quality-Gates im Backend:
-  - `valid_frames >= N`
-  - `avg_assignment_confidence >= X`
-  - `ai_success_rate >= Y`
-  - sonst `processing_progress.phase = "quality_warning"` + UI-Hinweis.
-- Team/Player-Stats nur schreiben, wenn Gate erfüllt; sonst Report-Block “Nicht genug verlässliche Daten”.
-- `raw_metrics` standardisieren: `frames_analyzed`, `ai_success_rate`, `coverage_ratio`, `assignment_confidence_avg`, `data_quality_score`.
+### B. DB-seitige Entdoppelung hart machen
+- Migration:
+  - Unique-Index auf `tracking_uploads(match_id, camera_index, upload_mode)`.
+- `camera-ops` auf echtes Upsert gegen diesen Schlüssel.
+- Ergebnis: keine Duplikate mehr durch Retry/Parallelität.
 
-5) Abnahme (muss erfüllt sein)
-- Kameraansicht zeigt nirgends “Simulation”.
-- `analyze-frame` Logs sind bei Tracking-Lauf sichtbar (mehrere Calls pro Minute).
-- Ein 20s-Clip liefert entweder belastbare Basis-KPIs oder klaren “insufficient_data”-Status (kein 0%-Fake-Dashboard).
-- Ein 90min-Lauf bleibt verarbeitbar ohne Hänger; Progress bewegt sich match-spezifisch.
-- `cameras_used` stimmt mit real verbundenen Kameras überein.
-- Heatmap stimmt räumlich mit sichtbarem Spielfeldausschnitt und Kalibrierung überein.
+### C. `process-tracking` Quellenpriorisierung fixen
+- Bei vorhandenen Uploads pro Kamera:
+  - **batch priorisieren**, live nur als Fallback.
+- So wird dieselbe Aufnahme nicht doppelt als getrennte Quelle verarbeitet.
+- Zusätzlich: klarere Progress-Details (`source=batch|live`, `frames_used`, `reason_fallback`).
+
+### D. Tore/Kernereignisse robust lösen
+- Kurzfristig (zuverlässig):
+  - `LiveEventTicker` auch in `CameraTrackingPage` integrieren (nicht nur in `TrackingPage`).
+  - Im Match-Report klarer Hinweis: „Tore/Karten/Fouls kommen aus Events; ohne Events bleiben diese Werte leer.“
+- Mittelfristig:
+  - optionale „AI Event Suggestions“ (nur Vorschläge, nicht auto-commit), damit Tore nicht still verloren gehen.
+
+### E. KPI-Transparenz statt Schein-Nullen
+- Wenn Ball-/Event-Basis unzureichend:
+  - kein stilles 0 als scheinbarer Fakt,
+  - stattdessen Zustand „nicht belastbar“ pro KPI-Block.
+- `CoachSummary`/KPI-Karten anpassen: fehlende Datengrundlage explizit anzeigen.
+
+### F. Reprocess sichtbar und vertrauenswürdig machen
+- Reprocess startet bereits, aber Nutzerfeedback ist unklar.
+- Ergänzen:
+  - letzte Run-Zeit,
+  - verwendete Quelle (batch/live),
+  - konkreter Grund bei „keine taktischen KPIs generiert“.
+
+### G. Deployment-Fehler `UnsetActiveDeploymentID`
+- Das ist sehr wahrscheinlich ein Deploy-Transaktionsproblem, kein Fachlogik-Fehler.
+- Fix-Plan:
+  - betroffene Functions einzeln neu deployen (nicht als großer Sammeldeploy),
+  - danach Funktionsaufrufe mit Edge-Logs validieren.
+
+## 3) Betroffene Dateien
+
+- `src/pages/TrackingPage.tsx` (Legacy-Ingest entfernen/angleichen)
+- `src/pages/CameraTrackingPage.tsx` (Event-Erfassung + gleiche Pipeline)
+- `supabase/functions/camera-ops/index.ts` (auth + robustes upsert)
+- `supabase/functions/process-tracking/index.ts` (batch-vs-live Priorisierung, bessere Diagnostik)
+- `src/pages/MatchReport.tsx` (KPI-Verfügbarkeitsstatus + bessere Reprocess-Transparenz)
+- `src/components/CoachSummary.tsx` (keine „plausibel“-Aussage bei fehlender Event-/Ballbasis)
+- DB Migration für Unique-Index auf `tracking_uploads`
+
+## 4) Abnahme (muss erfüllt sein)
+
+1. Ein Tor wird nach Event-Erfassung im Report zuverlässig als Tor angezeigt.
+2. Bei fehlender Event-/Ballbasis werden KPIs als „nicht belastbar“ markiert, nicht irreführend als scheinbar normale 0.
+3. Für ein Match mit batch+live derselben Kamera wird nur eine priorisierte Quelle verarbeitet.
+4. „Neu verarbeiten“ zeigt sichtbar Fortschritt + Quelle + Ergebnisgrund.
+5. Keine neuen doppelten `tracking_uploads` pro `(match_id, camera_index, upload_mode)`.
+
