@@ -109,6 +109,16 @@ export function AnalysisStatusBanner({ stage, coverageRatio = 1, isExtrapolated 
             {playerCount} Spieler erkannt
           </div>
         )}
+        {framesAnalyzed !== undefined && (
+          <div className="flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] text-muted-foreground">
+            {framesAnalyzed} Frames analysiert
+          </div>
+        )}
+        {camerasUsed !== undefined && camerasUsed > 0 && (
+          <div className="flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] text-muted-foreground">
+            {camerasUsed} Kamera{camerasUsed > 1 ? "s" : ""}
+          </div>
+        )}
         {stage === "prognose" && (
           <div className="flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-[10px] text-amber-700 dark:text-amber-400">
             <AlertTriangle className="h-3 w-3" />
