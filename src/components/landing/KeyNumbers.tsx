@@ -28,7 +28,7 @@ export function KeyNumbers() {
   const { t } = useTranslation();
 
   const stats = [
-    { value: 3, suffix: "", label: t("landing.smartphonesEnough"), sublabel: t("landing.keyNumberSmartphones") },
+    { value: 1, suffix: "", label: t("landing.smartphonesEnough"), sublabel: t("landing.keyNumberSmartphones") },
     { value: 30, suffix: "s", label: t("landing.toReport"), sublabel: t("landing.keyNumberReport") },
     { value: 0, suffix: "€", label: t("landing.hardwareCost"), sublabel: t("landing.keyNumberHardware") },
   ];
