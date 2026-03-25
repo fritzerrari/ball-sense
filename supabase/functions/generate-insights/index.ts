@@ -220,6 +220,25 @@ REGELN:
     // Update match status
     await supabase.from("matches").update({ status: "done" }).eq("id", match_id);
 
+    // Notify all club members that the report is ready
+    if (clubId) {
+      const { data: clubProfiles } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("club_id", clubId);
+
+      const matchLabel = match?.away_club_name ?? "Spiel";
+      for (const profile of clubProfiles ?? []) {
+        await supabase.from("notifications").insert({
+          user_id: profile.user_id,
+          match_id: match_id,
+          type: "report_ready",
+          title: "Analyse fertig",
+          body: `Der Report für "${matchLabel}" am ${match?.date ?? ""} ist verfügbar.`,
+        });
+      }
+    }
+
     // Cleanup: delete frames from storage after successful analysis
     await supabase.storage.from("match-frames").remove([`${match_id}.json`]);
     console.log(`Cleaned up frames for match ${match_id}`);
