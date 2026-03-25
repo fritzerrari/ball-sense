@@ -319,8 +319,19 @@ export default function FieldCalibration() {
         toast.error("Ecken konnten nicht erkannt werden. Bitte manuell setzen.");
       }
 
+      // Apply AI-detected field_rect for coverage
+      if (data?.fieldRect) {
+        const rect = data.fieldRect;
+        setFieldRect(rect);
+        const coverage = data.coveragePercent ?? Math.round(rect.w * rect.h * 100);
+        if (coverage < 90) {
+          setCoverage("custom");
+          toast.info(`Teilausschnitt erkannt: ~${coverage}% des Feldes sichtbar`);
+        }
+      }
+
       // Auto-set coverage for partial views
-      if (nextSuggestion.isPartialView) {
+      if (nextSuggestion.isPartialView && !data?.fieldRect) {
         const portion = nextSuggestion.visiblePortion;
         if (portion === "left_half") {
           handleCoverageChange("left_half");
