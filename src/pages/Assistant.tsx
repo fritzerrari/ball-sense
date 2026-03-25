@@ -5,7 +5,7 @@ import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, T
 import { Slider } from "@/components/ui/slider";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
-import PitchVisualization, { getPlayerColor } from "@/components/PitchVisualization";
+import { getPlayerColor } from "@/components/PlayerRosterPanel";
 import PlayerRosterPanel from "@/components/PlayerRosterPanel";
 import { usePlayers } from "@/hooks/use-players";
 import { supabase } from "@/integrations/supabase/client";
@@ -171,7 +171,7 @@ export default function AssistantPage() {
     let idx = 0;
     players.forEach(p => {
       if (selectedPlayerIds.has(p.id)) {
-        map.set(p.id, { color: getPlayerColor(idx), index: idx });
+        map.set(p.id, { color: getPlayerColor(p.position ?? null), index: idx });
         idx++;
       }
     });
@@ -638,7 +638,9 @@ export default function AssistantPage() {
                 )}
               </div>
             </div>
-            <PitchVisualization players={pitchPlayers} mode={pitchMode} timeRange={timeRange[0] === 0 && timeRange[1] === 1 ? undefined : timeRange} className="rounded-lg overflow-hidden" />
+            <div className="aspect-[16/10] rounded-lg overflow-hidden bg-muted/30 border border-border flex items-center justify-center">
+              <span className="text-xs text-muted-foreground">Spielfeld-Visualisierung (wird überarbeitet)</span>
+            </div>
             
             {/* Time Range Slider */}
             {pitchMode === "heatmap" && selectedPlayerIds.size > 0 && (

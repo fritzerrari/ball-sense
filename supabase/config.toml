@@ -24,11 +24,5 @@ verify_jwt = false
 [functions.detect-field-corners]
 verify_jwt = false
 
-[functions.stream-tracking]
-verify_jwt = false
-
 [functions.cleanup-highlights]
-verify_jwt = false
-
-[functions.analyze-frame]
 verify_jwt = false
