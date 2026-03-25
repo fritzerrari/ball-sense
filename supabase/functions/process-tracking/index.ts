@@ -700,13 +700,28 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
     await updateProgress("upload", 10, "Uploads werden geladen");
 
     // Look for both batch uploads (status=uploaded) AND streaming uploads (status=streaming)
-    const { data: uploads, error: uplErr } = await supabase
-      .from("tracking_uploads").select("*").eq("match_id", matchId).in("status", ["uploaded", "streaming"]);
-    if (uplErr) throw uplErr;
-    if (!uploads || uploads.length === 0) {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    let uploads: any[] = [];
+    for (let attempt = 1; attempt <= 8; attempt++) {
+      const { data: candidateUploads, error: uplErr } = await supabase
+        .from("tracking_uploads")
+        .select("*")
+        .eq("match_id", matchId)
+        .in("status", ["uploaded", "streaming"]);
+
+      if (uplErr) throw uplErr;
+      uploads = candidateUploads ?? [];
+      if (uploads.length > 0) break;
+
+      await updateProgress("upload", Math.min(12, 5 + attempt), `Warte auf Upload… (${attempt}/8)`);
+      await sleep(750);
+    }
+
+    if (uploads.length === 0) {
+      await updateProgress("error", 0, "Keine Uploads gefunden — bitte Neuverarbeitung starten");
       if (mode === "full") {
-        await updateProgress("error", 0, "Keine Uploads gefunden");
-        await supabase.from("matches").update({ status: "done" }).eq("id", matchId);
+        await supabase.from("matches").update({ status: "error" }).eq("id", matchId);
       }
       return;
     }
@@ -723,7 +738,17 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         if (uploadMode === "live" || !rawPath) {
           // Streaming upload: chunks stored as {matchId}/cam_{n}/chunk_*.json
           const chunkPrefix = `${matchId}/cam_${upload.camera_index}/`;
-          const { data: chunkFiles } = await supabase.storage.from("tracking").list(chunkPrefix, { limit: 1000, sortBy: { column: "name", order: "asc" } });
+
+          let chunkFiles: any[] = [];
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            const { data } = await supabase.storage
+              .from("tracking")
+              .list(chunkPrefix, { limit: 1000, sortBy: { column: "name", order: "asc" } });
+            chunkFiles = data ?? [];
+            if (chunkFiles.length > 0) break;
+            await sleep(400);
+          }
+
           if (!chunkFiles || chunkFiles.length === 0) {
             console.warn(`[process-tracking] No chunks found for cam ${upload.camera_index} at ${chunkPrefix}`);
             continue;
@@ -733,17 +758,37 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           const allFrames: TrackingFrame[] = [];
           for (const chunkFile of chunkFiles) {
             if (!chunkFile.name.endsWith(".json")) continue;
-            const { data: chunkData, error: chunkErr } = await supabase.storage.from("tracking").download(`${chunkPrefix}${chunkFile.name}`);
-            if (chunkErr) { console.warn(`Chunk download failed: ${chunkFile.name}`, chunkErr); continue; }
+
+            let chunkData: any = null;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              const { data, error: chunkErr } = await supabase.storage
+                .from("tracking")
+                .download(`${chunkPrefix}${chunkFile.name}`);
+              if (!chunkErr && data) {
+                chunkData = data;
+                break;
+              }
+              if (attempt === 3) {
+                console.warn(`Chunk download failed: ${chunkFile.name}`, chunkErr);
+              } else {
+                await sleep(300);
+              }
+            }
+
+            if (!chunkData) continue;
             const chunk = JSON.parse(await chunkData.text());
             if (chunk.frames) allFrames.push(...chunk.frames);
           }
 
           if (allFrames.length > 0) {
             sessions.push({
-              matchId, cameraIndex: upload.camera_index,
-              frames: allFrames, framesCount: allFrames.length,
-              durationSec: upload.duration_sec || (allFrames.length > 1 ? (allFrames[allFrames.length - 1].timestamp - allFrames[0].timestamp) / 1000 : 0),
+              matchId,
+              cameraIndex: upload.camera_index,
+              frames: allFrames,
+              framesCount: allFrames.length,
+              durationSec: upload.duration_sec || (allFrames.length > 1
+                ? (allFrames[allFrames.length - 1].timestamp - allFrames[0].timestamp) / 1000
+                : 0),
               createdAt: upload.uploaded_at,
             });
             console.log(`[process-tracking] Loaded ${allFrames.length} frames from ${chunkFiles.length} chunks (cam ${upload.camera_index})`);
@@ -751,29 +796,39 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         } else {
           // Batch upload: single file at file_path
           const storagePath = rawPath.startsWith("tracking/") ? rawPath.slice("tracking/".length) : rawPath;
-          // Remove trailing slash if present
           const cleanPath = storagePath.replace(/\/+$/, "");
-          const { data: fileData, error: dlErr } = await supabase.storage.from("tracking").download(cleanPath);
-          if (dlErr) {
-            // Try with .json extension as fallback
-            const jsonPath = cleanPath.endsWith(".json") ? cleanPath : `${cleanPath}.json`;
-            const { data: fileData2, error: dlErr2 } = await supabase.storage.from("tracking").download(jsonPath);
-            if (dlErr2) {
-              console.error(`Download cam ${upload.camera_index} failed (tried ${cleanPath} and ${jsonPath}):`, dlErr2);
-              continue;
+          const candidatePaths = [cleanPath, cleanPath.endsWith(".json") ? cleanPath : `${cleanPath}.json`];
+
+          let loadedSession: TrackingSession | null = null;
+          for (const candidatePath of candidatePaths) {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              const { data: fileData, error: dlErr } = await supabase.storage.from("tracking").download(candidatePath);
+              if (!dlErr && fileData) {
+                loadedSession = JSON.parse(await fileData.text()) as TrackingSession;
+                break;
+              }
+              if (attempt < 3) await sleep(300);
             }
-            const session: TrackingSession = JSON.parse(await fileData2.text());
-            sessions.push(session);
-          } else {
-            const session: TrackingSession = JSON.parse(await fileData.text());
-            sessions.push(session);
+            if (loadedSession) break;
           }
+
+          if (!loadedSession) {
+            console.error(`[process-tracking] Download cam ${upload.camera_index} failed after retries (${cleanPath})`);
+            continue;
+          }
+
+          sessions.push(loadedSession);
         }
       } catch (fileErr) {
         console.error(`[process-tracking] Error loading upload ${upload.id}:`, fileErr);
         continue;
       }
-      await updateProgress("detection", 15 + Math.round(((ui + 1) / uploads.length) * 15), `Kamera ${upload.camera_index + 1} geladen`);
+
+      await updateProgress(
+        "detection",
+        15 + Math.round(((ui + 1) / uploads.length) * 15),
+        `Kamera ${upload.camera_index + 1} geladen`,
+      );
     }
 
     if (sessions.length === 0) {
