@@ -1,79 +1,68 @@
 
 
-# Systemanalyse: 3 kritische Fehler im Recording-Flow
+# Fix: Upload-Fehler + Aufnahme stoppt nach wenigen Frames
 
 ## Identifizierte Probleme
 
-### 1. "System hört nach 5 Frames auf"
-`MIN_FRAMES_FOR_ANALYSIS = 5` in `RecordingGuard.tsx`. Bei 30-Sekunden-Intervall = 2,5 Minuten. Das System stoppt NICHT automatisch, aber der Stop-Button wird nach 5 Frames aktiv und zeigt "Stoppen & Endanalyse" — das suggeriert dem User, dass genug Daten da sind. 5 Frames sind viel zu wenig fuer eine sinnvolle Analyse.
+### 1. Frame-Capture stoppt still bei 180 Frames (aber auch bei wenigen)
+`MAX_FRAMES = 180` in `frame-capture.ts` (Zeile 8). Wenn `frames.length >= MAX_FRAMES` ist, wird `return` aufgerufen und keine neuen Frames mehr erfasst — ohne Warnung. Fuer den Halbzeit-Workflow muss das viel hoeher sein oder ganz entfallen.
 
-**Fix**: MIN_FRAMES auf 20 erhoehen (~10 Minuten). Fortschrittsanzeige mit klarer Empfehlung ("Optimal: ganze Halbzeit"). Stop-Button bleibt rot/deaktiviert bis Minimum erreicht, danach gelb mit "Frueh stoppen" Warnung.
+Zusaetzlich: `MIN_FRAMES_FOR_ANALYSIS = 20` blockiert den Stop-Button komplett. Der User MUSS 20 Frames (~10 Min.) abwarten.
 
-### 2. "Event-Buttons (Tor etc.) nicht klickbar am Handy"
-Die `MatchEventQuickBar` wird NUR angezeigt wenn `hasHighlights` true ist. Das prueft `useModuleAccess("video_highlights")`, welches `session?.user?.id` braucht. **Der Kamera-Helfer ist NICHT eingeloggt** → `auth.uid()` ist null → `hasAccess` ist immer false → Buttons werden nie gerendert.
+### 2. Upload schlaegt fehl (Fehlermeldung im Screenshot)
+Zwei Ursachen:
+- **Helfer (anonym)**: Die `camera-ops` Edge Function existiert zwar, aber der `match-frames` Storage-Bucket hat keine Anon-Policy fuer Uploads. Die Edge Function nutzt `SUPABASE_SERVICE_ROLE_KEY` — das sollte funktionieren. **Aber**: Der Bucket koennte eine Dateigroessenbegrenzung haben, oder die Frames-Payload ist zu gross fuer eine einzelne Edge-Function-Anfrage (max ~6MB Body).
+- **Trainer (auth)**: `analysis_jobs` INSERT-Policy prueft `EXISTS(SELECT 1 FROM matches WHERE id = match_id AND home_club_id = get_user_club_id(auth.uid()))`. Wenn der User keinem Club zugeordnet ist oder `get_user_club_id` null liefert, schlaegt der Insert fehl.
 
-Zusaetzlich: Selbst fuer eingeloggte Trainer kann das Modul `video_highlights` deaktiviert sein.
-
-**Fix**: Event-Buttons (Tor, Karte, Ecke) IMMER anzeigen waehrend der Aufnahme — die sind Kern-Funktionalitaet, kein Premium-Feature. Nur den Highlight-Clip-Teil (Video-Extraktion) an Modul-Zugriff koppeln. Buttons groesser machen (min 48px Touch-Target).
-
-### 3. "Video wird nicht hochgeladen / keine Analyse"
-**DAS ist der Hauptfehler.** Die gesamte Post-Recording-Logik in `CameraTrackingPage.tsx` nutzt den authentifizierten Supabase-Client:
-
-```
-supabase.storage.from("match-frames").upload(...)     // RLS: auth required
-supabase.from("analysis_jobs").insert(...)            // RLS: club member required  
-supabase.from("matches").update(...)                  // RLS: club member required
-supabase.functions.invoke("analyze-match", ...)       // Sends anon token
-```
-
-Der Kamera-Helfer ist NICHT eingeloggt. `auth.uid()` = null. ALLE diese Operationen schlagen durch RLS fehl. Die Frames gehen verloren, kein Job wird erstellt, keine Analyse wird gestartet.
-
-**Fix**: Neue Edge Function `camera-ops` die als Gateway fuer anonyme Kamera-Helfer dient. Nutzt Service-Role-Key intern. Validiert den Session-Token statt JWT.
-
----
+### 3. Halbzeit-Workflow fehlt komplett
+Kein Pause/Resume-Zyklus. Kein Neustart fuer 2. Halbzeit.
 
 ## Plan
 
-### A. Edge Function `camera-ops` erstellen
-Neues Gateway fuer alle Kamera-Helfer-Operationen (kein Login noetig):
+### A. `frame-capture.ts` — Unbegrenztes Capturing
+- `MAX_FRAMES` von 180 auf 9999 erhoehen
+- Frame-Capture laeuft bis `stop()` aufgerufen wird
 
-- `action: "upload-frames"` — Nimmt `session_token`, `match_id`, `frames[]`, `duration_sec` entgegen. Validiert Session-Token via Hash-Lookup in `camera_access_sessions`. Laed Frames in `match-frames` Bucket hoch (Service Role). Erstellt `analysis_job`. Updated Match-Status. Ruft `analyze-match` auf.
-- `action: "log-event"` — Nimmt `session_token`, `match_id`, `event_type`, `minute` entgegen. Fuegt `match_events` Eintrag ein (Service Role).
+### B. `RecordingGuard.tsx` — Stop immer erlauben
+- `MIN_FRAMES_FOR_ANALYSIS` auf 1 setzen
+- `canStopRecording()` gibt immer true zurueck ab 1 Frame
+- Warnung erfolgt im StopConfirmDialog, nicht durch Blockierung
 
-### B. `CameraTrackingPage.tsx` ueberarbeiten
-- Erkennen ob User eingeloggt oder Kamera-Helfer (via `sessionToken` State)
-- Eingeloggte User: Direkte Supabase-Calls (wie bisher)
-- Kamera-Helfer: Alle Operationen ueber `camera-ops` Edge Function routen
-- Frame-Upload und Analyse-Trigger ueber Edge Function statt direktem Client
+### C. `StopConfirmDialog.tsx` — Warnstufen beibehalten
+- Bereits korrekt implementiert mit Warnstufen
+- Keine Aenderung noetig
 
-### C. `MatchEventQuickBar.tsx` fixen
-- Event-Buttons IMMER anzeigen (nicht an `hasHighlights` koppeln)
-- Nur Highlight-Video-Extraktion an Modul-Check koppeln
-- Fuer Kamera-Helfer: Events ueber `camera-ops` Edge Function loggen
-- Touch-Targets vergroessern (h-12 statt h-9)
+### D. `CameraTrackingPage.tsx` — Halbzeit-Workflow + Upload-Fix
+- Neue Phase `"halftime_pause"` einfuegen
+- Halbzeit-Button: Frames hochladen, Capture stoppen, Stream aktiv lassen
+- "2. Halbzeit starten" Button in Pause-Phase
+- State `halfNumber` (1/2) tracken
+- Frame-Pfade: `{matchId}_h1.json` / `{matchId}_h2.json`
+- Upload-Fehlerbehandlung verbessern: Frames in Chunks aufteilen wenn > 4MB
 
-### D. `RecordingGuard.tsx` + Recording-UX verbessern
-- `MIN_FRAMES_FOR_ANALYSIS` auf 20 erhoehen
-- Fortschrittsanzeige: "X von ~30 Frames (Empfohlen: ganze Halbzeit)"
-- Stop-Button zeigt klare Warnung wenn < 20 Frames
-- Frame-Counter prominenter anzeigen mit Zeitschaetzung
+### E. `camera-ops/index.ts` — Upload robuster machen
+- Frames-Upload: Pruefen ob Payload-Groesse ok, ggf. Fehlermeldung verbessern
+- `phase`-Parameter in Dateiname einbauen (`{matchId}_{phase}.json`)
+- Bessere Error-Logs fuer Debugging
 
-### E. `StopConfirmDialog.tsx` verbessern
-- Klarere Warnstufen: < 10 Frames = "Sehr wenig", 10-20 = "Ausreichend", > 20 = "Gut"
-- Empfehlung wie lange noch aufnehmen
-
----
+### F. Fernsteuerung (CameraRemotePanel)
+- DB-Migration: `camera_access_sessions` um `command` (text) und `status_data` (jsonb) erweitern
+- Realtime aktivieren fuer `camera_access_sessions`
+- Neue Komponente `CameraRemotePanel.tsx`: Zeigt aktive Sessions, Buttons fuer Start/Stop/Halbzeit
+- `camera-ops` Edge Function: Neue Actions `heartbeat` und `send-command`
+- Helfer-Kamera: Realtime-Listener fuer Command-Aenderungen
+- Panel in Match-Detail-Seite einbinden
 
 ## Betroffene Dateien
 
 | Datei | Aktion |
 |---|---|
-| `supabase/functions/camera-ops/index.ts` | NEU — Gateway fuer anonyme Kamera-Operationen |
-| `src/pages/CameraTrackingPage.tsx` | Ueberarbeiten: Auth-Erkennung, Edge-Function-Routing |
-| `src/components/MatchEventQuickBar.tsx` | Fix: Immer anzeigen, groessere Buttons, Edge-Function-Support |
-| `src/components/RecordingGuard.tsx` | MIN_FRAMES erhoehen, bessere UX |
-| `src/components/StopConfirmDialog.tsx` | Klarere Warnstufen |
-| `supabase/config.toml` | camera-ops Function registrieren |
+| `src/lib/frame-capture.ts` | MAX_FRAMES auf 9999 |
+| `src/components/RecordingGuard.tsx` | MIN_FRAMES auf 1 |
+| `src/pages/CameraTrackingPage.tsx` | Halbzeit-Pause-Phase, Upload-Fix, Realtime-Listener, Heartbeat |
+| `supabase/functions/camera-ops/index.ts` | Dateiname mit Phase, heartbeat/send-command Actions |
+| `src/components/CameraRemotePanel.tsx` | NEU — Fernsteuerungs-UI |
+| `src/pages/MatchReport.tsx` oder Matches-Detail | CameraRemotePanel einbinden |
 
-Keine DB-Schema-Aenderungen noetig — alle Tabellen existieren bereits.
+**DB-Migration**: `camera_access_sessions` um `command` und `status_data` erweitern + Realtime aktivieren.
 
