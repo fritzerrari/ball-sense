@@ -21,9 +21,7 @@ const MatchReport = lazy(() => import("./pages/MatchReport"));
 const CameraTrackingPage = lazy(() => import("./pages/CameraTrackingPage"));
 const ProcessingPage = lazy(() => import("./pages/ProcessingPage"));
 const Players = lazy(() => import("./pages/Players"));
-const PlayerProfile = lazy(() => import("./pages/PlayerProfile"));
 const Fields = lazy(() => import("./pages/Fields"));
-const FieldCalibration = lazy(() => import("./pages/FieldCalibration"));
 const SettingsPage = lazy(() => import("./pages/Settings"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Assistant = lazy(() => import("./pages/Assistant"));
@@ -70,9 +68,7 @@ const App = () => (
                 <Route path="/matches/:id/processing" element={<ProtectedRoute><ProcessingPage /></ProtectedRoute>} />
                 <Route path="/camera/:id/track" element={<CameraTrackingPage />} />
                 <Route path="/players" element={<ProtectedRoute><Players /></ProtectedRoute>} />
-                <Route path="/players/:id" element={<ProtectedRoute><PlayerProfile /></ProtectedRoute>} />
                 <Route path="/fields" element={<ProtectedRoute><Fields /></ProtectedRoute>} />
-                <Route path="/fields/:id/calibrate" element={<ProtectedRoute><FieldCalibration /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                 <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />

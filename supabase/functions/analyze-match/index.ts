@@ -242,6 +242,9 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
     const analysis = JSON.parse(toolCall.function.arguments);
     await supabase.from("analysis_jobs").update({ progress: 70 }).eq("id", job_id);
 
+    // Delete old analysis results for this match before inserting new ones (reprocess case)
+    await supabase.from("analysis_results").delete().eq("match_id", match_id);
+
     // Store analysis results
     const resultTypes = [
       { type: "match_structure", data: analysis.match_structure },

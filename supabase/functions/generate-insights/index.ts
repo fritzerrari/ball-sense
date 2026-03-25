@@ -14,8 +14,13 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  let job_id: string | undefined;
+
   try {
-    const { match_id, job_id } = await req.json();
+    const body = await req.json();
+    const match_id = body.match_id;
+    job_id = body.job_id;
+
     if (!match_id || !job_id) {
       return new Response(JSON.stringify({ error: "match_id and job_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -45,7 +50,13 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    if (!LOVABLE_API_KEY) {
+      await supabase.from("analysis_jobs").update({
+        status: "failed",
+        error_message: "AI gateway not configured",
+      }).eq("id", job_id);
+      throw new Error("LOVABLE_API_KEY not configured");
+    }
 
     const analysisContext = results.map(r => `${r.result_type}: ${JSON.stringify(r.data)}`).join("\n\n");
     const matchInfo = `${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"} am ${match?.date ?? "?"}`;
@@ -87,10 +98,7 @@ REGELN:
               parameters: {
                 type: "object",
                 properties: {
-                  executive_summary: {
-                    type: "string",
-                    description: "1-2 paragraph executive match summary for the coach",
-                  },
+                  executive_summary: { type: "string", description: "1-2 paragraph executive match summary for the coach" },
                   key_insights: {
                     type: "array",
                     description: "3-5 key coaching insights",
@@ -105,10 +113,7 @@ REGELN:
                       required: ["title", "description", "category", "confidence"],
                     },
                   },
-                  coaching_conclusions: {
-                    type: "string",
-                    description: "2-3 paragraphs of coaching conclusions and tactical takeaways",
-                  },
+                  coaching_conclusions: { type: "string", description: "2-3 paragraphs of coaching conclusions and tactical takeaways" },
                   training_recommendations: {
                     type: "array",
                     description: "3-5 specific training recommendations",
@@ -138,27 +143,37 @@ REGELN:
       const errText = await insightsResponse.text();
       console.error("AI insights error:", insightsResponse.status, errText);
 
-      if (insightsResponse.status === 429) {
-        await supabase.from("analysis_jobs").update({ status: "failed", error_message: "Rate limit" }).eq("id", job_id);
-        return new Response(JSON.stringify({ error: "Rate limited" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (insightsResponse.status === 402) {
-        await supabase.from("analysis_jobs").update({ status: "failed", error_message: "Payment required" }).eq("id", job_id);
-        return new Response(JSON.stringify({ error: "Payment required" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const errorMsg = insightsResponse.status === 429
+        ? "Rate limit erreicht. Bitte später erneut versuchen."
+        : insightsResponse.status === 402
+        ? "AI-Kontingent aufgebraucht."
+        : `AI-Fehler: ${insightsResponse.status}`;
 
-      throw new Error(`AI error: ${insightsResponse.status}`);
+      await supabase.from("analysis_jobs").update({
+        status: "failed",
+        error_message: errorMsg,
+      }).eq("id", job_id);
+
+      return new Response(JSON.stringify({ error: errorMsg }), {
+        status: insightsResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const aiResult = await insightsResponse.json();
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("No tool call in insights response");
+    if (!toolCall) {
+      await supabase.from("analysis_jobs").update({
+        status: "failed",
+        error_message: "AI hat keine strukturierte Antwort geliefert",
+      }).eq("id", job_id);
+      throw new Error("No tool call in insights response");
+    }
 
     const insights = JSON.parse(toolCall.function.arguments);
+
+    // Delete old report data for this match (reprocess case)
+    await supabase.from("report_sections").delete().eq("match_id", match_id);
+    await supabase.from("training_recommendations").delete().eq("match_id", match_id);
 
     // Store report sections
     const sections = [
@@ -205,11 +220,24 @@ REGELN:
     // Update match status
     await supabase.from("matches").update({ status: "done" }).eq("id", match_id);
 
+    // Cleanup: delete frames from storage after successful analysis
+    await supabase.storage.from("match-frames").remove([`${match_id}.json`]);
+    console.log(`Cleaned up frames for match ${match_id}`);
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("generate-insights error:", error);
+
+    // Always mark job as failed so UI shows retry
+    if (job_id) {
+      await supabase.from("analysis_jobs").update({
+        status: "failed",
+        error_message: error instanceof Error ? error.message : "Unbekannter Fehler bei der Insight-Generierung",
+      }).eq("id", job_id);
+    }
+
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
