@@ -846,12 +846,16 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       if (players) { for (const p of players) { if (p.position) playerPositions[p.id] = p.position; } }
     }
 
-    await updateProgress("tracking", 45, "Tracks werden aufgebaut");
-    const tracks = buildTracks(mergedFrames);
+    // Frame sampling: only process every 5th frame for performance
+    const SAMPLE_RATE = 5;
+    const sampledFrames = mergedFrames.filter((_, i) => i % SAMPLE_RATE === 0);
+    console.log(`[process-tracking] Frame sampling: ${mergedFrames.length} → ${sampledFrames.length} frames (1/${SAMPLE_RATE})`);
+    
+    const tracks = buildTracks(sampledFrames);
     const sortedTracks = [...tracks.entries()].sort((a, b) => b[1].length - a[1].length);
     const trackProfiles = buildTrackProfiles(sortedTracks);
     if (sessions.length > 1) { for (const tp of trackProfiles) { tp.cameraCount = sessions.length; } }
-    await updateProgress("tracking", 55, `${tracks.size} Tracks erkannt`);
+    await updateProgress("tracking", 55, `${tracks.size} Tracks erkannt (${sampledFrames.length} Frames verarbeitet)`);
 
     // ── Auto-Discovery Mode ──
     if (useAutoDiscovery && trackProfiles.length > 0) {
