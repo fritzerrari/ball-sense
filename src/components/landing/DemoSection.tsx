@@ -758,25 +758,25 @@ function ReportTabContent({ de }: { de: boolean }) {
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card/50 p-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
           {reportTypes.map((rt) => (
             <button
               key={rt.key}
               onClick={() => setReportType(rt.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${reportType === rt.key ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${reportType === rt.key ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"}`}
             >
               <rt.icon className="w-3 h-3" />
               {rt.label}
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
           {reportStyles.map((rs) => (
             <button
               key={rs.key}
               onClick={() => setReportStyle(rs.key)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${reportStyle === rs.key ? "bg-primary/10 text-primary border border-primary/30" : "bg-muted/20 text-muted-foreground hover:bg-muted/40 border border-transparent"}`}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all whitespace-nowrap ${reportStyle === rs.key ? "bg-primary/10 text-primary border border-primary/30" : "bg-muted/20 text-muted-foreground hover:bg-muted/40 border border-transparent"}`}
             >
               <rs.icon className="w-3 h-3" />
               {rs.label}
