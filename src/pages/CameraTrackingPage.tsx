@@ -107,6 +107,10 @@ export default function CameraTrackingPage() {
       );
       if (res.ok) {
         const data = await res.json();
+        // Update transfer authorization status from server
+        if (data.transfer_authorized !== undefined) {
+          setTransferAuthorized(data.transfer_authorized);
+        }
         return data.command as string | null;
       }
     } catch {
@@ -464,10 +468,16 @@ export default function CameraTrackingPage() {
               <ImageIcon className="inline h-3 w-3 mr-1" />
               Alle 30 Sek. wird ein Standbild erfasst
             </p>
-            {isHelper && (
+            {isHelper && !transferAuthorized && (
+              <div className="flex items-center gap-1.5 bg-amber-500/20 rounded-full px-4 py-2 border border-amber-500/30">
+                <Loader2 className="h-3.5 w-3.5 text-amber-400 animate-spin" />
+                <span className="text-xs text-amber-300 font-medium">Warte auf Freigabe vom Trainer…</span>
+              </div>
+            )}
+            {isHelper && transferAuthorized && (
               <div className="flex items-center gap-1.5 bg-primary/20 rounded-full px-3 py-1">
                 <Wifi className="h-3 w-3 text-primary" />
-                <span className="text-xs text-primary">Live-Verbindung aktiv</span>
+                <span className="text-xs text-primary">Live-Verbindung aktiv — Freigabe erteilt</span>
               </div>
             )}
           </div>
