@@ -133,6 +133,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
           const statusData = s.status_data ?? {};
           const currentPhase = statusData.phase ?? "unknown";
           const frameCount = statusData.frame_count ?? 0;
+          const thumbnail = statusData.thumbnail as string | undefined;
           const lastSeen = s.last_used_at ? new Date(s.last_used_at) : null;
           const isOnline = lastSeen && (Date.now() - lastSeen.getTime()) < 60000;
           const isRecording = currentPhase === "recording";
@@ -162,6 +163,17 @@ export default function CameraRemotePanel({ matchId }: Props) {
                   <span className="text-xs text-muted-foreground">{frameCount} Frames</span>
                 )}
               </div>
+
+              {/* Live thumbnail preview */}
+              {thumbnail && isOnline && (
+                <div className="rounded overflow-hidden border border-border">
+                  <img
+                    src={`data:image/jpeg;base64,${thumbnail}`}
+                    alt="Live-Vorschau"
+                    className="w-full h-auto"
+                  />
+                </div>
+              )}
 
               <div className="flex gap-2">
                 {(isReady || isPaused) && (
