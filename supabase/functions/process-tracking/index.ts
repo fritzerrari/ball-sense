@@ -846,9 +846,9 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       if (players) { for (const p of players) { if (p.position) playerPositions[p.id] = p.position; } }
     }
 
-    // Frame sampling: only process every 5th frame for performance
-    const SAMPLE_RATE = 5;
-    const sampledFrames = mergedFrames.filter((_, i) => i % SAMPLE_RATE === 0);
+    // Adaptive frame sampling: use lower rate for short recordings to preserve track quality
+    const SAMPLE_RATE = mergedFrames.length <= 30 ? 1 : mergedFrames.length <= 100 ? 2 : mergedFrames.length <= 300 ? 3 : 5;
+    const sampledFrames = SAMPLE_RATE <= 1 ? mergedFrames : mergedFrames.filter((_, i) => i % SAMPLE_RATE === 0);
     console.log(`[process-tracking] Frame sampling: ${mergedFrames.length} → ${sampledFrames.length} frames (1/${SAMPLE_RATE})`);
     
     const tracks = buildTracks(sampledFrames);
