@@ -418,6 +418,7 @@ export default function MatchReport() {
           <div className="relative mb-3 flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={match.status} />
+              {hasStats && <AnalysisStatusBanner stage={analysisStage} compact />}
               <ConsentStatusBadge status={match.opponent_consent_confirmed ? "granted" : "denied"} compact className="max-w-none" />
             </div>
             <div className="flex flex-wrap gap-2">
