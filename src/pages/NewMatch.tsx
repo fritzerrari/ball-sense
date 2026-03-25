@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft, Calendar, Upload, Video, Square, Loader2, Check,
-  Swords, ArrowRight, Sparkles, FileVideo,
+  Swords, ArrowRight, Sparkles, FileVideo, ImageIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useFields } from "@/hooks/use-fields";
@@ -11,6 +11,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
+import { captureFramesFromFile, startLiveCapture, type FrameCaptureResult } from "@/lib/frame-capture";
 
 type Step = "info" | "upload" | "processing";
 
@@ -34,13 +35,16 @@ export default function NewMatch() {
   const [uploadMode, setUploadMode] = useState<"file" | "record">("file");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [statusText, setStatusText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Record mode
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [frameCount, setFrameCount] = useState(0);
 
   useEffect(() => {
     if (fields?.length && !fieldId) setFieldId(fields[0].id);
@@ -79,50 +83,46 @@ export default function NewMatch() {
     }
   };
 
-  const uploadVideoBlob = useCallback(async (blob: Blob, fileName: string) => {
+  /** Send captured frames to analyze-match and navigate to processing */
+  const analyzeFrames = useCallback(async (captureResult: FrameCaptureResult) => {
     if (!matchId || !clubId) return;
-    setUploading(true);
-    setUploadProgress(10);
+
+    setStatusText("Analyse wird gestartet…");
+    setUploadProgress(80);
+
     try {
-      const filePath = `matches/${matchId}/${fileName}`;
-      setUploadProgress(20);
-
-      const { error: storageError } = await supabase.storage
-        .from("match-videos")
-        .upload(filePath, blob, { contentType: blob.type, upsert: true });
-      if (storageError) throw storageError;
-      setUploadProgress(60);
-
-      // Create match_videos entry
-      const { error: dbError } = await supabase.from("match_videos").insert({
-        match_id: matchId,
-        club_id: clubId,
-        file_path: filePath,
-        file_size_bytes: blob.size,
-        status: "uploaded",
-      });
-      if (dbError) throw dbError;
-      setUploadProgress(80);
-
       // Create analysis job
-      const { error: jobError } = await supabase.from("analysis_jobs").insert({
+      const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
         match_id: matchId,
         status: "queued",
         progress: 0,
-      });
+      }).select().single();
       if (jobError) throw jobError;
 
       // Update match status
       await supabase.from("matches").update({ status: "processing" }).eq("id", matchId);
+      setUploadProgress(90);
+
+      // Invoke analyze-match with frames
+      const { error: fnError } = await supabase.functions.invoke("analyze-match", {
+        body: {
+          match_id: matchId,
+          job_id: job.id,
+          frames: captureResult.frames,
+          duration_sec: captureResult.durationSec,
+        },
+      });
+      if (fnError) {
+        console.error("analyze-match error:", fnError);
+        // Don't block — the job is created, ProcessingPage will show status
+      }
+
       setUploadProgress(100);
-
-      toast.success("Video hochgeladen! Analyse startet…");
       setStep("processing");
-
-      // Navigate to processing page
-      setTimeout(() => navigate(`/matches/${matchId}/processing`), 1500);
+      toast.success("Analyse gestartet!");
+      setTimeout(() => navigate(`/matches/${matchId}/processing`), 1000);
     } catch (err: any) {
-      toast.error(err.message ?? "Upload fehlgeschlagen");
+      toast.error(err.message ?? "Analyse konnte nicht gestartet werden");
       setUploading(false);
     }
   }, [matchId, clubId, navigate]);
@@ -130,7 +130,27 @@ export default function NewMatch() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await uploadVideoBlob(file, `upload-${Date.now()}.${file.name.split('.').pop()}`);
+
+    setUploading(true);
+    setUploadProgress(0);
+    setStatusText("Frames werden extrahiert…");
+
+    try {
+      const result = await captureFramesFromFile(file, (pct) => {
+        setUploadProgress(Math.round(pct * 0.7)); // 0-70% for extraction
+        setStatusText(`Frame ${Math.round(pct)}% extrahiert…`);
+      });
+
+      if (result.frames.length === 0) {
+        throw new Error("Keine Frames konnten extrahiert werden");
+      }
+
+      setStatusText(`${result.frames.length} Frames extrahiert`);
+      await analyzeFrames(result);
+    } catch (err: any) {
+      toast.error(err.message ?? "Frame-Extraktion fehlgeschlagen");
+      setUploading(false);
+    }
   };
 
   const startRecording = useCallback(async () => {
@@ -139,35 +159,61 @@ export default function NewMatch() {
         video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
       }
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2_500_000 });
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      recorder.onstop = () => stream.getTracks().forEach(t => t.stop());
-      recorder.start(1000);
-      mediaRecorderRef.current = recorder;
+
+      // Start live frame capture
+      setTimeout(() => {
+        if (videoRef.current) {
+          liveCaptureRef.current = startLiveCapture(videoRef.current);
+        }
+      }, 500); // short delay for video element to render
+
       setIsRecording(true);
+      if (navigator.vibrate) navigator.vibrate(50);
+
+      // Update frame count periodically
+      const countInterval = setInterval(() => {
+        const count = liveCaptureRef.current?.getFrameCount() ?? 0;
+        setFrameCount(count);
+      }, 5000);
+
+      // Store interval for cleanup
+      (mediaRecorderRef as any)._countInterval = countInterval;
     } catch {
       toast.error("Kamera konnte nicht gestartet werden");
     }
   }, []);
 
-  const stopAndUpload = useCallback(async () => {
-    const recorder = mediaRecorderRef.current;
-    if (!recorder || recorder.state === "inactive") return;
-    await new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-      recorder.stop();
-    });
+  const stopAndAnalyze = useCallback(async () => {
+    // Stop live capture
+    const captureResult = liveCaptureRef.current?.stop();
+    liveCaptureRef.current = null;
+
+    // Stop camera stream
+    streamRef.current?.getTracks().forEach(t => t.stop());
     if (videoRef.current) videoRef.current.srcObject = null;
     setIsRecording(false);
-    const blob = new Blob(chunksRef.current, { type: "video/webm" });
-    await uploadVideoBlob(blob, `recording-${Date.now()}.webm`);
-  }, [uploadVideoBlob]);
+
+    // Clear count interval
+    if ((mediaRecorderRef as any)._countInterval) {
+      clearInterval((mediaRecorderRef as any)._countInterval);
+    }
+
+    if (!captureResult || captureResult.frames.length === 0) {
+      toast.error("Keine Frames aufgenommen. Bitte erneut versuchen.");
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(70);
+    setStatusText(`${captureResult.frames.length} Frames aufgenommen`);
+
+    await analyzeFrames(captureResult);
+  }, [analyzeFrames]);
 
   const canProceed = Boolean(date && fieldId);
 
@@ -287,7 +333,6 @@ export default function NewMatch() {
         {/* Step 2: Upload */}
         {step === "upload" && !uploading && (
           <div className="space-y-4">
-            {/* Mode toggle */}
             <div className="flex gap-2 p-1 bg-muted rounded-xl">
               <button
                 onClick={() => setUploadMode("file")}
@@ -314,7 +359,9 @@ export default function NewMatch() {
                 </div>
                 <div>
                   <h3 className="font-semibold font-display">Spielvideo hochladen</h3>
-                  <p className="text-sm text-muted-foreground mt-1">MP4, MOV oder WebM — max. 2 GB</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    MP4, MOV oder WebM — es werden nur Schlüsselbilder extrahiert (~50 KB pro Frame)
+                  </p>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -326,6 +373,10 @@ export default function NewMatch() {
                 <Button onClick={() => fileInputRef.current?.click()} size="lg" className="w-full gap-2 h-14 text-base">
                   <Upload className="h-5 w-5" /> Datei auswählen
                 </Button>
+                <p className="text-xs text-muted-foreground">
+                  <ImageIcon className="inline h-3 w-3 mr-1" />
+                  Das Video wird nicht hochgeladen — nur Einzelbilder alle 30 Sek.
+                </p>
               </div>
             )}
 
@@ -340,10 +391,15 @@ export default function NewMatch() {
                     </div>
                   )}
                   {isRecording && (
-                    <div className="absolute top-3 left-3 flex items-center gap-2 bg-destructive/90 rounded-full px-3 py-1.5">
-                      <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                      <span className="text-xs text-white font-medium">REC</span>
-                    </div>
+                    <>
+                      <div className="absolute top-3 left-3 flex items-center gap-2 bg-destructive/90 rounded-full px-3 py-1.5">
+                        <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                        <span className="text-xs text-white font-medium">REC</span>
+                      </div>
+                      <div className="absolute top-3 right-3 bg-black/60 rounded-full px-3 py-1.5">
+                        <span className="text-xs text-white font-medium">{frameCount} Frames</span>
+                      </div>
+                    </>
                   )}
                 </div>
                 <div className="p-4">
@@ -352,22 +408,26 @@ export default function NewMatch() {
                       <Video className="h-5 w-5" /> Aufnahme starten
                     </Button>
                   ) : (
-                    <Button onClick={stopAndUpload} size="lg" variant="destructive" className="w-full gap-2 h-14 text-base">
-                      <Square className="h-5 w-5" /> Stoppen & Hochladen
+                    <Button onClick={stopAndAnalyze} size="lg" variant="destructive" className="w-full gap-2 h-14 text-base">
+                      <Square className="h-5 w-5" /> Stoppen & Analysieren
                     </Button>
                   )}
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    <ImageIcon className="inline h-3 w-3 mr-1" />
+                    Alle 30 Sek. wird ein Standbild erfasst — kein Video-Upload
+                  </p>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Uploading state */}
+        {/* Uploading/Extracting state */}
         {uploading && (
           <div className="glass-card p-8 space-y-4 text-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
             <div>
-              <h3 className="font-semibold font-display">Video wird hochgeladen…</h3>
+              <h3 className="font-semibold font-display">{statusText || "Verarbeitung…"}</h3>
               <p className="text-sm text-muted-foreground mt-1">Bitte nicht schließen.</p>
             </div>
             <Progress value={uploadProgress} />

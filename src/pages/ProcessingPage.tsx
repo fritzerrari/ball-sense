@@ -4,11 +4,12 @@ import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Loader2, Upload, Brain, Lightbulb, ClipboardList, ArrowRight } from "lucide-react";
+import { CheckCircle2, Loader2, Upload, Brain, Lightbulb, ClipboardList, ArrowRight, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const STAGES = [
-  { key: "uploaded", label: "Upload abgeschlossen", icon: Upload },
+  { key: "uploaded", label: "Frames empfangen", icon: Upload },
   { key: "analyzing", label: "Spielstruktur analysieren", icon: Brain },
   { key: "interpreting", label: "Coaching-Insights generieren", icon: Lightbulb },
   { key: "complete", label: "Report erstellen", icon: ClipboardList },
@@ -21,13 +22,15 @@ export default function ProcessingPage() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<JobStatus>("queued");
   const [progress, setProgress] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("analysis_jobs")
-        .select("status, progress")
+        .select("status, progress, error_message")
         .eq("match_id", id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -36,11 +39,46 @@ export default function ProcessingPage() {
       if (data) {
         setStatus(data.status as JobStatus);
         setProgress(data.progress ?? 0);
-        if (data.status === "complete") clearInterval(interval);
+        if (data.error_message) setErrorMessage(data.error_message);
+        if (data.status === "complete" || data.status === "failed") clearInterval(interval);
       }
     }, 2000);
     return () => clearInterval(interval);
   }, [id]);
+
+  const handleRetry = async () => {
+    if (!id) return;
+    setRetrying(true);
+    try {
+      // Get the latest job
+      const { data: job } = await supabase
+        .from("analysis_jobs")
+        .select("id")
+        .eq("match_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (job) {
+        // Reset job status
+        await supabase.from("analysis_jobs").update({
+          status: "queued",
+          progress: 0,
+          error_message: null,
+          started_at: null,
+        }).eq("id", job.id);
+
+        setStatus("queued");
+        setProgress(0);
+        setErrorMessage(null);
+        toast.info("Analyse wird erneut gestartet…");
+      }
+    } catch {
+      toast.error("Retry fehlgeschlagen");
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const currentStageIndex = STAGES.findIndex(s => s.key === status);
   const isComplete = status === "complete";
@@ -50,8 +88,14 @@ export default function ProcessingPage() {
     <AppLayout>
       <div className="mx-auto max-w-xl py-12">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-display font-bold">Analyse läuft</h1>
-          <p className="text-muted-foreground mt-2">Dein Spielbericht wird automatisch erstellt.</p>
+          <h1 className="text-2xl font-display font-bold">
+            {isComplete ? "Analyse abgeschlossen" : isFailed ? "Analyse fehlgeschlagen" : "Analyse läuft"}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {isComplete ? "Dein Spielbericht ist fertig." :
+             isFailed ? "Es gab ein Problem bei der Analyse." :
+             "Dein Spielbericht wird automatisch erstellt."}
+          </p>
         </div>
 
         <Card className="border-border bg-card">
@@ -83,8 +127,16 @@ export default function ProcessingPage() {
             )}
 
             {isFailed && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-center">
-                <p className="text-sm text-destructive font-medium">Analyse fehlgeschlagen. Bitte versuche es erneut.</p>
+              <div className="space-y-3">
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-center">
+                  <p className="text-sm text-destructive font-medium">
+                    {errorMessage || "Analyse fehlgeschlagen. Bitte versuche es erneut."}
+                  </p>
+                </div>
+                <Button onClick={handleRetry} disabled={retrying} variant="outline" className="w-full gap-2">
+                  {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Erneut versuchen
+                </Button>
               </div>
             )}
 
