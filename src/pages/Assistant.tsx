@@ -5,7 +5,7 @@ import { BrainCircuit, Send, Loader2, Sparkles, Zap, Target, Users, BarChart3, T
 import { Slider } from "@/components/ui/slider";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
-import PitchVisualization, { getPlayerColor } from "@/components/PitchVisualization";
+import { getPlayerColor } from "@/components/PlayerRosterPanel";
 import PlayerRosterPanel from "@/components/PlayerRosterPanel";
 import { usePlayers } from "@/hooks/use-players";
 import { supabase } from "@/integrations/supabase/client";
