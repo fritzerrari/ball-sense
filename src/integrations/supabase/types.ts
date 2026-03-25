@@ -74,6 +74,7 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          job_kind: string
           match_id: string
           progress: number | null
           started_at: string | null
@@ -85,6 +86,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          job_kind?: string
           match_id: string
           progress?: number | null
           started_at?: string | null
@@ -96,6 +98,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          job_kind?: string
           match_id?: string
           progress?: number | null
           started_at?: string | null
@@ -544,6 +547,8 @@ export type Database = {
           match_id: string | null
           session_token_hash: string
           status_data: Json | null
+          transfer_authorized: boolean
+          transfer_authorized_at: string | null
         }
         Insert: {
           camera_index?: number | null
@@ -557,6 +562,8 @@ export type Database = {
           match_id?: string | null
           session_token_hash: string
           status_data?: Json | null
+          transfer_authorized?: boolean
+          transfer_authorized_at?: string | null
         }
         Update: {
           camera_index?: number | null
@@ -570,6 +577,8 @@ export type Database = {
           match_id?: string | null
           session_token_hash?: string
           status_data?: Json | null
+          transfer_authorized?: boolean
+          transfer_authorized_at?: string | null
         }
         Relationships: [
           {

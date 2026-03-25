@@ -6,6 +6,49 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/** Try to load frames from storage with fallback: main.json -> _h1+_h2 -> _chunk_* */
+async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number } | null> {
+  // 1. Try canonical file
+  const { data: mainFile } = await supabase.storage.from("match-frames").download(`${matchId}.json`);
+  if (mainFile) {
+    try {
+      const parsed = JSON.parse(await mainFile.text());
+      if (parsed.frames?.length) return { frames: parsed.frames, duration_sec: parsed.duration_sec ?? 0 };
+    } catch { /* corrupt */ }
+  }
+
+  // 2. Try half files (_h1 + _h2)
+  const allHalfFrames: string[] = [];
+  let totalDuration = 0;
+  for (const suffix of ["_h1", "_h2"]) {
+    const { data: halfFile } = await supabase.storage.from("match-frames").download(`${matchId}${suffix}.json`);
+    if (halfFile) {
+      try {
+        const parsed = JSON.parse(await halfFile.text());
+        if (parsed.frames?.length) {
+          allHalfFrames.push(...parsed.frames);
+          totalDuration += parsed.duration_sec ?? 0;
+        }
+      } catch { /* skip */ }
+    }
+  }
+  if (allHalfFrames.length > 0) return { frames: allHalfFrames, duration_sec: totalDuration };
+
+  // 3. Try chunk files (_chunk_0, _chunk_1, ...)
+  const allChunkFrames: string[] = [];
+  for (let i = 0; i < 100; i++) {
+    const { data: chunkFile } = await supabase.storage.from("match-frames").download(`${matchId}_chunk_${i}.json`);
+    if (!chunkFile) break; // No more chunks
+    try {
+      const parsed = JSON.parse(await chunkFile.text());
+      if (parsed.frames?.length) allChunkFrames.push(...parsed.frames);
+    } catch { /* skip corrupt */ }
+  }
+  if (allChunkFrames.length > 0) return { frames: allChunkFrames, duration_sec: allChunkFrames.length * 30 };
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -14,8 +57,13 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  let job_id: string | undefined;
+
   try {
-    const { match_id, job_id, frames: inlineFrames, duration_sec: inlineDuration } = await req.json();
+    const body = await req.json();
+    const { match_id, job_id: bodyJobId, frames: inlineFrames, duration_sec: inlineDuration, phase } = body;
+    job_id = bodyJobId;
+
     if (!match_id || !job_id) {
       return new Response(JSON.stringify({ error: "match_id and job_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -24,15 +72,14 @@ serve(async (req) => {
 
     let frames = inlineFrames as string[] | undefined;
     let duration_sec = inlineDuration as number | undefined;
+    const isLivePartial = phase === "live_partial";
 
-    // If no inline frames, load from Storage (retry/reprocess case)
+    // If no inline frames, load from Storage with fallback chain
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
       console.log("No inline frames, loading from storage...");
-      const { data: fileData, error: dlError } = await supabase.storage
-        .from("match-frames")
-        .download(`${match_id}.json`);
+      const storageResult = await loadFramesFromStorage(supabase, match_id);
 
-      if (dlError || !fileData) {
+      if (!storageResult) {
         await supabase.from("analysis_jobs").update({
           status: "failed",
           error_message: "Keine Frames gefunden. Bitte Video erneut hochladen.",
@@ -42,19 +89,18 @@ serve(async (req) => {
         });
       }
 
-      const parsed = JSON.parse(await fileData.text());
-      frames = parsed.frames;
-      duration_sec = parsed.duration_sec;
+      frames = storageResult.frames;
+      duration_sec = storageResult.duration_sec;
+    }
 
-      if (!frames || frames.length === 0) {
-        await supabase.from("analysis_jobs").update({
-          status: "failed",
-          error_message: "Gespeicherte Frames sind leer.",
-        }).eq("id", job_id);
-        return new Response(JSON.stringify({ error: "Stored frames empty" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    if (!frames || frames.length === 0) {
+      await supabase.from("analysis_jobs").update({
+        status: "failed",
+        error_message: "Gespeicherte Frames sind leer.",
+      }).eq("id", job_id);
+      return new Response(JSON.stringify({ error: "Stored frames empty" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Update job status
@@ -144,8 +190,7 @@ WICHTIG:
     await supabase.from("analysis_jobs").update({ progress: 40 }).eq("id", job_id);
 
     // Use lighter model for live partial analysis or very few frames
-    const isLightweight = (inlineFrames && inlineFrames.length < 5) || 
-      (await req.clone().json().catch(() => ({}))).phase === "live_partial";
+    const isLightweight = isLivePartial || selectedFrames.length < 5;
     const modelName = isLightweight ? "google/gemini-2.5-flash-lite" : "google/gemini-2.5-flash";
     console.log(`Using model: ${modelName} (${selectedFrames.length} frames, lightweight: ${isLightweight})`);
 
@@ -273,29 +318,29 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                   },
                   pressing_data: {
                     type: "array",
-                    description: "For each analyzed frame, estimate pressing line heights and team compactness. pressing_line = y-coordinate (0-100) of the highest defensive line player. compactness = distance between highest and deepest outfield player.",
+                    description: "For each analyzed frame, estimate pressing line heights and team compactness.",
                     items: {
                       type: "object",
                       properties: {
                         frame_index: { type: "integer" },
-                        pressing_line_home: { type: "number", description: "y-coordinate (0-100) of highest home defensive player" },
-                        pressing_line_away: { type: "number", description: "y-coordinate (0-100) of highest away defensive player" },
-                        compactness_home: { type: "number", description: "Distance (0-100) between highest and deepest home outfield player" },
-                        compactness_away: { type: "number", description: "Distance (0-100) between highest and deepest away outfield player" },
+                        pressing_line_home: { type: "number" },
+                        pressing_line_away: { type: "number" },
+                        compactness_home: { type: "number" },
+                        compactness_away: { type: "number" },
                       },
                       required: ["frame_index", "pressing_line_home", "pressing_line_away", "compactness_home", "compactness_away"],
                     },
                   },
                   transitions: {
                     type: "array",
-                    description: "Detected transition moments: ball wins leading to counters or ball losses leading to gegenpressing.",
+                    description: "Detected transition moments.",
                     items: {
                       type: "object",
                       properties: {
                         frame_index: { type: "integer" },
                         type: { type: "string", enum: ["ball_win_counter", "ball_loss_gegenpressing"] },
                         speed: { type: "string", enum: ["fast", "medium", "slow"] },
-                        players_in_new_phase: { type: "integer", description: "How many players transitioned within ~5 seconds" },
+                        players_in_new_phase: { type: "integer" },
                         description: { type: "string" },
                       },
                       required: ["frame_index", "type", "speed", "players_in_new_phase", "description"],
@@ -303,7 +348,7 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                   },
                   pass_directions: {
                     type: "object",
-                    description: "Estimated passing tendencies for both teams based on observed build-up patterns.",
+                    description: "Estimated passing tendencies for both teams.",
                     properties: {
                       home: {
                         type: "object",
@@ -332,15 +377,15 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                   },
                   formation_timeline: {
                     type: "array",
-                    description: "Formation changes detected throughout the match. Include at least one entry for the starting formation.",
+                    description: "Formation changes detected throughout the match.",
                     items: {
                       type: "object",
                       properties: {
                         frame_index: { type: "integer" },
                         minute_approx: { type: "integer" },
-                        home_formation: { type: "string", description: "e.g. 4-4-2, 4-3-3, 3-5-2" },
-                        away_formation: { type: "string", description: "e.g. 4-4-2, 4-3-3, 3-5-2" },
-                        change_trigger: { type: "string", description: "What triggered the change, e.g. 'substitution', 'tactical adjustment', 'losing'" },
+                        home_formation: { type: "string" },
+                        away_formation: { type: "string" },
+                        change_trigger: { type: "string" },
                       },
                       required: ["frame_index", "minute_approx", "home_formation", "away_formation"],
                     },
@@ -383,8 +428,10 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
     const analysis = JSON.parse(toolCall.function.arguments);
     await supabase.from("analysis_jobs").update({ progress: 70 }).eq("id", job_id);
 
-    // Delete old analysis results for this match before inserting new ones (reprocess case)
-    await supabase.from("analysis_results").delete().eq("match_id", match_id);
+    // For live_partial: don't delete old results, just add new ones
+    if (!isLivePartial) {
+      await supabase.from("analysis_results").delete().eq("match_id", match_id);
+    }
 
     // Store analysis results
     const resultTypes = [
@@ -405,6 +452,23 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
         result_type: result.type,
         data: result.data,
         confidence: analysis.confidence ?? 0.5,
+      });
+    }
+
+    // For live_partial: mark complete without triggering insights
+    if (isLivePartial) {
+      await supabase.from("analysis_jobs").update({
+        status: "complete",
+        progress: 100,
+        completed_at: new Date().toISOString(),
+      }).eq("id", job_id);
+
+      return new Response(JSON.stringify({
+        success: true,
+        frames_analyzed: selectedFrames.length,
+        phase: "live_partial",
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -433,7 +497,6 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
   } catch (error) {
     console.error("analyze-match error:", error);
     const errMsg = error instanceof Error ? error.message : "Unbekannter Fehler bei der Analyse";
-    // Always mark job as failed so UI shows retry
     if (job_id) {
       await supabase.from("analysis_jobs").update({
         status: "failed",

@@ -40,6 +40,7 @@ export default function CameraTrackingPage() {
   const [frameCount, setFrameCount] = useState(0);
   const [syncedFrames, setSyncedFrames] = useState(0);
   const [halfNumber, setHalfNumber] = useState(1);
+  const [transferAuthorized, setTransferAuthorized] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -106,6 +107,10 @@ export default function CameraTrackingPage() {
       );
       if (res.ok) {
         const data = await res.json();
+        // Update transfer authorization status from server
+        if (data.transfer_authorized !== undefined) {
+          setTransferAuthorized(data.transfer_authorized);
+        }
         return data.command as string | null;
       }
     } catch {
@@ -463,10 +468,16 @@ export default function CameraTrackingPage() {
               <ImageIcon className="inline h-3 w-3 mr-1" />
               Alle 30 Sek. wird ein Standbild erfasst
             </p>
-            {isHelper && (
+            {isHelper && !transferAuthorized && (
+              <div className="flex items-center gap-1.5 bg-destructive/20 rounded-full px-4 py-2 border border-destructive/30">
+                <Loader2 className="h-3.5 w-3.5 text-destructive animate-spin" />
+                <span className="text-xs text-destructive font-medium">Warte auf Freigabe vom Trainer…</span>
+              </div>
+            )}
+            {isHelper && transferAuthorized && (
               <div className="flex items-center gap-1.5 bg-primary/20 rounded-full px-3 py-1">
                 <Wifi className="h-3 w-3 text-primary" />
-                <span className="text-xs text-primary">Live-Verbindung aktiv</span>
+                <span className="text-xs text-primary">Live-Verbindung aktiv — Freigabe erteilt</span>
               </div>
             )}
           </div>
@@ -554,8 +565,14 @@ export default function CameraTrackingPage() {
 
       <div className="safe-area-pad border-t border-border bg-background p-4 space-y-2">
         {phase === "ready" && (
-          <Button onClick={handleReadyStart} size="lg" className="w-full gap-2 h-14 text-base">
-            <Video className="h-5 w-5" /> Aufnahme starten
+          <Button
+            onClick={handleReadyStart}
+            size="lg"
+            className="w-full gap-2 h-14 text-base"
+            disabled={isHelper && !transferAuthorized}
+          >
+            <Video className="h-5 w-5" />
+            {isHelper && !transferAuthorized ? "Warte auf Freigabe…" : "Aufnahme starten"}
           </Button>
         )}
         {phase === "recording" && (

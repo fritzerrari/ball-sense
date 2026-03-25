@@ -132,10 +132,10 @@ REGELN:
                     items: {
                       type: "object",
                       properties: {
-                        title: { type: "string" },
-                        description: { type: "string" },
-                        category: { type: "string", enum: ["offense", "defense", "transition", "set_piece"] },
-                        priority: { type: "integer", enum: [1, 2, 3] },
+                        title: { type: "string", description: "Short title for the recommendation" },
+                        description: { type: "string", description: "Detailed description of the training exercise" },
+                        category: { type: "string", enum: ["offense", "defense", "transition", "set_piece"], description: "Category of the recommendation" },
+                        priority: { type: "integer", description: "Priority level 1-3" },
                         linked_pattern: { type: "string", description: "Which detected pattern this addresses" },
                       },
                       required: ["title", "description", "category", "priority", "linked_pattern"],
@@ -271,7 +271,13 @@ REGELN:
     }
 
     // Cleanup: delete frames from storage after successful analysis
-    await supabase.storage.from("match-frames").remove([`${match_id}.json`]);
+    // Try to clean up all possible frame files
+    const cleanupPaths = [`${match_id}.json`];
+    for (let i = 0; i < 50; i++) {
+      cleanupPaths.push(`${match_id}_chunk_${i}.json`);
+    }
+    cleanupPaths.push(`${match_id}_h1.json`, `${match_id}_h2.json`);
+    await supabase.storage.from("match-frames").remove(cleanupPaths);
     console.log(`Cleaned up frames for match ${match_id}`);
 
     return new Response(JSON.stringify({ success: true }), {
