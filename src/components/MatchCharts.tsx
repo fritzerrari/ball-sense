@@ -230,6 +230,18 @@ export function MatchKpiStrip({
   const homeAgg = aggregatePlayerMetrics(homePlayerStats);
   const awayAgg = aggregatePlayerMetrics(awayPlayerStats);
 
+  // Detect if tactical data is actually available (not just zeros from missing ball detection)
+  const hasTacticalData = (stats: PlayerStat[]) => {
+    const raw = stats[0]?.players ? undefined : undefined; // check raw_metrics
+    const totalBallContacts = stats.reduce((s, p) => s + (p.ball_contacts ?? 0), 0);
+    const totalPasses = stats.reduce((s, p) => s + (p.passes_total ?? 0), 0);
+    const totalDuels = stats.reduce((s, p) => s + (p.duels_total ?? 0), 0);
+    return totalBallContacts > 0 || totalPasses > 0 || totalDuels > 0;
+  };
+
+  const homeTactical = hasTacticalData(homePlayerStats);
+  const awayTactical = hasTacticalData(awayPlayerStats);
+
   const cards = [
     {
       label: "Kontrolle",
@@ -238,6 +250,7 @@ export function MatchKpiStrip({
       awayValue: awayTeamStats?.possession_pct ?? 0,
       icon: Gauge,
       detail: "Ballbesitz zeigt, welches Team das Match strukturell kontrolliert und längere Ballphasen hält.",
+      requiresTactical: true,
     },
     {
       label: "Passquote",
@@ -246,6 +259,7 @@ export function MatchKpiStrip({
       awayValue: awayAgg.passAccuracy,
       icon: Activity,
       detail: "Die Passquote macht sichtbar, wie sauber der Aufbau war und ob das Team unter Druck sauber blieb.",
+      requiresTactical: true,
     },
     {
       label: "Zweikampfquote",
@@ -254,6 +268,7 @@ export function MatchKpiStrip({
       awayValue: awayAgg.duelRate,
       icon: Shield,
       detail: "Die Zweikampfquote spiegelt Präsenz, Timing und Robustheit in direkten Duellen wider.",
+      requiresTactical: true,
     },
     {
       label: "Ballgewinne",
@@ -261,6 +276,7 @@ export function MatchKpiStrip({
       awayValue: awayAgg.ballRecoveries,
       icon: Trophy,
       detail: "Ballgewinne zeigen, welches Team second balls, Gegenpressing und Defensivumschalten besser kontrolliert.",
+      requiresTactical: true,
     },
     {
       label: "Schüsse",
@@ -268,6 +284,7 @@ export function MatchKpiStrip({
       awayValue: awayAgg.shots,
       icon: Crosshair,
       detail: "Schüsse geben die Offensivfrequenz wieder, nicht zwingend die Abschlussqualität.",
+      requiresTactical: true,
     },
     {
       label: "Scorer",
@@ -275,23 +292,31 @@ export function MatchKpiStrip({
       awayValue: awayAgg.goals + awayAgg.assists,
       icon: Goal,
       detail: "Scorer fasst direkte Torbeteiligungen zusammen und hebt die produktivere Mannschaft hervor.",
+      requiresTactical: false, // Goals come from events, not ball proximity
     },
   ];
 
   return (
     <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-6">
-      {cards.map(({ label, unit, homeValue, awayValue, icon: Icon, detail }) => {
-        const winner = leadingTeam(homeValue, awayValue, homeName, awayName);
+      {cards.map(({ label, unit, homeValue, awayValue, icon: Icon, detail, requiresTactical }) => {
+        const noData = requiresTactical && !homeTactical && !awayTactical;
+        const winner = noData ? "Nicht belastbar" : leadingTeam(homeValue, awayValue, homeName, awayName);
         const maxValue = Math.max(homeValue, awayValue);
+        const displayValue = noData ? "—" : formatMetricValue(maxValue, unit);
 
         return (
           <MetricDetailDialog
             key={label}
             title={`${label} im Matchvergleich`}
-            subtitle={detail}
-            chips={["Match KPI", "Game State", "Drilldown"]}
-            insight={`Führend: ${winner}. Diese Kennzahl hilft dir zu erkennen, ob das Spiel eher über Kontrolle, Intensität oder direkte Aktionen entschieden wurde.`}
-            facts={[
+            subtitle={noData ? "Taktische Daten nicht verfügbar — Ballerkennung war unzureichend." : detail}
+            chips={noData ? ["Keine Daten"] : ["Match KPI", "Game State", "Drilldown"]}
+            insight={noData
+              ? "Diese Kennzahl erfordert Ballerkennung. Erfasse Tore und Karten über den Event-Ticker während des Spiels."
+              : `Führend: ${winner}. Diese Kennzahl hilft dir zu erkennen, ob das Spiel eher über Kontrolle, Intensität oder direkte Aktionen entschieden wurde.`
+            }
+            facts={noData ? [
+              { label: "Status", value: "Nicht belastbar", hint: "Taktische Daten setzen Ballerkennung voraus" },
+            ] : [
               { label: homeName, value: formatMetricValue(homeValue, unit), hint: "Wert der Heimmannschaft" },
               { label: awayName, value: formatMetricValue(awayValue, unit), hint: "Wert der Auswärtsmannschaft" },
               { label: "Momentum", value: winner, hint: "Team mit Vorteil in dieser Kategorie" },
@@ -300,15 +325,17 @@ export function MatchKpiStrip({
             <div className="game-panel relative h-full overflow-hidden p-4">
               <div className="relative space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${noData ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
                     <Icon className="h-4 w-4" />
                   </div>
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Battle Pulse</span>
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    {noData ? "Nicht verfügbar" : "Battle Pulse"}
+                  </span>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="text-2xl font-bold font-display">{formatMetricValue(maxValue, unit)}</p>
-                  <p className="truncate text-xs font-medium text-primary">{winner}</p>
+                  <p className={`text-2xl font-bold font-display ${noData ? "text-muted-foreground" : ""}`}>{displayValue}</p>
+                  <p className={`truncate text-xs font-medium ${noData ? "text-muted-foreground" : "text-primary"}`}>{winner}</p>
                 </div>
               </div>
             </div>

@@ -244,20 +244,23 @@ export default function CameraTrackingPage() {
     return () => clearInterval(interval);
   }, [phase, elapsedSec, isPaused, stateKey]);
 
-  // 30-second micro-batch sync during tracking
+  // Periodic micro-batch sync during tracking — only sends NEW frames since last sync
+  const lastSyncFrameCount = useRef(0);
   useEffect(() => {
     if (phase !== "tracking" || isPaused) return;
-    const SYNC_INTERVAL_MS = 10_000;
+    const SYNC_INTERVAL_MS = 30_000; // 30s instead of 10s
     const syncMicroBatch = async () => {
       const token = localStorage.getItem(sessionKey);
       if (!liveEngineRef.current || !trackerRef.current || !id || !token) return;
       try {
-        const syncData = liveEngineRef.current.getStatsForSync();
-        if (syncData.totalFrames < 5) return;
-        const frames = trackerRef.current.getRecentFrames?.() ?? [];
+        const allFrames = trackerRef.current.getRecentFrames?.() ?? [];
+        const newFrames = allFrames.slice(lastSyncFrameCount.current);
+        if (newFrames.length < 5) return;
+        lastSyncFrameCount.current = allFrames.length;
+
         const durationSec = trackerRef.current.getElapsedSeconds();
         const trackingData = {
-          matchId: id, cameraIndex: cam, frames, framesCount: frames.length,
+          matchId: id, cameraIndex: cam, frames: newFrames, framesCount: newFrames.length,
           durationSec, createdAt: new Date().toISOString(),
         };
         await fetch(CAMERA_OPS_URL, {
@@ -265,15 +268,10 @@ export default function CameraTrackingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "upload_tracking", matchId: id, cameraIndex: cam, sessionToken: token,
-            trackingData, framesCount: frames.length, durationSec,
+            trackingData, framesCount: allFrames.length, durationSec,
           }),
         });
-        await fetch(PROCESS_TRACKING_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-camera-session-token": token },
-          body: JSON.stringify({ matchId: id, action: "incremental" }),
-        });
-        console.log(`[MicroBatch] Synced ${syncData.totalFrames} frames, ${syncData.playerStats.length} players`);
+        console.log(`[MicroBatch] Synced ${newFrames.length} new frames (total: ${allFrames.length})`);
       } catch (err) {
         console.warn("[MicroBatch] Sync failed:", err);
       }
