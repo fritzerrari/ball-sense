@@ -536,34 +536,40 @@ export type Database = {
           camera_index: number | null
           club_id: string
           code_id: string
+          command: string | null
           created_at: string
           expires_at: string
           id: string
           last_used_at: string | null
           match_id: string | null
           session_token_hash: string
+          status_data: Json | null
         }
         Insert: {
           camera_index?: number | null
           club_id: string
           code_id: string
+          command?: string | null
           created_at?: string
           expires_at: string
           id?: string
           last_used_at?: string | null
           match_id?: string | null
           session_token_hash: string
+          status_data?: Json | null
         }
         Update: {
           camera_index?: number | null
           club_id?: string
           code_id?: string
+          command?: string | null
           created_at?: string
           expires_at?: string
           id?: string
           last_used_at?: string | null
           match_id?: string | null
           session_token_hash?: string
+          status_data?: Json | null
         }
         Relationships: [
           {

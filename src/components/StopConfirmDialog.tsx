@@ -18,8 +18,8 @@ interface StopConfirmDialogProps {
 }
 
 function getQualityLevel(frames: number) {
-  if (frames < 10) return { label: "Sehr wenig Daten", color: "text-destructive", emoji: "🔴" };
-  if (frames < 20) return { label: "Wenig Daten", color: "text-amber-500", emoji: "🟡" };
+  if (frames < 5) return { label: "Sehr wenig Daten", color: "text-destructive", emoji: "🔴" };
+  if (frames < 15) return { label: "Wenig Daten", color: "text-amber-500", emoji: "🟡" };
   if (frames < RECOMMENDED_FRAMES) return { label: "Ausreichend", color: "text-amber-500", emoji: "🟡" };
   return { label: "Gute Datenbasis", color: "text-primary", emoji: "🟢" };
 }
@@ -42,14 +42,14 @@ export default function StopConfirmDialog({ open, onOpenChange, onConfirm, frame
                 <span className="text-muted-foreground">— {frameCount} Frames</span>
               </div>
 
-              {frameCount < 10 && (
+              {frameCount < 5 && (
                 <p className="text-destructive font-medium text-sm">
                   ⚠ Sehr wenige Daten — die Analyse wird kaum verwertbar sein.
                   Empfehlung: Noch ~{remainingMinutes} Min. aufnehmen.
                 </p>
               )}
 
-              {frameCount >= 10 && frameCount < RECOMMENDED_FRAMES && (
+              {frameCount >= 5 && frameCount < RECOMMENDED_FRAMES && (
                 <p className="text-amber-500 font-medium text-sm">
                   Die Analyse wird funktionieren, aber noch ~{remainingMinutes} Min. ergeben deutlich bessere Ergebnisse.
                 </p>

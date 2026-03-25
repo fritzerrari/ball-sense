@@ -5,7 +5,7 @@
  */
 
 const FRAME_INTERVAL_SEC = 30;
-const MAX_FRAMES = 180;
+const MAX_FRAMES = 9999;
 const CAPTURE_WIDTH = 640;
 const JPEG_QUALITY = 0.6;
 
