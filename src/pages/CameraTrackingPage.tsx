@@ -26,6 +26,7 @@ import { FootballTracker, type Detection, type UploadMode, type StabilityEvent }
 import { LiveStatsEngine, type LiveSnapshot } from "@/lib/live-stats-engine";
 import type { HighlightClip } from "@/lib/highlight-recorder";
 import { TrackingOverlay } from "@/components/TrackingOverlay";
+import { LiveEventTicker } from "@/components/LiveEventTicker";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -1284,17 +1285,32 @@ export default function CameraTrackingPage() {
             </div>
 
             {/* Sticky bottom buttons — always visible */}
-            <div className="flex gap-2 pt-3 pb-2 bg-background sticky bottom-0 border-t border-border mt-auto">
-              <Button variant="outline" size="lg" className="flex-1" onClick={handleTogglePause}>
-                {isPaused ? (
-                  <><Play className="mr-2 h-4 w-4" /> Fortsetzen</>
-                ) : (
-                  <><Pause className="mr-2 h-4 w-4" /> Pausieren</>
-                )}
-              </Button>
-              <Button variant="destructive" size="lg" className="flex-1" onClick={handleEnd}>
-                <Flag className="mr-2 h-4 w-4" /> Beenden
-              </Button>
+            <div className="flex flex-col gap-2 pt-3 pb-2 bg-background sticky bottom-0 border-t border-border mt-auto">
+              {/* Event Ticker — directly in camera tracking for operators */}
+              {id && (
+                <LiveEventTicker
+                  matchId={id}
+                  elapsedSec={elapsedSec}
+                  homePlayers={[]}
+                  awayPlayers={[]}
+                  trackOpponent={true}
+                  onEventAdded={() => {
+                    toast.success("Event erfasst ✓");
+                  }}
+                />
+              )}
+              <div className="flex gap-2">
+                <Button variant="outline" size="lg" className="flex-1" onClick={handleTogglePause}>
+                  {isPaused ? (
+                    <><Play className="mr-2 h-4 w-4" /> Fortsetzen</>
+                  ) : (
+                    <><Pause className="mr-2 h-4 w-4" /> Pausieren</>
+                  )}
+                </Button>
+                <Button variant="destructive" size="lg" className="flex-1" onClick={handleEnd}>
+                  <Flag className="mr-2 h-4 w-4" /> Beenden
+                </Button>
+              </div>
             </div>
           </div>
         )}

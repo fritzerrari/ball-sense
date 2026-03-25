@@ -1156,34 +1156,38 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       await supabase.from("player_match_stats").delete().eq("match_id", matchId).eq("period", "partial");
     }
 
+    const hasBallData = ballPositions.length >= 10;
+
     const playerInserts = playerStats.map((ps) => {
       const t = ps.tactical;
+      // If no ball data, store tactical KPIs as null (not 0) to distinguish "no data" from "actually zero"
+      const tacticalAvailable = hasBallData && ((t?.ball_contacts ?? 0) > 0 || (t?.passes_total ?? 0) > 0 || (t?.duels_total ?? 0) > 0);
       return {
         match_id: matchId, player_id: ps.player_id, team: ps.team, period,
         distance_km: ps.stats.distance_km, top_speed_kmh: ps.stats.top_speed_kmh, avg_speed_kmh: ps.stats.avg_speed_kmh,
         sprint_count: ps.stats.sprint_count, sprint_distance_m: ps.stats.sprint_distance_m,
         heatmap_grid: ps.stats.heatmap_grid, positions_raw: ps.stats.positions_raw,
         minutes_played: ps.stats.minutes_played || Math.round(totalDurationSec / 60),
-        // Tactical stats
-        ball_contacts: t?.ball_contacts ?? 0,
-        passes_total: t?.passes_total ?? 0,
-        passes_completed: t?.passes_completed ?? 0,
-        pass_accuracy: t?.pass_accuracy ?? null,
-        duels_total: t?.duels_total ?? 0,
-        duels_won: t?.duels_won ?? 0,
-        tackles: t?.tackles ?? 0,
-        interceptions: t?.interceptions ?? 0,
-        ball_recoveries: t?.ball_recoveries ?? 0,
-        shots_total: t?.shots_total ?? 0,
-        shots_on_target: t?.shots_on_target ?? 0,
-        goals: t?.goals ?? 0,
-        assists: t?.assists ?? 0,
-        crosses: t?.crosses ?? 0,
-        fouls_committed: t?.fouls_committed ?? 0,
-        fouls_drawn: t?.fouls_drawn ?? 0,
+        // Tactical stats: null when no ball data available
+        ball_contacts: tacticalAvailable ? (t?.ball_contacts ?? 0) : null,
+        passes_total: tacticalAvailable ? (t?.passes_total ?? 0) : null,
+        passes_completed: tacticalAvailable ? (t?.passes_completed ?? 0) : null,
+        pass_accuracy: tacticalAvailable ? (t?.pass_accuracy ?? null) : null,
+        duels_total: tacticalAvailable ? (t?.duels_total ?? 0) : null,
+        duels_won: tacticalAvailable ? (t?.duels_won ?? 0) : null,
+        tackles: tacticalAvailable ? (t?.tackles ?? 0) : null,
+        interceptions: tacticalAvailable ? (t?.interceptions ?? 0) : null,
+        ball_recoveries: tacticalAvailable ? (t?.ball_recoveries ?? 0) : null,
+        shots_total: tacticalAvailable ? (t?.shots_total ?? 0) : (t?.shots_total && t.shots_total > 0 ? t.shots_total : null),
+        shots_on_target: tacticalAvailable ? (t?.shots_on_target ?? 0) : (t?.shots_on_target && t.shots_on_target > 0 ? t.shots_on_target : null),
+        goals: t?.goals ?? 0,     // Goals always come from events
+        assists: t?.assists ?? 0, // Assists always come from events
+        crosses: tacticalAvailable ? (t?.crosses ?? 0) : null,
+        fouls_committed: t?.fouls_committed ?? 0, // Always from events
+        fouls_drawn: t?.fouls_drawn ?? 0,         // Always from events
         yellow_cards: (ps as any)._yellowCards ?? 0,
         red_cards: (ps as any)._redCards ?? 0,
-        aerial_won: t?.aerial_won ?? 0,
+        aerial_won: tacticalAvailable ? (t?.aerial_won ?? 0) : null,
         data_source: "fieldiq", raw_metrics: {
           assignment_confidence: ps.confidence, cameras_used: actualCamerasUsed,
           camera_indices: [...uniqueCameraIndices],
@@ -1192,8 +1196,8 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           coverage_ratio: needsExtrapolation ? coverageRatio : 1,
           extrapolated: needsExtrapolation,
           tactical_estimated: t?.is_estimated ?? true,
-          ball_detections_available: ballPositions.length >= 10,
-          tactical_data_available: (t?.ball_contacts ?? 0) > 0 || (t?.passes_total ?? 0) > 0 || (t?.duels_total ?? 0) > 0,
+          ball_detections_available: hasBallData,
+          tactical_data_available: tacticalAvailable,
           analysis_stage: mode === "incremental" ? "prognose" : (needsExtrapolation ? "vorläufig" : "final"),
           recalculation_needed: needsExtrapolation,
         },
