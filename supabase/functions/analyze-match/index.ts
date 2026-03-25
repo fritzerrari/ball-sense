@@ -224,8 +224,18 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                     items: {
                       type: "object",
                       properties: {
-                        frame_index: { type: "integer", description: "0-based index of the frame" },
+                      frame_index: { type: "integer", description: "0-based index of the frame" },
                         label: { type: "string", description: "Short description of what happens in this frame, e.g. 'Angriff über links'" },
+                        frame_type: { type: "string", enum: ["tactical", "detail", "unusable"], description: "tactical = full field view, detail = close-up/zoom, unusable = blurry or no field visible" },
+                        visible_area: {
+                          type: "object",
+                          description: "Estimated visible portion of the pitch in this frame",
+                          properties: {
+                            description: { type: "string", description: "e.g. 'Full pitch', 'Left half + center', 'Penalty area close-up'" },
+                            estimated_coverage_pct: { type: "number", description: "Estimated percentage of total pitch visible (0-100)" },
+                          },
+                          required: ["description", "estimated_coverage_pct"],
+                        },
                         ball: {
                           type: "object",
                           properties: {
@@ -248,7 +258,7 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                           },
                         },
                       },
-                      required: ["frame_index", "ball", "players"],
+                      required: ["frame_index", "ball", "players", "frame_type", "visible_area"],
                     },
                   },
                   visual_quality: { type: "string", enum: ["good", "moderate", "poor"] },
