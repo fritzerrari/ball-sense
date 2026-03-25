@@ -47,8 +47,8 @@ export default function CameraTrackingPage() {
   const [recordingStartTime, setRecordingStartTime] = useState(0);
   const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
 
-  const isAuthenticated = useIsAuthenticated();
-  const isHelper = !!sessionToken && !isAuthenticated;
+  useIsAuthenticated();
+  const isHelper = !!sessionToken?.trim();
 
   const handleCodeSuccess = useCallback((data: { matchId: string; cameraIndex: number; sessionToken: string }) => {
     setMatchId(data.matchId);
