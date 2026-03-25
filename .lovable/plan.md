@@ -1,60 +1,81 @@
 
 
-# Landing Page Erweiterungen: Wertversprechen, Transparenz & Berichte
+# Fehleranalyse, Optimierung & Mitbewerber-Vergleichsseite
 
-## Was wird gemacht
+## 1. Gefundener Fehler: `useTranslation must be used within I18nProvider`
 
-### 1. Neue Sektion: "Warum FieldIQ?" (Value Proposition)
-Neue Komponente `src/components/landing/WhyFieldIQ.tsx` — wird zwischen KeyNumbers und DemoSection eingefügt.
+**Ursache**: Der Fehler tritt als HMR-Artefakt (Hot Module Replacement) auf. Die `I18nProvider` umschließt die gesamte App korrekt in `main.tsx`. Der Fehler ist kein strukturelles Problem, sondern entsteht bei Hot-Reloads wenn die i18n-Modul-Referenz kurzzeitig ungültig wird. Ein harter Reload (F5) löst das Problem.
 
-Kernbotschaft: **"Es geht nicht um 9 oder 10 Kilometer Laufdistanz. Es geht darum, WARUM dein Team in der 70. Minute die Kontrolle verliert."**
+**Fix empfohlen**: Trotzdem eine defensive Absicherung einbauen — in `useTranslation()` statt `throw Error` einen Fallback-Kontext zurückgeben, der die deutschen Keys direkt liest. Das verhindert Crashes bei HMR und Edge-Cases.
 
-Aufbau:
-- Linke Spalte: Überschrift + Einleitung ("Klassische Statistiken wie Laufdistanz oder Topspeed sagen dir, WAS passiert ist. FieldIQ sagt dir, WARUM — und was du ändern kannst.")
-- Rechte Spalte: 3-4 Vergleichskarten im "Vorher/Nachher"-Stil:
-  - **Klassisch**: "9.2 km Laufleistung" → **FieldIQ**: "Sprint-Intensität sinkt ab Min. 60 um 40% — Ermüdung links"
-  - **Klassisch**: "23 km/h Topspeed" → **FieldIQ**: "Konter-Geschwindigkeit: 3 Spieler in 5s in Position"
-  - **Klassisch**: "58% Ballbesitz" → **FieldIQ**: "Dominanz nur in HZ 1 — ab Min. 40 Kontrollverlust über links"
-  - **Klassisch**: "12 Torschüsse" → **FieldIQ**: "62% Angriffe über rechts — Gegner liest euch"
+## 2. Code-Review Ergebnisse
 
-### 2. Neue Sektion: "Was musst du tun?" (Transparenz)
-Neue Komponente `src/components/landing/TransparencySection.tsx` — wird nach WhyFieldIQ eingefügt.
+**Keine kritischen Fehler gefunden in:**
+- `WhyFieldIQ.tsx` — sauber, zweisprachig, Vergleichskarten korrekt
+- `TransparencySection.tsx` — 3-Phasen-Layout korrekt, Labels stimmen
+- `FeatureCards.tsx` — 17 Cards, alle Icons importiert, Pressing/Scouting/Fatigue korrekt
+- `FAQSection.tsx` — 8 FAQ-Einträge inkl. Presse + manueller Aufwand
+- `PressingChart.tsx`, `FormationTimeline.tsx`, `FatigueIndicator.tsx` — Props-Interfaces korrekt, Recharts-Imports vorhanden
+- `MatchReport.tsx` — Lazy-Imports aller 6 neuen Analyse-Komponenten korrekt
 
-Klare Auflistung in 3 Phasen:
-- **Vor dem Spiel** (2 Min): Smartphone aufstellen, Feldkalibrierung (4 Ecken antippen), Aufstellung eingeben oder aus Kader wählen
-- **Während des Spiels** (optional): Events antippen (Tor, Karte, Ecke, Chance) — das löst Highlight-Clips aus. Ansonsten: nichts tun, die KI analysiert automatisch
-- **Nach dem Spiel**: Aufnahme stoppen → KI analysiert in ~2 Min → Report öffnen
+**Performance-Optimierung:**
+- Alle neuen Analyse-Komponenten sind bereits lazy-loaded (gut)
+- `FeatureCards.tsx` hat 17 Cards mit individuellen `motion`-Animationen + `whileHover` — bei 17 Karten auf Mobile ist das 17x IntersectionObserver. Optimierung: `viewport={{ once: true, margin: "-50px" }}` ist gesetzt (gut), aber die `whileHover`-Animation auf Touch-Geräten ist unnötig → entfernen für Mobile
 
-Visueller Stil: Step-Cards mit Icons, klare "manuell" vs. "automatisch" Labels, minimaler Text.
+## 3. Bilder/Screenshots
 
-### 3. Gegner-Scouting in FeatureCards hervorheben
-Die FeatureCard "Gegner-Scouting" existiert bereits. Erweitern um:
-- Prominentere Platzierung (nach oben verschieben, `sm:col-span-2`)
-- Ergänzter Text: "Analysiere den Gegner aus früheren Spielen: Bevorzugte Angriffsseite, Pressing-Verhalten, Schwachstellen — automatischer Scouting-Report mit Taktik-Empfehlung"
+Die HeroSlider-Slides (TrackingSlide, CalibrationSlide, DataTransferSlide) sind **reine SVG/CSS-Mockups**, keine externen Bilder. Sie bleiben konsistent unabhängig vom Umbau. Gleiches gilt für die DemoSection — alles programmatisch generiert, keine Screenshots die veralten könnten.
 
-### 4. Berichte-Feature bestätigen & hervorheben
-Die Berichte (Vor/Halbzeit/Nach, 3 Stile) sind bereits voll implementiert und in der Demo interaktiv erlebbar. Auf der Landing Page:
-- In FeatureCards die "KI-Berichte in 3 Stilen"-Card updaten mit Zusatz: "Content-Generierung für Social Media, Vereinswebsite und Presse — exportierbar als PDF, teilbar per WhatsApp, E-Mail und X"
-- Neuer FAQ-Eintrag: "Kann ich FieldIQ für Pressearbeit nutzen?" → "Ja, generiere Vor-, Halbzeit- und Nachberichte in 3 Stilen..."
+## 4. Mitbewerber-Vergleichsseite — Rechtliche Einschätzung
 
-### 5. LandingPage.tsx Seitenstruktur anpassen
-Neue Reihenfolge:
-```
-KeyNumbers → WhyFieldIQ (NEU) → TransparencySection (NEU) → DemoSection → HowItWorks → ...
-```
+**Grundsätzlich erlaubt** in Deutschland und der EU:
+- Vergleichende Werbung ist nach § 6 UWG (Gesetz gegen unlauteren Wettbewerb) und EU-Richtlinie 2006/114/EG **zulässig**, wenn sie:
+  - Objektiv und nachprüfbar ist (Fakten, keine subjektiven Behauptungen)
+  - Waren/Dienstleistungen für denselben Bedarf vergleicht
+  - Keine Verwechslungsgefahr erzeugt
+  - Den Ruf des Mitbewerbers nicht herabsetzt oder verunglimpft
+  - Keine geschützten Markenzeichen missbräuchlich verwendet
 
-## Betroffene Dateien
+**Empfehlung für die Umsetzung:**
+- Kategorien statt Markennamen verwenden: "GPS-Westen-Systeme", "Kamera-Tracking-Lösungen", "Manuelle Statistik-Apps" (es gibt bereits `landing.gpsVests` als i18n-Key)
+- Objektive Kriterien: Kosten, Hardware-Bedarf, Installationsaufwand, Datenschutz, Liga-Eignung
+- **Keine** Logos oder geschützten Markennamen wie "Veo", "Catapult" etc.
+- Hinweis-Fußnote: "Stand: März 2026. Angaben basieren auf öffentlich verfügbaren Informationen."
 
-| Datei | Aktion |
+**Implementierung:** Eigene Seite `/compare` (nicht Landing Page, da sie schon lang genug ist) mit sachlicher Vergleichstabelle nach Kategorien. Navigation über Footer + optional als Link in der Pricing-Section.
+
+## Plan
+
+### Dateien ändern
+
+| Datei | Änderung |
 |---|---|
-| `src/components/landing/WhyFieldIQ.tsx` | NEU — Value-Proposition-Sektion |
-| `src/components/landing/TransparencySection.tsx` | NEU — "Was musst du tun?"-Sektion |
-| `src/pages/LandingPage.tsx` | Neue Sektionen einbinden |
-| `src/components/landing/FeatureCards.tsx` | Scouting + Berichte-Cards anpassen |
-| `src/lib/i18n.tsx` | Neue Übersetzungs-Keys für beide Sprachen |
-| `src/components/landing/FAQSection.tsx` | Neuen FAQ-Eintrag für Berichte/Presse |
+| `src/lib/i18n.tsx` | `useTranslation` defensiv absichern — Fallback statt throw |
+| `src/components/landing/FeatureCards.tsx` | `whileHover` nur auf Desktop (Responsive-Check) |
+| `src/pages/ComparePage.tsx` | NEU — Sachliche Vergleichsseite nach Kategorien |
+| `src/App.tsx` | Neue Route `/compare` |
+| `src/components/landing/Footer.tsx` | Link zu `/compare` einfügen |
+| `src/components/landing/PricingSection.tsx` | Optional: Link "Wie unterscheiden wir uns?" → `/compare` |
+| `src/lib/i18n.tsx` | Neue Keys für Vergleichsseite (de + en) |
 
-## Zu den Berichten
+### Vergleichsseite Inhalt
 
-Ja, Vor-, Halbzeit- und Nachberichte sind vollständig implementiert und funktionieren weiterhin. Die Demo zeigt sie interaktiv mit 3 Stilen (Analytisch, Social Media, Zeitung). Das Content-System (Report-Generator mit PDF-Export, Social Sharing) ist intakt. Die Landing Page wird diese Funktionalität nun prominenter kommunizieren.
+Tabelle mit Spalten:
+- **FieldIQ** (hervorgehoben)
+- **GPS-Westen-Systeme** (z.B. Catapult-Typ)
+- **Kamera-Tracking** (z.B. Veo-Typ)
+- **Manuelle Statistik-Apps**
+
+Zeilen:
+- Monatliche Kosten
+- Hardware-Investition
+- Einrichtungsaufwand
+- Taktische Analyse
+- KI-Berichte
+- Pressing-Analyse
+- Gegner-Scouting
+- DSGVO-Konformität
+- Liga-Eignung
+
+Plus: "Warum wir anders sind"-Abschnitt mit den Kern-Differenzierern aus WhyFieldIQ.
 
