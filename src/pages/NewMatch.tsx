@@ -475,15 +475,39 @@ export default function NewMatch() {
                     </>
                   )}
                 </div>
-                <div className="p-4">
+                <div className="p-4 space-y-2">
                   {!isRecording ? (
                     <Button onClick={startRecording} size="lg" className="w-full gap-2 h-14 text-base">
                       <Video className="h-5 w-5" /> Aufnahme starten
                     </Button>
                   ) : (
-                    <Button onClick={stopAndAnalyze} size="lg" variant="destructive" className="w-full gap-2 h-14 text-base">
-                      <Square className="h-5 w-5" /> Stoppen & Analysieren
-                    </Button>
+                    <>
+                      {showHalftimeButton && (
+                        <Button
+                          onClick={triggerHalftimeAnalysis}
+                          disabled={halftimeSending}
+                          size="lg"
+                          variant="secondary"
+                          className="w-full gap-2 h-12 text-base border border-primary/30 bg-primary/10 hover:bg-primary/20"
+                        >
+                          {halftimeSending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Clock className="h-5 w-5 text-primary" />
+                          )}
+                          ⚽ Halbzeit-Analyse starten
+                        </Button>
+                      )}
+                      {halftimeSent && (
+                        <div className="flex items-center justify-center gap-2 py-1 text-xs text-primary">
+                          <Check className="h-3 w-3" />
+                          <span>HZ-Analyse läuft im Hintergrund</span>
+                        </div>
+                      )}
+                      <Button onClick={stopAndAnalyze} size="lg" variant="destructive" className="w-full gap-2 h-14 text-base">
+                        <Square className="h-5 w-5" /> Stoppen & Endanalyse
+                      </Button>
+                    </>
                   )}
                   <p className="text-xs text-muted-foreground text-center mt-2">
                     <ImageIcon className="inline h-3 w-3 mr-1" />
