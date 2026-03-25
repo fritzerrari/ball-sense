@@ -373,6 +373,7 @@ export default function CameraTrackingPage() {
     if (videoRef.current) videoRef.current.srcObject = null;
     if ((streamRef as any)._countInterval) clearInterval((streamRef as any)._countInterval);
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+    if (deltaUploadRef.current) clearInterval(deltaUploadRef.current);
 
     if (!captureResult || captureResult.frames.length === 0) {
       toast.error("Keine Frames aufgenommen");
