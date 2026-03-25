@@ -118,6 +118,7 @@ export async function captureFramesFromFile(
  */
 export function startLiveCapture(videoEl: HTMLVideoElement) {
   const frames: string[] = [];
+  let skippedFrames = 0;
   const canvas = document.createElement("canvas");
   let interval: ReturnType<typeof setInterval> | null = null;
   const startTime = Date.now();
@@ -131,8 +132,13 @@ export function startLiveCapture(videoEl: HTMLVideoElement) {
     canvas.height = Math.round(CAPTURE_WIDTH * aspectRatio);
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-    frames.push(dataUrl.split(",")[1]);
+
+    if (isFrameUsable(ctx, canvas.width, canvas.height)) {
+      const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+      frames.push(dataUrl.split(",")[1]);
+    } else {
+      skippedFrames++;
+    }
   };
 
   // Capture first frame immediately
@@ -143,13 +149,14 @@ export function startLiveCapture(videoEl: HTMLVideoElement) {
     stop: (): FrameCaptureResult => {
       if (interval) clearInterval(interval);
       const durationSec = Math.round((Date.now() - startTime) / 1000);
-      return { frames, durationSec };
+      return { frames, durationSec, skippedFrames };
     },
     /** Returns a snapshot of frames captured so far WITHOUT stopping the capture */
     getSnapshot: (): FrameCaptureResult => {
       const durationSec = Math.round((Date.now() - startTime) / 1000);
-      return { frames: [...frames], durationSec };
+      return { frames: [...frames], durationSec, skippedFrames };
     },
     getFrameCount: () => frames.length,
+    getSkippedCount: () => skippedFrames,
   };
 }
