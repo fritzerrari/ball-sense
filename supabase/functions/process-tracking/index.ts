@@ -846,9 +846,9 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       if (players) { for (const p of players) { if (p.position) playerPositions[p.id] = p.position; } }
     }
 
-    // Frame sampling: only process every 5th frame for performance
-    const SAMPLE_RATE = 5;
-    const sampledFrames = mergedFrames.filter((_, i) => i % SAMPLE_RATE === 0);
+    // Adaptive frame sampling: use lower rate for short recordings to preserve track quality
+    const SAMPLE_RATE = mergedFrames.length <= 30 ? 1 : mergedFrames.length <= 100 ? 2 : mergedFrames.length <= 300 ? 3 : 5;
+    const sampledFrames = SAMPLE_RATE <= 1 ? mergedFrames : mergedFrames.filter((_, i) => i % SAMPLE_RATE === 0);
     console.log(`[process-tracking] Frame sampling: ${mergedFrames.length} → ${sampledFrames.length} frames (1/${SAMPLE_RATE})`);
     
     const tracks = buildTracks(sampledFrames);
@@ -859,10 +859,19 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
 
     // ── Auto-Discovery Mode ──
     if (useAutoDiscovery && trackProfiles.length > 0) {
+      // Adaptive minimum track length: scale with available frames
+      const minTrackLen = Math.max(3, Math.floor(sampledFrames.length * 0.15));
       const fieldTracks = trackProfiles.filter(t => t.sidelineRatio < 0.45 && t.edgeRatio < 0.4);
-      const playerTracks = fieldTracks.filter(t => t.positions.length > 20);
-      const sortedByY = [...playerTracks].sort((a, b) => a.cy - b.cy);
-      const medianIdx = Math.floor(sortedByY.length / 2);
+      const playerTracks = fieldTracks.filter(t => t.positions.length >= minTrackLen);
+      
+      // If still no tracks pass the filter, relax sideline filter
+      const candidateTracks = playerTracks.length > 0 ? playerTracks 
+        : fieldTracks.filter(t => t.positions.length >= Math.max(2, Math.floor(sampledFrames.length * 0.08)));
+      
+      console.log(`[process-tracking] Auto-Discovery: ${trackProfiles.length} total tracks, ${fieldTracks.length} field tracks, ${candidateTracks.length} player candidates (minLen=${minTrackLen})`);
+      
+      const sortedByY = [...candidateTracks].sort((a, b) => a.cy - b.cy);
+      const medianIdx = Math.max(1, Math.floor(sortedByY.length / 2));
       const homeGroup = sortedByY.slice(0, medianIdx);
       const awayGroup = sortedByY.slice(medianIdx);
 
@@ -1114,6 +1123,84 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
     const teamGroups = { home: [] as PlayerStat[], away: [] as PlayerStat[] };
     for (const ps of playerStats) { if (ps.team === "home") teamGroups.home.push(ps); else if (ps.team === "away") teamGroups.away.push(ps); }
     const teamInserts = [];
+    
+    // If no player stats at all, generate team-level stats from raw track data
+    if (playerStats.length === 0 && trackProfiles.length > 0) {
+      console.log(`[process-tracking] No player assignments — generating team stats from ${trackProfiles.length} raw tracks`);
+      const fieldTracks = trackProfiles.filter(t => t.sidelineRatio < 0.45 && t.edgeRatio < 0.4 && t.positions.length >= 2);
+      
+      if (fieldTracks.length > 0) {
+        // Compute aggregate physical stats from all field tracks
+        let totalDist = 0, topSpeed = 0;
+        const mergedHeatmap: number[][] = Array.from({ length: 7 }, () => Array(10).fill(0));
+        
+        for (const track of fieldTracks) {
+          const trackStats = computeTrackStats(track.positions, fieldW, fieldH);
+          const extrapolated = needsExtrapolation ? extrapolateStats(trackStats, coverageRatio) : trackStats;
+          totalDist += extrapolated.distance_km;
+          if (extrapolated.top_speed_kmh > topSpeed) topSpeed = extrapolated.top_speed_kmh;
+          for (let r = 0; r < 7; r++) for (let c = 0; c < 10; c++) mergedHeatmap[r][c] += trackStats.heatmap_grid[r]?.[c] || 0;
+        }
+        
+        const maxH = Math.max(1, ...mergedHeatmap.flat());
+        for (let r = 0; r < 7; r++) for (let c = 0; c < 10; c++) mergedHeatmap[r][c] = Math.round((mergedHeatmap[r][c] / maxH) * 100) / 100;
+        
+        teamInserts.push({
+          match_id: matchId, team: "home",
+          total_distance_km: Math.round(totalDist * 100) / 100,
+          avg_distance_km: Math.round((totalDist / Math.max(1, fieldTracks.length)) * 100) / 100,
+          top_speed_kmh: Math.round(topSpeed * 10) / 10,
+          possession_pct: null,
+          formation_heatmap: mergedHeatmap,
+          data_source: "fieldiq",
+          raw_metrics: {
+            tracked_player_count: fieldTracks.length,
+            cameras_used: sessions.length,
+            camera_indices: [...cameraContributions.keys()],
+            raw_tracks_only: true,
+            coverage_ratio: coverageRatio,
+            extrapolated: needsExtrapolation,
+            analysis_stage: "vorläufig",
+            note: "Stats aus Rohdaten ohne Spielerzuordnung — Aufstellung fehlt",
+          },
+        });
+        
+        // Also insert per-track player stats so data shows up in reports
+        const trackInserts = fieldTracks.map((track, i) => {
+          const trackStats = computeTrackStats(track.positions, fieldW, fieldH);
+          const extrapolated = needsExtrapolation ? extrapolateStats(trackStats, coverageRatio) as typeof trackStats : trackStats;
+          return {
+            match_id: matchId, player_id: null, team: "home", period,
+            distance_km: extrapolated.distance_km, top_speed_kmh: extrapolated.top_speed_kmh, avg_speed_kmh: extrapolated.avg_speed_kmh,
+            sprint_count: extrapolated.sprint_count, sprint_distance_m: extrapolated.sprint_distance_m,
+            heatmap_grid: trackStats.heatmap_grid, positions_raw: trackStats.positions_raw,
+            minutes_played: trackStats.minutes_played || Math.round(totalDurationSec / 60),
+            ball_contacts: 0, passes_total: 0, passes_completed: 0, pass_accuracy: null,
+            duels_total: 0, duels_won: 0, tackles: 0, interceptions: 0, ball_recoveries: 0,
+            shots_total: 0, shots_on_target: 0, goals: 0, assists: 0, crosses: 0,
+            fouls_committed: 0, fouls_drawn: 0, yellow_cards: 0, red_cards: 0, aerial_won: 0,
+            data_source: "fieldiq",
+            raw_metrics: {
+              player_name: `Track ${i + 1}`,
+              auto_discovered: true,
+              coverage_ratio: needsExtrapolation ? coverageRatio : 1,
+              extrapolated: needsExtrapolation,
+              tactical_estimated: false,
+              ball_detections_available: false,
+              analysis_stage: "vorläufig",
+              raw_track_fallback: true,
+            },
+          };
+        });
+        
+        if (trackInserts.length > 0) {
+          const { error: tiErr } = await supabase.from("player_match_stats").insert(trackInserts);
+          if (tiErr) console.error("[process-tracking] Track insert error:", tiErr);
+          else console.log(`[process-tracking] Inserted ${trackInserts.length} raw track stats as fallback`);
+        }
+      }
+    }
+    
     for (const [team, players] of Object.entries(teamGroups)) {
       if (players.length === 0) continue;
       const totalDist = players.reduce((s, p) => s + p.stats.distance_km, 0);
@@ -1125,7 +1212,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       teamInserts.push({
         match_id: matchId, team, total_distance_km: Math.round(totalDist * 100) / 100,
         avg_distance_km: Math.round((totalDist / players.length) * 100) / 100,
-        top_speed_kmh: Math.round(topSpeed * 10) / 10, possession_pct: null, // Cannot be reliably estimated from position tracking alone
+        top_speed_kmh: Math.round(topSpeed * 10) / 10, possession_pct: null,
         formation_heatmap: mergedHeatmap, data_source: "fieldiq",
         raw_metrics: {
           tracked_player_count: players.length, cameras_used: sessions.length,
@@ -1197,16 +1284,22 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       }
     }
 
+    // Count total stats generated (including fallback track stats)
+    const totalStatsCount = playerStats.length || trackProfiles.filter(t => t.sidelineRatio < 0.45 && t.edgeRatio < 0.4 && t.positions.length >= 2).length;
+    
     await supabase.from("matches").update({
       status: "done",
       processing_progress: {
         phase: "complete", progress: 100,
-        detail: `${stageLabel} · ${playerStats.length} Spieler · ${sessions.length} Kamera(s)`,
+        detail: `${stageLabel} · ${totalStatsCount} Spieler · ${sessions.length} Kamera(s)`,
         analysis_stage: analysisStage,
+        total_tracks: trackProfiles.length,
+        field_tracks: trackProfiles.filter(t => t.sidelineRatio < 0.45).length,
+        assigned_players: playerStats.length,
         updated_at: new Date().toISOString(),
       },
     }).eq("id", matchId);
-    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${playerStats.length} players, ${sessions.length} camera(s)`);
+    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${totalStatsCount} stats (${playerStats.length} assigned + fallback), ${sessions.length} camera(s), ${trackProfiles.length} tracks`);
   } catch (err) {
     console.error("[process-tracking] Error:", err);
     await updateProgress("error", 0, err instanceof Error ? err.message : "Verarbeitung fehlgeschlagen");
