@@ -112,7 +112,8 @@ Kontext:
 - ${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"}
 - Datum: ${match?.date ?? "unbekannt"}
 - Platzgröße: ${match?.fields?.width_m ?? 105}x${match?.fields?.height_m ?? 68}m
-- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten
+- Feldtyp: ${fieldType !== "unknown" ? fieldType : "Standard-Großfeld"}
+- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten${calibrationNote}
 
 Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Spielerverteilung und Formationen
@@ -120,8 +121,12 @@ Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Erkennbare Muster und Spielphasen
 - Ballpositionen und Druckzonen
 - Für JEDEN Frame: Schätze die ungefähren Positionen (x,y in 0-100% des Spielfelds) aller erkennbaren Spieler beider Teams und des Balls. x=0 ist die linke Torlinie, x=100 die rechte. y=0 oben, y=100 unten. Gib auch eine kurze Beschreibung der Szene pro Frame.
+- Für JEDEN Frame: Schätze den sichtbaren Feldausschnitt (visible_area). Wenn die Kamera geschwenkt oder gezoomt wurde, zeigen verschiedene Frames unterschiedliche Bereiche.
 
-WICHTIG: Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.`,
+WICHTIG: 
+- Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.
+- Wenn ein Frame eine Nahaufnahme zeigt (< 30% Feldabdeckung), markiere ihn als "detail" Frame.
+- Frames mit schlechter Qualität oder ohne erkennbares Spielfeld als "unusable" markieren.`,
       },
     ];
 
