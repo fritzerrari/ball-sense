@@ -1,128 +1,145 @@
 
 
-# Komplett-Überarbeitung: Features, Demo, Anleitung + Gamechanger
+# Analyse: Was geht, was fehlt, was wäre möglich
 
-## Kontext & Probleme
+## Status Quo — Was funktioniert
 
-Die Landing Page (Features, Demo, HowItWorks, FullGuide) beschreibt ein **Multi-Kamera-Tracking-System mit On-Device YOLO/DeepSORT**, das in der Realität nicht existiert. Der aktuelle Produktkern ist: **Smartphone-Kamera filmt → Frames werden extrahiert (1 JPEG/30s) → Gemini Vision analysiert → KI-Insights + Spielzug-Replay**. 
-
-### Hauptdiskrepanzen
-
-| Landing Page behauptet | Realität |
+| Feature | Status |
 |---|---|
-| Multi-Kamera-Fusion, 2-3 Kameras, QR-Codes | Nicht implementiert (Edge Functions gelöscht) |
-| On-Device KI-Modell (~20MB ONNX), Spieler-Tracking in Echtzeit | Frame-Capture alle 30s, Gemini Vision cloud-seitig |
-| Player-Detections mit Confidence, Zuordnung, 95% Accuracy | KI schätzt ~70-80% Positionen aus Standbildern |
-| Laufdistanz, Topspeed, Sprint-Tracking pro Spieler | Nicht vorhanden — nur aggregierte taktische Insights |
-| Kalibrierung mit 4-Punkt-System | `FieldCalibration`-Route wurde gelöscht |
-| Heatmaps pro Spieler basierend auf Tracking | Nur Demo-Daten, keine echten Heatmaps |
-| 20 Abschnitte in FullGuide beschreiben Tracking-Features | ~60% der beschriebenen Features existieren nicht |
+| 1 Smartphone filmt, Frames alle 30s | ✅ Funktioniert |
+| Gemini Vision analysiert Formationen, Gefahrenzonen | ✅ Funktioniert |
+| Halbzeit-Analyse während Aufnahme | ✅ Funktioniert |
+| Coaching-Insights + Trainingsplan | ✅ Funktioniert |
+| Spielzug-Replay (geschätzte Positionen) | ✅ Funktioniert |
+| Platz-Kalibrierung mit KI-Eckerkennung | ✅ Code vorhanden (FieldCalibration.tsx + detect-field-corners Edge Function) |
+| Teilausschnitte (linke/rechte Hälfte, custom) | ✅ Im Kalibrierungs-Code implementiert |
+| Video-Upload + Live-Aufnahme | ✅ Beides möglich (NewMatch.tsx) |
 
-**Risiko**: Nutzer registrieren sich, erwarten Tracking-Daten, finden stattdessen KI-Bildanalyse. Das ist ein Vertrauensproblem.
+## Deine Fragen im Detail
 
-## Gamechanger-Idee: Match-Trend-Dashboard
+### 1. Automatische Platzerkennung
 
-Ein **Trend-Dashboard über mehrere Spiele** — der Trainer sieht auf einen Blick, wie sich sein Team entwickelt. Kein anderes Amateurprodukt bietet das.
+**Ist bereits implementiert!** Die `FieldCalibration.tsx` nutzt eine `detect-field-corners` Edge Function die via Gemini Vision:
+- 4 Eckpunkte automatisch erkennt
+- Feldtyp identifiziert (Großfeld, Kleinfeld, Jugend, Futsal)
+- Dimensionen vorschlägt (z.B. 105×68m)
+- Erkennt ob es ein echtes Spielfeld ist oder nicht
+- Teilansichten erkennt (nur linke/rechte Hälfte sichtbar)
 
-- Vergleich der letzten 5-10 Spiele: Dominanz, Chancen, Ballverlust-Muster
-- Trend-Linien für KI-Confidence, Spielkontrolle, Angriffsrichtungen
-- "Formkurve" basierend auf den tatsächlich vorhandenen Analyse-Daten
-- Automatische Erkennung von Mustern ("Ihr werdet in der 2. Halbzeit regelmäßig über links verwundbar")
+**Was fehlt**: Die Kalibrierung wird aktuell NICHT automatisch vor der Analyse ausgelöst. Der User muss manuell zu `/fields/:id/calibrate` navigieren. Das könnte automatisiert werden.
 
-## Umsetzungsplan
+### 2. Kamera schwenkt oder zoomt
 
-### Schritt 1: Landing Page — Features komplett umschreiben
+**Problem**: Aktuell nimmt das System an, dass die Kamera statisch steht. Bei Schwenk/Zoom verschieben sich die Spielfeldkoordinaten zwischen Frames — die KI-Positionsschätzungen werden inkonsistent.
 
-**FeatureCards.tsx** — Die 12 Feature-Karten ersetzen durch das, was wirklich existiert:
-1. Smartphone-Kamera genügt (1 Handy filmt, KI analysiert)
-2. KI-Halbzeitanalyse (Analyse schon in der Pause)
-3. Spielzug-Replay (animierte Taktik-Grafik aus KI-Schätzungen)
-4. Coaching-Insights (KI-generierte taktische Empfehlungen)
-5. Trainingsplan-Generator (automatische Übungsvorschläge)
-6. Gefährdungszonen & Ballverlust-Muster
-7. KI-Berichte (Vor-, Halbzeit-, Nachbericht in 3 Stilen)
-8. DSGVO-konform (Einwilligung pro Spieler)
-9. KI-Assistent (Chat-basiert)
-10. Match-Trend-Dashboard (NEU — Gamechanger)
+**Was machbar wäre** (rein mit Gemini Vision, ohne extra Backend):
+- **Schwenk-Erkennung**: Gemini kann pro Frame den sichtbaren Feldausschnitt schätzen ("Frame zeigt linke Hälfte" vs. "Frame zeigt Mittellinie"). Das Prompt wird um eine `visible_area` Angabe pro Frame erweitert
+- **Normalisierung**: Positionen werden relativ zum sichtbaren Ausschnitt geschätzt und dann auf das Gesamtfeld hochgerechnet
+- **Zoom-Toleranz**: Gemini erkennt Nahaufnahmen ("Strafraum-Detail") und markiert diese — solche Frames werden für taktische Übersicht ignoriert, aber für Detailanalyse genutzt
+- **Qualitäts-Warnung**: Starke Schwenks/Zooms → niedrigere Confidence im Report
 
-**Entfernen**: Multi-Kamera, On-Device-Tracking, Echtzeit-Erkennung, Leaderboards mit exakten Messwerten, Player-Level-Tracking-Stats
+**Limitierung**: Das funktioniert als "Best Effort". Exakte Koordinaten bei dynamischer Kamera sind ohne Computer Vision (Homographie-Transformation pro Frame) nicht möglich.
 
-### Schritt 2: HowItWorks — 3 Schritte anpassen
+### 3. Optimale Kamera-Anzahl und Platzierung
 
-Aktuell nutzt HowItWorks i18n-Keys, die auf das alte Tracking-Modell verweisen. Neue 3 Schritte:
-1. **Aufnehmen** — Smartphone aufstellen, Spiel filmen (kein spezielles Equipment)
-2. **KI analysiert** — Gemini Vision erkennt Formationen, Spielzüge, Gefahrenzonen
-3. **Coaching-Report** — Fertige Insights, Trainingsplan und Spielzug-Replay im Browser
+**Aktueller Stand**: 1 Kamera. Mehr ist im Code nicht vorgesehen.
 
-### Schritt 3: DemoSection — auf echte Features reduzieren
+**Optimale Konfiguration für das aktuelle System**:
 
-Die DemoSection ist 1546 Zeilen und zeigt Features, die nicht existieren (Player-Tracking-Stats, Radar-Charts mit echten Werten, Heatmaps pro Spieler). Überarbeitung:
-- **Behalten**: Coach Summary, KI-Insights, Report-Workflow (Pre/Half/Post), Trainingsplan
-- **Ersetzen**: Tracking-Statistiken → KI-Analyse-Ergebnisse (Dominanz, Tempo, Phasen, Gefahrenzonen)
-- **Neu hinzufügen**: Spielzug-Replay Demo (Mini-TacticalReplay mit Mock-Frames)
-- **Entfernen**: Spieler-Distanz-Balken, Radar-Charts, PlayerDetailModal mit Tracking-Daten, Speed/Pass-Leaderboards mit km/h-Werten
-- Ziel: ~800 Zeilen statt 1546
+```text
+                    ┌─────────────────────────────┐
+                    │         Spielfeld            │
+                    │                              │
+                    │                              │
+                    │                              │
+                    └─────────────────────────────┘
+                              📱
+                        Mittellinie, erhöht
+                        (Tribüne, 3-5m Höhe)
+```
 
-### Schritt 4: AnalyticsShowcase — umbauen
+1 Kamera reicht, weil:
+- Gemini analysiert Standbilder, keine Echtzeit-Tracks
+- Höhere Position = bessere Übersicht = bessere KI-Schätzungen
+- Schräge Perspektive (Eckfahne) ist schlecht → Mittellinie ideal
 
-Aktuell zeigt es Heatmap + Tracking-Stats (11.2 km, 32.1 km/h, 47 Sprints). Ersetzen durch:
-- Spielstruktur-Visualisierung (Phasen-Timeline)
-- Gefahrenzonen-Grafik (links/mitte/rechts)
-- Spielzug-Replay-Preview
-- "Confidence"-Anzeige statt exakter Messwerte
+**Was mit 2 Kameras möglich wäre** (Feature-Erweiterung):
+- Kamera 1: Linke Hälfte, Kamera 2: Rechte Hälfte
+- Frames beider Kameras werden als 2 Bild-Sets an Gemini geschickt
+- KI fusioniert die Perspektiven zu einem Gesamtbild
+- Payload verdoppelt sich → Edge Function muss 40 statt 20 Frames verarbeiten
 
-### Schritt 5: FullGuide — komplett überarbeiten
+### 4. Teilausschnitte
 
-Die 20 Abschnitte des FullGuide beschreiben ein anderes Produkt. Neuer Guide (~12 Abschnitte):
-1. App installieren (Android/iOS) — bleibt
-2. Account & Verein einrichten — bleibt
-3. Kader anlegen — vereinfachen (keine Tracking-Consent-Details)
-4. Spielfeld anlegen — bleibt (ohne Kalibrierung)
-5. Spiel anlegen — vereinfachen
-6. Aufnehmen starten — NEU (Smartphone filmen, nicht "Tracking starten")
-7. Während des Spiels — vereinfachen (Events eintragen, Halbzeit-Analyse)
-8. Spiel beenden & Analyse starten — NEU
-9. Report verstehen — NEU (KI-Insights statt Tracking-Stats)
-10. Spielzug-Replay nutzen — NEU
-11. KI-Assistent — bleibt
-12. Tipps & Troubleshooting — bleibt
+**Bereits implementiert** in der Kalibrierung (`coverage: "left_half" | "right_half" | "custom"`). Die KI kann auch Teilansichten erkennen. Was fehlt:
+- Die `analyze-match` Function nutzt die Kalibrierungsdaten des Feldes NICHT — sie weiß nicht, dass nur die linke Hälfte gefilmt wird
+- Positionsschätzungen beziehen sich immer auf "das sichtbare Feld"
 
-**Entfernen**: Kalibrierung (4-Punkt), Multi-Kamera-Setup (1/2/3 Kameras), Kamera-Codes, On-Device-KI, Spielererkennung ohne Trikotnummern (irrelevant ohne Tracking)
+### 5. User-Fehler vermeiden
 
-### Schritt 6: Match-Trend-Dashboard bauen (Gamechanger)
+**Aktuelle Schwachstellen** wo User scheitern können:
 
-**Neue Seite**: `/trends` (oder als Tab im Dashboard)
-- Query: alle `analysis_results` + `report_sections` der letzten N Spiele des Clubs
-- Visualisierungen:
-  - **Formkurve**: Dominanz + Tempo pro Spiel als Linie
-  - **Gefahrenzonen-Trend**: Angriffsseiten über mehrere Spiele
-  - **Ballverlust-Hotspots**: Wiederkehrende Muster
-  - **KI-Confidence-Trend**: Wird die Analyse besser?
-  - **Coaching-Insights-Zusammenfassung**: Top-3 wiederkehrende Themen
-- Einfache Recharts-Charts (bereits als Dependency vorhanden)
-- NavLink in AppLayout hinzufügen
+| Fehlerquelle | Auswirkung | Lösung |
+|---|---|---|
+| Kein Platz angelegt → Spiel kann nicht erstellt werden | Blockiert | Auto-Platz erstellen wenn keiner vorhanden |
+| Kamera zu nah am Spielfeld (Bodenhöhe) | Schlechte Analyse | Positionierungstipps vor Aufnahmestart |
+| Aufnahme zu kurz (< 5 Frames) | Sinnlose Analyse | Mindest-Aufnahmezeit erzwingen (z.B. 3 Min) |
+| Versehentlich gestoppt | Daten verloren | Bestätigungsdialog vor Stop |
+| Handy dreht sich → Stream bricht ab | Frames verloren | Orientation Lock erzwingen |
+| Browser-Tab wechseln → Kamera pausiert | Lücken in Frames | Warnung bei Visibility Change |
+| Kein Internet beim Analyse-Start | Upload schlägt fehl | Offline-Queue mit Retry |
+| Doppeltes Analyse-Triggering | Duplicate Jobs | Debounce + Check ob Job bereits existiert |
 
-### Schritt 7: i18n-Keys aktualisieren
+---
 
-Die betroffenen Keys in `src/lib/i18n.tsx` (DE + EN) für Features, HowItWorks, Landing-Texte anpassen.
+## Umsetzungsplan: Erweiterte Features
 
-## Betroffene Dateien
+### Schritt 1: Smart Recording Guard (User-Fehler vermeiden)
+
+Neue Komponente `RecordingGuard` die vor und während der Aufnahme prüft:
+- **Vor Start**: Kamera-Positionierungstipps-Overlay ("Stelle dein Handy erhöht auf, Blick auf Mittellinie")
+- **Orientierungssperre**: `screen.orientation.lock("landscape")` beim Aufnahmestart
+- **Visibility-Warnung**: `document.visibilitychange` Listener → Toast "App im Vordergrund halten!"
+- **Mindest-Frames**: Stop-Button erst aktiv nach >= 5 Frames (2.5 Min)
+- **Bestätigungsdialog**: "Aufnahme wirklich beenden?" vor dem Stoppen
+- **Frame-Qualitätsprüfung**: Schwarze/unscharfe Frames automatisch überspringen
+
+### Schritt 2: Auto-Setup (Platz automatisch erkennen)
+
+Wenn der User "Aufnahme starten" drückt:
+1. Erster Frame wird an `detect-field-corners` geschickt (bereits vorhandene Edge Function)
+2. Wenn kein Platz kalibriert → automatische Felderkennung aus dem ersten Kamerabild
+3. Ergebnis wird als Banner angezeigt: "Großfeld erkannt (105×68m) ✓" oder "Feld konnte nicht erkannt werden — Analyse läuft trotzdem"
+4. Kalibrierungsdaten werden an `analyze-match` weitergegeben für bessere Positionsschätzungen
+
+### Schritt 3: Schwenk/Zoom-Toleranz
+
+`analyze-match` Prompt erweitern:
+- Pro Frame zusätzlich `visible_area: { description: string, estimated_coverage_pct: number }` abfragen
+- Frames mit < 30% Feldabdeckung (Zoom auf Spieler) als "Detail-Frame" markieren → nicht für Taktik-Replay nutzen
+- Im Report anzeigen: "3 von 20 Frames zeigten Nahaufnahmen und wurden für die taktische Analyse ausgeschlossen"
+
+### Schritt 4: Kalibrierungsdaten in Analyse integrieren
+
+`analyze-match` bekommt Feld-Infos:
+- `field_dimensions`, `coverage`, `field_rect` aus der Kalibrierung
+- Prompt sagt der KI: "Die Kamera zeigt nur die linke Spielfeldhälfte. Positionsangaben normalisieren auf das Gesamtfeld."
+- Bessere Positionsschätzungen im Tactical Replay
+
+### Betroffene Dateien
 
 | Datei | Änderung |
 |---|---|
-| `src/components/landing/FeatureCards.tsx` | Features komplett umschreiben |
-| `src/components/landing/HowItWorks.tsx` | 3 Schritte anpassen |
-| `src/components/landing/DemoSection.tsx` | Auf ~800 Zeilen reduzieren, echte Features |
-| `src/components/landing/AnalyticsShowcase.tsx` | Tracking-Stats → KI-Analyse |
-| `src/pages/FullGuide.tsx` | Von 20 auf ~12 Abschnitte, echtes Produkt |
-| `src/lib/i18n.tsx` | Keys für Landing/Features/Steps aktualisieren |
-| `src/pages/Dashboard.tsx` | Trend-Link hinzufügen |
-| `src/pages/TrendDashboard.tsx` | NEU — Match-Trend-Dashboard |
-| `src/components/AppLayout.tsx` | NavLink für Trends |
-| `src/App.tsx` | Route `/trends` hinzufügen |
+| `src/pages/CameraTrackingPage.tsx` | RecordingGuard einbauen, Orientierungssperre, Visibility-Warnung |
+| `src/pages/NewMatch.tsx` | Gleiche Guards für Record-Modus |
+| `src/lib/frame-capture.ts` | Frame-Qualitätsprüfung (Schwarzbild-Erkennung), Orientierungs-Metadaten |
+| `supabase/functions/analyze-match/index.ts` | Prompt um visible_area + Kalibrierungsdaten erweitern |
+| `src/components/RecordingGuard.tsx` | NEU — Positionierungstipps, Orientation Lock, Visibility Warning |
+| `src/components/CameraSetupOverlay.tsx` | NEU — Tipps vor Aufnahmestart |
 
-## Einschränkungen
-- Die Demo bleibt mit generierten Testdaten — aber zeigt nur Features, die wirklich existieren
-- Der Trend-Dashboard braucht mindestens 2 analysierte Spiele, um sinnvoll zu sein (Empty State für weniger)
-- Alle Tracking-bezogenen i18n-Keys bleiben im Code (werden von CameraTrackingPage genutzt), aber Landing-Keys werden aktualisiert
+### Was NICHT geht (Grenzen)
+- Echtes Multi-Kamera-Stitching → braucht dediziertes CV-Backend
+- Exakte Spieler-Identifikation (Trikotnummer lesen) → Gemini kann das nur sporadisch
+- Echtzeit-Tracking mit fps-genauen Positionen → braucht YOLO/DeepSORT
+- Automatische Schwenk-Kompensation (Homographie pro Frame) → braucht OpenCV
 
