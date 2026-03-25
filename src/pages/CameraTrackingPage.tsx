@@ -59,7 +59,13 @@ export default function CameraTrackingPage() {
       }, 300);
     }
 
+    // Start video recorder for highlights if module is enabled
+    if (hasHighlights && streamRef.current) {
+      videoRecorderRef.current = startVideoRecorder(streamRef.current);
+    }
+
     setPhase("recording");
+    setRecordingStartTime(Date.now());
     setHalftimeSent(false);
     if (navigator.vibrate) navigator.vibrate(50);
 
@@ -141,6 +147,8 @@ export default function CameraTrackingPage() {
 
     const captureResult = liveCaptureRef.current?.stop();
     liveCaptureRef.current = null;
+    videoRecorderRef.current?.stop();
+    videoRecorderRef.current = null;
 
     streamRef.current?.getTracks().forEach(t => t.stop());
     if (videoRef.current) videoRef.current.srcObject = null;
