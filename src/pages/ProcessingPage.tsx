@@ -24,15 +24,16 @@ export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
-  const [insightsTriggered, setInsightsTriggered] = useState(false);
 
+  // Poll-only: no client-side triggering of generate-insights (server handles it)
   useEffect(() => {
     if (!id) return;
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("analysis_jobs")
-        .select("id, status, progress, error_message")
+        .select("id, status, progress, error_message, job_kind")
         .eq("match_id", id)
+        .eq("job_kind", "final")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -41,31 +42,38 @@ export default function ProcessingPage() {
         setStatus(data.status as JobStatus);
         setProgress(data.progress ?? 0);
         if (data.error_message) setErrorMessage(data.error_message);
-
-        // When analyze-match completes (status=interpreting), trigger generate-insights from client
-        if (data.status === "interpreting" && !insightsTriggered) {
-          setInsightsTriggered(true);
-          supabase.functions.invoke("generate-insights", {
-            body: { match_id: id, job_id: data.id },
-          }).catch((err) => console.error("generate-insights trigger error:", err));
-        }
-
         if (data.status === "complete" || data.status === "failed") clearInterval(interval);
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [id, insightsTriggered]);
+  }, [id]);
 
   const handleRetry = async () => {
     if (!id) return;
     setRetrying(true);
-    setInsightsTriggered(false);
     try {
+      // Check if there's already an active final job
+      const { data: activeJob } = await supabase
+        .from("analysis_jobs")
+        .select("id, status")
+        .eq("match_id", id)
+        .eq("job_kind", "final")
+        .in("status", ["queued", "analyzing", "interpreting"])
+        .maybeSingle();
+
+      if (activeJob) {
+        toast.info("Analyse läuft bereits…");
+        setStatus(activeJob.status as JobStatus);
+        setRetrying(false);
+        return;
+      }
+
       // Create new job
       const { data: newJob, error: jobError } = await supabase.from("analysis_jobs").insert({
         match_id: id,
         status: "queued",
         progress: 0,
+        job_kind: "final",
       }).select().single();
       if (jobError) throw jobError;
 
