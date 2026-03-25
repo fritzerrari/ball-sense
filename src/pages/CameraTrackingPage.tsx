@@ -1046,6 +1046,7 @@ export default function CameraTrackingPage() {
                     }
                   }}
                   className="absolute inset-0 w-full h-full object-cover"
+                  data-tracking-video="true"
                   playsInline muted autoPlay
                 />
               ) : (
