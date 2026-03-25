@@ -1,85 +1,82 @@
 
 
-# Diagnose: Was fehlt und was falsch läuft
+# Status-Analyse: Was funktioniert, was fehlt, wie geht es weiter
 
-## Problem 1: Video wird hochgeladen, aber NIE benutzt
+## Was funktioniert (architektonisch korrekt gebaut)
 
-Das ist der größte Fehler. Der aktuelle Flow:
+1. **Frame-Capture statt Video-Upload** — `frame-capture.ts` extrahiert alle 30s JPEG-Frames im Browser (~50KB/Frame). Kein 1.5GB-Video-Upload mehr.
+2. **NewMatch Flow** — Match anlegen (30s), dann Video hochladen oder aufnehmen, Frames werden extrahiert und direkt an `analyze-match` gesendet.
+3. **CameraTrackingPage** — Vereinfacht zu reinem Recorder mit Live-Frame-Capture + automatischem Analyse-Start.
+4. **analyze-match Edge Function** — Empfängt Base64-Frames, sendet sie als Multi-Image-Prompt an Gemini 2.5 Flash Vision, bekommt strukturierte Analyse via Tool Calling zurück.
+5. **generate-insights Edge Function** — Liest `analysis_results`, generiert Coaching-Insights + Trainingsempfehlungen via Gemini, speichert in `report_sections` + `training_recommendations`.
+6. **ProcessingPage** — Pollt `analysis_jobs` alle 2s, zeigt Fortschritt, hat Retry-Button.
+7. **MatchReport** — Zeigt Report-Sektionen, Insights, Danger Zones, Trainingsempfehlungen mit Confidence-Badges.
+8. **Datenmodell** — `analysis_jobs`, `analysis_results`, `report_sections`, `training_recommendations`, `match_videos` Tabellen mit RLS.
+9. **Auth, Navigation, i18n, Theme** — alles stabil.
 
-1. User nimmt Video auf oder lädt Datei hoch → **gesamtes Video geht in Supabase Storage** (ein 90-Min-Spiel = ~1.5 GB)
-2. `analyze-match` Edge Function wird aufgerufen → **liest das Video NICHT**
-3. Stattdessen schickt sie nur den Text "Match: Heim vs FC Musterstadt, Datum: 2026-03-25" an Gemini
-4. Gemini **halluziniert** eine Analyse aus diesem Text — ohne je einen Frame gesehen zu haben
+## Was noch Probleme hat / fehlt
 
-**Das Video wird also für nichts gebraucht.** Die gesamte "Analyse" ist eine Text-Halluzination.
+### Kritisch (Pipeline-Breaker)
 
-## Problem 2: Analyse wird nach Upload nie gestartet
+1. **Retry auf ProcessingPage hat keine Frames** — Der Retry-Button setzt den Job nur auf `queued` zurück, ruft aber `analyze-match` NICHT erneut auf. Und selbst wenn: die Frames sind weg (nur im Browser-Memory). Retry ohne Frames = sofortiger Fehler.
 
-In `NewMatch.tsx` wird nach dem Upload ein `analysis_jobs`-Eintrag mit Status `queued` erstellt — aber `analyze-match` wird **nie aufgerufen**. Die Edge Function wird nur beim manuellen "Analyse starten"-Button im `MatchReport.tsx` getriggert. Der User wartet also auf der Processing-Seite ewig.
+2. **Reprocess im MatchReport hat keine Frames** — `handleReprocess()` ruft `analyze-match` ohne `frames`-Parameter auf → Edge Function gibt sofort `400 "No frames provided"` zurück.
 
-## Problem 3: Kein Speicher-Management
+3. **Edge Function Timeout-Risiko** — Bei 20 Base64-Frames (je ~50KB) sind das ~1MB im Request-Body. Das funktioniert. Aber die Gemini-Vision-Analyse + anschließender `generate-insights`-Aufruf könnte an das Edge Function Timeout (~60s) stoßen. `analyze-match` ruft `generate-insights` per fetch auf — wenn das zusammen >60s dauert, bricht alles ab.
 
-Jedes hochgeladene Video bleibt permanent in Storage. Keine Lösch-Policy, keine Größenbeschränkung.
+4. **Keine Frames persistiert** — Frames leben nur im Browser-Memory während des Uploads. Kein Retry, kein Reprocess, keine spätere Nachanalyse möglich.
 
----
+### Wichtig (UX/Produkt)
 
-## Was tatsächlich gebaut werden muss
+5. **Dashboard zeigt keine Trainingsempfehlungen** — `Dashboard.tsx` hat keinen Zugriff auf `training_recommendations`. Zeigt nur alte Season-Stats (die aus dem alten Tracking-System kommen und leer sein werden).
 
-### Architektur-Entscheidung: Kein Video-Upload nötig
+6. **Matches-Seite verlinkt nicht zur ProcessingPage** — Matches mit Status `processing` haben keinen Link zur Fortschrittsansicht.
 
-Da Gemini Vision keine Videos aus Supabase Storage lesen kann (Edge Functions haben kein ffmpeg, kein Video-Decoder), gibt es zwei realistische Optionen:
+7. **Legacy Edge Functions noch vorhanden** — `camera-ops`, `process-tracking`, `cleanup-highlights`, `detect-field-corners` etc. sind noch da, werden aber nie aufgerufen. Tote Codebasis.
 
-**Option A — Frame-Capture im Browser (empfohlen)**
-- Statt Video hochzuladen: im Browser alle 30s einen Screenshot vom `<video>`-Element capturen (via Canvas → JPEG, ~50KB pro Frame)
-- 90 Minuten = ~180 Frames = ~9 MB statt 1.5 GB
-- Diese Frames als Base64-Array an `analyze-match` senden
-- Gemini Vision kann Base64-Bilder direkt analysieren
+8. **Legacy-Seiten noch in Navigation** — Fields, FieldCalibration, PlayerProfile noch in Routen, passen nicht zum neuen Produktmodell.
 
-**Option B — Video hochladen + externe Verarbeitung**
-- Braucht einen externen Worker (nicht Lovable) für ffmpeg → Frame-Extraktion
-- Teurer, komplexer, langsamer
+9. **`training_recommendations` RLS fehlt INSERT** — Die Tabelle erlaubt kein INSERT für authentifizierte User. `generate-insights` nutzt Service Role Key, also funktioniert es — aber das ist korrekt so. Gleiches gilt für `report_sections` und `analysis_results`.
 
-### Umsetzungsplan (Option A)
+### Nice-to-have
 
-#### 1. NewMatch Upload-Flow umbauen
-- **Kein ganzes Video mehr hochladen**
-- Bei "Datei hochladen": Video lokal im Browser abspielen, alle 30s Frame capturen
-- Bei "Aufnehmen": während der Aufnahme alle 30s Frame capturen
-- Frames als JPEG-Array sammeln (max 200 Frames)
-- Nach Ende: Frames + Matchdaten an `analyze-match` senden
-- Optional: kurzen 10s-Highlight-Clip speichern (für Preview), nicht das ganze Video
+10. **Kein Match-Vergleich** — Keine Trend-Ansicht über mehrere Spiele.
+11. **Keine Abo/Pricing-Logik** — Pricing-Seite existiert auf Landing Page, aber kein Checkout-Flow.
+12. **Kein Onboarding** — Nach Registrierung kein geführter Einstieg.
 
-#### 2. `analyze-match` Edge Function: echte Vision-Analyse
-- Empfängt Base64-Frames statt nur Text
-- Sendet Frames an Gemini Vision (`google/gemini-2.5-flash`) als Multi-Image-Prompt
-- Gemini sieht tatsächlich das Spielfeld und kann reale Muster erkennen
-- Strukturiertes Tool Calling bleibt (funktioniert gut)
+## Umsetzungsplan (priorisiert)
 
-#### 3. `analyze-match` nach Upload automatisch aufrufen
-- In `NewMatch.tsx` nach Frame-Capture direkt `supabase.functions.invoke("analyze-match", ...)` aufrufen
-- Kein manueller Trigger mehr nötig
+### Schritt 1: Frames persistieren + Retry reparieren
+- Nach Frame-Capture: Frames als JSON in Supabase Storage (`match-frames/{match_id}.json`) speichern
+- `analyze-match` Edge Function: wenn keine Frames im Request → aus Storage laden
+- Retry (ProcessingPage) und Reprocess (MatchReport) funktionieren dann automatisch
+- Frames nach 7 Tagen automatisch löschen (oder nach erfolgreicher Analyse)
 
-#### 4. Storage-Cleanup
-- Kein `match-videos` Bucket mehr für Vollvideos nötig
-- Optional: Frames temporär in Storage für Retry speichern, nach 24h löschen
+### Schritt 2: Timeout-Schutz
+- `analyze-match` soll `generate-insights` NICHT synchron aufrufen sondern nur Status `interpreting` setzen
+- Separater Client-seitiger Aufruf von `generate-insights` nach dem `analyze-match` fertig ist (ProcessingPage pollt und triggert)
+- Oder: `analyze-match` ruft `generate-insights` per fire-and-forget auf (kein await auf Response)
 
-#### 5. CameraTrackingPage gleich anpassen
-- Auch hier: Frame-Capture statt Video-Upload
-- Deutlich weniger Datenvolumen für mobile Nutzer
+### Schritt 3: Dashboard modernisieren
+- Quick Action "Neues Spiel" prominent
+- Letzte 3 Matches mit Analyse-Status (queued/analyzing/complete/failed)
+- Aktuelle Trainingsempfehlungen aus `training_recommendations`
+- Season-Stats aus altem System entfernen oder auf neue Daten umstellen
+
+### Schritt 4: Aufräumen
+- Legacy Edge Functions löschen: `camera-ops`, `process-tracking`, `cleanup-highlights`, `detect-field-corners`, `analyze-performance`
+- Legacy-Routen/Seiten entfernen oder vereinfachen: `FieldCalibration`, `PlayerProfile` (optional beibehalten)
+- Matches-Seite: Processing-Matches zur ProcessingPage verlinken
 
 ### Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/pages/NewMatch.tsx` | Frame-Capture statt Video-Upload, auto-trigger analyze-match |
-| `src/pages/CameraTrackingPage.tsx` | Frame-Capture statt Video-Upload |
-| `supabase/functions/analyze-match/index.ts` | Base64-Frames empfangen, Gemini Vision mit Bildern |
-| `src/pages/ProcessingPage.tsx` | Retry-Button der analyze-match aufruft |
-
-### Erwartetes Ergebnis
-
-- **~9 MB statt ~1.5 GB** pro Spiel
-- **Echte visuelle Analyse** statt Text-Halluzination
-- **Automatischer Start** nach Upload
-- **Sofort funktionsfähig** — keine externen Services nötig
+| `src/pages/NewMatch.tsx` | Frames in Storage persistieren nach Capture |
+| `src/pages/ProcessingPage.tsx` | Retry: Frames aus Storage laden + analyze-match aufrufen; generate-insights triggern |
+| `src/pages/MatchReport.tsx` | Reprocess: Frames aus Storage laden |
+| `supabase/functions/analyze-match/index.ts` | Frames aus Storage fallback; generate-insights fire-and-forget |
+| `src/pages/Dashboard.tsx` | Trainingsempfehlungen + neue Match-Status-Karten |
+| `src/pages/Matches.tsx` | Processing-Link zur ProcessingPage |
+| Legacy Functions | Löschen: camera-ops, process-tracking, cleanup-highlights, detect-field-corners, analyze-performance |
 
