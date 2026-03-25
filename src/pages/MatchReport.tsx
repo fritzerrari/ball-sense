@@ -500,6 +500,14 @@ export default function MatchReport() {
           )}
         </div>
 
+        {showProcessingRoadmap && id && (
+          <ProcessingRoadmap
+            matchId={id}
+            matchCreatedAt={match.created_at}
+            uploadCount={uploadCount}
+          />
+        )}
+
         {/* No stats warning with reprocess button */}
         {!hasStats && uploads && uploads.length > 0 && match.status === "done" && (
           <div className="glass-card border-amber-500/20 bg-amber-500/5 p-5 space-y-3">
