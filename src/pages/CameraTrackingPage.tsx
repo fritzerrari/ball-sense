@@ -769,6 +769,10 @@ export default function CameraTrackingPage() {
           cameraIndex: cam,
           sessionToken: token,
           points,
+          coverage: baseCalibration.coverage,
+          field_rect: baseCalibration.field_rect,
+          coverage_percent: baseCalibration.coverage_percent,
+          detected_features: baseCalibration.detected_features,
         }),
       });
 
