@@ -1172,9 +1172,8 @@ export default function CameraTrackingPage() {
               </div>
               {/* AI status indicator */}
               {(() => {
-                const aiStats = trackerRef.current?.getAIStats();
-                const hasAI = aiStats && aiStats.successful > 0;
-                const aiActive = aiStats && aiStats.total > 0;
+                const hasAI = aiStatsState.successful > 0;
+                const aiActive = aiStatsState.total > 0;
                 return (
                   <div className={`absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-sm border text-xs ${
                     hasAI
@@ -1184,7 +1183,7 @@ export default function CameraTrackingPage() {
                         : "bg-muted/60 border-border text-muted-foreground"
                   }`}>
                     <span className={`h-2 w-2 rounded-full ${hasAI ? "bg-primary animate-pulse" : aiActive ? "bg-amber-500" : "bg-muted-foreground"}`} />
-                    <span>{hasAI ? `KI ${aiStats.successful}/${aiStats.total}` : aiActive ? "KI wartet…" : "Aufnahme"}</span>
+                    <span>{hasAI ? `KI ${aiStatsState.successful}/${aiStatsState.total}` : aiActive ? "KI wartet…" : "Aufnahme"}</span>
                   </div>
                 );
               })()}
