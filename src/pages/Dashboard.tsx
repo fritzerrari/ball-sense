@@ -1,10 +1,9 @@
 import AppLayout from "@/components/AppLayout";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Map, Users, Swords, BarChart3, Zap, Trophy, Calendar, Clock } from "lucide-react";
+import { ChevronRight, Users, Swords, Zap, Calendar, Clock, Plus, Loader2, CheckCircle2, AlertTriangle, Sparkles } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useMatches } from "@/hooks/use-matches";
-import { useSeasonStats } from "@/hooks/use-match-stats";
 import { usePlayers } from "@/hooks/use-players";
 import { useFields } from "@/hooks/use-fields";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -12,33 +11,60 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { PlanBadge } from "@/components/PlanBadge";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
-import { DashboardCharts } from "@/components/DashboardCharts";
 import { MatchFlowGuide } from "@/components/MatchFlowGuide";
 import { useTranslation, useLocale } from "@/lib/i18n";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+
+interface TrainingRec {
+  id: string;
+  title: string;
+  description: string;
+  category: string | null;
+  priority: number | null;
+  match_id: string;
+}
 
 export default function Dashboard() {
-  const { clubName, clubPlan, clubLogoUrl } = useAuth();
+  const { clubName, clubPlan, clubLogoUrl, clubId } = useAuth();
   const { data: matches, isLoading: matchesLoading } = useMatches();
-  const { data: stats, isLoading: statsLoading } = useSeasonStats();
   const { data: players } = usePlayers();
   const { data: fields } = useFields();
   const { t } = useTranslation();
   const locale = useLocale();
 
+  // Fetch latest training recommendations
+  const { data: recommendations } = useQuery({
+    queryKey: ["training-recommendations", clubId],
+    queryFn: async () => {
+      if (!clubId) return [];
+      const { data } = await supabase
+        .from("training_recommendations")
+        .select("*")
+        .eq("club_id", clubId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      return (data ?? []) as TrainingRec[];
+    },
+    enabled: !!clubId,
+  });
+
   const hasMatches = matches && matches.length > 0;
-  const lastMatch = matches?.[0];
-  const nextMatch = matches?.find(m => m.status === "setup");
-  const doneMatches = matches?.filter(m => m.status === "done") ?? [];
   const hasPlayers = players && players.length > 0;
   const hasFields = fields && fields.length > 0;
 
-  if (matchesLoading || statsLoading) {
+  const recentMatches = matches?.slice(0, 3) ?? [];
+  const doneCount = matches?.filter(m => m.status === "done").length ?? 0;
+  const processingCount = matches?.filter(m => m.status === "processing").length ?? 0;
+
+  if (matchesLoading) {
     return <AppLayout><div className="max-w-5xl mx-auto"><SkeletonCard count={3} /></div></AppLayout>;
   }
 
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto space-y-8">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {clubLogoUrl && (
@@ -51,78 +77,86 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          {clubPlan && <PlanBadge plan={clubPlan} />}
+          <div className="flex items-center gap-3">
+            {clubPlan && <PlanBadge plan={clubPlan} />}
+            <Button variant="hero" size="sm" asChild>
+              <Link to="/matches/new"><Plus className="mr-1 h-4 w-4" /> Neues Spiel</Link>
+            </Button>
+          </div>
         </div>
 
         <PwaInstallPrompt />
         <MatchFlowGuide />
         <SetupChecklist hasPlayers={!!hasPlayers} hasFields={!!hasFields} />
 
-        {!hasMatches && (
-          <div className="glass-card p-6 glow-border">
-            <h2 className="text-lg font-semibold font-display mb-1">{t("dashboard.readyFirst")}</h2>
-            <p className="text-sm text-muted-foreground mb-6">{t("dashboard.startIn3Steps")}</p>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {[
-                { step: "1", label: t("dashboard.calibrateField"), icon: Map, href: "/fields", done: hasFields },
-                { step: "2", label: t("dashboard.addSquad"), icon: Users, href: "/players", done: hasPlayers },
-                { step: "3", label: t("dashboard.startMatch"), icon: Swords, href: "/matches/new", done: false },
-              ].map((s) => (
+        {/* Quick stats */}
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Swords className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Spiele analysiert</span>
+            </div>
+            <div className="text-2xl font-bold font-display">{doneCount}</div>
+          </div>
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Loader2 className={`h-4 w-4 ${processingCount > 0 ? "text-amber-500 animate-spin" : "text-muted-foreground"}`} />
+              <span className="text-xs text-muted-foreground">In Analyse</span>
+            </div>
+            <div className="text-2xl font-bold font-display">{processingCount}</div>
+          </div>
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Spieler</span>
+            </div>
+            <div className="text-2xl font-bold font-display">{players?.length ?? 0}</div>
+          </div>
+        </div>
+
+        {/* Recent matches */}
+        {recentMatches.length > 0 ? (
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-muted-foreground">Letzte Spiele</h3>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/matches">Alle anzeigen <ChevronRight className="h-3 w-3 ml-1" /></Link>
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {recentMatches.map((match) => (
                 <Link
-                  key={s.step}
-                  to={s.href}
-                  className={`glass-card p-5 flex items-center gap-4 hover:border-primary/30 transition-all group ${s.done ? "border-primary/20" : ""}`}
+                  key={match.id}
+                  to={match.status === "processing" ? `/matches/${match.id}/processing` : `/matches/${match.id}`}
+                  className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors group"
                 >
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold font-display transition-colors ${
-                    s.done ? "bg-emerald-500/20 text-emerald-400" : "bg-primary/10 text-primary group-hover:bg-primary/20"
-                  }`}>
-                    {s.done ? "✓" : s.step}
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">{s.label}</div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      {s.done ? t("dashboard.done") : <>{t("dashboard.setup")} <ChevronRight className="h-3 w-3" /></>}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      match.status === "done" ? "bg-emerald-500/10" :
+                      match.status === "processing" ? "bg-amber-500/10" :
+                      "bg-muted"
+                    }`}>
+                      {match.status === "done" ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                       match.status === "processing" ? <Loader2 className="h-4 w-4 text-amber-500 animate-spin" /> :
+                       match.status === "failed" ? <AlertTriangle className="h-4 w-4 text-destructive" /> :
+                       <Swords className="h-4 w-4 text-muted-foreground" />}
                     </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {clubName} vs {match.away_club_name || "TBD"}
+                      </p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-2">
+                        <Calendar className="h-3 w-3" /> {new Date(match.date).toLocaleDateString(locale)}
+                        {match.kickoff && <><Clock className="h-3 w-3" /> {match.kickoff}</>}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={match.status} />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </Link>
               ))}
-            </div>
-          </div>
-        )}
-
-        <div className="grid sm:grid-cols-4 gap-4">
-          {[
-            { label: t("dashboard.matchesTracked"), value: String(stats?.matchesTracked ?? 0), icon: Trophy },
-            { label: t("dashboard.totalKm"), value: stats?.totalKm ? `${stats.totalKm}` : "0", icon: BarChart3 },
-            { label: t("dashboard.topSpeed"), value: stats?.topSpeed ? `${stats.topSpeed} km/h` : "— km/h", icon: Zap },
-            { label: t("dashboard.activePlayers"), value: String(stats?.playerCount ?? 0), icon: Users },
-          ].map((stat) => (
-            <div key={stat.label} className="glass-card p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <stat.icon className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">{stat.label}</span>
-              </div>
-              <div className="text-2xl font-bold font-display">{stat.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {lastMatch && doneMatches.length > 0 ? (
-          <div className="glass-card p-6">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3">{t("dashboard.lastMatch")}</h3>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold font-display">
-                  {clubName} vs {doneMatches[0].away_club_name || t("dashboard.unknown")}
-                </p>
-                <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                  <Calendar className="h-3.5 w-3.5" /> {new Date(doneMatches[0].date).toLocaleDateString(locale)}
-                  <StatusBadge status={doneMatches[0].status} />
-                </p>
-              </div>
-              <Button variant="heroOutline" size="sm" asChild>
-                <Link to={`/matches/${doneMatches[0].id}`}>{t("dashboard.report")} <ChevronRight className="h-4 w-4 ml-1" /></Link>
-              </Button>
             </div>
           </div>
         ) : (
@@ -135,39 +169,37 @@ export default function Dashboard() {
           </div>
         )}
 
-        {nextMatch && (
-          <div className="glass-card p-6 glow-border">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3">{t("dashboard.nextMatch")}</h3>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold font-display">
-                  {clubName} vs {nextMatch.away_club_name || t("dashboard.tbd")}
-                </p>
-                <p className="text-sm text-muted-foreground flex items-center gap-3 mt-1">
-                  <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{new Date(nextMatch.date).toLocaleDateString(locale)}</span>
-                  {nextMatch.kickoff && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{nextMatch.kickoff}</span>}
-                </p>
-              </div>
-              <Button variant="hero" size="sm" asChild>
-                <Link to={`/matches/${nextMatch.id}`}>{t("dashboard.setup")}</Link>
-              </Button>
+        {/* Training Recommendations */}
+        {recommendations && recommendations.length > 0 && (
+          <div className="glass-card p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-semibold text-muted-foreground">Trainingsempfehlungen</h3>
+            </div>
+            <div className="space-y-3">
+              {recommendations.map((rec) => (
+                <div key={rec.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/50">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 mt-0.5">
+                    <Zap className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{rec.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{rec.description}</p>
+                  </div>
+                  {rec.priority && (
+                    <span className={`shrink-0 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
+                      rec.priority === 1 ? "bg-destructive/10 text-destructive" :
+                      rec.priority === 2 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" :
+                      "bg-muted text-muted-foreground"
+                    }`}>
+                      P{rec.priority}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
-
-        {stats?.topPlayerName && (
-          <div className="glass-card p-5 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">{t("dashboard.topRunner")}</div>
-              <div className="font-semibold font-display">{stats.topPlayerName}</div>
-            </div>
-          </div>
-        )}
-
-        <DashboardCharts />
       </div>
     </AppLayout>
   );
