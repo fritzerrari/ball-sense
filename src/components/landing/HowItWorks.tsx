@@ -41,7 +41,18 @@ export function HowItWorks() {
           </motion.div>
         </div>
 
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4 relative">
+          {/* Desktop step connectors */}
+          {[0, 1].map((idx) => (
+            <div
+              key={idx}
+              className="hidden md:block absolute top-1/2 -translate-y-1/2 z-10"
+              style={{ left: `${((idx + 1) * 100) / 3}%`, transform: "translate(-50%, -50%)" }}
+            >
+              <div className="w-8 h-px bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" />
+            </div>
+          ))}
+
           {steps.map((step, i) => (
             <motion.div
               key={i}
@@ -56,6 +67,11 @@ export function HowItWorks() {
                 {step.num}
               </span>
 
+              {/* Prominent number badge */}
+              <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-xs font-bold text-primary font-display">{step.num}</span>
+              </div>
+
               <div className="relative">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/15 transition-colors">
                   <step.icon className="h-5 w-5 text-primary" />
@@ -63,12 +79,6 @@ export function HowItWorks() {
                 <h3 className="text-lg font-semibold font-display mb-2">{t(step.titleKey)}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{t(step.descKey)}</p>
               </div>
-
-              {i < 2 && (
-                <div className="hidden md:block absolute top-1/2 -right-2 translate-x-full -translate-y-1/2 z-10">
-                  <div className="w-4 h-px bg-border" />
-                </div>
-              )}
             </motion.div>
           ))}
         </div>

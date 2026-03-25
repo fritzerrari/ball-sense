@@ -410,30 +410,59 @@ export default function NewMatch() {
             </div>
 
             {uploadMode === "file" && (
-              <div className="glass-card p-8 text-center space-y-4">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                  <FileVideo className="h-8 w-8 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold font-display">Spielvideo hochladen</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    MP4, MOV oder WebM — es werden nur Schlüsselbilder extrahiert (~50 KB pro Frame)
+              <div className="space-y-4">
+                <div className="glass-card p-8 text-center space-y-4">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                    <FileVideo className="h-8 w-8 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold font-display">Spielvideo hochladen</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      MP4, MOV oder WebM — es werden nur Schlüsselbilder extrahiert (~50 KB pro Frame)
+                    </p>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <Button onClick={() => fileInputRef.current?.click()} size="lg" className="w-full gap-2 h-14 text-base">
+                    <Upload className="h-5 w-5" /> Datei auswählen
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    <ImageIcon className="inline h-3 w-3 mr-1" />
+                    Das Video wird nicht hochgeladen — nur Einzelbilder alle 30 Sek.
                   </p>
                 </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <Button onClick={() => fileInputRef.current?.click()} size="lg" className="w-full gap-2 h-14 text-base">
-                  <Upload className="h-5 w-5" /> Datei auswählen
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  <ImageIcon className="inline h-3 w-3 mr-1" />
-                  Das Video wird nicht hochgeladen — nur Einzelbilder alle 30 Sek.
-                </p>
+
+                {/* Multi-camera hint */}
+                <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                      <Video className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground mb-1">Mehrere Kameras?</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Starte weitere Aufnahmen über den Kamera-Code im Spiel-Detail. 1 Kamera reicht — 2–3 für volle Feldabdeckung.
+                      </p>
+                      <div className="flex items-center gap-3 mt-2">
+                        {[
+                          { count: "1", label: "Basis", desc: "Halbes Feld" },
+                          { count: "2", label: "Empfohlen", desc: "Volles Feld" },
+                          { count: "3", label: "Optimal", desc: "Alle Winkel" },
+                        ].map((cam) => (
+                          <div key={cam.count} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <span className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px]">{cam.count}</span>
+                            <span>{cam.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
