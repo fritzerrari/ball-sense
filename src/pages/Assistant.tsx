@@ -638,7 +638,9 @@ export default function AssistantPage() {
                 )}
               </div>
             </div>
-            <PitchVisualization players={pitchPlayers} mode={pitchMode} timeRange={timeRange[0] === 0 && timeRange[1] === 1 ? undefined : timeRange} className="rounded-lg overflow-hidden" />
+            <div className="aspect-[16/10] rounded-lg overflow-hidden bg-muted/30 border border-border flex items-center justify-center">
+              <span className="text-xs text-muted-foreground">Spielfeld-Visualisierung (wird überarbeitet)</span>
+            </div>
             
             {/* Time Range Slider */}
             {pitchMode === "heatmap" && selectedPlayerIds.size > 0 && (
