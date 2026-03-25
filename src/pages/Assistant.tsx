@@ -171,7 +171,7 @@ export default function AssistantPage() {
     let idx = 0;
     players.forEach(p => {
       if (selectedPlayerIds.has(p.id)) {
-        map.set(p.id, { color: getPlayerColor(idx), index: idx });
+        map.set(p.id, { color: getPlayerColor(p.position ?? null), index: idx });
         idx++;
       }
     });
