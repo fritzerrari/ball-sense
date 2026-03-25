@@ -18,6 +18,9 @@ import {
   Bell,
   X,
   Crosshair,
+  Pause,
+  Play,
+  RotateCcw,
 } from "lucide-react";
 import { FootballTracker, type Detection, type UploadMode, type StabilityEvent } from "@/lib/football-tracker";
 import { LiveStatsEngine, type LiveSnapshot } from "@/lib/live-stats-engine";
@@ -54,12 +57,13 @@ interface MatchEvent {
 }
 
 const SESSION_PREFIX = "camera_session";
+const STATE_PREFIX = "camera_tracking_state";
 const CODE_REGEX = /^\d{6}$/;
 
 const WIZARD_STEPS: { key: Phase; label: string }[] = [
   { key: "auth", label: "Code" },
   { key: "camera", label: "Kamera" },
-  { key: "tracking", label: "Tracking" },
+  { key: "tracking", label: "Aufnahme" },
 ];
 
 export default function CameraTrackingPage() {
@@ -67,6 +71,7 @@ export default function CameraTrackingPage() {
   const [searchParams] = useSearchParams();
   const cam = Number.parseInt(searchParams.get("cam") ?? "0", 10);
   const sessionKey = useMemo(() => `${SESSION_PREFIX}_${id}_${cam}`, [id, cam]);
+  const stateKey = useMemo(() => `${STATE_PREFIX}_${id}_${cam}`, [id, cam]);
 
   const [code, setCode] = useState("");
   const [phase, setPhase] = useState<Phase>("auth");
@@ -94,6 +99,8 @@ export default function CameraTrackingPage() {
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
   const [liveStats, setLiveStats] = useState<LiveSnapshot | null>(null);
   const [lineupCounts, setLineupCounts] = useState<LineupCounts>({ home: 0, away: 0 });
+  const [isPaused, setIsPaused] = useState(false);
+  const [autoCalibAttempted, setAutoCalibAttempted] = useState(false);
 
   const trackerRef = useRef<FootballTracker | null>(null);
   const liveEngineRef = useRef<LiveStatsEngine | null>(null);
@@ -115,6 +122,13 @@ export default function CameraTrackingPage() {
 
   const formatTime = (sec: number) =>
     `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
+
+  // Auto-submit when 6 digits entered
+  useEffect(() => {
+    if (CODE_REGEX.test(code) && !isAuthorizing && phase === "auth") {
+      handleLogin();
+    }
+  }, [code]);
 
   // Online/offline tracking
   useEffect(() => {
@@ -185,45 +199,67 @@ export default function CameraTrackingPage() {
     }
   };
 
-  // Auto-restore session
+  // Auto-restore session with state recovery
   useEffect(() => {
     if (!id || Number.isNaN(cam) || cam < 0 || cam > 4) return;
     if (sessionToken) {
       void fetchSession(sessionToken).then(() => {
-        // Session restored, go to camera phase and start loading model in parallel
+        // Check for saved tracking state
+        try {
+          const savedState = localStorage.getItem(stateKey);
+          if (savedState) {
+            const parsed = JSON.parse(savedState);
+            if (parsed.phase === "tracking" && parsed.elapsedSec > 0) {
+              setElapsedSec(parsed.elapsedSec);
+              // Go to camera first, user can resume tracking
+              setPhase("camera");
+              toast.info("Letzte Session wiederhergestellt — tippe 'Tracking fortsetzen' um weiterzumachen");
+              return;
+            }
+          }
+        } catch { /* ignore parse errors */ }
         setPhase("camera");
       }).catch(() => {
         localStorage.removeItem(sessionKey);
+        localStorage.removeItem(stateKey);
         setPhase("auth");
       });
     }
   }, [cam, id, sessionKey, sessionToken]);
 
-  // Timer
+  // Timer — respects pause
   useEffect(() => {
-    if (phase === "tracking") {
+    if (phase === "tracking" && !isPaused) {
       timerRef.current = window.setInterval(() => setElapsedSec((v) => v + 1), 1000);
       return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }
-  }, [phase]);
+  }, [phase, isPaused]);
+
+  // Save tracking state periodically
+  useEffect(() => {
+    if (phase !== "tracking") return;
+    const interval = setInterval(() => {
+      localStorage.setItem(stateKey, JSON.stringify({ phase: "tracking", elapsedSec, isTracking: !isPaused }));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [phase, elapsedSec, isPaused, stateKey]);
 
   // 30-second micro-batch sync during tracking
   useEffect(() => {
-    if (phase !== "tracking") return;
-    const SYNC_INTERVAL_MS = 30_000; // 30 seconds
+    if (phase !== "tracking" || isPaused) return;
+    const SYNC_INTERVAL_MS = 30_000;
     const syncMicroBatch = async () => {
       const token = localStorage.getItem(sessionKey);
       if (!liveEngineRef.current || !trackerRef.current || !id || !token) return;
       try {
         const syncData = liveEngineRef.current.getStatsForSync();
-        if (syncData.totalFrames < 5) return; // Not enough data yet
+        if (syncData.totalFrames < 5) return;
         const frames = trackerRef.current.getRecentFrames?.() ?? [];
         const durationSec = trackerRef.current.getElapsedSeconds();
         const trackingData = {
           matchId: id, cameraIndex: cam, frames, framesCount: frames.length,
           durationSec, createdAt: new Date().toISOString(),
         };
-        // Upload tracking data chunk
         await fetch(CAMERA_OPS_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -232,7 +268,6 @@ export default function CameraTrackingPage() {
             trackingData, framesCount: frames.length, durationSec,
           }),
         });
-        // Trigger incremental processing
         await fetch(PROCESS_TRACKING_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-camera-session-token": token },
@@ -245,7 +280,7 @@ export default function CameraTrackingPage() {
     };
     const interval = setInterval(syncMicroBatch, SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [phase, id, cam, sessionKey]);
+  }, [phase, isPaused, id, cam, sessionKey]);
 
   // Auto-load model when entering camera phase
   useEffect(() => {
@@ -261,7 +296,7 @@ export default function CameraTrackingPage() {
   // Auto-start camera when entering camera phase
   useEffect(() => {
     if (phase !== "camera" || !trackerRef.current) return;
-    if (cameraReady) return; // Already started
+    if (cameraReady) return;
     const startCam = async () => {
       if (!videoRef.current) return;
       try {
@@ -271,14 +306,27 @@ export default function CameraTrackingPage() {
         }
         setCameraReady(true);
       } catch {
-        // Camera unavailable — still allow to proceed
         setCameraReady(true);
       }
     };
-    // Small delay to ensure tracker is initialized
     const t = setTimeout(startCam, 300);
     return () => clearTimeout(t);
   }, [phase, cam, modelLoaded]);
+
+  // AUTO-CALIBRATION: trigger auto-detect when camera is ready and not calibrated
+  useEffect(() => {
+    if (phase !== "camera" || !cameraReady || isCalibrated || autoCalibAttempted) return;
+    if (detectingCalibration || showInlineCalibration) return;
+
+    const t = setTimeout(() => {
+      setAutoCalibAttempted(true);
+      setShowInlineCalibration(true);
+      toast.info("Platz wird automatisch erkannt…");
+      // Auto-detect will run via handleAutoDetectInline
+      handleAutoDetectInline();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [phase, cameraReady, isCalibrated, autoCalibAttempted, detectingCalibration, showInlineCalibration]);
 
   // Attach stream to tracking video
   useEffect(() => {
@@ -306,7 +354,7 @@ export default function CameraTrackingPage() {
       setCode("");
       await fetchSession(data.sessionToken);
       setPhase("camera");
-      toast.success("Kamera angemeldet");
+      toast.success("Kamera angemeldet ✓");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Anmeldung fehlgeschlagen");
     } finally {
@@ -317,7 +365,6 @@ export default function CameraTrackingPage() {
   const handleStartTracking = async () => {
     if (!trackerRef.current || !id) return;
 
-    // Set squad sizes from lineup data so simulation matches reality
     trackerRef.current.setSquadSizes(lineupCounts.home, lineupCounts.away);
 
     const token = localStorage.getItem(sessionKey);
@@ -332,7 +379,7 @@ export default function CameraTrackingPage() {
     // Check video highlights module access
     try {
       const { data: hasAccess } = await supabase.rpc("can_access_module", {
-        _user_id: "00000000-0000-0000-0000-000000000000", // anon check via plan
+        _user_id: "00000000-0000-0000-0000-000000000000",
         _club_id: "00000000-0000-0000-0000-000000000000",
         _plan: "club",
         _module_key: "video_highlights",
@@ -344,11 +391,8 @@ export default function CameraTrackingPage() {
         });
         setHighlightsEnabled(true);
       }
-    } catch {
-      // Module not available, highlights disabled
-    }
+    } catch { /* Module not available */ }
 
-    // Configure live streaming if selected
     if (uploadMode === "live" && token) {
       trackerRef.current.configureLiveStream({
         matchId: id,
@@ -361,7 +405,6 @@ export default function CameraTrackingPage() {
       });
     }
 
-    // Setup stability monitoring
     trackerRef.current.setStabilityCallback((event: StabilityEvent, detail?: string) => {
       if (event === "bump") {
         setStabilityWarning(detail || "Kamera wurde bewegt");
@@ -373,14 +416,11 @@ export default function CameraTrackingPage() {
       }
     });
     trackerRef.current.startStabilityMonitoring();
-
-    // Setup zoom monitoring
     trackerRef.current.setZoomChangeCallback((current, calibrated) => {
       setStabilityWarning(`Zoom verändert (${current.toFixed(1)}x → kalibriert: ${calibrated.toFixed(1)}x)`);
     });
     trackerRef.current.startZoomMonitoring();
 
-    // Initialize LiveStatsEngine
     const fieldW = match?.fields?.width_m ?? 105;
     const fieldH = match?.fields?.height_m ?? 68;
     const engine = new LiveStatsEngine(fieldW, fieldH);
@@ -389,7 +429,6 @@ export default function CameraTrackingPage() {
 
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
-      // Feed frame to LiveStatsEngine for instant computation
       engine.processFrame(frame);
       const pCount = frame.detections.filter(d => d.label === "person").length;
       setPeakDetections((prev) => Math.max(prev, pCount));
@@ -403,16 +442,32 @@ export default function CameraTrackingPage() {
         toast.success(`✅ Erkennung bestätigt: ${pCount} Spieler erkannt`);
       }
     });
+    setIsPaused(false);
     setPhase("tracking");
+    // Save state
+    localStorage.setItem(stateKey, JSON.stringify({ phase: "tracking", elapsedSec, isTracking: true }));
+  };
+
+  const handleTogglePause = () => {
+    if (isPaused) {
+      trackerRef.current?.resumeTracking?.();
+      setIsPaused(false);
+      toast.success("Tracking fortgesetzt ▶️");
+    } else {
+      trackerRef.current?.pauseTracking();
+      setIsPaused(true);
+      toast.info("Tracking pausiert ⏸️");
+    }
   };
 
   const handleGoBack = () => {
     if (phase === "camera") {
       setPhase("auth");
     } else if (phase === "tracking") {
-      // Pause instead of stop
       trackerRef.current?.pauseTracking();
+      setIsPaused(true);
       setPhase("camera");
+      localStorage.setItem(stateKey, JSON.stringify({ phase: "tracking", elapsedSec, isTracking: false }));
     } else if (phase === "ended") {
       setPhase("tracking");
     }
@@ -423,7 +478,7 @@ export default function CameraTrackingPage() {
       streamRef.current.getTracks().forEach((t) => t.stop());
     }
     setPhase("ended");
-    // Auto-start upload
+    localStorage.removeItem(stateKey);
     setTimeout(() => handleUpload(), 500);
   };
 
@@ -432,7 +487,6 @@ export default function CameraTrackingPage() {
     if (!trackerRef.current || !id || !token) return;
     setUploading(true);
     try {
-      // Build session data from tracker frames
       const frames = trackerRef.current.stopTracking();
       const durationSec = trackerRef.current.getElapsedSeconds();
       const trackingData = {
@@ -446,7 +500,6 @@ export default function CameraTrackingPage() {
 
       toast.info("Daten werden hochgeladen…");
 
-      // Upload tracking data through camera-ops (service role bypasses storage RLS)
       const uploadResp = await fetch(CAMERA_OPS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -468,15 +521,14 @@ export default function CameraTrackingPage() {
         body: JSON.stringify({ action: "update_status", matchId: id, cameraIndex: cam, sessionToken: token, status: "processing" }),
       });
 
-      // Trigger processing - try with camera session token header
+      // Trigger processing
       const processResp = await fetch(PROCESS_TRACKING_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-camera-session-token": token },
         body: JSON.stringify({ matchId: id }),
       });
       if (!processResp.ok) {
-        console.warn("[Upload] Process-tracking trigger failed, will retry via anon key");
-        // Fallback: trigger with anon key (process-tracking also accepts this for camera sessions)
+        console.warn("[Upload] Process-tracking trigger failed, retrying…");
         await fetch(PROCESS_TRACKING_URL, {
           method: "POST",
           headers: {
@@ -487,6 +539,13 @@ export default function CameraTrackingPage() {
           body: JSON.stringify({ matchId: id }),
         }).catch(e => console.error("[Upload] Retry also failed:", e));
       }
+
+      // Release camera session
+      await fetch(CAMERA_OPS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "release", matchId: id, cameraIndex: cam, sessionToken: token }),
+      }).catch(() => console.warn("[Upload] Camera release failed"));
 
       // Upload highlight clips if any
       const recorder = trackerRef.current.getHighlightRecorder();
@@ -509,6 +568,23 @@ export default function CameraTrackingPage() {
     }
   };
 
+  const handleNewTracking = () => {
+    // Reset state for a new tracking session on the same match
+    setElapsedSec(0);
+    setCurrentDetections([]);
+    setDetectionConfirmed(false);
+    setPeakDetections(0);
+    setUploadDone(false);
+    setUploading(false);
+    setIsPaused(false);
+    setLiveStats(null);
+    setLiveEvents([]);
+    confirmSoundPlayed.current = false;
+    setCameraReady(false);
+    setAutoCalibAttempted(false);
+    setPhase("camera");
+  };
+
   // Inline calibration handlers
   const addInlineCalibrationPoint = useCallback((clientX: number, clientY: number) => {
     if (!showInlineCalibration || savingCalibration) return;
@@ -521,30 +597,25 @@ export default function CameraTrackingPage() {
 
     const now = Date.now();
     const last = lastCalibrationInputRef.current;
-    // Stronger debounce: 500ms + 3% distance threshold
     if (last && now - last.ts < 500 && Math.abs(last.x - x) < 0.03 && Math.abs(last.y - y) < 0.03) {
       return;
     }
     lastCalibrationInputRef.current = { x, y, ts: now };
 
-    // Check if tapping on existing point to delete it
     setCalibrationPoints((prev) => {
       const hitIdx = prev.findIndex(pt => Math.abs(pt.x - x) < 0.05 && Math.abs(pt.y - y) < 0.05);
       if (hitIdx >= 0) {
-        // Remove tapped point
         const next = [...prev];
         next.splice(hitIdx, 1);
         try { navigator.vibrate?.(50); } catch {}
         return next;
       }
       if (prev.length >= 4) return prev;
-      // Vibration feedback
       try { navigator.vibrate?.(30); } catch {}
       return [...prev, { x, y }];
     });
   }, [savingCalibration, showInlineCalibration]);
 
-  // Single unified handler — NO onClick, NO onTouchEnd
   const handleInlineCalibrationTap = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -552,9 +623,10 @@ export default function CameraTrackingPage() {
   }, [addInlineCalibrationPoint]);
 
   const handleAutoDetectInline = useCallback(async () => {
-    if (!showInlineCalibration || savingCalibration) return;
+    // Allow auto-detect even if showInlineCalibration is being set simultaneously
+    if (savingCalibration) return;
 
-    const video = trackingVideoRef.current;
+    const video = trackingVideoRef.current ?? videoRef.current;
     if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
       toast.error("Kein Kamerabild verfügbar — bitte kurz warten");
       return;
@@ -583,10 +655,10 @@ export default function CameraTrackingPage() {
           ? data.pitchRejectionReason
           : "Kein echter Fußballplatz erkannt";
         toast.error(reason);
+        toast.info("Bitte manuell die 4 Eckpunkte des sichtbaren Spielfelds antippen.");
         return;
       }
 
-      // Store field coverage info from AI detection
       const detectedFieldRect = data?.fieldRect ?? { x: 0, y: 0, w: 1, h: 1 };
       const coveragePercent = data?.coveragePercent ?? 100;
       const isPartial = data?.isPartialView === true || coveragePercent < 90;
@@ -630,7 +702,6 @@ export default function CameraTrackingPage() {
           }
 
           if (finalPoints.length === 4) {
-            // Store the detected field rect for use in calibration save
             (window as any).__detectedFieldRect = detectedFieldRect;
             (window as any).__detectedCoverage = coveragePercent;
             (window as any).__detectedFeatures = data?.detectedFeatures ?? [];
@@ -644,14 +715,15 @@ export default function CameraTrackingPage() {
         }
       }
 
-      toast.error("Ecken konnten nicht erkannt werden — bitte manuell die 4 Eckpunkte antippen");
+      toast.error("Ecken konnten nicht automatisch erkannt werden");
+      toast.info("Bitte tippe die 4 Eckpunkte des sichtbaren Spielfelds an.");
     } catch (error) {
       console.error("[Calibration] Auto-detect failed", error);
-      toast.error(error instanceof Error ? error.message : "Automatische Erkennung fehlgeschlagen");
+      toast.error("Automatische Erkennung fehlgeschlagen — bitte manuell kalibrieren");
     } finally {
       setDetectingCalibration(false);
     }
-  }, [savingCalibration, showInlineCalibration]);
+  }, [savingCalibration]);
 
   const saveInlineCalibration = useCallback(async (points: { x: number; y: number }[]) => {
     if (!id || Number.isNaN(cam) || cam < 0 || cam > 4) return;
@@ -662,7 +734,6 @@ export default function CameraTrackingPage() {
       return;
     }
 
-    // Use AI-detected field rect if available
     const detectedRect = (window as any).__detectedFieldRect ?? { x: 0, y: 0, w: 1, h: 1 };
     const detectedCoverage = (window as any).__detectedCoverage ?? 100;
     const detectedFeatures = (window as any).__detectedFeatures ?? [];
@@ -679,7 +750,6 @@ export default function CameraTrackingPage() {
       detected_features: detectedFeatures,
     };
 
-    // Clean up global refs
     delete (window as any).__detectedFieldRect;
     delete (window as any).__detectedCoverage;
     delete (window as any).__detectedFeatures;
@@ -783,11 +853,13 @@ export default function CameraTrackingPage() {
 
       <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-20 rounded-lg bg-card/90 p-2 text-center">
         <p className="text-xs font-medium text-foreground">
-          {savingCalibration
-            ? "Kalibrierung wird gespeichert…"
-            : calibrationPoints.length < 4
-              ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
-              : "Kalibrierung wird vorbereitet…"}
+          {detectingCalibration
+            ? "🔍 Platz wird automatisch erkannt…"
+            : savingCalibration
+              ? "Kalibrierung wird gespeichert…"
+              : calibrationPoints.length < 4
+                ? `Tippe auf: ${cornerLabels[calibrationPoints.length]} (${calibrationPoints.length + 1}/4)`
+                : "Kalibrierung wird vorbereitet…"}
         </p>
       </div>
 
@@ -866,7 +938,7 @@ export default function CameraTrackingPage() {
         style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
       />
 
-      {/* Wizard Stepper - simplified 3 steps */}
+      {/* Wizard Stepper */}
       <div className="px-4 py-2 border-b border-border bg-card/30">
         <div className="flex items-center gap-1 max-w-lg mx-auto">
           {WIZARD_STEPS.map((step, i) => {
@@ -906,7 +978,7 @@ export default function CameraTrackingPage() {
             <div>
               <h2 className="text-xl font-bold font-display mb-2">Kamera anmelden</h2>
               <p className="text-sm text-muted-foreground">
-                Gib den <strong>6-stelligen Kamera-Code</strong> ein, den du vom Trainer erhalten hast.
+                Gib den <strong>6-stelligen Kamera-Code</strong> ein — die Anmeldung startet automatisch.
               </p>
             </div>
             <input
@@ -914,16 +986,15 @@ export default function CameraTrackingPage() {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               inputMode="numeric"
               placeholder="000000"
-              className="w-full rounded-xl border border-border bg-muted px-4 py-4 text-center text-3xl tracking-[0.4em] text-foreground placeholder:text-muted-foreground font-mono"
+              className="w-full rounded-xl border border-border bg-muted px-4 py-5 text-center text-4xl tracking-[0.5em] text-foreground placeholder:text-muted-foreground font-mono"
               autoFocus
             />
-            <Button variant="hero" size="xl" className="w-full min-h-[56px]" onClick={handleLogin} disabled={isAuthorizing || !CODE_REGEX.test(code)}>
-              {isAuthorizing ? (
-                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Wird geprüft…</>
-              ) : (
-                <>Anmelden <ChevronRight className="ml-2 h-5 w-5" /></>
-              )}
-            </Button>
+            {isAuthorizing && (
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                Wird geprüft…
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Den Code findest du unter <strong>Einstellungen → Kamera-Codes</strong> im Hauptgerät.
             </p>
@@ -933,16 +1004,32 @@ export default function CameraTrackingPage() {
         {/* Phase: Camera — combined camera + calibration + model loading */}
         {phase === "camera" && (
           <div className="w-full max-w-sm space-y-4 text-center">
-            {/* Model loading indicator */}
+            {/* Progress steps */}
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2 justify-center">
+                {modelLoaded ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                <span className={modelLoaded ? "text-primary font-medium" : "text-muted-foreground"}>
+                  {modelLoaded ? "KI-Modell bereit ✓" : `KI-Modell wird geladen… ${progress}%`}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 justify-center">
+                {cameraReady ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                <span className={cameraReady ? "text-primary font-medium" : "text-muted-foreground"}>
+                  {cameraReady ? "Kamera bereit ✓" : "Kamera wird gestartet…"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 justify-center">
+                {isCalibrated ? <CheckCircle2 className="h-4 w-4 text-primary" /> : detectingCalibration ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Crosshair className="h-4 w-4 text-muted-foreground" />}
+                <span className={isCalibrated ? "text-primary font-medium" : detectingCalibration ? "text-primary" : "text-muted-foreground"}>
+                  {isCalibrated ? "Platz kalibriert ✓" : detectingCalibration ? "Platz wird erkannt…" : "Platz noch nicht kalibriert"}
+                </span>
+              </div>
+            </div>
+
+            {/* Model loading bar */}
             {!modelLoaded && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 justify-center text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  KI-Modell wird geladen… {progress}%
-                </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
-                </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
               </div>
             )}
 
@@ -968,34 +1055,12 @@ export default function CameraTrackingPage() {
               {inlineCalibrationOverlay}
             </div>
 
-            {/* Calibration status */}
-            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left ${
-              isCalibrated ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"
-            }`}>
-              {isCalibrated ? (
-                <>
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Platz kalibriert ✓</p>
-                    <p className="text-xs text-muted-foreground">{match?.fields?.name ?? "Platz"}</p>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => { setShowInlineCalibration(true); setCalibrationPoints([]); }}>
-                    <Crosshair className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Nicht kalibriert</p>
-                    <p className="text-xs text-muted-foreground">Tippe auf Kalibrieren für genaue Daten</p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => { setShowInlineCalibration(true); setCalibrationPoints([]); }}>
-                    <Crosshair className="mr-1 h-4 w-4" /> Kalibrieren
-                  </Button>
-                </>
-              )}
-            </div>
+            {/* Calibration manual trigger (only if not auto-calibrating) */}
+            {!isCalibrated && !showInlineCalibration && !detectingCalibration && (
+              <Button variant="outline" className="w-full" onClick={() => { setShowInlineCalibration(true); setCalibrationPoints([]); }}>
+                <Crosshair className="mr-2 h-4 w-4" /> Manuell kalibrieren
+              </Button>
+            )}
 
             {/* Upload mode toggle */}
             <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
@@ -1012,7 +1077,7 @@ export default function CameraTrackingPage() {
               </button>
             </div>
 
-            {/* Start tracking button */}
+            {/* Start / Resume tracking button */}
             <Button
               variant="hero"
               size="xl"
@@ -1032,6 +1097,8 @@ export default function CameraTrackingPage() {
                 <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Modell wird geladen…</>
               ) : !isCalibrated ? (
                 <><Crosshair className="mr-2 h-5 w-5" /> Platz kalibrieren &amp; starten</>
+              ) : elapsedSec > 0 ? (
+                <><Play className="mr-2 h-5 w-5" /> Tracking fortsetzen ({formatTime(elapsedSec)})</>
               ) : (
                 <>Tracking starten <ChevronRight className="ml-2 h-5 w-5" /></>
               )}
@@ -1052,12 +1119,16 @@ export default function CameraTrackingPage() {
         {/* Phase: Tracking */}
         {phase === "tracking" && (
           <div className="w-full max-w-lg flex flex-col" style={{ maxHeight: "calc(100dvh - 7rem)" }}>
-            {/* Scrollable content area */}
             <div className="flex-1 overflow-y-auto space-y-4 pb-2">
             {/* Timer */}
             <div className="text-center">
-              <div className="text-5xl sm:text-6xl font-bold font-display tracking-tight gradient-text">{formatTime(elapsedSec)}</div>
-              {uploadMode === "live" && (
+              <div className={`text-5xl sm:text-6xl font-bold font-display tracking-tight ${isPaused ? "text-muted-foreground" : "gradient-text"}`}>
+                {formatTime(elapsedSec)}
+              </div>
+              {isPaused && (
+                <p className="text-sm text-amber-500 font-medium mt-1">⏸️ Pausiert</p>
+              )}
+              {uploadMode === "live" && !isPaused && (
                 <div className="flex items-center justify-center gap-2 mt-1">
                   <Wifi className="h-3.5 w-3.5 text-primary" />
                   <span className="text-xs text-muted-foreground">
@@ -1080,7 +1151,6 @@ export default function CameraTrackingPage() {
                 muted
                 autoPlay
               />
-              {/* TrackingOverlay hidden: simulation mode generates random positions that don't match real players */}
               {!streamRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
                   <Camera className="h-12 w-12" />
@@ -1090,8 +1160,8 @@ export default function CameraTrackingPage() {
               {inlineCalibrationOverlay}
 
               <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card/80 backdrop-blur-sm border border-border text-xs">
-                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="font-medium text-muted-foreground">REC</span>
+                <span className={`h-2 w-2 rounded-full ${isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"}`} />
+                <span className="font-medium text-muted-foreground">{isPaused ? "PAUSE" : "REC"}</span>
               </div>
               <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 backdrop-blur-sm border border-amber-500/30 text-xs text-amber-400">
                 <Camera className="h-3 w-3" />
@@ -1177,11 +1247,12 @@ export default function CameraTrackingPage() {
 
             {/* Sticky bottom buttons — always visible */}
             <div className="flex gap-2 pt-3 pb-2 bg-background sticky bottom-0 border-t border-border mt-auto">
-              <Button variant="outline" size="lg" className="flex-1" onClick={() => {
-                setShowInlineCalibration(true);
-                setCalibrationPoints([]);
-              }}>
-                <Crosshair className="mr-2 h-4 w-4" /> Kalibrieren
+              <Button variant="outline" size="lg" className="flex-1" onClick={handleTogglePause}>
+                {isPaused ? (
+                  <><Play className="mr-2 h-4 w-4" /> Fortsetzen</>
+                ) : (
+                  <><Pause className="mr-2 h-4 w-4" /> Pausieren</>
+                )}
               </Button>
               <Button variant="destructive" size="lg" className="flex-1" onClick={handleEnd}>
                 <Flag className="mr-2 h-4 w-4" /> Beenden
@@ -1207,12 +1278,18 @@ export default function CameraTrackingPage() {
 
             {uploadDone ? (
               <div className="space-y-4">
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-                  <p className="text-sm text-muted-foreground">Die Daten werden jetzt verarbeitet.</p>
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-2">
+                  <p className="text-sm font-medium text-foreground">Die Daten werden jetzt verarbeitet.</p>
+                  <p className="text-xs text-muted-foreground">Kamera wurde freigegeben und kann für das nächste Spiel verwendet werden.</p>
                 </div>
-                <Button variant="hero" size="xl" className="w-full min-h-[56px]" asChild>
-                  <Link to="/">Fertig</Link>
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="hero" size="xl" className="flex-1 min-h-[56px]" asChild>
+                    <Link to="/">Fertig</Link>
+                  </Button>
+                  <Button variant="outline" size="xl" className="min-h-[56px]" onClick={handleNewTracking}>
+                    <RotateCcw className="mr-2 h-5 w-5" /> Neues Tracking
+                  </Button>
+                </div>
               </div>
             ) : uploading ? (
               <div className="flex items-center justify-center gap-2">

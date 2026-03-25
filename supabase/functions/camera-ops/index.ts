@@ -131,6 +131,18 @@ serve(async (req) => {
       });
     }
 
+    if (action === "release") {
+      // Release camera session after upload — expire it immediately
+      const sessionHash = await sha256(sessionToken);
+      await supabase.from("camera_access_sessions")
+        .update({ expires_at: new Date().toISOString() })
+        .eq("match_id", matchId)
+        .eq("camera_index", cameraIndex)
+        .eq("session_token_hash", sessionHash);
+      console.log(`[camera-ops] Released session for match=${matchId} cam=${cameraIndex}`);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "register_upload") {
       const filePath = String(body.filePath ?? "").trim();
       const framesCount = Number(body.framesCount ?? 0);
