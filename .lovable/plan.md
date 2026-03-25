@@ -1,126 +1,116 @@
 
 
-## Analyse: Kalibrierung, Verarbeitung & Gemini Embeddings
+## Kamera-Flow Optimierung: Kalibrierung, Session-Wiederaufnahme & UX
 
 ### Identifizierte Probleme
 
-**1. Kalibrierung funktioniert schlecht auf Mobile**
-- Dreifache Event-Handler (`onPointerDown` + `onClick` + `onTouchEnd`) feuern gleichzeitig auf Mobilgeraeten
-- Die 350ms-Debounce filtert nicht zuverlaessig, weil verschiedene Event-Typen unterschiedliche Koordinaten liefern
-- Auto-Erkennung ueber Gemini Vision liefert oft keine 4 Eckpunkte zurueck oder scheitert an Bildqualitaet
-- Der `calibrationOverlayRef` wird zwischen Camera- und Tracking-Phase geteilt, was zu Referenz-Problemen fuehrt
+1. **Keine automatische Kalibrierung nach Code-Eingabe**: Nach Login wird der User zur Camera-Phase geleitet, sieht den Kalibrierungs-Hinweis aber nur passiv. Es wird weder automatisch erkannt noch aktiv die Kalibrierung gestartet.
 
-**2. Analyse haengt / liefert keine Ergebnisse**
-- `process-tracking` Edge Function fuehrt die komplette Verarbeitung (Download, Track-Building, Stats, DB-Inserts) synchron aus
-- Edge Functions haben ein CPU-Zeitlimit von 2 Sekunden — die Verarbeitung ueberschreitet das bei realen Datenmengen
-- `EdgeRuntime.waitUntil` wird genutzt, aber die Berechnung innerhalb ist trotzdem zu aufwendig
-- 30-Sekunden Micro-Batch-Sync waehrend des Trackings erzeugt viele kleine Uploads, die einzeln verarbeitet werden muessen
+2. **Kameras werden nach Analyse nicht freigegeben**: Camera-Sessions laufen 12h, aber nach Spielende/Upload gibt es keine Freigabe. Neue Codes koennen nicht generiert werden wenn das Limit (3 aktive Codes) erreicht ist.
 
-**3. Gemini Embeddings**
-- Embeddings koennten semantische Aehnlichkeitssuche fuer Spielszenen, Spielervergleiche und taktische Muster ermoeglichen
-- Sind aber NICHT der primaere Engpass — die Kernprobleme sind UX (Kalibrierung) und Infrastruktur (Timeout)
+3. **Keine Wiederaufnahme bei Unterbrechung**: Wenn der User versehentlich die App verlässt oder das Tracking pausiert, gibt es keinen einfachen Weg zurueck ins laufende Tracking. Die Session geht verloren.
+
+4. **UX insgesamt zu komplex**: Zu viele Schritte, zu wenig Orientierung fuer den Kamera-Operator am Spielfeldrand.
 
 ---
 
 ### Loesung
 
-#### Teil 1: Kalibrierung reparieren
+#### Teil 1: Auto-Kalibrierung nach Code-Eingabe
 
-**Event-Handling vereinfachen** (`CameraTrackingPage.tsx`):
-- Entferne `onClick` und `onTouchEnd` komplett — nur `onPointerDown` verwenden (funktioniert auf allen Geraeten)
-- Erhoehe Debounce auf 500ms mit groesserem Distanz-Threshold (0.03 statt 0.01)
-- Eigenen `calibrationOverlayRef` fuer jede Phase verwenden
+Wenn der User in die Camera-Phase kommt und der Platz NICHT kalibriert ist:
+- Sobald die Kamera bereit ist, automatisch `handleAutoDetectInline()` ausfuehren (KI-Erkennung)
+- Falls KI erfolgreich: Punkte setzen, automatisch speichern, Toast zeigen
+- Falls KI fehlschlaegt: `showInlineCalibration` automatisch aktivieren mit klarer Anweisung "Tippe die 4 Eckpunkte des Spielfelds an"
+- Kein manueller Klick auf "Kalibrieren" noetig
 
-**Auto-Erkennung verbessern** (`detect-field-corners`):
-- Prompt-Optimierung: expliziter anweisen, immer 4 Punkte zurueckzugeben (auch geschaetzt)
-- Fallback-Logik: wenn nur 2-3 Ecken erkannt werden, fehlende Ecken aus bekannten Seitenverhaeltnissen berechnen
-- Bei Fehlschlag: sofort in manuellen Modus wechseln mit klarer Anleitung
+**Datei**: `src/pages/CameraTrackingPage.tsx` — neuer `useEffect` der bei `cameraReady && !isCalibrated` auto-detect triggert
 
-**UX-Verbesserungen**:
-- Groessere Touch-Targets fuer Eckpunkte (40x40px statt 24x24px)
-- Visuelle Verbindungslinien zwischen gesetzten Punkten zeichnen
-- "Punkt loeschen" durch Tippen auf gesetzten Punkt
-- Vibrationsfeedback bei jedem gesetzten Punkt (`navigator.vibrate`)
+#### Teil 2: Kamera-Freigabe nach Analyse
 
-#### Teil 2: Analyse-Verarbeitung enthaengen
+Nach Upload + Processing-Trigger:
+- Camera-Session als "completed" markieren (neuer `action: "release"` in `camera-ops`)
+- Backend deaktiviert die Session (setzt `expires_at` auf jetzt)
+- Frontend zeigt im "ended"-Screen: "Kamera freigegeben — kann fuer das naechste Spiel verwendet werden"
 
-**Processing aufteilen** (`process-tracking`):
-- Phase 1 (sofort, <1s CPU): Upload registrieren, Metadaten lesen, Job-Record in DB erstellen
-- Phase 2 (via `EdgeRuntime.waitUntil`): Leichtgewichtige Stats berechnen (nur physische Metriken: Distanz, Speed, Sprints)
-- Phase 3 (separater Aufruf): Taktische Stats (Ball-Proximity, Zweikampf-Heuristiken) als eigener Edge Function Call
+**Dateien**: `supabase/functions/camera-ops/index.ts` (neuer `release` action), `src/pages/CameraTrackingPage.tsx` (Release nach Upload)
 
-**Konkrete Aenderungen**:
-- `runProcessing` in 2 Phasen aufteilen: "quick-stats" (Track-Building + physische Metriken) und "deep-analysis" (taktische Zuordnung)
-- Quick-Stats sollen in <1.5s CPU fertig sein (Sampling: nur jeden 5. Frame verarbeiten)
-- Frame-Sampling erhoehen: statt alle Frames nur jeden 3.-5. Frame fuer Track-Building
-- Progress-Updates in DB schreiben, damit Frontend den Status pollen kann
+#### Teil 3: Session-Wiederaufnahme
 
-**Frontend-Polling verbessern** (`MatchReport.tsx`):
-- Polling-Intervall von 2s statt 5s waehrend "processing"-Status
-- Klare Fortschrittsanzeige mit Phasen-Beschreibung
-- Automatischer Reload der Stats wenn sich `processing_progress` aendert
+- `localStorage` speichert zusaetzlich: `camera_tracking_state_{matchId}_{cam}` mit `{ phase, elapsedSec, isTracking }`
+- Beim Laden der Seite: wenn Session-Token gueltig UND gespeicherter State vorhanden, direkt in die richtige Phase springen
+- Neuer "Fortsetzen"-Button wenn Match-Status "live" ist und eine gueltige Session existiert
+- `handleGoBack` aus Tracking-Phase pausiert nur (bereits implementiert), aber speichert den State
 
-#### Teil 3: Gemini Embeddings (optional, spaeter)
+**Datei**: `src/pages/CameraTrackingPage.tsx`
 
-Embeddings waeren nuetzlich fuer:
-- Spielszenen-Clustering (aehnliche Spielsituationen finden)
-- Spielervergleiche ueber mehrere Spiele hinweg
-- Taktik-Muster-Erkennung in natuerlicher Sprache
+#### Teil 4: UX-Vereinfachung
 
-Aber: aktuell generiert das System Simulations-Daten, keine echten Detections. Embeddings wuerden erst mit echtem Computer Vision (YOLO/ONNX) einen echten Mehrwert bringen. Empfehlung: erst Kalibrierung + Processing stabilisieren, dann Embeddings als naechsten Schritt.
+- **Auth-Phase**: Groesserer Code-Input, automatischer Submit bei 6 Ziffern (kein Button-Klick noetig)
+- **Camera-Phase**: Fortschritts-Anzeige vereinfachen — "Kamera bereit ✓ → Platz wird erkannt... → Tracking bereit!"
+- **Tracking-Phase**: "Pause/Fortsetzen"-Button statt nur "Beenden"
+- **Ended-Phase**: "Neues Tracking starten" Button fuer dasselbe Spiel (zurueck zur Camera-Phase)
+- Wizard-Stepper-Labels uebersetzen: "Code → Kamera → Aufnahme"
 
 ---
 
 ### Technische Details
 
-**Kalibrierung — einziger Event-Handler:**
+**Auto-Kalibrierung Trigger:**
 ```typescript
-// NUR onPointerDown verwenden — funktioniert auf Touch UND Desktop
-onPointerDown={(e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  // Deduplizierung ueber Timestamp + Position
-  addCalibrationPoint(e.clientX, e.clientY);
-}}
-// onClick, onTouchEnd, onTouchStart entfernen
+useEffect(() => {
+  if (phase !== "camera" || !cameraReady || isCalibrated) return;
+  if (detectingCalibration || showInlineCalibration) return;
+  // Warte kurz bis Kamerabild stabil ist
+  const t = setTimeout(() => {
+    setShowInlineCalibration(true);
+    handleAutoDetectInline(); // KI versucht automatisch
+  }, 1500);
+  return () => clearTimeout(t);
+}, [phase, cameraReady, isCalibrated]);
 ```
 
-**Fehlende Ecken berechnen:**
+**Session-Release (camera-ops):**
 ```typescript
-// Wenn nur 2-3 Ecken erkannt: Seitenverhaeltnis 105:68 nutzen
-if (corners.length === 2) {
-  // 2 Ecken = eine Seite bekannt → gegenueberliegende Seite schaetzen
-  const dx = corners[1].x - corners[0].x;
-  const dy = corners[1].y - corners[0].y;
-  const perpX = -dy * (68/105);
-  const perpY = dx * (68/105);
-  corners.push({ x: corners[1].x + perpX, y: corners[1].y + perpY });
-  corners.push({ x: corners[0].x + perpX, y: corners[0].y + perpY });
+if (action === "release") {
+  await supabase.from("camera_access_sessions")
+    .update({ expires_at: new Date().toISOString() })
+    .eq("match_id", matchId)
+    .eq("camera_index", cameraIndex)
+    .eq("session_token_hash", sessionHash);
+  return jsonResp({ success: true });
 }
 ```
 
-**Processing-Optimierung — Frame-Sampling:**
+**Auto-Submit bei 6 Ziffern:**
 ```typescript
-// Statt alle Frames: nur jeden 5. Frame fuer Track-Building
-const SAMPLE_RATE = 5;
-const sampledFrames = mergedFrames.filter((_, i) => i % SAMPLE_RATE === 0);
-const tracks = buildTracks(sampledFrames);
+useEffect(() => {
+  if (CODE_REGEX.test(code) && !isAuthorizing) {
+    handleLogin();
+  }
+}, [code]);
+```
+
+**Tracking-State Persistenz:**
+```typescript
+// Beim Start: State speichern
+localStorage.setItem(stateKey, JSON.stringify({ phase: "tracking", elapsedSec }));
+// Bei Wiederherstellung: direkt in Tracking springen
 ```
 
 ### Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/CameraTrackingPage.tsx` | Event-Handler vereinfachen, Touch-Targets vergroessern, Vibration |
-| `supabase/functions/detect-field-corners/index.ts` | Prompt optimieren, Fallback-Logik fuer fehlende Ecken |
-| `supabase/functions/process-tracking/index.ts` | Frame-Sampling, Processing in Phasen aufteilen |
-| `src/pages/MatchReport.tsx` | Polling-Intervall verkuerzen, bessere Fortschrittsanzeige |
+| `src/pages/CameraTrackingPage.tsx` | Auto-Kalibrierung, Session-Resume, Auto-Submit, Pause-Button, UX |
+| `supabase/functions/camera-ops/index.ts` | Neuer `release` Action |
+| `src/pages/CameraTrackingPage.tsx` | "Neues Tracking starten" in Ended-Phase |
 
 ### Prioritaet
 
-1. Kalibrierung Touch-Fix (sofortiger UX-Gewinn)
-2. Processing Frame-Sampling (verhindert Timeout)
-3. Auto-Detect Fallback-Logik
-4. Polling-Verbesserung
-5. Gemini Embeddings (spaeterer Schritt)
+1. Auto-Kalibrierung nach Kamera-Start (groesster UX-Gewinn)
+2. Auto-Submit bei 6 Ziffern
+3. Session-Wiederaufnahme bei Unterbrechung
+4. Kamera-Freigabe nach Analyse
+5. Pause/Fortsetzen-Button
 
