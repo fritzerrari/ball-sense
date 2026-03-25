@@ -213,7 +213,7 @@ export default function MatchReport() {
   const uploadCount = uploads?.length ?? 0;
   const showProcessingRoadmap = Boolean(
     id &&
-    (match.status === "processing" || (match.status === "live" && !hasStats) || (uploadCount > 0 && !hasStats && match.status !== "done")),
+    (match?.status === "processing" || (match?.status === "live" && !hasStats) || (uploadCount > 0 && !hasStats && match?.status !== "done")),
   );
   const homeAgg = aggregatePlayerMetrics(homePlayerStats);
   const awayAgg = aggregatePlayerMetrics(awayPlayerStats);
