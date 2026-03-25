@@ -2,16 +2,16 @@ import { motion } from "framer-motion";
 import {
   Smartphone,
   Brain,
-  BarChart3,
   Shield,
   Users,
   Zap,
   FileText,
   Dumbbell,
   Share2,
-  Clipboard,
-  Siren,
   Sparkles,
+  TrendingUp,
+  AlertTriangle,
+  MessageSquare,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
@@ -21,68 +21,58 @@ export function FeatureCards() {
   const features = [
     {
       icon: Smartphone,
-      title: t("landing.feat1Title"),
-      desc: t("landing.feat1Desc"),
+      title: language === "de" ? "1 Smartphone genügt" : "1 smartphone is enough",
+      desc: language === "de"
+        ? "Handy aufstellen, Spiel filmen — die KI übernimmt die Analyse. Kein Stativ, keine Sensoren, kein Extra-Equipment."
+        : "Set up your phone, film the match — AI handles the analysis. No tripod, no sensors, no extra equipment.",
       span: "sm:col-span-2",
       accent: "from-primary/20 to-primary/5",
     },
     {
-      icon: Clipboard,
-      title: language === "de" ? "Coach Summary zum Einstieg" : "Coach Summary at a glance",
-      desc:
-        language === "de"
-          ? "Startet jeden Report mit Spielkontrolle, Fokusspieler, Datenwarnung und nächster Coaching-Aktion."
-          : "Open every report with match control, focus player, data warning and the next coaching action.",
-      span: "",
-      accent: "from-accent/20 to-accent/5",
-    },
-    {
-      icon: BarChart3,
-      title: language === "de" ? "Interaktive Leaderboards" : "Interactive leaderboards",
-      desc:
-        language === "de"
-          ? "Top-Speed, Passquote, Sprints und Zweikämpfe als moderne Rankings mit klarer visueller Einordnung."
-          : "Top speed, passing, sprints and duels in modern ranking cards with clear visual context.",
-      span: "",
-      accent: "from-primary/15 to-transparent",
-    },
-    {
-      icon: Siren,
-      title: language === "de" ? "Datenqualität im Blick" : "Built-in data quality alerts",
-      desc:
-        language === "de"
-          ? "Auffällige Werte wie unrealistische Topspeeds werden direkt im Cockpit markiert statt erst im Nachhinein entdeckt."
-          : "Suspicious values like unrealistic top speeds are flagged directly in the cockpit instead of later.",
-      span: "",
-      accent: "from-accent/15 to-transparent",
-    },
-    {
       icon: Brain,
-      title: t("landing.feat2Title"),
-      desc: t("landing.feat2Desc"),
+      title: language === "de" ? "KI-Spielanalyse" : "AI match analysis",
+      desc: language === "de"
+        ? "Gemini Vision erkennt Formationen, Spielphasen, Gefahrenzonen und taktische Muster direkt aus dem Video."
+        : "Gemini Vision detects formations, match phases, danger zones and tactical patterns directly from the video.",
       span: "",
       accent: "from-primary/15 to-transparent",
     },
     {
       icon: Sparkles,
-      title: language === "de" ? "Was-wäre-wenn-Analyse" : "What-if tactical board",
-      desc:
-        language === "de"
-          ? "Teste Formationen, Rollen und Positionswechsel direkt aus dem Match-Report heraus."
-          : "Test formations, roles and position switches directly from the match report.",
+      title: language === "de" ? "Spielzug-Replay" : "Tactical replay",
+      desc: language === "de"
+        ? "Animierte Taktik-Grafik mit geschätzten Spielerpositionen — Schlüsselszenen als bewegte Spielfeld-Darstellung."
+        : "Animated tactical graphic with estimated player positions — key scenes as moving pitch visualization.",
+      span: "",
+      accent: "from-accent/20 to-accent/5",
+    },
+    {
+      icon: AlertTriangle,
+      title: language === "de" ? "Coaching-Insights & Alerts" : "Coaching insights & alerts",
+      desc: language === "de"
+        ? "Coach Summary mit Spielkontrolle, Fokusspieler und Datenwarnung. Sofort-Überblick statt langer Tabellen."
+        : "Coach summary with match control, focus player and data warnings. Instant overview instead of long tables.",
+      span: "",
+      accent: "from-primary/15 to-transparent",
+    },
+    {
+      icon: TrendingUp,
+      title: language === "de" ? "Match-Trend-Dashboard" : "Match trend dashboard",
+      desc: language === "de"
+        ? "Formkurve über mehrere Spiele: Wie entwickelt sich dein Team? Wiederkehrende Muster und Schwachstellen auf einen Blick."
+        : "Form curve across matches: How is your team developing? Recurring patterns and weaknesses at a glance.",
       span: "sm:col-span-2",
       accent: "from-primary/20 to-primary/5",
     },
-      {
-        icon: FileText,
-        title: language === "de" ? "Vor-, Halbzeit- & Nachberichte" : "Pre-, halftime & post-match reports",
-        desc:
-          language === "de"
-            ? "Erstelle Vorbericht, Halbzeitanalyse und Nachbericht direkt aus Tracking-, KI- und Matchdaten inklusive Export in mehrere Stilrichtungen."
-            : "Create pre-match, halftime and post-match reports directly from tracking, AI and match data with export in multiple styles.",
-        span: "sm:col-span-2",
-        accent: "from-accent/15 to-transparent",
-      },
+    {
+      icon: FileText,
+      title: language === "de" ? "KI-Berichte in 3 Stilen" : "AI reports in 3 styles",
+      desc: language === "de"
+        ? "Vorbericht, Halbzeitanalyse und Nachbericht — als analytischer Report, Social-Media-Post oder Zeitungsartikel."
+        : "Pre-match, halftime and post-match — as analytical report, social media post or newspaper article.",
+      span: "sm:col-span-2",
+      accent: "from-accent/15 to-transparent",
+    },
     {
       icon: Dumbbell,
       title: t("landing.feat8Title"),
@@ -91,25 +81,36 @@ export function FeatureCards() {
       accent: "from-primary/20 to-primary/5",
     },
     {
-      icon: Share2,
-      title: t("landing.feat9Title"),
-      desc: t("landing.feat9Desc"),
+      icon: MessageSquare,
+      title: language === "de" ? "KI-Assistent" : "AI assistant",
+      desc: language === "de"
+        ? "Chat-basierter Co-Trainer: Frage nach Taktik, Aufstellung oder Trainingsempfehlungen — die KI antwortet mit Kontext."
+        : "Chat-based co-coach: Ask about tactics, lineup or training — the AI answers with context.",
       span: "",
       accent: "from-accent/20 to-accent/5",
     },
     {
-      icon: Shield,
-      title: t("landing.feat4Title"),
-      desc: t("landing.feat4Desc"),
+      icon: Share2,
+      title: t("landing.feat9Title"),
+      desc: t("landing.feat9Desc"),
       span: "",
       accent: "from-primary/15 to-transparent",
+    },
+    {
+      icon: Shield,
+      title: t("landing.feat4Title"),
+      desc: language === "de"
+        ? "Einwilligung pro Spieler, DSGVO-konform. Minderjährige brauchen Eltern-Zustimmung."
+        : "Consent per player, GDPR-compliant. Minors require parental consent.",
+      span: "",
+      accent: "from-accent/15 to-transparent",
     },
     {
       icon: Users,
       title: t("landing.feat5Title"),
       desc: t("landing.feat5Desc"),
       span: "",
-      accent: "from-accent/15 to-transparent",
+      accent: "from-primary/15 to-transparent",
     },
     {
       icon: Zap,
@@ -137,8 +138,8 @@ export function FeatureCards() {
           </div>
           <p className="text-muted-foreground max-w-sm text-sm leading-relaxed md:text-right">
             {language === "de"
-              ? "Vom schnellen Trainer-Überblick bis zur Datenwarnung: das neue Coaching-Cockpit bringt Analyse, Priorisierung und Taktik in einen klaren Flow."
-              : "From instant coach summaries to data warnings: the new coaching cockpit brings analysis, prioritization and tactics into one clear flow."}
+              ? "Vom Smartphone-Video zur fertigen Taktik-Analyse: KI-Insights, Spielzug-Replay und Trainingsplan in einem klaren Flow."
+              : "From smartphone video to complete tactical analysis: AI insights, tactical replay and training plan in one clear flow."}
           </p>
         </motion.div>
 
