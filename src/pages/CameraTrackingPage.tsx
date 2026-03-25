@@ -932,12 +932,11 @@ export default function CameraTrackingPage() {
         </div>
       </div>
 
-      {/* Persistent hidden video */}
+      {/* Persistent capture video — NOT display:none, must decode on mobile */}
       <video
         ref={videoRef}
-        className="hidden"
         playsInline muted autoPlay
-        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none", zIndex: -1 }}
       />
 
       {/* Wizard Stepper */}

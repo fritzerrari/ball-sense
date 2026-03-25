@@ -319,7 +319,16 @@ export class FootballTracker {
    * Capture current video frame as base64 JPEG for AI analysis.
    */
   private captureFrameBase64(): string | null {
-    if (!this.videoElement || !this.videoElement.videoWidth) return null;
+    let srcVideo = this.videoElement;
+    // Fallback: if primary video has zero dimensions (mobile display:none issue), try finding visible tracking video
+    if (!srcVideo || !srcVideo.videoWidth) {
+      const fallback = document.querySelector<HTMLVideoElement>("video[data-tracking-video]");
+      if (fallback && fallback.videoWidth > 0) {
+        srcVideo = fallback;
+      } else {
+        return null;
+      }
+    }
     if (!this.aiFrameCanvas) {
       this.aiFrameCanvas = document.createElement("canvas");
     }
