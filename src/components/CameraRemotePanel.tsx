@@ -3,7 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff, CloudUpload } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff, CloudUpload, ShieldCheck, ShieldOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -13,6 +14,7 @@ interface CameraSession {
   camera_index: number | null;
   last_used_at: string | null;
   expires_at: string;
+  transfer_authorized: boolean;
   status_data: {
     phase?: string;
     frame_count?: number;
@@ -34,17 +36,19 @@ const PHASE_LABELS: Record<string, string> = {
   analyzing: "Wird analysiert",
   done: "Fertig",
   setup: "Wird eingerichtet",
+  waiting_auth: "Wartet auf Freigabe",
 };
 
 export default function CameraRemotePanel({ matchId }: Props) {
   const [sessions, setSessions] = useState<CameraSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [sendingCommand, setSendingCommand] = useState<string | null>(null);
+  const [togglingAuth, setTogglingAuth] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
     const { data } = await supabase
       .from("camera_access_sessions")
-      .select("id, match_id, camera_index, last_used_at, expires_at, status_data, command")
+      .select("id, match_id, camera_index, last_used_at, expires_at, transfer_authorized, status_data, command")
       .eq("match_id", matchId)
       .gt("expires_at", new Date().toISOString());
 
@@ -65,25 +69,18 @@ export default function CameraRemotePanel({ matchId }: Props) {
           table: "camera_access_sessions",
           filter: `match_id=eq.${matchId}`,
         },
-        () => {
-          loadSessions();
-        },
+        () => { loadSessions(); },
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [matchId, loadSessions]);
 
   const sendCommand = useCallback(async (sessionId: string, command: string) => {
     setSendingCommand(`${sessionId}-${command}`);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Nicht eingeloggt");
-        return;
-      }
+      if (!session) { toast.error("Nicht eingeloggt"); return; }
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
@@ -94,11 +91,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({
-            action: "send-command",
-            session_id: sessionId,
-            command,
-          }),
+          body: JSON.stringify({ action: "send-command", session_id: sessionId, command }),
         },
       );
 
@@ -118,6 +111,39 @@ export default function CameraRemotePanel({ matchId }: Props) {
       setSendingCommand(null);
     }
   }, []);
+
+  const toggleTransferAuth = useCallback(async (sessionId: string, authorized: boolean) => {
+    setTogglingAuth(sessionId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Nicht eingeloggt"); return; }
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: "authorize-transfer", session_id: sessionId, authorized }),
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Freigabe fehlgeschlagen");
+      }
+
+      toast.success(authorized ? "Datenübertragung freigegeben" : "Datenübertragung gesperrt");
+      loadSessions();
+    } catch (err: any) {
+      toast.error(err.message ?? "Fehler");
+    } finally {
+      setTogglingAuth(null);
+    }
+  }, [loadSessions]);
 
   if (loading) return null;
   if (sessions.length === 0) return null;
@@ -142,6 +168,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
           const isRecording = currentPhase === "recording";
           const isPaused = currentPhase === "halftime_pause";
           const isReady = currentPhase === "ready";
+          const isAuthorized = s.transfer_authorized;
 
           return (
             <div key={s.id} className="rounded-lg border border-border p-3 space-y-2">
@@ -164,7 +191,26 @@ export default function CameraRemotePanel({ matchId }: Props) {
                 </div>
               </div>
 
-              {/* Live thumbnail preview — shown in ready, recording, and halftime */}
+              {/* Transfer authorization toggle */}
+              <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  {isAuthorized ? (
+                    <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                  ) : (
+                    <ShieldOff className="h-3.5 w-3.5 text-muted-foreground" />
+                  )}
+                  <span className="text-xs font-medium">
+                    {isAuthorized ? "Datenübertragung aktiv" : "Datenübertragung gesperrt"}
+                  </span>
+                </div>
+                <Switch
+                  checked={isAuthorized}
+                  disabled={togglingAuth === s.id}
+                  onCheckedChange={(checked) => toggleTransferAuth(s.id, checked)}
+                />
+              </div>
+
+              {/* Live thumbnail preview */}
               {thumbnail && isOnline && (
                 <div className="rounded overflow-hidden border border-border">
                   <img
@@ -193,7 +239,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
               )}
 
               <div className="flex gap-2">
-                {(isReady || isPaused) && (
+                {(isReady || isPaused) && isAuthorized && (
                   <Button
                     size="sm"
                     className="gap-1.5 h-8 text-xs"
@@ -208,7 +254,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
                     {isPaused ? "2. HZ starten" : "Start"}
                   </Button>
                 )}
-                {isRecording && (
+                {isRecording && isAuthorized && (
                   <>
                     <Button
                       size="sm"
@@ -239,6 +285,11 @@ export default function CameraRemotePanel({ matchId }: Props) {
                       Stop
                     </Button>
                   </>
+                )}
+                {!isAuthorized && (isReady || isPaused) && (
+                  <p className="text-[10px] text-muted-foreground italic">
+                    Datenübertragung zuerst freigeben
+                  </p>
                 )}
               </div>
             </div>
