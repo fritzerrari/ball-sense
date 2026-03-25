@@ -76,6 +76,7 @@ export default function MatchReport() {
   const { id } = useParams();
   const { clubName } = useAuth();
   const { data: match, isLoading } = useMatch(id);
+  const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
 
   const [sections, setSections] = useState<ReportSection[]>([]);
   const [training, setTraining] = useState<TrainingRec[]>([]);
