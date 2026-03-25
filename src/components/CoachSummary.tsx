@@ -58,10 +58,13 @@ function aggregate(stats: PlayerStat[]) {
     },
   );
 
+  const hasTacticalData = totals.passesTotal > 0 || totals.duelsTotal > 0 || totals.ballRecoveries > 0;
+
   return {
     passAccuracy: totals.passesTotal > 0 ? round((totals.passesCompleted / totals.passesTotal) * 100, 0) : 0,
     duelRate: totals.duelsTotal > 0 ? round((totals.duelsWon / totals.duelsTotal) * 100, 0) : 0,
     ballRecoveries: totals.ballRecoveries,
+    hasTacticalData,
   };
 }
 
@@ -247,13 +250,13 @@ export function CoachSummary({
           </div>
           <div className="rounded-2xl border border-border bg-background/60 p-3">
             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Passquote</p>
-            <p className="mt-2 text-lg font-bold font-display">{homeAgg.passAccuracy ? `${homeAgg.passAccuracy}%` : "—"}</p>
-            <p className="text-xs text-muted-foreground">Aufbauqualität</p>
+            <p className="mt-2 text-lg font-bold font-display">{homeAgg.hasTacticalData && homeAgg.passAccuracy ? `${homeAgg.passAccuracy}%` : "—"}</p>
+            <p className="text-xs text-muted-foreground">{homeAgg.hasTacticalData ? "Aufbauqualität" : "Keine Ballerkennung"}</p>
           </div>
           <div className="rounded-2xl border border-border bg-background/60 p-3">
             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Zweikampfquote</p>
-            <p className="mt-2 text-lg font-bold font-display">{homeAgg.duelRate ? `${homeAgg.duelRate}%` : "—"}</p>
-            <p className="text-xs text-muted-foreground">Defensivpräsenz</p>
+            <p className="mt-2 text-lg font-bold font-display">{homeAgg.hasTacticalData && homeAgg.duelRate ? `${homeAgg.duelRate}%` : "—"}</p>
+            <p className="text-xs text-muted-foreground">{homeAgg.hasTacticalData ? "Defensivpräsenz" : "Keine Ballerkennung"}</p>
           </div>
           <div className="rounded-2xl border border-border bg-background/60 p-3 sm:col-span-3 xl:col-span-1">
             <div className="flex items-start justify-between gap-3">
@@ -268,6 +271,15 @@ export function CoachSummary({
             </div>
           </div>
         </div>
+
+        {!homeAgg.hasTacticalData && homePlayerStats.length > 0 && (
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+            <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">⚠ Taktische KPIs nicht verfügbar</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Ballkontakte, Pässe und Zweikämpfe erfordern Ballerkennung. Tore und Karten müssen über den Event-Ticker während des Spiels erfasst werden.
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );

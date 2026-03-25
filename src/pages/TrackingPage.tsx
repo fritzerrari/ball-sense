@@ -247,14 +247,16 @@ export default function TrackingPage() {
       );
       setHalftimeUploadProgress(60);
 
-      await supabase.from("tracking_uploads").insert({
+      await supabase.from("tracking_uploads").upsert({
         match_id: id,
         camera_index: cam,
+        upload_mode: "batch",
         file_path: result.filePath,
         status: "uploaded",
         frames_count: result.framesCount,
         duration_sec: result.durationSec,
-      });
+        uploaded_at: new Date().toISOString(),
+      }, { onConflict: "match_id,camera_index,upload_mode" });
       setHalftimeUploadProgress(100);
       setHalftimeUploadDone(true);
       toast.success("1. Halbzeit hochgeladen! Starte die 2. Halbzeit wenn es losgeht.");
@@ -312,14 +314,16 @@ export default function TrackingPage() {
       setUploadProgress(getOverallProgress("register", 20));
       let registered = false;
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const { error } = await supabase.from("tracking_uploads").insert({
+        const { error } = await supabase.from("tracking_uploads").upsert({
           match_id: id,
           camera_index: cam,
+          upload_mode: "batch",
           file_path: result.filePath,
           status: "uploaded",
           frames_count: result.framesCount,
           duration_sec: result.durationSec,
-        });
+          uploaded_at: new Date().toISOString(),
+        }, { onConflict: "match_id,camera_index,upload_mode" });
         if (!error) { registered = true; break; }
         console.warn(`[Upload] DB-Registrierung Versuch ${attempt}/3:`, error.message);
         if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
