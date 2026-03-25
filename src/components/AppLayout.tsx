@@ -27,7 +27,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, clubName, clubPlan, clubLogoUrl, signOut } = useAuth();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const { data: isAdmin } = useQuery({
@@ -205,7 +205,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             to="/matches"
             className="-mt-5 flex flex-col items-center gap-1 rounded-2xl border border-primary/20 bg-primary px-2 py-3 text-[11px] font-semibold text-primary-foreground shadow-lg"
           >
-            <Camera className="h-5 w-5" />
+            <Swords className="h-5 w-5" />
             <span>Tracking</span>
           </Link>
 
