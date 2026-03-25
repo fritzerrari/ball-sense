@@ -1,96 +1,79 @@
 
 
-# Komplette Überarbeitung: Match-Erstellung & Kamera-Tracking UX
+# Systemanalyse: 3 kritische Fehler im Recording-Flow
 
-## Problem
+## Identifizierte Probleme
 
-Aktuell gibt es zwei getrennte, unklare User-Journeys:
+### 1. "System hört nach 5 Frames auf"
+`MIN_FRAMES_FOR_ANALYSIS = 5` in `RecordingGuard.tsx`. Bei 30-Sekunden-Intervall = 2,5 Minuten. Das System stoppt NICHT automatisch, aber der Stop-Button wird nach 5 Frames aktiv und zeigt "Stoppen & Endanalyse" — das suggeriert dem User, dass genug Daten da sind. 5 Frames sind viel zu wenig fuer eine sinnvolle Analyse.
 
-1. **Trainer/Admin** (Desktop/App): Erstellt Spiel in `NewMatch.tsx` (2 Steps: Info → Upload), kann dort auch direkt aufnehmen. Kamera-Codes werden separat in Settings verwaltet. Es fehlt der Zusammenhang zwischen "Spiel anlegen" und "Code an Helfer weitergeben".
+**Fix**: MIN_FRAMES auf 20 erhoehen (~10 Minuten). Fortschrittsanzeige mit klarer Empfehlung ("Optimal: ganze Halbzeit"). Stop-Button bleibt rot/deaktiviert bis Minimum erreicht, danach gelb mit "Frueh stoppen" Warnung.
 
-2. **Kamera-Helfer** (PWA auf Handy): Gibt Code auf Login-Seite ein → wird zu `CameraTrackingPage` weitergeleitet. Aber: Die `camera-access` Edge Function existiert noch gar nicht, d.h. der Code-Lookup schlägt fehl. Der Camera-Setup-Overlay zeigt nur Tipps, aber keinen Code-Eingabe-Schritt.
+### 2. "Event-Buttons (Tor etc.) nicht klickbar am Handy"
+Die `MatchEventQuickBar` wird NUR angezeigt wenn `hasHighlights` true ist. Das prueft `useModuleAccess("video_highlights")`, welches `session?.user?.id` braucht. **Der Kamera-Helfer ist NICHT eingeloggt** → `auth.uid()` ist null → `hasAccess` ist immer false → Buttons werden nie gerendert.
 
-## Lösung: Zwei klar getrennte, idiotensichere Flows
+Zusaetzlich: Selbst fuer eingeloggte Trainer kann das Modul `video_highlights` deaktiviert sein.
 
-### Flow A: Trainer erstellt Spiel (NewMatch Wizard)
+**Fix**: Event-Buttons (Tor, Karte, Ecke) IMMER anzeigen waehrend der Aufnahme — die sind Kern-Funktionalitaet, kein Premium-Feature. Nur den Highlight-Clip-Teil (Video-Extraktion) an Modul-Zugriff koppeln. Buttons groesser machen (min 48px Touch-Target).
 
-Neuer 4-Step-Wizard mit großen, klaren Buttons und visuellen Fortschrittsbalken:
+### 3. "Video wird nicht hochgeladen / keine Analyse"
+**DAS ist der Hauptfehler.** Die gesamte Post-Recording-Logik in `CameraTrackingPage.tsx` nutzt den authentifizierten Supabase-Client:
 
-**Step 1 — "Gegner & Datum"** (wie bisher, vereinfacht)
-- Nur 3 Felder: Gegner (optional), Datum (vorausgefüllt), Platz (auto-select wenn nur 1)
-- Kein Kickoff-Feld (unnötig für Analyse)
-- Großer "Weiter"-Button
+```
+supabase.storage.from("match-frames").upload(...)     // RLS: auth required
+supabase.from("analysis_jobs").insert(...)            // RLS: club member required  
+supabase.from("matches").update(...)                  // RLS: club member required
+supabase.functions.invoke("analyze-match", ...)       // Sends anon token
+```
 
-**Step 2 — "Wie willst du aufnehmen?"** (NEU — zentraler Entscheidungsscreen)
-- 3 große Kacheln zum Antippen:
-  - **"Ich filme selbst"** → Icon: Smartphone mit Play → geht direkt zu Step 4 (Kamera)
-  - **"Helfer filmt (Code senden)"** → Icon: QR/Schlüssel → geht zu Step 3 (Code generieren)
-  - **"Video nachträglich hochladen"** → Icon: Upload → zeigt File-Upload-Bereich
-- Jede Kachel hat 1-Zeilen-Beschreibung
+Der Kamera-Helfer ist NICHT eingeloggt. `auth.uid()` = null. ALLE diese Operationen schlagen durch RLS fehl. Die Frames gehen verloren, kein Job wird erstellt, keine Analyse wird gestartet.
 
-**Step 3 — "Kamera-Code"** (NEU — nur bei "Helfer filmt")
-- Automatisch wird ein 6-stelliger Code generiert und angezeigt (riesige Schrift)
-- "Per WhatsApp teilen" / "Kopieren" Buttons
-- Visuelle Anleitung: "Dein Helfer öffnet FieldIQ → gibt diesen Code ein → Kamera startet automatisch"
-- "Weiteren Code erzeugen" für 2./3. Kamera
-- "Fertig"-Button → zurück zum Match-Detail
+**Fix**: Neue Edge Function `camera-ops` die als Gateway fuer anonyme Kamera-Helfer dient. Nutzt Service-Role-Key intern. Validiert den Session-Token statt JWT.
 
-**Step 4 — "Aufnahme"** (nur bei "Ich filme selbst")
-- Direkt zur Kamera mit Tipps-Overlay (wie bisher)
+---
 
-### Flow B: Kamera-Helfer (PWA — Code-Eingabe)
+## Plan
 
-Komplett neuer `CameraCodeEntry`-Fullscreen als erste Phase in `CameraTrackingPage`:
+### A. Edge Function `camera-ops` erstellen
+Neues Gateway fuer alle Kamera-Helfer-Operationen (kein Login noetig):
 
-**Phase 1 — Code eingeben** (ersetzt den Login-Page-Camera-Tab)
-- Fullscreen, kein Login nötig (das ist der Punkt!)
-- Großes FieldIQ-Logo oben
-- 6 einzelne Ziffernfelder (wie OTP-Input, nicht ein Textfeld)
-- Auto-Submit bei 6. Ziffer
-- Haptisches Feedback bei jeder Ziffer
-- Fehlermeldung inline ("Code ungültig — frag deinen Trainer")
-- Keine ablenkenden Tabs (Login/Register)
+- `action: "upload-frames"` — Nimmt `session_token`, `match_id`, `frames[]`, `duration_sec` entgegen. Validiert Session-Token via Hash-Lookup in `camera_access_sessions`. Laed Frames in `match-frames` Bucket hoch (Service Role). Erstellt `analysis_job`. Updated Match-Status. Ruft `analyze-match` auf.
+- `action: "log-event"` — Nimmt `session_token`, `match_id`, `event_type`, `minute` entgegen. Fuegt `match_events` Eintrag ein (Service Role).
 
-**Phase 2 — Kamera-Tipps** (wie bisher, CameraSetupOverlay)
-- 3 antippbare Tipps
-- "Aufnahme starten"-Button
+### B. `CameraTrackingPage.tsx` ueberarbeiten
+- Erkennen ob User eingeloggt oder Kamera-Helfer (via `sessionToken` State)
+- Eingeloggte User: Direkte Supabase-Calls (wie bisher)
+- Kamera-Helfer: Alle Operationen ueber `camera-ops` Edge Function routen
+- Frame-Upload und Analyse-Trigger ueber Edge Function statt direktem Client
 
-**Phase 3 — Aufnahme** (wie bisher, aber vereinfacht)
-- Großer roter REC-Indikator
-- Frame-Counter
-- Halbzeit-Button
-- Stop-Button mit Bestätigung
+### C. `MatchEventQuickBar.tsx` fixen
+- Event-Buttons IMMER anzeigen (nicht an `hasHighlights` koppeln)
+- Nur Highlight-Video-Extraktion an Modul-Check koppeln
+- Fuer Kamera-Helfer: Events ueber `camera-ops` Edge Function loggen
+- Touch-Targets vergroessern (h-12 statt h-9)
 
-### Neue Seite: `/camera` (ohne Match-ID)
+### D. `RecordingGuard.tsx` + Recording-UX verbessern
+- `MIN_FRAMES_FOR_ANALYSIS` auf 20 erhoehen
+- Fortschrittsanzeige: "X von ~30 Frames (Empfohlen: ganze Halbzeit)"
+- Stop-Button zeigt klare Warnung wenn < 20 Frames
+- Frame-Counter prominenter anzeigen mit Zeitschaetzung
 
-Eigenständige Route für den Kamera-Helfer-Einstieg — kein Login nötig, kein Match-ID in der URL. Der Code bestimmt alles.
+### E. `StopConfirmDialog.tsx` verbessern
+- Klarere Warnstufen: < 10 Frames = "Sehr wenig", 10-20 = "Ausreichend", > 20 = "Gut"
+- Empfehlung wie lange noch aufnehmen
 
-### Edge Function: `camera-access`
-
-Neue Edge Function die den Code-Lookup, Session-Erstellung und Validierung übernimmt:
-- `POST { action: "lookup", code: "123456" }` → hasht den Code, sucht in `camera_access_codes`, erstellt Session, gibt `matchId`, `cameraIndex`, `sessionToken` zurück
-- Verify JWT = false (kein Login nötig)
+---
 
 ## Betroffene Dateien
 
 | Datei | Aktion |
 |---|---|
-| `src/pages/NewMatch.tsx` | Komplett überarbeiten: 4-Step-Wizard mit Entscheidungsscreen |
-| `src/pages/CameraTrackingPage.tsx` | Code-Eingabe-Phase hinzufügen (OTP-Style), Login-Tab entfernen |
-| `src/pages/Login.tsx` | Camera-Tab entfernen, stattdessen Link zu `/camera` |
-| `src/components/CameraSetupOverlay.tsx` | Kleinere Optimierungen (größere Touch-Targets) |
-| `src/components/CameraCodeEntry.tsx` | NEU — Fullscreen OTP-Code-Eingabe-Komponente |
-| `src/components/MatchRecordingChoice.tsx` | NEU — 3-Kacheln-Entscheidungsscreen |
-| `src/components/CameraCodeShare.tsx` | NEU — Code-Anzeige + WhatsApp/Copy-Sharing |
-| `supabase/functions/camera-access/index.ts` | NEU — Edge Function für Code-Lookup |
-| `src/App.tsx` | Route `/camera` hinzufügen (ohne `:id`) |
+| `supabase/functions/camera-ops/index.ts` | NEU — Gateway fuer anonyme Kamera-Operationen |
+| `src/pages/CameraTrackingPage.tsx` | Ueberarbeiten: Auth-Erkennung, Edge-Function-Routing |
+| `src/components/MatchEventQuickBar.tsx` | Fix: Immer anzeigen, groessere Buttons, Edge-Function-Support |
+| `src/components/RecordingGuard.tsx` | MIN_FRAMES erhoehen, bessere UX |
+| `src/components/StopConfirmDialog.tsx` | Klarere Warnstufen |
+| `supabase/config.toml` | camera-ops Function registrieren |
 
-## Design-Prinzipien
-
-- **Große Touch-Targets** (min. 48px) auf allen interaktiven Elementen
-- **Maximal 1 Entscheidung pro Screen** — kein Scrollen nötig
-- **Automatische Aktionen** wo möglich (Auto-Submit, Auto-Select, Auto-Focus)
-- **Klare Fehlermeldungen** in einfacher Sprache ("Code falsch" statt "Hash-Validierung fehlgeschlagen")
-- **Haptisches Feedback** bei allen wichtigen Interaktionen
-- **Kein Text-Overload** — Icons + 1 Satz pro Element
+Keine DB-Schema-Aenderungen noetig — alle Tabellen existieren bereits.
 
