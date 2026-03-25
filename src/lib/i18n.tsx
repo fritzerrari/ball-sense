@@ -14,6 +14,21 @@ const de: TranslationDict = {
   "nav.settings": "Einstellungen",
   "nav.admin": "Admin",
   "nav.signout": "Abmelden",
+  "nav.trends": "Trends",
+  "nav.more": "Mehr",
+  "nav.core": "Kernbereich",
+  "nav.manage": "Verwaltung",
+  "nav.install": "Installation",
+  "nav.tracking": "Aufnahme",
+
+  // Dashboard extra
+  "dashboard.analyzed": "Analysiert",
+  "dashboard.inAnalysis": "In Analyse",
+  "dashboard.players": "Spieler",
+  "dashboard.newMatch": "Neues Spiel",
+  "dashboard.recentMatches": "Letzte Spiele",
+  "dashboard.showAll": "Alle anzeigen",
+  "dashboard.trainingRecs": "Trainingsempfehlungen",
 
   // Common
   "common.save": "Speichern",
@@ -593,6 +608,21 @@ const en: TranslationDict = {
   "nav.settings": "Settings",
   "nav.admin": "Admin",
   "nav.signout": "Sign out",
+  "nav.trends": "Trends",
+  "nav.more": "More",
+  "nav.core": "Core",
+  "nav.manage": "Management",
+  "nav.install": "Installation",
+  "nav.tracking": "Recording",
+
+  // Dashboard extra
+  "dashboard.analyzed": "Analyzed",
+  "dashboard.inAnalysis": "In Analysis",
+  "dashboard.players": "Players",
+  "dashboard.newMatch": "New Match",
+  "dashboard.recentMatches": "Recent Matches",
+  "dashboard.showAll": "Show all",
+  "dashboard.trainingRecs": "Training Recommendations",
 
   // Common
   "common.save": "Save",
