@@ -64,12 +64,20 @@ serve(async (req) => {
       progress: 10,
     }).eq("id", job_id);
 
-    // Get match info
+    // Get match info with field calibration data
     const { data: match } = await supabase
       .from("matches")
-      .select("*, fields(name, width_m, height_m)")
+      .select("*, fields(name, width_m, height_m, calibration)")
       .eq("id", match_id)
       .single();
+
+    // Extract calibration context for better analysis
+    const fieldCalibration = match?.fields?.calibration as any;
+    const coverage = fieldCalibration?.coverage ?? "full";
+    const fieldType = fieldCalibration?.field_type ?? "unknown";
+    const calibrationNote = coverage !== "full"
+      ? `\nWICHTIG: Die Kamera zeigt nur einen Teilausschnitt des Feldes (${coverage === "left_half" ? "linke Hälfte" : coverage === "right_half" ? "rechte Hälfte" : "individueller Ausschnitt"}). Positionsangaben normalisieren auf das GESAMTE Feld.`
+      : "";
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
