@@ -1,76 +1,109 @@
 
-Ziel: Den echten Systemfehler beheben (nicht kosmetisch), damit Verarbeitung sichtbar läuft, KPIs nicht mehr als falsche 0 erscheinen und 20s bis 90min stabil funktionieren.
 
-1) Verifizierte Hauptursachen (aus aktuellem Code + Logs + DB)
-- Upload-Doppelpfad aktiv: In `CameraTrackingPage` läuft immer Micro-Batch `upload_tracking` (batch), optional zusätzlich `stream-tracking` (live). Ergebnis: 2 Uploads für dieselbe Kamera (batch + live), Status-Mix („done“ + „streaming“), Verwirrung im Report.
-- KPIs bleiben 0 trotz Daten, weil Logik „Daten vorhanden“ zu früh annimmt:
-  - `ball_detections_available` wird global auf `ballPositions.length >= 10` gesetzt.
-  - Taktik-KPIs brauchen aber Ball-Nähe pro Spieler; wenn diese fehlt, bleiben Pässe/Zweikämpfe 0.
-  - UI zeigt dann 0 statt „nicht belastbar“.
-- Spielerzuordnung ist qualitativ schwach:
-  - `buildTracks()` trackt aktuell alle Detections (inkl. Ball), nicht nur Personen.
-  - Dadurch Track-Sprünge, `assignment_confidence` oft 0.1, unrealistische Top-Speed >45 km/h.
-- Tore fehlen logisch korrekt, aber UX-seitig problematisch:
-  - Tore/Karten kommen nur aus `match_events`.
-  - In `CameraTrackingPage` fehlt aktive Event-Erfassung (nur Anzeige eingehender Events), daher bleiben Tore 0.
-- 90-Minuten-Risiko:
-  - Micro-Batch lädt alle bisherigen Frames (`getRecentFrames()`) alle 10s erneut hoch → Payload wächst ständig, ineffizient und fehleranfällig bei langen Spielen.
+## Diagnose: Warum das System grundlegend nicht funktioniert
 
-2) Umsetzungsplan (Priorität)
-A. Pipeline entkoppeln und vereinheitlichen
-- In `CameraTrackingPage`: klarer Modus
-  - `batch`: nur finaler Upload
-  - `live`: nur Chunk-Upload (kein paralleles batch-Micro-Batch)
-- In `TrackingPage`: Legacy-DB-Insert entfernen, nur noch über `camera-ops` Gateway.
-- Nicht-priorisierte Uploads nach Full-Run auf `ignored` setzen (kein „streaming“-Leichenzustand im Report).
+### Das Kernproblem
 
-B. Tracking/Statistik-Kernlogik korrigieren
-- `process-tracking/buildTracks`: nur `label === "person"` tracken.
-- Sanity-Layer ausrollen:
-  - Speed-Cap (z. B. 45 km/h) + Outlier-Filter bei großen Sprüngen.
-  - Min-Track-Length / Min-Frame-Count pro Spieler.
-  - Mindest-`assignment_confidence` für taktische KPIs.
-- Taktik-Verfügbarkeit als eigenes Signal speichern (`raw_metrics.tactical_data_available` + Grundcode).
+Das System nutzt einen **allgemeinen Chat-KI-Modell** (Gemini Flash) als Echtzeit-Spielererkennungssystem. Das ist fundamental der falsche Ansatz. Die Edge-Function-Logs zeigen es klar:
 
-C. KPI-Anzeige ehrlich machen (keine Schein-Nullen)
-- In `MatchCharts`/`CoachSummary`:
-  - Wenn `tactical_data_available=false` → „— / Nicht belastbar“ statt 0%.
-  - Battle-Pulse Karten mit „Nicht genügend Ballereignisse“ Zustand.
-- `data_quality_score` neu gewichten: Coverage + Assignment-Confidence + Ball-Proximity-Rate + Outlier-Penalty.
+```text
+[analyze-frame] google/gemini-2.5-flash error: Expected ',' or ']' after array element in JSON at position 3315
+[analyze-frame] google/gemini-2.5-flash-lite error: Expected ',' or ']' after array element in JSON at position 2988
+[analyze-frame] All models failed. Last error: Expected ',' or ']' ...
+```
 
-D. Ereignis-/Tor-Problem robust lösen
-- `LiveEventTicker` direkt in `CameraTrackingPage` integrieren (Erfassung, nicht nur Anzeige).
-- Report-Hinweis präzisieren: „Offizielle Tore/Karten aus Event-Ticker“.
-- Optional später: AI-Ereignisvorschläge als Vorschlagssystem (nicht automatische Torbuchung).
+**Jeder zweite AI-Call schlägt fehl**, weil das Modell unstrukturierten Text zurückgibt statt valides JSON. Der Prompt sagt "Return ONLY valid JSON", aber Chat-Modelle halten sich nicht zuverlässig daran.
 
-E. Reprocessing sichtbar und nachvollziehbar
-- `ProcessingRoadmap` strikt an `matches.processing_progress.updated_at` + `phase` hängen.
-- Bei Retry: sofort sichtbarer Laufstatus + verwendete Quelle (`batch|live`) + Grund bei fehlender KPI-Bildung.
+### Vergleich mit Veo/professionellen Systemen
 
-F. DB-Härtung
-- Dedupe-Migration korrigieren: erst Duplikate löschen, dann Unique-Index.
-- Upload-Konsistenz sicherstellen auf `(match_id, camera_index, upload_mode)`.
+Veo nutzt dedizierte Computer-Vision-Modelle (YOLO, etc.), die speziell auf Spielererkennung trainiert sind. Wir können kein YOLO auf Lovable laufen lassen. Aber wir **können** das vorhandene AI-System drastisch verbessern:
 
-3) Technische Details (konkret umzusetzen)
-- `supabase/functions/process-tracking/index.ts`
-  - Person-only Track-Build
-  - KPI-Gates + `tactical_data_available`
-  - Source-Finalisierung (`ignored` für Nebenquelle)
-  - Outlier-Filter + Speed-Cap
-- `src/pages/CameraTrackingPage.tsx`
-  - Upload-Modus strikt trennen
-  - EventTicker integrieren
-- `src/pages/TrackingPage.tsx`
-  - Kamera-ops statt direkter `tracking_uploads`-Schreibpfad
-- `src/components/CoachSummary.tsx` + `src/components/MatchCharts.tsx`
-  - „Nicht belastbar“-Darstellung statt 0
-- `supabase/migrations/*`
-  - sichere Dedupe/Unique-Reihenfolge
+### Die 3 kritischen Fixes
 
-4) Abnahme (harte Kriterien)
-- Keine Doppel-Upload-Karten mehr für dieselbe Kamera in einem Lauf.
-- Bei fehlender taktischer Datengrundlage: keine 0%-Scheinwerte, sondern klar „nicht belastbar“.
-- Tore erscheinen zuverlässig, sobald sie im Event-Ticker erfasst werden (auch über Kamera-Ansicht).
-- 20s-Clip: entweder belastbare Basiswerte oder sauberer „insufficient data“-Status.
-- 90min-Run: keine exponentiell wachsenden Re-Uploads; Verarbeitung bleibt stabil und sichtbar.
-- Keine unrealistischen Top-Speed-Ausreißer >45 km/h ohne Qualitätswarnung/Filter.
+**1. Structured Output via Tool Calling (statt freier JSON-Text)**
+
+Das ist der wichtigste Fix. Die Lovable AI Gateway unterstützt **Tool Calling** — das zwingt das Modell, strukturierte Daten im exakten Schema zurückzugeben. Keine JSON-Parse-Fehler mehr.
+
+Statt:
+```
+Prompt: "Return ONLY valid JSON..."
+→ Modell gibt manchmal Markdown, manchmal kaputtes JSON
+```
+
+Neu:
+```typescript
+tools: [{
+  type: "function",
+  function: {
+    name: "report_detections",
+    parameters: {
+      type: "object",
+      properties: {
+        detections: { type: "array", items: { ... } },
+        field_coverage: { type: "number" },
+        player_count: { type: "integer" }
+      }
+    }
+  }
+}],
+tool_choice: { type: "function", function: { name: "report_detections" } }
+```
+→ **Garantiert valides JSON**, keine Parse-Fehler, keine Fallback-Kaskade.
+
+**2. Frame-Rate reduzieren, Qualität erhöhen**
+
+Aktuell: Alle 2.5s ein Frame → 24 AI-Calls pro Minute → viele Rate-Limits + Kosten.
+Neu: Alle **5s** ein Frame, dafür mit `gemini-2.5-flash` (zuverlässiger).
+Ergebnis: Halb so viele Calls, doppelt so stabil.
+
+**3. Detections zwischen AI-Calls interpolieren**
+
+Aktuell wird das letzte AI-Ergebnis nur 8s wiederverwendet. Wenn ein Call fehlschlägt, gibt es eine Lücke.
+Neu: Einfache lineare Interpolation der Positionen zwischen erfolgreichen Detections. 
+
+### Umsetzungsplan
+
+#### A. `analyze-frame` Edge Function komplett umbauen
+- Tool Calling statt JSON-Prompt
+- Einzelnes zuverlässiges Modell (`google/gemini-2.5-flash`)
+- Robustere Fehlerbehandlung mit leerem Fallback statt Crash
+
+#### B. `football-tracker.ts` optimieren
+- AI-Interval von 2.5s auf 5s
+- Fallback-Reuse von 8s auf 15s
+- Einfache Position-Interpolation zwischen Frames
+- Detection-Broadcast unabhängig vom AI-Status (UI bleibt responsiv)
+
+#### C. `process-tracking` — Tactical KPIs ehrlich machen
+- `tactical_data_available` Flag konsequent nutzen
+- Bei `< 10 Ball-Detections`: alle taktischen KPIs als `null` speichern (nicht 0)
+- Team-Stats: `possession_pct` nur setzen wenn Ball-Daten vorhanden
+
+#### D. `CoachSummary` + `MatchCharts` — UI-Transparenz
+- Wenn `tactical_data_available === false`: Block komplett als "Nicht verfügbar" markieren
+- Battle-Pulse-Karten: "Keine Daten" statt "0%"
+- Expliziter Hinweis: "Tore/Karten nur über Event-Ticker"
+
+#### E. Event-Ticker in CameraTrackingPage
+- `LiveEventTicker` direkt einbinden (existiert bereits als Komponente)
+- Kamera-Operatoren können Tore/Karten während der Aufnahme erfassen
+
+### Betroffene Dateien
+
+| Datei | Änderung |
+|-------|----------|
+| `supabase/functions/analyze-frame/index.ts` | Tool Calling statt JSON-Prompt |
+| `src/lib/football-tracker.ts` | 5s Interval, 15s Reuse, Interpolation |
+| `supabase/functions/process-tracking/index.ts` | Taktische KPIs als null statt 0 |
+| `src/components/CoachSummary.tsx` | "Nicht verfügbar" bei fehlenden Daten |
+| `src/components/MatchCharts.tsx` | Battle-Pulse "Keine Daten" State |
+| `src/pages/CameraTrackingPage.tsx` | LiveEventTicker Integration |
+
+### Erwartetes Ergebnis
+
+1. **0 JSON-Parse-Fehler** — Tool Calling garantiert valides Schema
+2. **Stabile Spielererkennung** — weniger, aber zuverlässigere AI-Calls
+3. **Ehrliche KPIs** — kein stilles 0%, sondern klares "Nicht verfügbar"
+4. **Tore im Report** — über Event-Ticker erfassbar (auch vom Kamera-Operator)
+5. **Halbierte AI-Kosten** — 12 statt 24 Calls/Minute
+
