@@ -29,6 +29,9 @@ export default function CameraTrackingPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
+  const videoRecorderRef = useRef<VideoRecorderHandle | null>(null);
+  const [recordingStartTime, setRecordingStartTime] = useState(0);
+  const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
 
   const initCamera = useCallback(async () => {
     try {
