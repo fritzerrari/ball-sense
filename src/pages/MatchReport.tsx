@@ -210,6 +210,11 @@ export default function MatchReport() {
   const homePlayerStats = (playerStats ?? []).filter((s) => s.team === "home");
   const awayPlayerStats = (playerStats ?? []).filter((s) => s.team === "away");
   const hasStats = (playerStats?.length ?? 0) > 0;
+  const uploadCount = uploads?.length ?? 0;
+  const showProcessingRoadmap = Boolean(
+    id &&
+    (match.status === "processing" || (match.status === "live" && !hasStats) || (uploadCount > 0 && !hasStats && match.status !== "done")),
+  );
   const homeAgg = aggregatePlayerMetrics(homePlayerStats);
   const awayAgg = aggregatePlayerMetrics(awayPlayerStats);
 
