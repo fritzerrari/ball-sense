@@ -319,17 +319,26 @@ export class FootballTracker {
    * Capture current video frame as base64 JPEG for AI analysis.
    */
   private captureFrameBase64(): string | null {
-    if (!this.videoElement || !this.videoElement.videoWidth) return null;
+    let srcVideo = this.videoElement;
+    // Fallback: if primary video has zero dimensions (mobile display:none issue), try finding visible tracking video
+    if (!srcVideo || !srcVideo.videoWidth) {
+      const fallback = document.querySelector<HTMLVideoElement>("video[data-tracking-video]");
+      if (fallback && fallback.videoWidth > 0) {
+        srcVideo = fallback;
+      } else {
+        return null;
+      }
+    }
     if (!this.aiFrameCanvas) {
       this.aiFrameCanvas = document.createElement("canvas");
     }
     // Resize to 480px wide for faster upload & lower base64 size
-    const scale = Math.min(1, 480 / this.videoElement.videoWidth);
-    this.aiFrameCanvas.width = Math.round(this.videoElement.videoWidth * scale);
-    this.aiFrameCanvas.height = Math.round(this.videoElement.videoHeight * scale);
+    const scale = Math.min(1, 480 / srcVideo.videoWidth);
+    this.aiFrameCanvas.width = Math.round(srcVideo.videoWidth * scale);
+    this.aiFrameCanvas.height = Math.round(srcVideo.videoHeight * scale);
     const ctx = this.aiFrameCanvas.getContext("2d");
     if (!ctx) return null;
-    ctx.drawImage(this.videoElement, 0, 0, this.aiFrameCanvas.width, this.aiFrameCanvas.height);
+    ctx.drawImage(srcVideo, 0, 0, this.aiFrameCanvas.width, this.aiFrameCanvas.height);
     // Get as JPEG base64 with lower quality to stay under API limits
     const dataUrl = this.aiFrameCanvas.toDataURL("image/jpeg", 0.5);
     return dataUrl.split(",")[1] ?? null;

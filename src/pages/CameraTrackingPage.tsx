@@ -98,6 +98,7 @@ export default function CameraTrackingPage() {
   const [highlightClipCount, setHighlightClipCount] = useState(0);
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
   const [liveStats, setLiveStats] = useState<LiveSnapshot | null>(null);
+  const [aiStatsState, setAiStatsState] = useState<{ total: number; successful: number; errors: number }>({ total: 0, successful: 0, errors: 0 });
   const [lineupCounts, setLineupCounts] = useState<LineupCounts>({ home: 0, away: 0 });
   const [isPaused, setIsPaused] = useState(false);
   const [autoCalibAttempted, setAutoCalibAttempted] = useState(false);
@@ -428,6 +429,9 @@ export default function CameraTrackingPage() {
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
       engine.processFrame(frame);
+      // Update AI stats reactively
+      const stats = trackerRef.current?.getAIStats();
+      if (stats) setAiStatsState(stats);
       const pCount = frame.detections.filter(d => d.label === "person").length;
       setPeakDetections((prev) => Math.max(prev, pCount));
       if (pCount >= 2 && !detectionConfirmed) {
@@ -932,12 +936,11 @@ export default function CameraTrackingPage() {
         </div>
       </div>
 
-      {/* Persistent hidden video */}
+      {/* Persistent capture video — NOT display:none, must decode on mobile */}
       <video
         ref={videoRef}
-        className="hidden"
         playsInline muted autoPlay
-        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none", zIndex: -1 }}
       />
 
       {/* Wizard Stepper */}
@@ -1047,6 +1050,7 @@ export default function CameraTrackingPage() {
                     }
                   }}
                   className="absolute inset-0 w-full h-full object-cover"
+                  data-tracking-video="true"
                   playsInline muted autoPlay
                 />
               ) : (
@@ -1149,6 +1153,7 @@ export default function CameraTrackingPage() {
               <video
                 ref={trackingVideoRef}
                 className={`absolute inset-0 w-full h-full object-cover ${showInlineCalibration ? "pointer-events-none" : ""}`}
+                data-tracking-video="true"
                 playsInline
                 muted
                 autoPlay
@@ -1167,9 +1172,8 @@ export default function CameraTrackingPage() {
               </div>
               {/* AI status indicator */}
               {(() => {
-                const aiStats = trackerRef.current?.getAIStats();
-                const hasAI = aiStats && aiStats.successful > 0;
-                const aiActive = aiStats && aiStats.total > 0;
+                const hasAI = aiStatsState.successful > 0;
+                const aiActive = aiStatsState.total > 0;
                 return (
                   <div className={`absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-sm border text-xs ${
                     hasAI
@@ -1179,7 +1183,7 @@ export default function CameraTrackingPage() {
                         : "bg-muted/60 border-border text-muted-foreground"
                   }`}>
                     <span className={`h-2 w-2 rounded-full ${hasAI ? "bg-primary animate-pulse" : aiActive ? "bg-amber-500" : "bg-muted-foreground"}`} />
-                    <span>{hasAI ? `KI ${aiStats.successful}/${aiStats.total}` : aiActive ? "KI wartet…" : "Aufnahme"}</span>
+                    <span>{hasAI ? `KI ${aiStatsState.successful}/${aiStatsState.total}` : aiActive ? "KI wartet…" : "Aufnahme"}</span>
                   </div>
                 );
               })()}
@@ -1187,10 +1191,9 @@ export default function CameraTrackingPage() {
 
             {/* AI detection status */}
             {(() => {
-              const aiStats = trackerRef.current?.getAIStats();
-              const hasAI = aiStats && aiStats.successful > 0;
-              const aiErrors = aiStats ? aiStats.errors : 0;
-              if (!aiStats || aiStats.total === 0) return null;
+              const hasAI = aiStatsState.successful > 0;
+              const aiErrors = aiStatsState.errors;
+              if (aiStatsState.total === 0) return null;
               return (
                 <div className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-left ${
                   hasAI
@@ -1204,7 +1207,7 @@ export default function CameraTrackingPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {hasAI
-                        ? `${aiStats.successful} von ${aiStats.total} Frames erfolgreich analysiert · ${playerCount} Spieler erkannt`
+                        ? `${aiStatsState.successful} von ${aiStatsState.total} Frames erfolgreich analysiert · ${playerCount} Spieler erkannt`
                         : aiErrors > 3
                           ? "Bildanalyse fehlgeschlagen — Daten werden trotzdem aufgezeichnet"
                           : "Warte auf erste KI-Analyse…"

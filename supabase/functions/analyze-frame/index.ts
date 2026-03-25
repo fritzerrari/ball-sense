@@ -79,8 +79,8 @@ Rules:
 - If no players visible, return empty detections array.
 - Referees should have label "person" and team "referee"`;
 
-    // Try with primary model, fall back to lighter model on 400
-    const models = ["google/gemini-2.5-flash-lite", "google/gemini-2.5-flash"];
+    // Use reliable model first, lite as fallback
+    const models = ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
     let lastError = "";
 
     for (const model of models) {
