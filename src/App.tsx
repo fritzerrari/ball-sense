@@ -70,6 +70,7 @@ const App = () => (
                 <Route path="/matches/:id" element={<ProtectedRoute><MatchReport /></ProtectedRoute>} />
                 <Route path="/matches/:id/processing" element={<ProtectedRoute><ProcessingPage /></ProtectedRoute>} />
                 <Route path="/camera/:id/track" element={<CameraTrackingPage />} />
+                <Route path="/camera" element={<CameraTrackingPage />} />
                 <Route path="/players" element={<ProtectedRoute><Players /></ProtectedRoute>} />
                 <Route path="/fields" element={<ProtectedRoute><Fields /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
