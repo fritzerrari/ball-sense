@@ -16,7 +16,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import { useOpponentHistory } from "@/hooks/use-opponent-history";
+import { motion } from "framer-motion";
 
+// New cockpit components
+import MatchScorecard from "@/components/MatchScorecard";
+import MomentumTimeline from "@/components/MomentumTimeline";
+import TacticalGradeMatrix from "@/components/TacticalGradeMatrix";
+import RiskRadar from "@/components/RiskRadar";
+import PlayerSpotlight from "@/components/PlayerSpotlight";
+import OpponentDNA from "@/components/OpponentDNA";
+import TrainingMicroCycle from "@/components/TrainingMicroCycle";
+
+// Lazy-loaded analysis components
 const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
 const HighlightGallery = lazy(() => import("@/components/HighlightGallery"));
 const PressingChart = lazy(() => import("@/components/PressingChart"));
@@ -34,14 +45,6 @@ const CATEGORY_ICONS: Record<string, typeof Target> = {
   transition: Zap,
   set_piece: TrendingUp,
   general: Lightbulb,
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  offense: "Angriff",
-  defense: "Verteidigung",
-  transition: "Umschaltspiel",
-  set_piece: "Standards",
-  general: "Allgemein",
 };
 
 const CONFIDENCE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -81,6 +84,11 @@ interface AnalysisJob {
   progress: number;
 }
 
+// Helper to safely parse JSON section content
+function parseJson(content: string): any {
+  try { return JSON.parse(content); } catch { return null; }
+}
+
 export default function MatchReport() {
   const { id } = useParams();
   const { clubName } = useAuth();
@@ -98,7 +106,6 @@ export default function MatchReport() {
   useEffect(() => {
     if (!id) return;
     loadReportData();
-    // Poll if not complete
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("analysis_jobs")
@@ -121,14 +128,12 @@ export default function MatchReport() {
   const loadReportData = async () => {
     if (!id) return;
     setLoadingReport(true);
-
     const [sectionsRes, trainingRes, resultsRes, jobRes] = await Promise.all([
       supabase.from("report_sections").select("*").eq("match_id", id).order("sort_order"),
       supabase.from("training_recommendations").select("*").eq("match_id", id).order("priority"),
       supabase.from("analysis_results").select("*").eq("match_id", id),
       supabase.from("analysis_jobs").select("id, status, progress").eq("match_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
-
     setSections(sectionsRes.data ?? []);
     setTraining(trainingRes.data ?? []);
     setAnalysisResults(resultsRes.data ?? []);
@@ -141,18 +146,11 @@ export default function MatchReport() {
     setReprocessing(true);
     try {
       const { data: newJob, error } = await supabase.from("analysis_jobs").insert({
-        match_id: id,
-        status: "queued",
-        progress: 0,
+        match_id: id, status: "queued", progress: 0,
       }).select().single();
       if (error) throw error;
-
       await supabase.from("matches").update({ status: "processing" }).eq("id", id);
-
-      // Trigger analysis — frames will be loaded from storage by the edge function
-      await supabase.functions.invoke("analyze-match", {
-        body: { match_id: id, job_id: newJob.id },
-      });
+      await supabase.functions.invoke("analyze-match", { body: { match_id: id, job_id: newJob.id } });
       toast.success("Neue Analyse gestartet!");
     } catch (err: any) {
       toast.error(err.message ?? "Fehler");
@@ -161,49 +159,49 @@ export default function MatchReport() {
     }
   };
 
-  if (isLoading) return <AppLayout><div className="mx-auto max-w-4xl"><SkeletonCard count={3} /></div></AppLayout>;
-  if (!match) return <AppLayout><div className="mx-auto max-w-4xl py-20 text-center text-muted-foreground">Spiel nicht gefunden</div></AppLayout>;
+  if (isLoading) return <AppLayout><div className="mx-auto max-w-5xl"><SkeletonCard count={3} /></div></AppLayout>;
+  if (!match) return <AppLayout><div className="mx-auto max-w-5xl py-20 text-center text-muted-foreground">Spiel nicht gefunden</div></AppLayout>;
 
-  const summary = sections.find(s => s.section_type === "summary");
+  // Extract sections by type
+  const getSection = (type: string) => sections.find(s => s.section_type === type);
+  const summary = getSection("summary");
   const insights = sections.filter(s => s.section_type === "insight");
-  const coaching = sections.find(s => s.section_type === "coaching");
-    const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
-    const chances = analysisResults.find(r => r.result_type === "chances");
-    const matchStructure = analysisResults.find(r => r.result_type === "match_structure");
-    const framePositions = analysisResults.find(r => r.result_type === "frame_positions");
-    const pressingData = analysisResults.find(r => r.result_type === "pressing_data");
-    const transitions = analysisResults.find(r => r.result_type === "transitions");
-    const passDirections = analysisResults.find(r => r.result_type === "pass_directions");
-    const formationTimeline = analysisResults.find(r => r.result_type === "formation_timeline");
-    const opponentScouting = sections.find(s => s.section_type === "opponent_scouting");
-    const isProcessing = job?.status && !["complete", "failed"].includes(job.status);
-    const hasReport = sections.length > 0;
+  const coaching = getSection("coaching");
+  const matchRating = parseJson(getSection("match_rating")?.content ?? "null");
+  const tacticalGrades = parseJson(getSection("tactical_grades")?.content ?? "null");
+  const momentumData = parseJson(getSection("momentum")?.content ?? "null");
+  const riskMatrix = parseJson(getSection("risk_matrix")?.content ?? "null");
+  const playerSpotlight = parseJson(getSection("player_spotlight")?.content ?? "null");
+  const opponentDna = parseJson(getSection("opponent_dna")?.content ?? "null");
+  const nextMatchActions = parseJson(getSection("next_match_actions")?.content ?? "null");
+  const trainingMicroCycle = parseJson(getSection("training_micro_cycle")?.content ?? "null");
+  const opponentScouting = getSection("opponent_scouting");
+
+  // Analysis results
+  const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
+  const chances = analysisResults.find(r => r.result_type === "chances");
+  const matchStructure = analysisResults.find(r => r.result_type === "match_structure");
+  const framePositions = analysisResults.find(r => r.result_type === "frame_positions");
+  const pressingData = analysisResults.find(r => r.result_type === "pressing_data");
+  const transitions = analysisResults.find(r => r.result_type === "transitions");
+  const passDirections = analysisResults.find(r => r.result_type === "pass_directions");
+  const formationTimeline = analysisResults.find(r => r.result_type === "formation_timeline");
+
+  const isProcessing = job?.status && !["complete", "failed"].includes(job.status);
+  const hasReport = sections.length > 0;
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-4xl space-y-6">
-        {/* Header */}
+      <div className="mx-auto max-w-5xl space-y-6">
+        {/* Compact Nav */}
         <div className="flex items-center gap-3">
           <Link to="/matches" className="rounded-lg p-2 transition-colors hover:bg-muted">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold font-display truncate">
-              {clubName} vs {match.away_club_name || "Gegner"}
-            </h1>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-3.5 w-3.5" />
-              {new Date(match.date).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-              {match.kickoff && <span>· {match.kickoff}</span>}
-            </div>
+            <p className="text-xs text-muted-foreground">Match Report</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleReprocess}
-            disabled={reprocessing || isProcessing}
-            className="gap-1.5"
-          >
+          <Button variant="outline" size="sm" onClick={handleReprocess} disabled={reprocessing || !!isProcessing} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${reprocessing ? "animate-spin" : ""}`} />
             Neu analysieren
           </Button>
@@ -249,165 +247,180 @@ export default function MatchReport() {
           </Card>
         )}
 
-        {/* Report content */}
+        {/* ═══════════ COCKPIT REPORT ═══════════ */}
         {hasReport && (
           <>
-            {/* Executive Summary */}
+            {/* 1. HERO SCORECARD */}
+            {matchRating && (
+              <MatchScorecard
+                rating={matchRating}
+                homeTeam={clubName ?? "Heim"}
+                awayTeam={match.away_club_name || "Gegner"}
+                date={match.date}
+                kickoff={match.kickoff}
+              />
+            )}
+
+            {/* 2. TACTICAL GRADES */}
+            {tacticalGrades && <TacticalGradeMatrix grades={tacticalGrades} />}
+
+            {/* 3. MOMENTUM TIMELINE */}
+            {momentumData && <MomentumTimeline data={momentumData} />}
+
+            {/* 4. EXECUTIVE SUMMARY */}
             {summary && (
-              <Card className="relative overflow-hidden">
-                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary/50" />
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Brain className="h-5 w-5 text-primary" />
-                    <h2 className="font-semibold font-display text-lg">Zusammenfassung</h2>
-                  </div>
-                  <p className="text-sm leading-relaxed text-foreground/90">{summary.content}</p>
-                </CardContent>
-              </Card>
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+                <Card className="relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm">
+                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary/50" />
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Brain className="h-5 w-5 text-primary" />
+                      <h2 className="font-semibold font-display text-lg">Zusammenfassung</h2>
+                    </div>
+                    <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{summary.content}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
             )}
 
-            {/* Match Structure */}
-            {matchStructure && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    <h2 className="font-semibold font-display">Spielverlauf</h2>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-3 mb-4">
-                    <div className="rounded-xl border border-border bg-muted/30 p-3">
-                      <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Dominanz</p>
-                      <p className="text-lg font-bold font-display mt-1 capitalize">
-                        {matchStructure.data?.dominant_team === "home" ? "Heim" :
-                         matchStructure.data?.dominant_team === "away" ? "Auswärts" : "Ausgeglichen"}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border bg-muted/30 p-3">
-                      <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Tempo</p>
-                      <p className="text-lg font-bold font-display mt-1 capitalize">
-                        {matchStructure.data?.tempo === "high" ? "Hoch" :
-                         matchStructure.data?.tempo === "medium" ? "Mittel" : "Niedrig"}
-                      </p>
-                    </div>
-                  </div>
-                  {matchStructure.data?.phases?.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-widest text-muted-foreground">Phasen</p>
-                      {matchStructure.data.phases.map((phase: any, i: number) => (
-                        <div key={i} className="flex items-start gap-3 rounded-lg border border-border/50 p-3">
-                          <div className={`mt-0.5 h-2.5 w-2.5 rounded-full shrink-0 ${
-                            phase.momentum === "home" ? "bg-primary" :
-                            phase.momentum === "away" ? "bg-destructive" : "bg-muted-foreground"
-                          }`} />
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">{phase.period}</p>
-                            <p className="text-sm">{phase.description}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <ConfidenceBadge confidence={matchStructure.confidence} />
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Key Insights */}
+            {/* 5. KEY INSIGHTS with impact scores */}
             {insights.length > 0 && (
-              <div className="space-y-3">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+                className="space-y-3"
+              >
                 <div className="flex items-center gap-2">
                   <Lightbulb className="h-5 w-5 text-primary" />
                   <h2 className="font-semibold font-display">Coaching-Insights</h2>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {insights.map((ins) => {
-                    const Icon = CATEGORY_ICONS[ins.title?.toLowerCase().includes("verteidigung") ? "defense" : "offense"] ?? Lightbulb;
+                  {insights.map((ins, idx) => {
+                    const parsed = parseJson(ins.content);
+                    const description = parsed?.description ?? ins.content;
+                    const impactScore = parsed?.impact_score;
+                    const category = parsed?.category;
+                    const Icon = CATEGORY_ICONS[category] ?? Lightbulb;
                     const conf = CONFIDENCE_STYLES[ins.confidence] ?? CONFIDENCE_STYLES.medium;
                     return (
-                      <Card key={ins.id} className="relative overflow-hidden">
-                        <CardContent className="pt-5">
-                          <div className="flex items-start gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                              <Icon className="h-4 w-4 text-primary" />
+                      <motion.div
+                        key={ins.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 + idx * 0.06 }}
+                      >
+                        <Card className="relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm h-full">
+                          <CardContent className="pt-5">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                                <Icon className="h-4 w-4 text-primary" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-medium text-sm flex-1">{ins.title}</h3>
+                                  {impactScore && (
+                                    <span className={`text-xs font-bold font-display ${
+                                      impactScore >= 8 ? "text-emerald-500" : impactScore >= 5 ? "text-amber-500" : "text-muted-foreground"
+                                    }`}>
+                                      {impactScore}/10
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
+                                <Badge variant="outline" className={`mt-2 text-[10px] ${conf.bg} ${conf.text} border-0`}>
+                                  {conf.label}
+                                </Badge>
+                              </div>
                             </div>
-                            <div className="min-w-0">
-                              <h3 className="font-medium text-sm">{ins.title}</h3>
-                              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{ins.content}</p>
-                              <Badge variant="outline" className={`mt-2 text-[10px] ${conf.bg} ${conf.text} border-0`}>
-                                {conf.label}
-                              </Badge>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
                     );
                   })}
                 </div>
-              </div>
+              </motion.div>
             )}
 
-            {/* Tactical Replay */}
-            {framePositions?.data?.frames?.length > 0 && (
-              <Suspense fallback={<SkeletonCard count={1} />}>
-                <TacticalReplay
-                  frames={framePositions.data.frames}
-                  intervalSec={framePositions.data.interval_sec ?? 30}
-                />
-              </Suspense>
+            {/* 6. RISK MATRIX */}
+            {riskMatrix && <RiskRadar risks={riskMatrix} />}
+
+            {/* 7. PLAYER SPOTLIGHT */}
+            {playerSpotlight?.mvp && playerSpotlight?.concern && (
+              <PlayerSpotlight mvp={playerSpotlight.mvp} concern={playerSpotlight.concern} />
             )}
 
-            {/* Video Highlights */}
-            {hasHighlights && id && (
-              <Suspense fallback={<SkeletonCard count={1} />}>
-                <HighlightGallery matchId={id} />
-              </Suspense>
+            {/* ═══ TACTICAL ANALYSIS SECTION ═══ */}
+            {(pressingData || transitions || passDirections || formationTimeline || framePositions) && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center gap-2 pt-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Taktische Detailanalyse</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                {/* Tactical Replay */}
+                {framePositions?.data?.frames?.length > 0 && (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <TacticalReplay frames={framePositions.data.frames} intervalSec={framePositions.data.interval_sec ?? 30} />
+                  </Suspense>
+                )}
+
+                {/* Video Highlights */}
+                {hasHighlights && id && (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <HighlightGallery matchId={id} />
+                  </Suspense>
+                )}
+
+                {/* Pressing */}
+                {pressingData?.data?.length > 0 && (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <PressingChart data={pressingData.data} intervalSec={framePositions?.data?.interval_sec ?? 30} />
+                  </Suspense>
+                )}
+
+                {/* Transitions */}
+                {transitions?.data?.length > 0 && (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <TransitionAnalysis data={transitions.data} intervalSec={framePositions?.data?.interval_sec ?? 30} />
+                  </Suspense>
+                )}
+
+                {/* Pass Direction Map */}
+                {passDirections?.data && (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <PassDirectionMap data={passDirections.data} />
+                  </Suspense>
+                )}
+
+                {/* Formation Timeline */}
+                {formationTimeline?.data?.length > 0 && (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <FormationTimeline data={formationTimeline.data} />
+                  </Suspense>
+                )}
+
+                {/* Fatigue */}
+                {framePositions?.data?.frames?.length >= 4 && (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <FatigueIndicator frames={framePositions.data.frames} intervalSec={framePositions.data.interval_sec ?? 30} />
+                  </Suspense>
+                )}
+              </motion.div>
             )}
 
-            {/* Pressing Analysis */}
-            {pressingData?.data?.length > 0 && (
-              <Suspense fallback={<SkeletonCard count={1} />}>
-                <PressingChart
-                  data={pressingData.data}
-                  intervalSec={framePositions?.data?.interval_sec ?? 30}
-                />
-              </Suspense>
+            {/* 8. OPPONENT DNA + DO/DON'T */}
+            {opponentDna && (
+              <OpponentDNA dna={opponentDna} actions={nextMatchActions ?? undefined} />
             )}
 
-            {/* Transitions */}
-            {transitions?.data?.length > 0 && (
-              <Suspense fallback={<SkeletonCard count={1} />}>
-                <TransitionAnalysis
-                  data={transitions.data}
-                  intervalSec={framePositions?.data?.interval_sec ?? 30}
-                />
-              </Suspense>
-            )}
-
-            {/* Pass Direction Map */}
-            {passDirections?.data && (
-              <Suspense fallback={<SkeletonCard count={1} />}>
-                <PassDirectionMap data={passDirections.data} />
-              </Suspense>
-            )}
-
-            {/* Formation Timeline */}
-            {formationTimeline?.data?.length > 0 && (
-              <Suspense fallback={<SkeletonCard count={1} />}>
-                <FormationTimeline data={formationTimeline.data} />
-              </Suspense>
-            )}
-
-            {/* Fatigue Indicator */}
-            {framePositions?.data?.frames?.length >= 4 && (
-              <Suspense fallback={<SkeletonCard count={1} />}>
-                <FatigueIndicator
-                  frames={framePositions.data.frames}
-                  intervalSec={framePositions.data.interval_sec ?? 30}
-                />
-              </Suspense>
-            )}
-
-            {/* Opponent Scouting (AI-generated from current match) */}
+            {/* Opponent Scouting (legacy) */}
             {opponentScouting && (() => {
               try {
                 const scoutData = JSON.parse(opponentScouting.content);
@@ -419,7 +432,7 @@ export default function MatchReport() {
               } catch { return null; }
             })()}
 
-            {/* Opponent History Profile (aggregated from past matches) */}
+            {/* Opponent History */}
             {opponentProfile && opponentProfile.matchCount >= 1 && (
               <Suspense fallback={<SkeletonCard count={1} />}>
                 <OpponentHistoryProfile profile={opponentProfile} />
@@ -430,7 +443,7 @@ export default function MatchReport() {
             {(dangerZones || chances) && (
               <div className="grid gap-4 sm:grid-cols-2">
                 {dangerZones && (
-                  <Card>
+                  <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
                     <CardContent className="pt-5">
                       <div className="flex items-center gap-2 mb-3">
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -460,7 +473,7 @@ export default function MatchReport() {
                   </Card>
                 )}
                 {chances && (
-                  <Card>
+                  <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
                     <CardContent className="pt-5">
                       <div className="flex items-center gap-2 mb-3">
                         <Target className="h-4 w-4 text-primary" />
@@ -469,11 +482,11 @@ export default function MatchReport() {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="rounded-lg bg-muted/30 p-2.5 text-center">
                           <p className="text-2xl font-bold font-display">{chances.data?.home_chances ?? "?"}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase">Heim Chancen</p>
+                          <p className="text-[10px] text-muted-foreground uppercase">Heim</p>
                         </div>
                         <div className="rounded-lg bg-muted/30 p-2.5 text-center">
                           <p className="text-2xl font-bold font-display">{chances.data?.away_chances ?? "?"}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase">Gast Chancen</p>
+                          <p className="text-[10px] text-muted-foreground uppercase">Gast</p>
                         </div>
                       </div>
                       {chances.data?.pattern_notes && (
@@ -485,21 +498,26 @@ export default function MatchReport() {
               </div>
             )}
 
-            {/* Coaching Conclusions */}
+            {/* 9. COACHING CONCLUSIONS */}
             {coaching && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <ClipboardList className="h-5 w-5 text-primary" />
-                    <h2 className="font-semibold font-display">Coaching-Schlussfolgerungen</h2>
-                  </div>
-                  <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{coaching.content}</p>
-                </CardContent>
-              </Card>
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
+                <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ClipboardList className="h-5 w-5 text-primary" />
+                      <h2 className="font-semibold font-display">Coaching-Schlussfolgerungen</h2>
+                    </div>
+                    <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{coaching.content}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
             )}
 
-            {/* Training Recommendations */}
-            {training.length > 0 && (
+            {/* 10. TRAINING MICRO-CYCLE */}
+            {trainingMicroCycle && <TrainingMicroCycle sessions={trainingMicroCycle} />}
+
+            {/* 11. LEGACY TRAINING RECOMMENDATIONS */}
+            {training.length > 0 && !trainingMicroCycle && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Zap className="h-5 w-5 text-primary" />
@@ -508,12 +526,10 @@ export default function MatchReport() {
                 {training.map((rec) => {
                   const Icon = CATEGORY_ICONS[rec.category] ?? Zap;
                   return (
-                    <Card key={rec.id}>
+                    <Card key={rec.id} className="border-border/50 bg-card/80 backdrop-blur-sm">
                       <CardContent className="pt-5">
                         <div className="flex items-start gap-3">
-                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                            rec.priority === 1 ? "bg-primary/15" : "bg-muted"
-                          }`}>
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${rec.priority === 1 ? "bg-primary/15" : "bg-muted"}`}>
                             <Icon className={`h-4 w-4 ${rec.priority === 1 ? "text-primary" : "text-muted-foreground"}`} />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -530,9 +546,6 @@ export default function MatchReport() {
                                 Basiert auf: {rec.linked_pattern}
                               </p>
                             )}
-                            <Badge variant="outline" className="mt-2 text-[10px]">
-                              {CATEGORY_LABELS[rec.category] ?? rec.category}
-                            </Badge>
                           </div>
                         </div>
                       </CardContent>
@@ -553,17 +566,5 @@ export default function MatchReport() {
         )}
       </div>
     </AppLayout>
-  );
-}
-
-function ConfidenceBadge({ confidence }: { confidence: number }) {
-  const level = confidence >= 0.7 ? "high" : confidence >= 0.4 ? "medium" : "estimated";
-  const style = CONFIDENCE_STYLES[level];
-  return (
-    <div className="mt-3 flex justify-end">
-      <Badge variant="outline" className={`text-[10px] ${style.bg} ${style.text} border-0`}>
-        Konfidenz: {Math.round(confidence * 100)}% — {style.label}
-      </Badge>
-    </div>
   );
 }

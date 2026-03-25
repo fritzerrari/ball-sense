@@ -32,7 +32,7 @@ export default function PressingChart({ data, intervalSec }: Props) {
   const avgAwayPressing = chartData.reduce((s, d) => s + d.awayPress, 0) / chartData.length;
 
   return (
-    <Card>
+    <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center gap-2 mb-1">
           <ArrowUp className="h-5 w-5 text-primary" />
