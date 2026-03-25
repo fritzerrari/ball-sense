@@ -15,6 +15,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useModuleAccess } from "@/hooks/use-module-access";
+import { useOpponentHistory } from "@/hooks/use-opponent-history";
 
 const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
 const HighlightGallery = lazy(() => import("@/components/HighlightGallery"));
@@ -24,6 +25,7 @@ const PassDirectionMap = lazy(() => import("@/components/PassDirectionMap"));
 const FormationTimeline = lazy(() => import("@/components/FormationTimeline"));
 const FatigueIndicator = lazy(() => import("@/components/FatigueIndicator"));
 const OpponentScoutReport = lazy(() => import("@/components/OpponentScoutReport"));
+const OpponentHistoryProfile = lazy(() => import("@/components/OpponentHistoryProfile"));
 
 const CATEGORY_ICONS: Record<string, typeof Target> = {
   offense: Target,
@@ -83,6 +85,7 @@ export default function MatchReport() {
   const { clubName } = useAuth();
   const { data: match, isLoading } = useMatch(id);
   const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
+  const { data: opponentProfile } = useOpponentHistory(match?.away_club_name);
 
   const [sections, setSections] = useState<ReportSection[]>([]);
   const [training, setTraining] = useState<TrainingRec[]>([]);
