@@ -126,6 +126,9 @@ export default function MatchReport() {
   const [generatingCode, setGeneratingCode] = useState(false);
 
   // Realtime subscription + faster polling for live/processing matches
+  const isLive = match?.status === "live" || match?.status === "processing";
+  const hasPartialData = (playerStats ?? []).some((s: any) => s.period === "partial");
+
   useEffect(() => {
     if (!id || !isLive) return;
     
