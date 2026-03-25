@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft, Calendar, Upload, Video, Square, Loader2, Check,
-  Swords, ArrowRight, Sparkles, FileVideo, ImageIcon,
+  Swords, ArrowRight, Sparkles, FileVideo, ImageIcon, Clock,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useFields } from "@/hooks/use-fields";
@@ -45,6 +45,8 @@ export default function NewMatch() {
   const streamRef = useRef<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
+  const [halftimeSent, setHalftimeSent] = useState(false);
+  const [halftimeSending, setHalftimeSending] = useState(false);
 
   useEffect(() => {
     if (fields?.length && !fieldId) setFieldId(fields[0].id);
