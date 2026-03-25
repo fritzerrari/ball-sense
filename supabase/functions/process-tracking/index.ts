@@ -89,22 +89,24 @@ function buildTracks(frames: TrackingFrame[]) {
   const THRESHOLD = 0.12;
 
   for (const frame of frames) {
+    // CRITICAL FIX: Only track persons, not balls or other labels
+    const personDetections = frame.detections.filter(d => d.label === "person");
     const used = new Set<number>();
     const matched = new Set<number>();
 
     for (const [tid, pos] of active) {
       let bestIdx = -1;
       let bestDist = THRESHOLD;
-      for (let i = 0; i < frame.detections.length; i++) {
+      for (let i = 0; i < personDetections.length; i++) {
         if (used.has(i)) continue;
-        const d = euclidean(pos, frame.detections[i]);
+        const d = euclidean(pos, personDetections[i]);
         if (d < bestDist) {
           bestDist = d;
           bestIdx = i;
         }
       }
       if (bestIdx >= 0) {
-        const det = frame.detections[bestIdx];
+        const det = personDetections[bestIdx];
         tracks.get(tid)!.push({ t: frame.timestamp, x: det.x, y: det.y });
         active.set(tid, { x: det.x, y: det.y });
         used.add(bestIdx);
@@ -112,9 +114,9 @@ function buildTracks(frames: TrackingFrame[]) {
       }
     }
 
-    for (let i = 0; i < frame.detections.length; i++) {
+    for (let i = 0; i < personDetections.length; i++) {
       if (used.has(i)) continue;
-      const det = frame.detections[i];
+      const det = personDetections[i];
       const tid = nextTrackId++;
       tracks.set(tid, [{ t: frame.timestamp, x: det.x, y: det.y }]);
       active.set(tid, { x: det.x, y: det.y });
@@ -248,6 +250,8 @@ function computeTrackStats(
   let sprintDist = 0;
   let inSprint = false;
   const SPRINT_THRESHOLD_KMH = 20;
+  const SPEED_CAP_KMH = 45; // Realistic max for football
+  const MAX_JUMP_M = 8; // Max plausible distance between frames (~8m)
   const speeds: number[] = [];
 
   for (let i = 1; i < positions.length; i++) {
@@ -259,8 +263,12 @@ function computeTrackStats(
     const dt = (curr.t - prev.t) / 1000;
     if (dt <= 0) continue;
 
-    totalDist += dist;
     const speed = (dist / dt) * 3.6;
+
+    // Outlier filter: skip unrealistic jumps (tracking glitch)
+    if (speed > SPEED_CAP_KMH || dist > MAX_JUMP_M) continue;
+
+    totalDist += dist;
     speeds.push(speed);
     if (speed > topSpeed) topSpeed = speed;
 
@@ -298,7 +306,7 @@ function computeTrackStats(
 
   return {
     distance_km: Math.round(totalDist / 10) / 100,
-    top_speed_kmh: Math.round(topSpeed * 10) / 10,
+    top_speed_kmh: Math.round(Math.min(topSpeed, SPEED_CAP_KMH) * 10) / 10,
     avg_speed_kmh: Math.round(avgSpeed * 10) / 10,
     sprint_count: sprintCount,
     sprint_distance_m: Math.round(sprintDist),
@@ -1185,6 +1193,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           extrapolated: needsExtrapolation,
           tactical_estimated: t?.is_estimated ?? true,
           ball_detections_available: ballPositions.length >= 10,
+          tactical_data_available: (t?.ball_contacts ?? 0) > 0 || (t?.passes_total ?? 0) > 0 || (t?.duels_total ?? 0) > 0,
           analysis_stage: mode === "incremental" ? "prognose" : (needsExtrapolation ? "vorläufig" : "final"),
           recalculation_needed: needsExtrapolation,
         },
