@@ -12,6 +12,11 @@ import {
   TrendingUp,
   AlertTriangle,
   MessageSquare,
+  ArrowUp,
+  ArrowRightLeft,
+  Eye,
+  Layers,
+  Battery,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
@@ -109,6 +114,51 @@ export function FeatureCards() {
       icon: Users,
       title: t("landing.feat5Title"),
       desc: t("landing.feat5Desc"),
+      span: "",
+      accent: "from-primary/15 to-transparent",
+    },
+    {
+      icon: ArrowUp,
+      title: language === "de" ? "Pressing-Analyse" : "Pressing analysis",
+      desc: language === "de"
+        ? "Wie hoch verteidigt dein Team? Pressing-Höhe und Kompaktheit im Zeitverlauf — Korrelation mit Ballgewinnen."
+        : "How high does your team defend? Pressing height and compactness over time — correlation with ball recoveries.",
+      span: "",
+      accent: "from-primary/20 to-primary/5",
+    },
+    {
+      icon: ArrowRightLeft,
+      title: language === "de" ? "Umschaltmomente" : "Transition analysis",
+      desc: language === "de"
+        ? "Konter vs. Gegenpressing: Wie schnell schaltet dein Team um? Umschaltgeschwindigkeit und beteiligte Spieler."
+        : "Counters vs. gegenpressing: How fast does your team transition? Speed and involved players.",
+      span: "",
+      accent: "from-accent/20 to-accent/5",
+    },
+    {
+      icon: Eye,
+      title: language === "de" ? "Gegner-Scouting" : "Opponent scouting",
+      desc: language === "de"
+        ? "Automatischer Scouting-Report: Bevorzugte Angriffsseite, Schwachstellen und empfohlene Gegenstrategie."
+        : "Auto scouting report: Preferred attack side, weaknesses and recommended counter-strategy.",
+      span: "sm:col-span-2",
+      accent: "from-primary/20 to-primary/5",
+    },
+    {
+      icon: Layers,
+      title: language === "de" ? "Formations-Timeline" : "Formation timeline",
+      desc: language === "de"
+        ? "Wann hat dein Team die Formation gewechselt? Timeline mit Auslöser und Formationswechseln im Spielverlauf."
+        : "When did your team change formation? Timeline with triggers and formation changes during the match.",
+      span: "",
+      accent: "from-accent/15 to-transparent",
+    },
+    {
+      icon: Battery,
+      title: language === "de" ? "Ermüdungs-Indikator" : "Fatigue indicator",
+      desc: language === "de"
+        ? "Sprint-Intensität pro 15-Min-Intervall und Positionsdrift — erkennt, wann dein Team müde wird."
+        : "Sprint intensity per 15-min interval and positional drift — detects when your team gets tired.",
       span: "",
       accent: "from-primary/15 to-transparent",
     },

@@ -122,6 +122,10 @@ Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Ballpositionen und Druckzonen
 - Für JEDEN Frame: Schätze die ungefähren Positionen (x,y in 0-100% des Spielfelds) aller erkennbaren Spieler beider Teams und des Balls. x=0 ist die linke Torlinie, x=100 die rechte. y=0 oben, y=100 unten. Gib auch eine kurze Beschreibung der Szene pro Frame.
 - Für JEDEN Frame: Schätze den sichtbaren Feldausschnitt (visible_area). Wenn die Kamera geschwenkt oder gezoomt wurde, zeigen verschiedene Frames unterschiedliche Bereiche.
+- Für JEDEN Frame: Schätze die Pressing-Linie beider Teams (y-Koordinate des höchsten Verteidigungsspielers, 0=oben, 100=unten) und die Kompaktheit (Abstand zwischen höchstem und tiefstem Feldspieler).
+- Erkenne Umschaltmomente: Wann gewinnt ein Team den Ball und kontert? Wann verliert ein Team den Ball und presst sofort nach?
+- Schätze die Passrichtungs-Tendenzen: Bevorzugt das Team lange oder kurze Bälle? Spielaufbau über links, zentral oder rechts?
+- Erkenne Formationswechsel im Spielverlauf: Wann ändert sich die Grundordnung? Was war der Auslöser?
 
 WICHTIG: 
 - Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.
@@ -261,10 +265,84 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                       required: ["frame_index", "ball", "players", "frame_type", "visible_area"],
                     },
                   },
+                  pressing_data: {
+                    type: "array",
+                    description: "For each analyzed frame, estimate pressing line heights and team compactness. pressing_line = y-coordinate (0-100) of the highest defensive line player. compactness = distance between highest and deepest outfield player.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        frame_index: { type: "integer" },
+                        pressing_line_home: { type: "number", description: "y-coordinate (0-100) of highest home defensive player" },
+                        pressing_line_away: { type: "number", description: "y-coordinate (0-100) of highest away defensive player" },
+                        compactness_home: { type: "number", description: "Distance (0-100) between highest and deepest home outfield player" },
+                        compactness_away: { type: "number", description: "Distance (0-100) between highest and deepest away outfield player" },
+                      },
+                      required: ["frame_index", "pressing_line_home", "pressing_line_away", "compactness_home", "compactness_away"],
+                    },
+                  },
+                  transitions: {
+                    type: "array",
+                    description: "Detected transition moments: ball wins leading to counters or ball losses leading to gegenpressing.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        frame_index: { type: "integer" },
+                        type: { type: "string", enum: ["ball_win_counter", "ball_loss_gegenpressing"] },
+                        speed: { type: "string", enum: ["fast", "medium", "slow"] },
+                        players_in_new_phase: { type: "integer", description: "How many players transitioned within ~5 seconds" },
+                        description: { type: "string" },
+                      },
+                      required: ["frame_index", "type", "speed", "players_in_new_phase", "description"],
+                    },
+                  },
+                  pass_directions: {
+                    type: "object",
+                    description: "Estimated passing tendencies for both teams based on observed build-up patterns.",
+                    properties: {
+                      home: {
+                        type: "object",
+                        properties: {
+                          long_pct: { type: "number" },
+                          short_pct: { type: "number" },
+                          build_up_left_pct: { type: "number" },
+                          build_up_center_pct: { type: "number" },
+                          build_up_right_pct: { type: "number" },
+                        },
+                        required: ["long_pct", "short_pct", "build_up_left_pct", "build_up_center_pct", "build_up_right_pct"],
+                      },
+                      away: {
+                        type: "object",
+                        properties: {
+                          long_pct: { type: "number" },
+                          short_pct: { type: "number" },
+                          build_up_left_pct: { type: "number" },
+                          build_up_center_pct: { type: "number" },
+                          build_up_right_pct: { type: "number" },
+                        },
+                        required: ["long_pct", "short_pct", "build_up_left_pct", "build_up_center_pct", "build_up_right_pct"],
+                      },
+                    },
+                    required: ["home", "away"],
+                  },
+                  formation_timeline: {
+                    type: "array",
+                    description: "Formation changes detected throughout the match. Include at least one entry for the starting formation.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        frame_index: { type: "integer" },
+                        minute_approx: { type: "integer" },
+                        home_formation: { type: "string", description: "e.g. 4-4-2, 4-3-3, 3-5-2" },
+                        away_formation: { type: "string", description: "e.g. 4-4-2, 4-3-3, 3-5-2" },
+                        change_trigger: { type: "string", description: "What triggered the change, e.g. 'substitution', 'tactical adjustment', 'losing'" },
+                      },
+                      required: ["frame_index", "minute_approx", "home_formation", "away_formation"],
+                    },
+                  },
                   visual_quality: { type: "string", enum: ["good", "moderate", "poor"] },
                   confidence: { type: "number" },
                 },
-                required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "frame_positions", "visual_quality", "confidence"],
+                required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "frame_positions", "pressing_data", "transitions", "pass_directions", "formation_timeline", "visual_quality", "confidence"],
               },
             },
           },
@@ -309,6 +387,10 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
       { type: "chances", data: analysis.chances },
       { type: "ball_loss_patterns", data: analysis.ball_loss_patterns },
       ...(analysis.frame_positions?.length ? [{ type: "frame_positions", data: { frames: analysis.frame_positions, interval_sec: Math.round((duration_sec ?? 0) / selectedFrames.length) } }] : []),
+      ...(analysis.pressing_data?.length ? [{ type: "pressing_data", data: analysis.pressing_data }] : []),
+      ...(analysis.transitions?.length ? [{ type: "transitions", data: analysis.transitions }] : []),
+      ...(analysis.pass_directions ? [{ type: "pass_directions", data: analysis.pass_directions }] : []),
+      ...(analysis.formation_timeline?.length ? [{ type: "formation_timeline", data: analysis.formation_timeline }] : []),
     ];
 
     for (const result of resultTypes) {
