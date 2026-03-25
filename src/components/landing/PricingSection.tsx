@@ -105,6 +105,18 @@ export function PricingSection() {
             </motion.div>
           ))}
         </div>
+
+        <motion.div
+          className="text-center mt-10"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.6 }}
+        >
+          <Link to="/compare" className="text-sm text-muted-foreground hover:text-primary transition-colors underline underline-offset-4">
+            {language === "de" ? "Wie unterscheiden wir uns von GPS-Westen & Co.?" : "How do we compare to GPS vests & others?"}
+          </Link>
+        </motion.div>
       </div>
     </section>
   );

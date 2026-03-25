@@ -19,9 +19,11 @@ import {
   Battery,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function FeatureCards() {
   const { t, language } = useTranslation();
+  const isMobile = useIsMobile();
 
   const features = [
     {
@@ -217,7 +219,7 @@ export function FeatureCards() {
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
               transition={{ duration: 0.5, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-              whileHover={{ y: -6, borderColor: "hsl(var(--primary) / 0.3)" }}
+              whileHover={isMobile ? undefined : { y: -6, borderColor: "hsl(var(--primary) / 0.3)" }}
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${feature.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl`} />
 
