@@ -14,8 +14,10 @@ import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useModuleAccess } from "@/hooks/use-module-access";
 
 const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
+const HighlightGallery = lazy(() => import("@/components/HighlightGallery"));
 
 const CATEGORY_ICONS: Record<string, typeof Target> = {
   offense: Target,
@@ -74,6 +76,7 @@ export default function MatchReport() {
   const { id } = useParams();
   const { clubName } = useAuth();
   const { data: match, isLoading } = useMatch(id);
+  const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
 
   const [sections, setSections] = useState<ReportSection[]>([]);
   const [training, setTraining] = useState<TrainingRec[]>([]);
@@ -328,6 +331,13 @@ export default function MatchReport() {
                   frames={framePositions.data.frames}
                   intervalSec={framePositions.data.interval_sec ?? 30}
                 />
+              </Suspense>
+            )}
+
+            {/* Video Highlights */}
+            {hasHighlights && id && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <HighlightGallery matchId={id} />
               </Suspense>
             )}
 

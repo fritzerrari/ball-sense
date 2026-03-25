@@ -6,9 +6,12 @@ import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileTex
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
+import { startVideoRecorder, type VideoRecorderHandle } from "@/lib/video-recorder";
 import RecordingGuard, { canStopRecording } from "@/components/RecordingGuard";
 import CameraSetupOverlay from "@/components/CameraSetupOverlay";
 import StopConfirmDialog from "@/components/StopConfirmDialog";
+import MatchEventQuickBar from "@/components/MatchEventQuickBar";
+import { useModuleAccess } from "@/hooks/use-module-access";
 
 type Phase = "setup" | "ready" | "recording" | "analyzing" | "done";
 
@@ -26,6 +29,9 @@ export default function CameraTrackingPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
+  const videoRecorderRef = useRef<VideoRecorderHandle | null>(null);
+  const [recordingStartTime, setRecordingStartTime] = useState(0);
+  const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
 
   const initCamera = useCallback(async () => {
     try {
@@ -53,7 +59,13 @@ export default function CameraTrackingPage() {
       }, 300);
     }
 
+    // Start video recorder for highlights if module is enabled
+    if (hasHighlights && streamRef.current) {
+      videoRecorderRef.current = startVideoRecorder(streamRef.current);
+    }
+
     setPhase("recording");
+    setRecordingStartTime(Date.now());
     setHalftimeSent(false);
     if (navigator.vibrate) navigator.vibrate(50);
 
@@ -135,6 +147,8 @@ export default function CameraTrackingPage() {
 
     const captureResult = liveCaptureRef.current?.stop();
     liveCaptureRef.current = null;
+    videoRecorderRef.current?.stop();
+    videoRecorderRef.current = null;
 
     streamRef.current?.getTracks().forEach(t => t.stop());
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -245,6 +259,16 @@ export default function CameraTrackingPage() {
                   <Eye className="h-3 w-3 text-primary" />
                   <span className="text-xs text-primary font-medium">Ergebnisse ansehen</span>
                 </Link>
+              </div>
+            )}
+            {/* Highlight Quick Bar */}
+            {hasHighlights && matchId && (
+              <div className="absolute bottom-4 right-4">
+                <MatchEventQuickBar
+                  matchId={matchId}
+                  recorderRef={videoRecorderRef}
+                  recordingStartTime={recordingStartTime}
+                />
               </div>
             )}
           </>
