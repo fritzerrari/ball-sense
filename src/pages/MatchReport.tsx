@@ -321,6 +321,16 @@ export default function MatchReport() {
               </div>
             )}
 
+            {/* Tactical Replay */}
+            {framePositions?.data?.frames?.length > 0 && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <TacticalReplay
+                  frames={framePositions.data.frames}
+                  intervalSec={framePositions.data.interval_sec ?? 30}
+                />
+              </Suspense>
+            )}
+
             {/* Danger Zones + Chances */}
             {(dangerZones || chances) && (
               <div className="grid gap-4 sm:grid-cols-2">
