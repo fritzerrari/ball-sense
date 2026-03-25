@@ -18,8 +18,8 @@ interface StopConfirmDialogProps {
 }
 
 function getQualityLevel(frames: number) {
-  if (frames < 10) return { label: "Sehr wenig Daten", color: "text-destructive", emoji: "🔴" };
-  if (frames < 20) return { label: "Wenig Daten", color: "text-amber-500", emoji: "🟡" };
+  if (frames < 5) return { label: "Sehr wenig Daten", color: "text-destructive", emoji: "🔴" };
+  if (frames < 15) return { label: "Wenig Daten", color: "text-amber-500", emoji: "🟡" };
   if (frames < RECOMMENDED_FRAMES) return { label: "Ausreichend", color: "text-amber-500", emoji: "🟡" };
   return { label: "Gute Datenbasis", color: "text-primary", emoji: "🟢" };
 }

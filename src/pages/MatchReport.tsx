@@ -26,6 +26,7 @@ const FormationTimeline = lazy(() => import("@/components/FormationTimeline"));
 const FatigueIndicator = lazy(() => import("@/components/FatigueIndicator"));
 const OpponentScoutReport = lazy(() => import("@/components/OpponentScoutReport"));
 const OpponentHistoryProfile = lazy(() => import("@/components/OpponentHistoryProfile"));
+const CameraRemotePanel = lazy(() => import("@/components/CameraRemotePanel"));
 
 const CATEGORY_ICONS: Record<string, typeof Target> = {
   offense: Target,
@@ -207,6 +208,13 @@ export default function MatchReport() {
             Neu analysieren
           </Button>
         </div>
+
+        {/* Camera Remote Control */}
+        {id && (
+          <Suspense fallback={null}>
+            <CameraRemotePanel matchId={id} />
+          </Suspense>
+        )}
 
         {/* Processing state */}
         {isProcessing && (
