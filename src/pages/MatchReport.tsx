@@ -555,16 +555,11 @@ export default function MatchReport() {
             isExtrapolated={isExtrapolated}
             playerCount={(playerStats ?? []).length}
             matchStatus={match.status}
-            actualProgress={(() => {
-              const framesAnalyzed = homeTeamStats?.raw_metrics && typeof homeTeamStats.raw_metrics === "object"
-                ? (homeTeamStats.raw_metrics as any)?.frames_analyzed ?? 0 : 0;
-              const playerCount = (playerStats ?? []).length;
-              return Math.round(
-                coverageRatio * 40 +
-                Math.min(1, playerCount / 14) * 30 +
-                Math.min(1, framesAnalyzed / 100) * 30
-              );
-            })()}
+            actualProgress={
+              homeTeamStats?.raw_metrics && typeof homeTeamStats.raw_metrics === "object"
+                ? (homeTeamStats.raw_metrics as any)?.data_quality_score ?? undefined
+                : undefined
+            }
             framesAnalyzed={
               homeTeamStats?.raw_metrics && typeof homeTeamStats.raw_metrics === "object"
                 ? (homeTeamStats.raw_metrics as any)?.frames_analyzed ?? undefined
