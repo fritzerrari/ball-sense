@@ -37,9 +37,12 @@ serve(async (req) => {
     const { data: results } = await supabase
       .from("analysis_results")
       .select("*")
-      .eq("job_id", job_id);
+      .eq("match_id", match_id);
 
-    if (!results?.length) {
+    // Filter results for this job or all match results
+    const relevantResults = results?.filter(r => r.job_id === job_id) ?? results ?? [];
+
+    if (!relevantResults.length) {
       await supabase.from("analysis_jobs").update({
         status: "failed",
         error_message: "Keine Analyseergebnisse gefunden",
@@ -58,7 +61,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
-    const analysisContext = results.map(r => `${r.result_type}: ${JSON.stringify(r.data)}`).join("\n\n");
+    const analysisContext = relevantResults.map(r => `${r.result_type}: ${JSON.stringify(r.data)}`).join("\n\n");
     const matchInfo = `${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"} am ${match?.date ?? "?"}`;
 
     await supabase.from("analysis_jobs").update({ progress: 90 }).eq("id", job_id);
@@ -75,6 +78,15 @@ serve(async (req) => {
           {
             role: "system",
             content: `Du bist ein erfahrener Fußball-Trainer-Assistent. Erstelle aus der Spielanalyse verständliche, sofort nutzbare Coaching-Erkenntnisse und Trainingsempfehlungen.
+
+Die Analyse enthält möglicherweise:
+- pressing_data: Pressing-Linie und Kompaktheit pro Frame
+- transitions: Umschaltmomente (Konter vs. Gegenpressing)
+- pass_directions: Passrichtungs-Tendenzen
+- formation_timeline: Formationswechsel im Spielverlauf
+
+Nutze diese Daten, um KONKRETE taktische Empfehlungen zu geben.
+Erstelle zusätzlich einen Gegner-Scouting-Report basierend auf den Away-Team-Daten.
 
 REGELN:
 - Schreibe für Trainer, nicht für Analysten
@@ -128,6 +140,18 @@ REGELN:
                       },
                       required: ["title", "description", "category", "priority", "linked_pattern"],
                     },
+                  },
+                  opponent_scouting: {
+                    type: "object",
+                    description: "Structured opponent scouting report based on observed away team data",
+                    properties: {
+                      preferred_attack_side: { type: "string", description: "left, center, right, or mixed" },
+                      formation_weaknesses: { type: "string", description: "Key weaknesses in opponent formation" },
+                      recommended_counter_strategy: { type: "string", description: "Tactical recommendation for next encounter" },
+                      pressing_behavior: { type: "string", description: "How the opponent presses: high, medium, low, situational" },
+                      transition_speed: { type: "string", description: "How quickly the opponent transitions" },
+                    },
+                    required: ["preferred_attack_side", "formation_weaknesses", "recommended_counter_strategy"],
                   },
                 },
                 required: ["executive_summary", "key_insights", "coaching_conclusions", "training_recommendations"],
@@ -186,6 +210,13 @@ REGELN:
         sort_order: 10 + i,
       })),
       { section_type: "coaching", title: "Coaching-Schlussfolgerungen", content: insights.coaching_conclusions, confidence: "high", sort_order: 50 },
+      ...(insights.opponent_scouting ? [{
+        section_type: "opponent_scouting",
+        title: "Gegner-Scouting",
+        content: JSON.stringify(insights.opponent_scouting),
+        confidence: "medium",
+        sort_order: 60,
+      }] : []),
     ];
 
     for (const section of sections) {
