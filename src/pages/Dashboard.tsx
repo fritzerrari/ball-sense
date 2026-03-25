@@ -79,8 +79,8 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             {clubPlan && <PlanBadge plan={clubPlan} />}
-            <Button variant="hero" size="sm" asChild>
-              <Link to="/matches/new"><Plus className="mr-1 h-4 w-4" /> Neues Spiel</Link>
+            <Button variant="hero" size="sm" asChild className="hidden sm:inline-flex">
+              <Link to="/matches/new"><Plus className="mr-1 h-4 w-4" /> {t("dashboard.newMatch")}</Link>
             </Button>
           </div>
         </div>
@@ -94,21 +94,21 @@ export default function Dashboard() {
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-2">
               <Swords className="h-4 w-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Spiele analysiert</span>
+              <span className="text-xs text-muted-foreground">{t("dashboard.analyzed")}</span>
             </div>
             <div className="text-2xl font-bold font-display">{doneCount}</div>
           </div>
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-2">
               <Loader2 className={`h-4 w-4 ${processingCount > 0 ? "text-amber-500 animate-spin" : "text-muted-foreground"}`} />
-              <span className="text-xs text-muted-foreground">In Analyse</span>
+              <span className="text-xs text-muted-foreground">{t("dashboard.inAnalysis")}</span>
             </div>
             <div className="text-2xl font-bold font-display">{processingCount}</div>
           </div>
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-2">
               <Users className="h-4 w-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Spieler</span>
+              <span className="text-xs text-muted-foreground">{t("dashboard.players")}</span>
             </div>
             <div className="text-2xl font-bold font-display">{players?.length ?? 0}</div>
           </div>
@@ -118,9 +118,9 @@ export default function Dashboard() {
         {recentMatches.length > 0 ? (
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-muted-foreground">Letzte Spiele</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground">{t("dashboard.recentMatches")}</h3>
               <Button variant="ghost" size="sm" asChild>
-                <Link to="/matches">Alle anzeigen <ChevronRight className="h-3 w-3 ml-1" /></Link>
+                <Link to="/matches">{t("dashboard.showAll")} <ChevronRight className="h-3 w-3 ml-1" /></Link>
               </Button>
             </div>
             <div className="space-y-3">
@@ -174,7 +174,7 @@ export default function Dashboard() {
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-5 w-5 text-primary" />
-              <h3 className="text-sm font-semibold text-muted-foreground">Trainingsempfehlungen</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground">{t("dashboard.trainingRecs")}</h3>
             </div>
             <div className="space-y-3">
               {recommendations.map((rec) => (

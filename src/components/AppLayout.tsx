@@ -27,7 +27,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, clubName, clubPlan, clubLogoUrl, signOut } = useAuth();
-  const { t, language } = useTranslation();
+  const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const { data: isAdmin } = useQuery({
@@ -50,23 +50,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.dashboard"), icon: Home, href: "/dashboard" },
     { label: t("nav.matches"), icon: Swords, href: "/matches" },
     { label: t("nav.squad"), icon: Users, href: "/players" },
-    { label: language === "de" ? "Trends" : "Trends", icon: TrendingUp, href: "/trends" },
+    { label: t("nav.trends"), icon: TrendingUp, href: "/trends" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
   ];
 
   const manageItems = [
     { label: t("nav.fields"), icon: Map, href: "/fields" },
     { label: t("nav.settings"), icon: Settings, href: "/settings" },
-    { label: "Installation", icon: Download, href: "/install" },
+    { label: t("nav.install"), icon: Download, href: "/install" },
   ];
 
   const adminItems = isAdmin ? [{ label: t("nav.admin"), icon: Shield, href: "/admin" }] : [];
-
-  const mobileItems = [
-    { label: "Start", icon: Home, href: "/dashboard" },
-    { label: "Spiele", icon: Swords, href: "/matches" },
-    { label: "Kader", icon: Users, href: "/players" },
-  ];
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return location.pathname === "/dashboard";
@@ -82,6 +76,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background md:grid md:grid-cols-[240px_1fr]">
+      {/* Desktop sidebar */}
       <aside className="hidden border-r border-sidebar-border bg-sidebar md:flex md:min-h-screen md:flex-col">
         <div className="border-b border-sidebar-border px-5 py-5">
           <Link to="/dashboard" className="flex items-center gap-2 font-display text-lg font-bold">
@@ -97,7 +92,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
         <div className="flex-1 space-y-6 px-3 py-5">
           <nav className="space-y-1">
-            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Kernbereich</p>
+            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t("nav.core")}</p>
             {mainItems.map((item) => (
               <Link
                 key={item.href}
@@ -115,7 +110,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </nav>
 
           <nav className="space-y-1">
-            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Verwaltung</p>
+            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t("nav.manage")}</p>
             {manageItems.map((item) => (
               <Link
                 key={item.href}
@@ -164,9 +159,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="min-h-[100dvh] pb-28 md:pb-0">
+      {/* Main content */}
+      <main className="min-h-[100dvh] pb-20 md:pb-0">
         <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
-          <div className="flex h-16 items-center gap-4 px-4 md:px-6">
+          <div className="flex h-14 items-center gap-4 px-4 md:px-6">
             <div className="min-w-0 md:hidden">
               <Link to="/dashboard" className="font-display text-lg font-bold">Field<span className="gradient-text">IQ</span></Link>
             </div>
@@ -186,49 +182,52 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <MobileInstallFab />
       </main>
 
+      {/* Mobile bottom navigation — clean 4-tab + more */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="grid grid-cols-5 px-2 py-2 safe-area-pad">
-          {mobileItems.map((item) => (
+        <div className="grid grid-cols-5 px-1">
+          {[
+            { label: t("nav.dashboard"), icon: Home, href: "/dashboard" },
+            { label: t("nav.matches"), icon: Swords, href: "/matches" },
+            { label: t("nav.squad"), icon: Users, href: "/players" },
+            { label: t("nav.trends"), icon: TrendingUp, href: "/trends" },
+          ].map((item) => (
             <Link
               key={item.href}
               to={item.href}
-              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors ${
+              className={`flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors ${
                 isActive(item.href) ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <item.icon className="h-5 w-5" />
+              <item.icon className={`h-5 w-5 ${isActive(item.href) ? "" : "opacity-70"}`} />
               <span>{item.label}</span>
             </Link>
           ))}
 
-          <Link
-            to="/matches"
-            className="-mt-5 flex flex-col items-center gap-1 rounded-2xl border border-primary/20 bg-primary px-2 py-3 text-[11px] font-semibold text-primary-foreground shadow-lg"
-          >
-            <Swords className="h-5 w-5" />
-            <span>Tracking</span>
-          </Link>
-
           <button
             type="button"
             onClick={() => setMoreOpen(true)}
-            className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground"
+            className="flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium text-muted-foreground"
           >
-            <MoreHorizontal className="h-5 w-5" />
-            <span>Mehr</span>
+            <MoreHorizontal className="h-5 w-5 opacity-70" />
+            <span>{t("nav.more")}</span>
           </button>
         </div>
       </div>
 
+      {/* More sheet */}
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
         <SheetContent side="bottom" className="rounded-t-3xl border-border bg-background">
           <SheetHeader>
-            <SheetTitle className="font-display">Mehr</SheetTitle>
-            <SheetDescription>Verwaltung, Installation und Admin getrennt vom Hauptmenü.</SheetDescription>
+            <SheetTitle className="font-display">{t("nav.more")}</SheetTitle>
+            <SheetDescription>{t("nav.manage")}</SheetDescription>
           </SheetHeader>
 
           <div className="mt-6 space-y-2">
-            {[...manageItems, ...adminItems].map((item) => (
+            {[
+              { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
+              ...manageItems,
+              ...adminItems,
+            ].map((item) => (
               <Link
                 key={item.href}
                 to={item.href}

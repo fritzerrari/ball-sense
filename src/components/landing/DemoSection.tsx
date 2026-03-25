@@ -335,18 +335,18 @@ function DashboardState({ onReload, de }: { onReset: () => void; onReload: () =>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="bg-card/80 border-2 border-primary/30 shadow-lg shadow-primary/10 p-1.5 rounded-xl backdrop-blur-sm flex h-auto flex-wrap justify-start">
-          <TabsTrigger value="overview" className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
-            <Brain className="w-4 h-4" /> {de ? "Übersicht" : "Overview"}
+        <TabsList className="bg-card/80 border border-primary/20 shadow-sm p-1 rounded-xl backdrop-blur-sm grid grid-cols-4 w-full h-auto">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm gap-1.5 px-2 sm:px-4 py-2 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
+            <Brain className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">{de ? "Übersicht" : "Overview"}</span><span className="sm:hidden">{de ? "Übersicht" : "Overview"}</span>
           </TabsTrigger>
-          <TabsTrigger value="replay" className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
-            <Eye className="w-4 h-4" /> {de ? "Spielzug-Replay" : "Tactical Replay"}
+          <TabsTrigger value="replay" className="text-xs sm:text-sm gap-1.5 px-2 sm:px-4 py-2 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
+            <Eye className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">{de ? "Replay" : "Replay"}</span><span className="sm:hidden">Replay</span>
           </TabsTrigger>
-          <TabsTrigger value="training" className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
-            <Dumbbell className="w-4 h-4" /> {de ? "Trainingsplan" : "Training Plan"}
+          <TabsTrigger value="training" className="text-xs sm:text-sm gap-1.5 px-2 sm:px-4 py-2 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
+            <Dumbbell className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">{de ? "Training" : "Training"}</span><span className="sm:hidden">Training</span>
           </TabsTrigger>
-          <TabsTrigger value="report" className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
-            <FileText className="w-4 h-4" /> {de ? "KI-Berichte" : "AI Reports"}
+          <TabsTrigger value="report" className="text-xs sm:text-sm gap-1.5 px-2 sm:px-4 py-2 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
+            <FileText className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">{de ? "Berichte" : "Reports"}</span><span className="sm:hidden">{de ? "Report" : "Report"}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -758,25 +758,25 @@ function ReportTabContent({ de }: { de: boolean }) {
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card/50 p-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
           {reportTypes.map((rt) => (
             <button
               key={rt.key}
               onClick={() => setReportType(rt.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${reportType === rt.key ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${reportType === rt.key ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"}`}
             >
               <rt.icon className="w-3 h-3" />
               {rt.label}
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
           {reportStyles.map((rs) => (
             <button
               key={rs.key}
               onClick={() => setReportStyle(rs.key)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${reportStyle === rs.key ? "bg-primary/10 text-primary border border-primary/30" : "bg-muted/20 text-muted-foreground hover:bg-muted/40 border border-transparent"}`}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all whitespace-nowrap ${reportStyle === rs.key ? "bg-primary/10 text-primary border border-primary/30" : "bg-muted/20 text-muted-foreground hover:bg-muted/40 border border-transparent"}`}
             >
               <rs.icon className="w-3 h-3" />
               {rs.label}
