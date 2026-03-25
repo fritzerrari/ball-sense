@@ -586,9 +586,18 @@ export default function CameraTrackingPage() {
         return;
       }
 
+      // Store field coverage info from AI detection
+      const detectedFieldRect = data?.fieldRect ?? { x: 0, y: 0, w: 1, h: 1 };
+      const coveragePercent = data?.coveragePercent ?? 100;
+      const isPartial = data?.isPartialView === true || coveragePercent < 90;
+
+      if (isPartial) {
+        toast.info(`Teilausschnitt erkannt: ~${coveragePercent}% des Feldes sichtbar. Daten werden automatisch hochgerechnet.`);
+      }
+
       if (Array.isArray(data?.corners) && data.corners.length >= 2) {
         const points = data.corners
-          .map((corner) => {
+          .map((corner: unknown) => {
             if (!corner || typeof corner !== "object") return null;
             const candidate = corner as { x?: number; y?: number };
             const x = Number(candidate.x);
@@ -599,10 +608,9 @@ export default function CameraTrackingPage() {
               y: Math.max(0, Math.min(1, y / 100)),
             };
           })
-          .filter((point): point is { x: number; y: number } => !!point);
+          .filter((point: unknown): point is { x: number; y: number } => !!point);
 
         if (points.length >= 2) {
-          // Complete missing corners client-side if backend returned 2-3
           let finalPoints = points;
           if (points.length === 2) {
             const dx = points[1].x - points[0].x;
@@ -622,11 +630,15 @@ export default function CameraTrackingPage() {
           }
 
           if (finalPoints.length === 4) {
+            // Store the detected field rect for use in calibration save
+            (window as any).__detectedFieldRect = detectedFieldRect;
+            (window as any).__detectedCoverage = coveragePercent;
+            (window as any).__detectedFeatures = data?.detectedFeatures ?? [];
             setCalibrationPoints(finalPoints);
-            toast.success(points.length < 4
-              ? `${points.length} Ecken erkannt, ${4 - points.length} ergänzt — Kalibrierung wird gespeichert…`
-              : "Eckpunkte erkannt — Kalibrierung wird gespeichert…"
-            );
+            const msg = points.length < 4
+              ? `${points.length} Ecken erkannt, ${4 - points.length} ergänzt`
+              : "4 Eckpunkte erkannt";
+            toast.success(`${msg}${isPartial ? ` · ${coveragePercent}% Abdeckung` : ""} — Kalibrierung wird gespeichert…`);
             return;
           }
         }
@@ -650,14 +662,27 @@ export default function CameraTrackingPage() {
       return;
     }
 
+    // Use AI-detected field rect if available
+    const detectedRect = (window as any).__detectedFieldRect ?? { x: 0, y: 0, w: 1, h: 1 };
+    const detectedCoverage = (window as any).__detectedCoverage ?? 100;
+    const detectedFeatures = (window as any).__detectedFeatures ?? [];
+    const isPartial = detectedCoverage < 90;
+
     const baseCalibration = {
       points,
       width_m: match?.fields?.width_m ?? 105,
       height_m: match?.fields?.height_m ?? 68,
       calibrated_at: new Date().toISOString(),
-      coverage: "full" as const,
-      field_rect: { x: 0, y: 0, w: 1, h: 1 },
+      coverage: isPartial ? "custom" as const : "full" as const,
+      field_rect: detectedRect,
+      coverage_percent: detectedCoverage,
+      detected_features: detectedFeatures,
     };
+
+    // Clean up global refs
+    delete (window as any).__detectedFieldRect;
+    delete (window as any).__detectedCoverage;
+    delete (window as any).__detectedFeatures;
 
     setSavingCalibration(true);
     try {
