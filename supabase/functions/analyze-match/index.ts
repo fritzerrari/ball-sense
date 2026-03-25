@@ -111,6 +111,7 @@ Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Angriffsrichtungen und Raumbesetzung
 - Erkennbare Muster und Spielphasen
 - Ballpositionen und Druckzonen
+- Für JEDEN Frame: Schätze die ungefähren Positionen (x,y in 0-100% des Spielfelds) aller erkennbaren Spieler beider Teams und des Balls. x=0 ist die linke Torlinie, x=100 die rechte. y=0 oben, y=100 unten. Gib auch eine kurze Beschreibung der Szene pro Frame.
 
 WICHTIG: Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.`,
       },
