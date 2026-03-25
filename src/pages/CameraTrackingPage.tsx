@@ -261,6 +261,16 @@ export default function CameraTrackingPage() {
                 </Link>
               </div>
             )}
+            {/* Highlight Quick Bar */}
+            {hasHighlights && matchId && (
+              <div className="absolute bottom-4 right-4">
+                <MatchEventQuickBar
+                  matchId={matchId}
+                  recorderRef={videoRecorderRef}
+                  recordingStartTime={recordingStartTime}
+                />
+              </div>
+            )}
           </>
         )}
 
