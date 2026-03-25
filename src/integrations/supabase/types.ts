@@ -1004,31 +1004,40 @@ export type Database = {
           club_id: string
           created_at: string
           duration_sec: number | null
+          event_minute: number | null
+          event_type: string | null
           file_path: string
           file_size_bytes: number | null
           id: string
           match_id: string
           status: string
+          video_type: string
         }
         Insert: {
           club_id: string
           created_at?: string
           duration_sec?: number | null
+          event_minute?: number | null
+          event_type?: string | null
           file_path: string
           file_size_bytes?: number | null
           id?: string
           match_id: string
           status?: string
+          video_type?: string
         }
         Update: {
           club_id?: string
           created_at?: string
           duration_sec?: number | null
+          event_minute?: number | null
+          event_type?: string | null
           file_path?: string
           file_size_bytes?: number | null
           id?: string
           match_id?: string
           status?: string
+          video_type?: string
         }
         Relationships: [
           {
