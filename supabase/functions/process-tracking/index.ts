@@ -726,6 +726,19 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       return;
     }
 
+    // Deduplicate uploads: keep only the newest per (camera_index, upload_mode)
+    const deduped = new Map<string, any>();
+    for (const u of uploads) {
+      const key = `${u.camera_index}_${u.upload_mode}`;
+      const existing = deduped.get(key);
+      if (!existing || new Date(u.uploaded_at) > new Date(existing.uploaded_at)) {
+        deduped.set(key, u);
+      }
+    }
+    uploads = [...deduped.values()];
+    const uniqueCameraIndices = new Set(uploads.map((u: any) => u.camera_index));
+    const actualCamerasUsed = uniqueCameraIndices.size;
+
     await updateProgress("detection", 15, `${uploads.length} Kamera-Upload(s) gefunden`);
 
     const sessions: TrackingSession[] = [];
@@ -1151,7 +1164,9 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         red_cards: (ps as any)._redCards ?? 0,
         aerial_won: t?.aerial_won ?? 0,
         data_source: "fieldiq", raw_metrics: {
-          assignment_confidence: ps.confidence, cameras_used: sessions.length, player_name: ps.player_name,
+          assignment_confidence: ps.confidence, cameras_used: actualCamerasUsed,
+          camera_indices: [...uniqueCameraIndices],
+          player_name: ps.player_name,
           auto_discovered: useAutoDiscovery && !ps.player_id,
           coverage_ratio: needsExtrapolation ? coverageRatio : 1,
           extrapolated: needsExtrapolation,
@@ -1210,8 +1225,8 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           data_source: "fieldiq",
           raw_metrics: {
             tracked_player_count: fieldTracks.length,
-            cameras_used: sessions.length,
-            camera_indices: [...cameraContributions.keys()],
+            cameras_used: actualCamerasUsed,
+            camera_indices: [...uniqueCameraIndices],
             raw_tracks_only: true,
             coverage_ratio: coverageRatio,
             extrapolated: needsExtrapolation,
@@ -1270,13 +1285,19 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         top_speed_kmh: Math.round(topSpeed * 10) / 10, possession_pct: null,
         formation_heatmap: mergedHeatmap, data_source: "fieldiq",
         raw_metrics: {
-          tracked_player_count: players.length, cameras_used: sessions.length,
-          camera_indices: [...cameraContributions.keys()],
+          tracked_player_count: players.length, cameras_used: actualCamerasUsed,
+          camera_indices: [...uniqueCameraIndices],
           opponent_tracking_enabled: shouldTrackTeam(matchContext, "away"),
           likely_official_tracks_ignored: likelyOfficials.length,
           coverage_ratio: coverageRatio,
           extrapolated: needsExtrapolation,
           analysis_stage: mode === "incremental" ? "prognose" : (needsExtrapolation ? "vorläufig" : "final"),
+          frames_analyzed: mergedFrames.length,
+          data_quality_score: Math.min(100, Math.round(
+            coverageRatio * 40 +
+            Math.min(1, players.length / 14) * 30 +
+            Math.min(1, mergedFrames.length / 100) * 30
+          )),
         },
       });
     }
@@ -1346,7 +1367,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       status: "done",
       processing_progress: {
         phase: "complete", progress: 100,
-        detail: `${stageLabel} · ${totalStatsCount} Spieler · ${sessions.length} Kamera(s)`,
+        detail: `${stageLabel} · ${totalStatsCount} Spieler · ${actualCamerasUsed} Kamera(s)`,
         analysis_stage: analysisStage,
         total_tracks: trackProfiles.length,
         field_tracks: trackProfiles.filter(t => t.sidelineRatio < 0.45).length,
@@ -1354,7 +1375,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         updated_at: new Date().toISOString(),
       },
     }).eq("id", matchId);
-    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${totalStatsCount} stats (${playerStats.length} assigned + fallback), ${sessions.length} camera(s), ${trackProfiles.length} tracks`);
+    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${totalStatsCount} stats (${playerStats.length} assigned + fallback), ${actualCamerasUsed} camera(s), ${trackProfiles.length} tracks`);
   } catch (err) {
     console.error("[process-tracking] Error:", err);
     await updateProgress("error", 0, err instanceof Error ? err.message : "Verarbeitung fehlgeschlagen");

@@ -323,15 +323,15 @@ export class FootballTracker {
     if (!this.aiFrameCanvas) {
       this.aiFrameCanvas = document.createElement("canvas");
     }
-    // Resize to 640px wide for faster upload & analysis
-    const scale = Math.min(1, 640 / this.videoElement.videoWidth);
+    // Resize to 480px wide for faster upload & lower base64 size
+    const scale = Math.min(1, 480 / this.videoElement.videoWidth);
     this.aiFrameCanvas.width = Math.round(this.videoElement.videoWidth * scale);
     this.aiFrameCanvas.height = Math.round(this.videoElement.videoHeight * scale);
     const ctx = this.aiFrameCanvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(this.videoElement, 0, 0, this.aiFrameCanvas.width, this.aiFrameCanvas.height);
-    // Get as JPEG base64 (strip data:image/jpeg;base64, prefix)
-    const dataUrl = this.aiFrameCanvas.toDataURL("image/jpeg", 0.7);
+    // Get as JPEG base64 with lower quality to stay under API limits
+    const dataUrl = this.aiFrameCanvas.toDataURL("image/jpeg", 0.5);
     return dataUrl.split(",")[1] ?? null;
   }
 

@@ -769,6 +769,10 @@ export default function CameraTrackingPage() {
           cameraIndex: cam,
           sessionToken: token,
           points,
+          coverage: baseCalibration.coverage,
+          field_rect: baseCalibration.field_rect,
+          coverage_percent: baseCalibration.coverage_percent,
+          detected_features: baseCalibration.detected_features,
         }),
       });
 
@@ -1163,22 +1167,55 @@ export default function CameraTrackingPage() {
                 <span className={`h-2 w-2 rounded-full ${isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"}`} />
                 <span className="font-medium text-muted-foreground">{isPaused ? "PAUSE" : "REC"}</span>
               </div>
-              <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 backdrop-blur-sm border border-amber-500/30 text-xs text-amber-400">
-                <Camera className="h-3 w-3" />
-                <span>Simulation</span>
-              </div>
+              {/* AI status indicator */}
+              {(() => {
+                const aiStats = trackerRef.current?.getAIStats();
+                const hasAI = aiStats && aiStats.successful > 0;
+                const aiActive = aiStats && aiStats.total > 0;
+                return (
+                  <div className={`absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-sm border text-xs ${
+                    hasAI
+                      ? "bg-primary/20 border-primary/30 text-primary"
+                      : aiActive
+                        ? "bg-amber-500/20 border-amber-500/30 text-amber-400"
+                        : "bg-muted/60 border-border text-muted-foreground"
+                  }`}>
+                    <span className={`h-2 w-2 rounded-full ${hasAI ? "bg-primary animate-pulse" : aiActive ? "bg-amber-500" : "bg-muted-foreground"}`} />
+                    <span>{hasAI ? `KI ${aiStats.successful}/${aiStats.total}` : aiActive ? "KI wartet…" : "Aufnahme"}</span>
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* Simulation info banner */}
-            <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-left">
-              <Camera className="h-4 w-4 shrink-0 text-amber-500" />
-              <div>
-                <p className="text-xs font-medium text-foreground">Simulationsmodus aktiv</p>
-                <p className="text-xs text-muted-foreground">
-                  Daten werden für die Backend-Analyse gesammelt. Echte Spielererkennung erfolgt serverseitig nach dem Spiel.
-                </p>
-              </div>
-            </div>
+            {/* AI detection status */}
+            {(() => {
+              const aiStats = trackerRef.current?.getAIStats();
+              const hasAI = aiStats && aiStats.successful > 0;
+              const aiErrors = aiStats ? aiStats.errors : 0;
+              if (!aiStats || aiStats.total === 0) return null;
+              return (
+                <div className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-left ${
+                  hasAI
+                    ? "border-primary/30 bg-primary/10"
+                    : "border-amber-500/30 bg-amber-500/10"
+                }`}>
+                  {hasAI ? <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" /> : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
+                  <div>
+                    <p className="text-xs font-medium text-foreground">
+                      {hasAI ? "KI-Erkennung aktiv" : "KI-Erkennung wird aufgebaut…"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {hasAI
+                        ? `${aiStats.successful} von ${aiStats.total} Frames erfolgreich analysiert · ${playerCount} Spieler erkannt`
+                        : aiErrors > 3
+                          ? "Bildanalyse fehlgeschlagen — Daten werden trotzdem aufgezeichnet"
+                          : "Warte auf erste KI-Analyse…"
+                      }
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Live Stats Dashboard */}
             {liveStats && liveStats.teams.length > 0 && (
