@@ -1,145 +1,62 @@
 
 
-# Analyse: Was geht, was fehlt, was wäre möglich
+# Video-Highlights Feature — Implementierungsplan
 
-## Status Quo — Was funktioniert
+## Überblick
 
-| Feature | Status |
-|---|---|
-| 1 Smartphone filmt, Frames alle 30s | ✅ Funktioniert |
-| Gemini Vision analysiert Formationen, Gefahrenzonen | ✅ Funktioniert |
-| Halbzeit-Analyse während Aufnahme | ✅ Funktioniert |
-| Coaching-Insights + Trainingsplan | ✅ Funktioniert |
-| Spielzug-Replay (geschätzte Positionen) | ✅ Funktioniert |
-| Platz-Kalibrierung mit KI-Eckerkennung | ✅ Code vorhanden (FieldCalibration.tsx + detect-field-corners Edge Function) |
-| Teilausschnitte (linke/rechte Hälfte, custom) | ✅ Im Kalibrierungs-Code implementiert |
-| Video-Upload + Live-Aufnahme | ✅ Beides möglich (NewMatch.tsx) |
+Parallele Video-Aufnahme via MediaRecorder während des Frame-Captures. Bei Match-Events (Tor, Karte, Chance) werden 20s-Highlight-Clips extrahiert und in den `match-videos` Bucket gespeichert. Das Feature wird über das bestehende `app_modules`-System gesteuert — nur Admins können es per Modul "video_highlights" für Vereine freischalten.
 
-## Deine Fragen im Detail
+## Datenbank-Änderungen
 
-### 1. Automatische Platzerkennung
+1. **`match_videos` Tabelle erweitern**: Neue Spalten `event_type text`, `event_minute integer`, `video_type text DEFAULT 'highlight'` um Highlights von vollen Videos zu unterscheiden
+2. **`app_modules` Insert**: Neuen Modul-Eintrag `video_highlights` einfügen (standardmäßig inaktiv)
+3. **RLS für `match_videos`**: DELETE-Policy für Club-Mitglieder hinzufügen (Cleanup)
 
-**Ist bereits implementiert!** Die `FieldCalibration.tsx` nutzt eine `detect-field-corners` Edge Function die via Gemini Vision:
-- 4 Eckpunkte automatisch erkennt
-- Feldtyp identifiziert (Großfeld, Kleinfeld, Jugend, Futsal)
-- Dimensionen vorschlägt (z.B. 105×68m)
-- Erkennt ob es ein echtes Spielfeld ist oder nicht
-- Teilansichten erkennt (nur linke/rechte Hälfte sichtbar)
+## Neue Dateien
 
-**Was fehlt**: Die Kalibrierung wird aktuell NICHT automatisch vor der Analyse ausgelöst. Der User muss manuell zu `/fields/:id/calibrate` navigieren. Das könnte automatisiert werden.
+### `src/lib/video-recorder.ts`
+Ring-Buffer-basierter Video-Recorder:
+- `MediaRecorder` mit `video/webm;codecs=vp9` (Fallback `video/mp4`)
+- 10s-Chunks via `ondataavailable` in Ring-Buffer (letzte 30s = 3 Chunks)
+- `extractHighlight(eventType, minute)` → nimmt Buffer-Inhalt, erstellt 15-20s Blob
+- `stop()` → räumt auf, gibt nichts zurück (kein Full-Game-Video)
+- Max 20 Highlights, 480p Auflösung
 
-### 2. Kamera schwenkt oder zoomt
+### `src/components/MatchEventQuickBar.tsx`
+Floating Action Bar während der Aufnahme:
+- Nur sichtbar wenn `video_highlights` Modul aktiv
+- Quick-Buttons: ⚽ Tor, 🟡 Karte, 📐 Ecke, ⚡ Chance
+- Bei Tap: Event in `match_events` speichern + Highlight aus Ring-Buffer extrahieren + Upload nach `match-videos/{matchId}/highlight_{type}_{minute}.webm`
+- Haptic Feedback + Toast "Highlight gespeichert ✓"
 
-**Problem**: Aktuell nimmt das System an, dass die Kamera statisch steht. Bei Schwenk/Zoom verschieben sich die Spielfeldkoordinaten zwischen Frames — die KI-Positionsschätzungen werden inkonsistent.
+### `src/components/HighlightGallery.tsx`
+Galerie-Komponente für Match-Report:
+- Listet alle Highlights eines Spiels aus `match_videos` WHERE `video_type = 'highlight'`
+- Video-Player inline, Download-Button
+- Nur sichtbar wenn Modul aktiv
 
-**Was machbar wäre** (rein mit Gemini Vision, ohne extra Backend):
-- **Schwenk-Erkennung**: Gemini kann pro Frame den sichtbaren Feldausschnitt schätzen ("Frame zeigt linke Hälfte" vs. "Frame zeigt Mittellinie"). Das Prompt wird um eine `visible_area` Angabe pro Frame erweitert
-- **Normalisierung**: Positionen werden relativ zum sichtbaren Ausschnitt geschätzt und dann auf das Gesamtfeld hochgerechnet
-- **Zoom-Toleranz**: Gemini erkennt Nahaufnahmen ("Strafraum-Detail") und markiert diese — solche Frames werden für taktische Übersicht ignoriert, aber für Detailanalyse genutzt
-- **Qualitäts-Warnung**: Starke Schwenks/Zooms → niedrigere Confidence im Report
+## Geänderte Dateien
 
-**Limitierung**: Das funktioniert als "Best Effort". Exakte Koordinaten bei dynamischer Kamera sind ohne Computer Vision (Homographie-Transformation pro Frame) nicht möglich.
+### `src/pages/CameraTrackingPage.tsx`
+- Ring-Buffer-Recorder parallel zu Frame-Capture starten
+- `MatchEventQuickBar` einbinden (nur wenn Modul aktiv)
+- Bei Stop: Recorder cleanup
 
-### 3. Optimale Kamera-Anzahl und Platzierung
+### `src/pages/NewMatch.tsx`
+- Gleiche Integration für den Record-Modus
 
-**Aktueller Stand**: 1 Kamera. Mehr ist im Code nicht vorgesehen.
+### `src/pages/MatchReport.tsx`
+- `HighlightGallery` als neuen Abschnitt nach Tactical Replay einfügen
+- Modul-Check: nur anzeigen wenn `video_highlights` aktiv
 
-**Optimale Konfiguration für das aktuelle System**:
+## Admin-Steuerung
 
-```text
-                    ┌─────────────────────────────┐
-                    │         Spielfeld            │
-                    │                              │
-                    │                              │
-                    │                              │
-                    └─────────────────────────────┘
-                              📱
-                        Mittellinie, erhöht
-                        (Tribüne, 3-5m Höhe)
-```
+Das `app_modules`-System ist bereits vollständig implementiert mit `can_access_module()` DB-Funktion. Der Admin kann im Admin-Panel unter dem bestehenden Modul-Management das Feature "Video-Highlights" pro Verein oder Plan aktivieren/deaktivieren. Es wird lediglich ein neuer Datensatz in `app_modules` eingefügt — kein neues Admin-UI nötig.
 
-1 Kamera reicht, weil:
-- Gemini analysiert Standbilder, keine Echtzeit-Tracks
-- Höhere Position = bessere Übersicht = bessere KI-Schätzungen
-- Schräge Perspektive (Eckfahne) ist schlecht → Mittellinie ideal
+## Technische Details
 
-**Was mit 2 Kameras möglich wäre** (Feature-Erweiterung):
-- Kamera 1: Linke Hälfte, Kamera 2: Rechte Hälfte
-- Frames beider Kameras werden als 2 Bild-Sets an Gemini geschickt
-- KI fusioniert die Perspektiven zu einem Gesamtbild
-- Payload verdoppelt sich → Edge Function muss 40 statt 20 Frames verarbeiten
-
-### 4. Teilausschnitte
-
-**Bereits implementiert** in der Kalibrierung (`coverage: "left_half" | "right_half" | "custom"`). Die KI kann auch Teilansichten erkennen. Was fehlt:
-- Die `analyze-match` Function nutzt die Kalibrierungsdaten des Feldes NICHT — sie weiß nicht, dass nur die linke Hälfte gefilmt wird
-- Positionsschätzungen beziehen sich immer auf "das sichtbare Feld"
-
-### 5. User-Fehler vermeiden
-
-**Aktuelle Schwachstellen** wo User scheitern können:
-
-| Fehlerquelle | Auswirkung | Lösung |
-|---|---|---|
-| Kein Platz angelegt → Spiel kann nicht erstellt werden | Blockiert | Auto-Platz erstellen wenn keiner vorhanden |
-| Kamera zu nah am Spielfeld (Bodenhöhe) | Schlechte Analyse | Positionierungstipps vor Aufnahmestart |
-| Aufnahme zu kurz (< 5 Frames) | Sinnlose Analyse | Mindest-Aufnahmezeit erzwingen (z.B. 3 Min) |
-| Versehentlich gestoppt | Daten verloren | Bestätigungsdialog vor Stop |
-| Handy dreht sich → Stream bricht ab | Frames verloren | Orientation Lock erzwingen |
-| Browser-Tab wechseln → Kamera pausiert | Lücken in Frames | Warnung bei Visibility Change |
-| Kein Internet beim Analyse-Start | Upload schlägt fehl | Offline-Queue mit Retry |
-| Doppeltes Analyse-Triggering | Duplicate Jobs | Debounce + Check ob Job bereits existiert |
-
----
-
-## Umsetzungsplan: Erweiterte Features
-
-### Schritt 1: Smart Recording Guard (User-Fehler vermeiden)
-
-Neue Komponente `RecordingGuard` die vor und während der Aufnahme prüft:
-- **Vor Start**: Kamera-Positionierungstipps-Overlay ("Stelle dein Handy erhöht auf, Blick auf Mittellinie")
-- **Orientierungssperre**: `screen.orientation.lock("landscape")` beim Aufnahmestart
-- **Visibility-Warnung**: `document.visibilitychange` Listener → Toast "App im Vordergrund halten!"
-- **Mindest-Frames**: Stop-Button erst aktiv nach >= 5 Frames (2.5 Min)
-- **Bestätigungsdialog**: "Aufnahme wirklich beenden?" vor dem Stoppen
-- **Frame-Qualitätsprüfung**: Schwarze/unscharfe Frames automatisch überspringen
-
-### Schritt 2: Auto-Setup (Platz automatisch erkennen)
-
-Wenn der User "Aufnahme starten" drückt:
-1. Erster Frame wird an `detect-field-corners` geschickt (bereits vorhandene Edge Function)
-2. Wenn kein Platz kalibriert → automatische Felderkennung aus dem ersten Kamerabild
-3. Ergebnis wird als Banner angezeigt: "Großfeld erkannt (105×68m) ✓" oder "Feld konnte nicht erkannt werden — Analyse läuft trotzdem"
-4. Kalibrierungsdaten werden an `analyze-match` weitergegeben für bessere Positionsschätzungen
-
-### Schritt 3: Schwenk/Zoom-Toleranz
-
-`analyze-match` Prompt erweitern:
-- Pro Frame zusätzlich `visible_area: { description: string, estimated_coverage_pct: number }` abfragen
-- Frames mit < 30% Feldabdeckung (Zoom auf Spieler) als "Detail-Frame" markieren → nicht für Taktik-Replay nutzen
-- Im Report anzeigen: "3 von 20 Frames zeigten Nahaufnahmen und wurden für die taktische Analyse ausgeschlossen"
-
-### Schritt 4: Kalibrierungsdaten in Analyse integrieren
-
-`analyze-match` bekommt Feld-Infos:
-- `field_dimensions`, `coverage`, `field_rect` aus der Kalibrierung
-- Prompt sagt der KI: "Die Kamera zeigt nur die linke Spielfeldhälfte. Positionsangaben normalisieren auf das Gesamtfeld."
-- Bessere Positionsschätzungen im Tactical Replay
-
-### Betroffene Dateien
-
-| Datei | Änderung |
-|---|---|
-| `src/pages/CameraTrackingPage.tsx` | RecordingGuard einbauen, Orientierungssperre, Visibility-Warnung |
-| `src/pages/NewMatch.tsx` | Gleiche Guards für Record-Modus |
-| `src/lib/frame-capture.ts` | Frame-Qualitätsprüfung (Schwarzbild-Erkennung), Orientierungs-Metadaten |
-| `supabase/functions/analyze-match/index.ts` | Prompt um visible_area + Kalibrierungsdaten erweitern |
-| `src/components/RecordingGuard.tsx` | NEU — Positionierungstipps, Orientation Lock, Visibility Warning |
-| `src/components/CameraSetupOverlay.tsx` | NEU — Tipps vor Aufnahmestart |
-
-### Was NICHT geht (Grenzen)
-- Echtes Multi-Kamera-Stitching → braucht dediziertes CV-Backend
-- Exakte Spieler-Identifikation (Trikotnummer lesen) → Gemini kann das nur sporadisch
-- Echtzeit-Tracking mit fps-genauen Positionen → braucht YOLO/DeepSORT
-- Automatische Schwenk-Kompensation (Homographie pro Frame) → braucht OpenCV
+- **Browser-Support**: `MediaRecorder` ist in allen modernen Browsern verfügbar; MIME-Type-Check mit Fallback
+- **RAM**: Ring-Buffer hält ~30s bei 480p ≈ 5-10MB — kein Problem
+- **Storage**: ~20 Clips × 5-10MB = 100-200MB pro Spiel im `match-videos` Bucket
+- **Cleanup**: Bestehende `cleanup-highlights` Edge Function (bereits in config.toml) kann für 7-Tage-Policy genutzt werden
 
