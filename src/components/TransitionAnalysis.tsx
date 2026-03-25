@@ -43,7 +43,7 @@ export default function TransitionAnalysis({ data, intervalSec }: Props) {
   };
 
   return (
-    <Card>
+    <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center gap-2">
           <ArrowRightLeft className="h-5 w-5 text-primary" />
