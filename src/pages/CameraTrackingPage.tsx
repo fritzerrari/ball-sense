@@ -469,9 +469,9 @@ export default function CameraTrackingPage() {
               Alle 30 Sek. wird ein Standbild erfasst
             </p>
             {isHelper && !transferAuthorized && (
-              <div className="flex items-center gap-1.5 bg-amber-500/20 rounded-full px-4 py-2 border border-amber-500/30">
-                <Loader2 className="h-3.5 w-3.5 text-amber-400 animate-spin" />
-                <span className="text-xs text-amber-300 font-medium">Warte auf Freigabe vom Trainer…</span>
+              <div className="flex items-center gap-1.5 bg-destructive/20 rounded-full px-4 py-2 border border-destructive/30">
+                <Loader2 className="h-3.5 w-3.5 text-destructive animate-spin" />
+                <span className="text-xs text-destructive font-medium">Warte auf Freigabe vom Trainer…</span>
               </div>
             )}
             {isHelper && transferAuthorized && (
@@ -565,8 +565,14 @@ export default function CameraTrackingPage() {
 
       <div className="safe-area-pad border-t border-border bg-background p-4 space-y-2">
         {phase === "ready" && (
-          <Button onClick={handleReadyStart} size="lg" className="w-full gap-2 h-14 text-base">
-            <Video className="h-5 w-5" /> Aufnahme starten
+          <Button
+            onClick={handleReadyStart}
+            size="lg"
+            className="w-full gap-2 h-14 text-base"
+            disabled={isHelper && !transferAuthorized}
+          >
+            <Video className="h-5 w-5" />
+            {isHelper && !transferAuthorized ? "Warte auf Freigabe…" : "Aufnahme starten"}
           </Button>
         )}
         {phase === "recording" && (
