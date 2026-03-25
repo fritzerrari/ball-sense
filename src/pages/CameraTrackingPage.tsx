@@ -429,6 +429,9 @@ export default function CameraTrackingPage() {
     trackerRef.current.startTracking(null, id, (frame) => {
       setCurrentDetections(frame.detections);
       engine.processFrame(frame);
+      // Update AI stats reactively
+      const stats = trackerRef.current?.getAIStats();
+      if (stats) setAiStatsState(stats);
       const pCount = frame.detections.filter(d => d.label === "person").length;
       setPeakDetections((prev) => Math.max(prev, pCount));
       if (pCount >= 2 && !detectionConfirmed) {
