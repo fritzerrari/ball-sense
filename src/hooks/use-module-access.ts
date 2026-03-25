@@ -21,14 +21,14 @@ export function useModuleAccess(moduleKey: string) {
       .rpc("can_access_module", {
         _user_id: session.user.id,
         _club_id: clubId,
-        _plan: plan ?? "trial",
+        _plan: clubPlan ?? "trial",
         _module_key: moduleKey,
       })
       .then(({ data }) => {
         setHasAccess(data === true);
         setLoading(false);
       });
-  }, [session?.user?.id, clubId, plan, moduleKey]);
+  }, [session?.user?.id, clubId, clubPlan, moduleKey]);
 
   return { hasAccess, loading };
 }
