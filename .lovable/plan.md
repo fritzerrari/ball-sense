@@ -1,81 +1,61 @@
 
 
-# Fehleranalyse, Optimierung & Mitbewerber-Vergleichsseite
+# Workflow-Vereinfachung, Transparenz-Update & Design-Optimierung
 
-## 1. Gefundener Fehler: `useTranslation must be used within I18nProvider`
+## Kernfrage: Braucht man noch die Aufstellung?
 
-**Ursache**: Der Fehler tritt als HMR-Artefakt (Hot Module Replacement) auf. Die `I18nProvider` umschließt die gesamte App korrekt in `main.tsx`. Der Fehler ist kein strukturelles Problem, sondern entsteht bei Hot-Reloads wenn die i18n-Modul-Referenz kurzzeitig ungültig wird. Ein harter Reload (F5) löst das Problem.
+**Nein, nicht zwingend.** Das System hat den Auto-Discovery-Modus, der Spieler automatisch erkennt. Die Aufstellung ist optional und verbessert nur die Zuordnung (Name statt "Spieler 3"). Die TransparencySection auf der Landing Page suggeriert aber noch, dass die Aufstellung Pflicht ist — das muss korrigiert werden.
 
-**Fix empfohlen**: Trotzdem eine defensive Absicherung einbauen — in `useTranslation()` statt `throw Error` einen Fallback-Kontext zurückgeben, der die deutschen Keys direkt liest. Das verhindert Crashes bei HMR und Edge-Cases.
+Der aktuelle `NewMatch.tsx` Flow ist bereits schlank (Gegner + Datum + Platz → Upload/Aufnahme), fragt keine Aufstellung ab. Aber die Landing Page und der "Coach Guide" kommunizieren das nicht klar genug.
 
-## 2. Code-Review Ergebnisse
-
-**Keine kritischen Fehler gefunden in:**
-- `WhyFieldIQ.tsx` — sauber, zweisprachig, Vergleichskarten korrekt
-- `TransparencySection.tsx` — 3-Phasen-Layout korrekt, Labels stimmen
-- `FeatureCards.tsx` — 17 Cards, alle Icons importiert, Pressing/Scouting/Fatigue korrekt
-- `FAQSection.tsx` — 8 FAQ-Einträge inkl. Presse + manueller Aufwand
-- `PressingChart.tsx`, `FormationTimeline.tsx`, `FatigueIndicator.tsx` — Props-Interfaces korrekt, Recharts-Imports vorhanden
-- `MatchReport.tsx` — Lazy-Imports aller 6 neuen Analyse-Komponenten korrekt
-
-**Performance-Optimierung:**
-- Alle neuen Analyse-Komponenten sind bereits lazy-loaded (gut)
-- `FeatureCards.tsx` hat 17 Cards mit individuellen `motion`-Animationen + `whileHover` — bei 17 Karten auf Mobile ist das 17x IntersectionObserver. Optimierung: `viewport={{ once: true, margin: "-50px" }}` ist gesetzt (gut), aber die `whileHover`-Animation auf Touch-Geräten ist unnötig → entfernen für Mobile
-
-## 3. Bilder/Screenshots
-
-Die HeroSlider-Slides (TrackingSlide, CalibrationSlide, DataTransferSlide) sind **reine SVG/CSS-Mockups**, keine externen Bilder. Sie bleiben konsistent unabhängig vom Umbau. Gleiches gilt für die DemoSection — alles programmatisch generiert, keine Screenshots die veralten könnten.
-
-## 4. Mitbewerber-Vergleichsseite — Rechtliche Einschätzung
-
-**Grundsätzlich erlaubt** in Deutschland und der EU:
-- Vergleichende Werbung ist nach § 6 UWG (Gesetz gegen unlauteren Wettbewerb) und EU-Richtlinie 2006/114/EG **zulässig**, wenn sie:
-  - Objektiv und nachprüfbar ist (Fakten, keine subjektiven Behauptungen)
-  - Waren/Dienstleistungen für denselben Bedarf vergleicht
-  - Keine Verwechslungsgefahr erzeugt
-  - Den Ruf des Mitbewerbers nicht herabsetzt oder verunglimpft
-  - Keine geschützten Markenzeichen missbräuchlich verwendet
-
-**Empfehlung für die Umsetzung:**
-- Kategorien statt Markennamen verwenden: "GPS-Westen-Systeme", "Kamera-Tracking-Lösungen", "Manuelle Statistik-Apps" (es gibt bereits `landing.gpsVests` als i18n-Key)
-- Objektive Kriterien: Kosten, Hardware-Bedarf, Installationsaufwand, Datenschutz, Liga-Eignung
-- **Keine** Logos oder geschützten Markennamen wie "Veo", "Catapult" etc.
-- Hinweis-Fußnote: "Stand: März 2026. Angaben basieren auf öffentlich verfügbaren Informationen."
-
-**Implementierung:** Eigene Seite `/compare` (nicht Landing Page, da sie schon lang genug ist) mit sachlicher Vergleichstabelle nach Kategorien. Navigation über Footer + optional als Link in der Pricing-Section.
+---
 
 ## Plan
 
-### Dateien ändern
+### 1. TransparencySection aktualisieren
 
-| Datei | Änderung |
+Die "Vor dem Spiel"-Phase korrigieren:
+- "Aufstellung aus Kader wählen" → als **optional** markieren statt **manuell**
+- Neuen Step ergänzen: "Oder: KI-Automatik — erkennt Spieler automatisch" (type: `auto`)
+- Kamera-Setup klarer: "1–3 Smartphones aufstellen (je nach Feldgröße)"
+
+Die "Während des Spiels"-Phase ergänzen:
+- "Kamera-Code eingeben & Aufnahme starten" als manuellen Schritt hinzufügen (das fehlt komplett)
+
+### 2. HowItWorks aktualisieren
+
+Schritt 1 erweitern um Kamera-Code-Konzept:
+- "Smartphone aufstellen, 6-stelligen Code eingeben, Aufnahme starten. 1–3 Kameras für beste Abdeckung."
+
+### 3. WhyFieldIQ ergänzen
+
+Einen 5. Vergleich hinzufügen, der den Prozess-Vorteil zeigt:
+- **Klassisch**: "2 Stunden manuelle Aufstellung + Statistik-Eingabe"
+- **FieldIQ**: "30 Sekunden Setup — die KI erkennt alles automatisch"
+
+### 4. NewMatch.tsx — Kamera-Anzahl explizit machen
+
+Im Upload-Schritt (Step 2) einen Hinweis ergänzen:
+- Info-Card: "Mehrere Kameras? Starte weitere Aufnahmen über den Kamera-Code im Spiel-Detail."
+- Visuelles Element: 1/2/3 Kamera-Icons mit kurzer Erklärung wann welche Anzahl sinnvoll ist
+
+### 5. Design & Layout Optimierung
+
+- **TransparencySection**: Visuellen Fortschrittsbalken zwischen den 3 Phasen ergänzen (verbindende Linie/Pfeil)
+- **WhyFieldIQ**: Farblichen Kontrast zwischen "Klassisch" (grau/durchgestrichen) und "FieldIQ" (grün/primary) verstärken
+- **HowItWorks**: Nummern-Badges prominenter gestalten, Step-Connector zwischen Karten auf Desktop
+
+---
+
+## Betroffene Dateien
+
+| Datei | Aktion |
 |---|---|
-| `src/lib/i18n.tsx` | `useTranslation` defensiv absichern — Fallback statt throw |
-| `src/components/landing/FeatureCards.tsx` | `whileHover` nur auf Desktop (Responsive-Check) |
-| `src/pages/ComparePage.tsx` | NEU — Sachliche Vergleichsseite nach Kategorien |
-| `src/App.tsx` | Neue Route `/compare` |
-| `src/components/landing/Footer.tsx` | Link zu `/compare` einfügen |
-| `src/components/landing/PricingSection.tsx` | Optional: Link "Wie unterscheiden wir uns?" → `/compare` |
-| `src/lib/i18n.tsx` | Neue Keys für Vergleichsseite (de + en) |
+| `src/components/landing/TransparencySection.tsx` | Aufstellung → optional, KI-Auto ergänzen, Kamera-Code-Step |
+| `src/components/landing/WhyFieldIQ.tsx` | 5. Vergleichskarte (Prozess-Vorteil) |
+| `src/components/landing/HowItWorks.tsx` | Kamera-Code + Multi-Kamera erwähnen |
+| `src/pages/NewMatch.tsx` | Kamera-Anzahl-Hinweis im Upload-Step |
+| `src/lib/i18n.tsx` | Aktualisierte Keys für HowItWorks |
 
-### Vergleichsseite Inhalt
-
-Tabelle mit Spalten:
-- **FieldIQ** (hervorgehoben)
-- **GPS-Westen-Systeme** (z.B. Catapult-Typ)
-- **Kamera-Tracking** (z.B. Veo-Typ)
-- **Manuelle Statistik-Apps**
-
-Zeilen:
-- Monatliche Kosten
-- Hardware-Investition
-- Einrichtungsaufwand
-- Taktische Analyse
-- KI-Berichte
-- Pressing-Analyse
-- Gegner-Scouting
-- DSGVO-Konformität
-- Liga-Eignung
-
-Plus: "Warum wir anders sind"-Abschnitt mit den Kern-Differenzierern aus WhyFieldIQ.
+Keine DB-Änderungen nötig.
 
