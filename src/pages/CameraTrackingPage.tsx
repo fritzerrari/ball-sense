@@ -1149,6 +1149,7 @@ export default function CameraTrackingPage() {
               <video
                 ref={trackingVideoRef}
                 className={`absolute inset-0 w-full h-full object-cover ${showInlineCalibration ? "pointer-events-none" : ""}`}
+                data-tracking-video="true"
                 playsInline
                 muted
                 autoPlay
