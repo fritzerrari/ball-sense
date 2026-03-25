@@ -196,13 +196,22 @@ export default function CameraTrackingPage() {
     setPhase("recording");
     setRecordingStartTime(Date.now());
     setFrameCount(0);
+    lastUploadedIndexRef.current = 0;
+    chunkIndexRef.current = 0;
     if (navigator.vibrate) navigator.vibrate(50);
 
     const countInterval = setInterval(() => {
       setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
-  }, [hasHighlights, isHelper]);
+
+    // Incremental delta upload every ~2.5 min (5 frames at 30s interval)
+    if (isHelper) {
+      deltaUploadRef.current = setInterval(() => {
+        uploadDelta();
+      }, 150000); // 2.5 minutes
+    }
+  }, [hasHighlights, isHelper, uploadDelta]);
 
   const handleSetupComplete = useCallback(async () => {
     await initCamera();
