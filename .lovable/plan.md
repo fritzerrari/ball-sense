@@ -1,137 +1,73 @@
 
+Ziel: Das System auf “echte, nachvollziehbare Daten” umstellen, Hänger eliminieren und den Prozess für 20s bis 90min robust machen.
 
-## Tiefenanalyse: Warum KPIs leer sind und Heatmaps falsch
+1) Harte Ursachen (aus Code + Logs)
+- Der Kamera-Screen zeigt weiterhin “Simulationsmodus aktiv” (`src/pages/CameraTrackingPage.tsx`), obwohl echte Erkennung erwartet wird → Vertrauensbruch.
+- `analyze-frame` hat für reale Läufe keine Logs; damit kommen Live-Detections nicht zuverlässig an.
+- Upload-Pipeline dupliziert Sessions: `camera-ops` schreibt pro Sync immer neue `tracking_uploads`-Rows, `process-tracking` verarbeitet alle Rows und zählt dieselbe Kamera mehrfach (z. B. “3 Kameras” bei nur Cam 0).
+- Kalibrierungs-Metadaten gehen verloren: `camera-ops save_calibration` speichert immer `coverage: full` + `field_rect: {0,0,1,1}` und ignoriert Teilausschnitt.
+- KPI/Status wirken “gleich”: Datenqualität wird aus einer UI-Formel berechnet (oft ~50%), nicht aus echten Pipeline-Kennzahlen; `frames_analyzed` wird nicht konsistent geschrieben.
+- Auto-Discovery erzeugt Platzhalter-Spieler und damit formal “Daten”, obwohl Qualität zu niedrig ist.
 
-### Identifizierte Kernprobleme (aus DB-Analyse)
+2) Umsetzungsplan (Hotfix + Umbau)
+A. Wahrheitsmodus (sofort)
+- Entferne Simulation-Badge/Banner in Tracking-UI.
+- Zeige stattdessen: “Echt-Erkennung aktiv” / “Keine Echt-Erkennung (Fallback: nur Aufnahme)”.
+- Wenn innerhalb von 8–10s kein erfolgreicher Frame-Call: klarer Fehlerzustand mit Handlung (“Kamera neu starten”, “Licht/Zoom prüfen”), kein stilles Weiterlaufen.
 
-**1. Alle taktischen KPIs sind 0 — Bug in `estimateTacticalStats`**
+B. Analyze-Frame Aufruf stabilisieren
+- `FootballTracker` Request robust machen: vollständige Header (`apikey` + `Authorization`), explizite Fehlercodes 402/429/500 nach UI durchreichen.
+- Detektions-Telemetrie je Lauf sammeln: `ai_total`, `ai_success`, `ai_fail`, `first_success_at_ms`.
+- Frontend-Guard: Tracking darf nur als “Echtdaten” gelten, wenn success-rate Mindestwert erreicht.
 
-Die Funktion hat einen Guard `if (positions.length < 5 || minutesPlayed < 1) return empty`. Bei kurzen Aufnahmen (26 Sekunden) ist `minutes_played = 0` (gerundet von 0.43), daher werden ALLE taktischen Stats (Paesse, Zweikampfe, Ballkontakte, Schuesse) sofort auf 0 gesetzt — obwohl Ballpositions-Daten vorhanden sind (`ball_detections_available: true`).
+C. Upload-/Processing-Entdoppelung
+- `camera-ops upload_tracking`: pro `match_id + camera_index + upload_mode` upsert/update statt immer insert.
+- `process-tracking`: Uploads vor Verarbeitung deduplizieren (neuester Datensatz je Kamera + Modus), Batch priorisieren gegenüber älteren Zwischenständen.
+- `cameras_used` aus eindeutigen `camera_index` berechnen, nicht aus `sessions.length`.
 
-**2. Fortschrittsanzeige zeigt 100% Datenqualitaet trotz "Vorlaeufig"**
+D. Kalibrierung korrekt persistieren
+- Frontend sendet bei `save_calibration` zusätzlich `field_rect`, `coverage_percent`, `coverage`, `detected_features`.
+- `camera-ops` speichert genau diese Werte (statt hardcoded full-field).
+- `tracking_uploads` erhält Kalibrierungs-Snapshot pro Upload; `process-tracking` nutzt diesen statt heuristischem Dauer-Override.
 
-`processing_progress.progress = 100` (= Verarbeitung abgeschlossen) wird als `actualProgress` an die `AnalysisStatusBanner` uebergeben. Die Banner-Logik zeigt dann "Datenqualitaet 100%" — aber das ist die PROCESSING-Fortschritt, nicht die DATEN-Qualitaet. Bei 39% Feldabdeckung sollte die Qualitaet ~39% sein, nicht 100%.
+E. KPI-Qualitätsgates statt Scheinwerte
+- In `process-tracking` Mindestqualitätsprüfung:
+  - zu wenige person-detections / zu wenig valide Frames / extrem niedrige assignment confidence → “insufficient_data” statt Fake-KPI.
+- Auto-Discovery nur bei ausreichender Evidenz; sonst keine Platzhalter-Stats.
+- Fouls/Karten/Tore weiterhin ausschließlich aus Match-Events (bereits korrekt), plus deutlicher Hinweis im Report.
 
-**3. `analyze-frame` Edge Function hat NULL Logs**
+F. Progress/Status korrekt trennen
+- `processing_progress` = technischer Pipeline-Fortschritt.
+- `data_quality` = separater, backend-berechneter Score (Coverage, Detection-Success-Rate, Assignment-Confidence, Frame-Dichte).
+- `MatchReport` und `AnalysisStatusBanner` nur noch backend-gelieferte Werte anzeigen, keine konstante Client-Schätzung.
 
-Das bedeutet: waehrend des Live-Trackings kommt kein einziger Frame-Analyse-Aufruf beim Server an. Moegliche Ursache: der `ANALYZE_FRAME_URL` im Client enthalt keinen API-Key/Authorization-Header. Die Edge Function erwartet das aber nicht explizit (kein Auth-Check), also ist es wahrscheinlicher ein CORS- oder URL-Problem bei der Konfiguration.
+G. 20s- und 90min-Robustheit
+- 20s: keine Mindestminute als K.O.-Kriterium, stattdessen framebasiert.
+- 90min: inkrementelle Verarbeitung in stabilen Blöcken, finaler Run nur auf neuen Daten; keine Mehrfachverarbeitung gleicher Chunks.
 
-**4. Heatmaps basieren auf nur 26 Frames mit 39% Abdeckung**
+3) Betroffene Dateien
+- `src/pages/CameraTrackingPage.tsx`
+- `src/lib/football-tracker.ts`
+- `src/pages/MatchReport.tsx`
+- `src/components/AnalysisStatusBanner.tsx`
+- `supabase/functions/camera-ops/index.ts`
+- `supabase/functions/process-tracking/index.ts`
+- optional: `supabase/functions/stream-tracking/index.ts` (Chunk-Zähler/Konsistenz)
 
-Die Detections kommen zwar an (15 Tracks erkannt), aber die Dichte ist extrem gering. Dazu werden alle Tracks mit `assignment_confidence: 0.1` (minimaler Wert) zugeordnet — die Zuordnung ist also fast zufaellig.
+4) Technische Details (konkret)
+- Dedupe-Key Uploads: `(match_id, camera_index, upload_mode)`; immer neueste Nutzlast.
+- Quality-Gates im Backend:
+  - `valid_frames >= N`
+  - `avg_assignment_confidence >= X`
+  - `ai_success_rate >= Y`
+  - sonst `processing_progress.phase = "quality_warning"` + UI-Hinweis.
+- Team/Player-Stats nur schreiben, wenn Gate erfüllt; sonst Report-Block “Nicht genug verlässliche Daten”.
+- `raw_metrics` standardisieren: `frames_analyzed`, `ai_success_rate`, `coverage_ratio`, `assignment_confidence_avg`, `data_quality_score`.
 
-**5. Zwei separate Konzepte werden vermischt: Processing-Progress vs. Daten-Qualitaet**
-
-Der User sieht "100% Datenqualitaet" + "WIRD KORRIGIERT" + "39% Feld" gleichzeitig — das ist widersprüchlich und verwirrend.
-
----
-
-### Loesung
-
-#### Fix 1: `minutesPlayed`-Guard in `estimateTacticalStats` reparieren
-
-Statt `minutesPlayed < 1` → `positions.length < 5` als einzigen Guard nutzen. Die Funktion kann auch bei Aufnahmen unter 1 Minute sinnvolle Proximity-Heuristiken berechnen, wenn genuegend Positionen vorhanden sind.
-
-**Datei**: `supabase/functions/process-tracking/index.ts` (Zeile 332)
-
-#### Fix 2: Datenqualitaet ≠ Processing-Progress trennen
-
-Neue Logik: Datenqualitaet = `coverageRatio * confidence * dataDensity`. Nicht mehr `processing_progress.progress` als `actualProgress` uebergeben. Stattdessen einen separaten `dataQuality`-Wert berechnen:
-- Coverage-Ratio (39% in diesem Fall)
-- Durchschnittliche Assignment-Confidence
-- Frame-Dichte (Frames pro Minute)
-
-In `MatchReport.tsx`: den Progress-Balken aus coverage_ratio berechnen, NICHT aus processing_progress.
-
-**Dateien**: `src/pages/MatchReport.tsx`, `src/components/AnalysisStatusBanner.tsx`
-
-#### Fix 3: `analyze-frame` Aufruf debuggen und reparieren
-
-Der `ANALYZE_FRAME_URL` in `football-tracker.ts` wird nur aufgerufen, wenn der Tracker laeuft. Aber es gibt keine Logs — das heisst der Aufruf scheitert still. Moegliche Ursachen:
-- Der Aufruf hat keinen Authorization-Header → Edge Function braucht keinen (kein Auth-Check im Code), aber die Supabase-Gateway koennte ihn blocken wenn `verify_jwt` nicht auf `false` steht
-- Die URL wird falsch zusammengesetzt wenn `VITE_SUPABASE_URL` leer ist
-
-Pruefen und fixen: `verify_jwt = false` in config.toml fuer `analyze-frame` sicherstellen + Anon-Key als Authorization-Header mitsenden.
-
-**Dateien**: `src/lib/football-tracker.ts`, `supabase/config.toml`
-
-#### Fix 4: `minutes_played` bei kurzen Aufnahmen korrekt berechnen
-
-Statt `Math.round(durationMs / 60000)` (= 0 bei 26s) → `Math.max(1, Math.round(durationMs / 60000))` oder Dezimalwert verwenden: `Math.round(durationMs / 6000) / 10` (= 0.4 min).
-
-**Datei**: `supabase/functions/process-tracking/index.ts`
-
-#### Fix 5: Datenqualitaets-Indikator richtig berechnen
-
-Neuer Qualitaetswert im Processing-Output:
-```
-data_quality = min(100, round(
-  coverageRatio * 40 +
-  (assignedPlayers / expectedPlayers) * 30 +
-  min(1, framesPerMinute / 60) * 30
-))
-```
-
-Dieser Wert wird im Banner als "Datenqualitaet" angezeigt statt der Processing-Progress.
-
----
-
-### Technische Details
-
-**estimateTacticalStats Guard-Fix (process-tracking):**
-```typescript
-// ALT: if (positions.length < 5 || minutesPlayed < 1) return empty;
-// NEU: nur Positionsanzahl pruefen, nicht Spielzeit
-if (positions.length < 5) return empty;
-```
-
-**minutes_played Fix:**
-```typescript
-// ALT: minutes_played: Math.round(durationMs / 60000),
-// NEU: Mindestens 1 Minute, damit Downstream-Logik nicht bricht
-minutes_played: Math.max(1, Math.round(durationMs / 60000)),
-```
-
-**Datenqualitaet statt Processing-Progress (MatchReport.tsx):**
-```typescript
-const dataQuality = Math.round(
-  coverageRatio * 40 +
-  Math.min(1, (playerStats?.length ?? 0) / 14) * 30 +
-  Math.min(1, (framesAnalyzed ?? 0) / 100) * 30
-);
-
-<AnalysisStatusBanner
-  actualProgress={dataQuality}  // statt processing_progress.progress
-  ...
-/>
-```
-
-**analyze-frame Auth-Header (football-tracker.ts):**
-```typescript
-const resp = await fetch(ANALYZE_FRAME_URL, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
-  },
-  body: JSON.stringify({ imageBase64, matchId, cameraIndex }),
-});
-```
-
-### Dateien
-
-| Datei | Aenderung |
-|-------|-----------|
-| `supabase/functions/process-tracking/index.ts` | minutesPlayed Guard fix, minutes_played min 1, dataQuality Output |
-| `src/lib/football-tracker.ts` | apikey Header bei analyze-frame Aufruf |
-| `src/pages/MatchReport.tsx` | dataQuality berechnen statt processing_progress |
-| `src/components/AnalysisStatusBanner.tsx` | Label "Datenqualitaet" korrekt anzeigen |
-| `supabase/config.toml` | verify_jwt = false fuer analyze-frame pruefen |
-
-### Prioritaet
-
-1. minutesPlayed Guard + minutes_played Fix (sofort — behebt leere KPIs)
-2. analyze-frame Auth-Header (ohne das kommt keine echte AI-Analyse an)
-3. Datenqualitaet vs Processing-Progress trennen
-4. dataQuality-Formel implementieren
-
+5) Abnahme (muss erfüllt sein)
+- Kameraansicht zeigt nirgends “Simulation”.
+- `analyze-frame` Logs sind bei Tracking-Lauf sichtbar (mehrere Calls pro Minute).
+- Ein 20s-Clip liefert entweder belastbare Basis-KPIs oder klaren “insufficient_data”-Status (kein 0%-Fake-Dashboard).
+- Ein 90min-Lauf bleibt verarbeitbar ohne Hänger; Progress bewegt sich match-spezifisch.
+- `cameras_used` stimmt mit real verbundenen Kameras überein.
+- Heatmap stimmt räumlich mit sichtbarem Spielfeldausschnitt und Kalibrierung überein.
