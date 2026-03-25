@@ -1,79 +1,75 @@
 
 
-# Status-Analyse & Optimierungsplan
+# Spielzug-Animation: Was geht, was fehlt
 
-## Was funktioniert (stabile Basis)
+## Aktuelle Datenlage
 
-1. **Frame-Capture Pipeline** — `frame-capture.ts` extrahiert alle 30s JPEG-Frames (640px, JPEG 0.6). ~50KB/Frame statt GB-Video.
-2. **Dual-Stage Analysis** — `analyze-match` (Gemini Vision) → `generate-insights` (Gemini Text), entkoppelt via client-seitigen Trigger.
-3. **Frame Persistence** — Frames in `match-frames` Storage Bucket, ermöglicht Retry und Reprocess.
-4. **Reprocess Cleanup** — Alte `analysis_results`, `report_sections`, `training_recommendations` werden vor Neuanalyse gelöscht.
-5. **Error Handling** — Beide Edge Functions setzen Job auf `failed` bei Fehlern. Storage-Cleanup nach Erfolg.
-6. **Halftime Analysis** — `getSnapshot()` erlaubt Zwischenanalyse ohne Aufnahme zu stoppen.
-7. **Dashboard** — Quick Stats, letzte Matches mit Status-Links, Trainingsempfehlungen.
-8. **Matches-Seite** — Processing-Banner verlinken zur ProcessingPage. Filter, Suche, Sortierung.
-9. **Onboarding** — 5-Schritt-Flow (Verein, Kader, Spielfeld, Install, Fertig) existiert bereits.
-10. **Auth, Navigation, i18n, Theme** — stabil.
+Die `analyze-match` Edge Function extrahiert aktuell **keine Spielerpositionen pro Frame**. Die Gemini-Vision-Analyse liefert nur:
+- `match_structure` (Dominanz, Tempo, Phasen)
+- `danger_zones` (Angriffs-/Schwachzonen links/mitte/rechts)
+- `chances` (Anzahl Chancen)
+- `ball_loss_patterns` (Zone + Beschreibung)
 
-## Was fehlt / optimiert werden kann
+Das sind **aggregierte taktische Aussagen**, keine Frame-für-Frame-Positionsdaten. Für eine animierte Spielzug-Grafik fehlt die entscheidende Ebene: **x,y-Koordinaten von Spielern und Ball pro Zeitpunkt**.
 
-### Bugs / Robustheit
+## Was technisch möglich ist
 
-1. **`analyze-match` catch-Block setzt Job nicht auf `failed`** — Zeile 275-279: Bei unbehandelten Fehlern (z.B. JSON-Parse-Fehler bei Tool Call) wird nur eine 500 Response zurückgegeben, aber der Job bleibt auf `analyzing` stecken. Der User sieht ewig den Spinner.
+### Option A: KI-geschätzte Spielzüge (realistisch, sofort umsetzbar)
 
-2. **Halftime überschreibt Frames, aber alter Job bleibt** — Wenn Halftime-Analyse gestartet wird, wird ein neuer Job erstellt. Der alte Job (falls vorhanden) bleibt mit falschem Status. Kein Problem, aber `ProcessingPage` pollt den *neuesten* Job — das passt. Allerdings: wenn die Halftime-Analyse noch läuft und der User "Stoppen & Endanalyse" drückt, wird ein *weiterer* Job erstellt und die Frames überschrieben. Die Halftime-Analyse arbeitet dann mit veralteten Daten oder läuft ins Leere.
+Gemini Vision kann aus den Frame-Bildern **grobe Spielerpositionen schätzen** — nicht pixelgenau, aber gut genug für eine schematische Taktik-Animation. Der Prompt wird erweitert um:
 
-3. **`generate-insights` liest `analysis_results` per `job_id`** — Wenn bei Reprocess ein neuer Job erstellt wird, aber die alten Results gelöscht und neue mit dem neuen `job_id` gespeichert werden, funktioniert das. ABER: bei Halftime-Analyse → Endanalyse könnte es zu einer Race Condition kommen, wenn die Halftime `generate-insights` noch läuft während die Endanalyse schon neue Results schreibt.
+```
+Für jeden Frame: Schätze die ungefähren Positionen (x,y in Prozent des Spielfelds)
+von erkennbaren Spielern beider Teams und dem Ball.
+```
 
-4. **`training_recommendations` Query im Dashboard hat kein `club_id` Filter** — Doch, hat es (Zeile 44). Aber es fehlt eine Deduplizierung: wenn mehrere Matches analysiert wurden, kommen bis zu 5 Recs pro Match. Das Dashboard zeigt nur die neuesten 5 insgesamt, was korrekt ist.
+Das liefert pro Frame ~10-22 geschätzte Positionen. Daraus kann man:
+- **Spielzüge als animierte Pfade** auf dem SVG-Spielfeld zeichnen (Pfeile, Punkte die sich bewegen)
+- **Schlüsselszenen** (z.B. Angriffszüge, Ballverluste) als 5-10s Animationen darstellen
+- **Play/Pause/Scrub** Timeline im MatchReport
 
-### UX-Optimierungen
+Genauigkeit: ~70-80% bei guter Kameraposition. Reicht für taktische Muster, nicht für Laufwege-Statistiken.
 
-5. **Kein Feedback nach Halftime-Analyse** — User sieht "HZ-Analyse läuft" Badge, aber keinen Link zum Report. Er muss manuell zu `/matches/{id}` navigieren, um die Halbzeit-Ergebnisse zu sehen.
+### Option B: Computer Vision Tracking (präzise, aufwändig)
 
-6. **CameraTrackingPage hat keinen Link zum Report nach "done"** — Phase `done` zeigt nur "Weitere Aufnahme", aber keinen "Report ansehen" oder "Zur Analyse" Link.
+Echtes Player-Tracking mit YOLO/DeepSORT pro Frame. Braucht GPU-Backend, deutlich mehr Rechenzeit. Nicht im aktuellen Scope.
 
-7. **ProcessingPage zeigt keine Halbzeit-Ergebnisse** — Wenn eine Halbzeit-Analyse abgeschlossen wurde, zeigt die ProcessingPage nur den Status des letzten Jobs. Es gibt keinen Hinweis auf bereits verfügbare Halbzeit-Insights.
+## Umsetzungsplan (Option A)
 
-8. **NewMatch: `ageGroup` wird nie gespeichert** — Das Feld existiert im UI (Zeile 364-377) mit State (Zeile 30), wird aber beim `insert` in Zeile 62-76 nicht verwendet. Das `matches` Table hat kein `age_group` Feld.
+### Schritt 1: Analyse-Prompt erweitern
+- `analyze-match` Tool-Schema um `player_positions` Array erweitern
+- Pro Frame: Array von `{ team: "home"|"away", x: 0-100, y: 0-100, role?: string }`
+- Ball-Position separat: `{ x, y }` pro Frame
+- Gemini liefert das als Teil des `submit_analysis` Tool Calls
 
-9. **Matches-Seite: Searchbar nutzt `.includes()` statt `.indexOf()`** — Zeile 229: `searchValues.includes(query)` erfordert exakten Match, nicht Teilstring-Suche. "FC" findet nicht "FC Musterstadt".
+### Schritt 2: Positionen in DB speichern
+- Neuer `analysis_results` Eintrag mit `result_type: "frame_positions"`
+- `data`: Array mit Zeitstempel + Positionen pro Frame
 
-### Architektur
+### Schritt 3: Animierte Taktik-Komponente bauen
+- Neue Komponente `TacticalReplay.tsx`
+- SVG-basiert auf dem bestehenden `HeatmapField`-Spielfeld
+- Spieler als farbige Kreise (Heim/Gast), Ball als weißer Punkt
+- CSS-Animationen zwischen Frames (interpolierte Bewegung)
+- Timeline-Slider: Frame-für-Frame oder Auto-Play
+- Schlüsselszenen-Marker (z.B. "Angriff über links, Min 23")
 
-10. **`match-videos` Bucket und `match_videos` Tabelle sind Altlasten** — Werden nirgendwo mehr befüllt. Der neue Flow nutzt `match-frames` Bucket, nicht `match-videos`.
-
-11. **`training_recommendations` fehlt in DB-Schema-Übersicht** — Tabelle wird verwendet, erscheint aber nicht in den RLS-Policies. `generate-insights` nutzt Service Role, also funktioniert INSERT. Aber SELECT muss per RLS erlaubt sein (via club_id). Muss geprüft werden.
-
-12. **Keine Benachrichtigung wenn Report fertig** — `notifications` Tabelle existiert, wird aber von `generate-insights` nicht befüllt. User erfährt nur durch Polling, dass der Report fertig ist.
-
----
-
-## Umsetzungsplan
-
-### Schritt 1: Kritische Bugfixes
-- **`analyze-match` catch-Block**: Job auf `failed` setzen mit Error-Message im generischen catch-Block
-- **Halftime Race Condition**: Vor dem Stoppen prüfen ob Halftime-Job noch läuft, ggf. warten oder canceln
-- **Matches-Suche**: `.includes(query)` → `.indexOf(query) >= 0` für Teilstring-Suche
-
-### Schritt 2: UX-Verbesserungen  
-- **CameraTrackingPage "done"**: Link zur ProcessingPage (`/matches/{id}/processing`) hinzufügen
-- **Halftime-Report-Link**: Nach erfolgreicher Halftime-Analyse einen "Ergebnisse ansehen" Link einblenden
-- **Benachrichtigung erstellen**: In `generate-insights` nach Erfolg eine Notification in die `notifications` Tabelle schreiben
-- **`ageGroup` entfernen oder speichern**: Entweder Feld aus UI entfernen oder `age_group` Spalte zur `matches` Tabelle hinzufügen
-
-### Schritt 3: Cleanup
-- **`match-videos` Bucket und `match_videos` Tabelle**: Nicht löschen (Migration-Risiko), aber im Code als deprecated markieren
-- **`supabase/config.toml`**: Legacy Function-Einträge entfernen (`analyze-performance`, `process-tracking`, `detect-field-corners`, `cleanup-highlights`) — Moment, die wurden bereits gelöscht. Config prüfen.
+### Schritt 4: In MatchReport integrieren
+- Neue Sektion "Spielzug-Replay" zwischen Coaching-Insights und Trainingsempfehlungen
+- Dropdown für erkannte Schlüsselszenen
+- Play/Pause Button + Geschwindigkeitsregler
 
 ### Betroffene Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `supabase/functions/analyze-match/index.ts` | catch-Block: Job auf `failed` setzen |
-| `supabase/functions/generate-insights/index.ts` | Notification erstellen nach Erfolg |
-| `src/pages/CameraTrackingPage.tsx` | Link zum Report/Processing nach "done" |
-| `src/pages/Matches.tsx` | Suche: Teilstring-Match statt exakt |
-| `src/pages/NewMatch.tsx` | `ageGroup` UI entfernen (kein DB-Feld) |
-| Migration (optional) | `age_group` Spalte zu `matches` hinzufügen, falls gewünscht |
+| `supabase/functions/analyze-match/index.ts` | Tool-Schema um `player_positions` erweitern |
+| `src/components/TacticalReplay.tsx` | Neue animierte Spielfeld-Komponente |
+| `src/pages/MatchReport.tsx` | TacticalReplay-Sektion einbauen |
+
+### Einschränkungen (transparent kommunizieren)
+- Positionen sind KI-Schätzungen, keine exakten Messwerte
+- Bei schlechter Kameraqualität oder Weitwinkel sinkt die Genauigkeit
+- Maximal ~20 Frames = ~20 Zeitpunkte, dazwischen wird interpoliert
+- Spieler-Identifikation (wer ist wer) ist unzuverlässig — nur Team-Zuordnung
 
