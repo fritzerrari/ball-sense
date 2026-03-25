@@ -23,6 +23,7 @@ export function Footer() {
             <ul className="space-y-2.5 text-xs text-muted-foreground">
               <li><a href="#features" className="hover:text-foreground transition-colors">{t("landing.features")}</a></li>
               <li><a href="#pricing" className="hover:text-foreground transition-colors">{t("landing.pricing")}</a></li>
+              <li><Link to="/compare" className="hover:text-foreground transition-colors">{t("compare.title")}</Link></li>
               <li><a href="#faq" className="hover:text-foreground transition-colors">{t("landing.faq")}</a></li>
             </ul>
           </div>
