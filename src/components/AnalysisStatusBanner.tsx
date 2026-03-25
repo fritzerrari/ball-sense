@@ -106,7 +106,7 @@ export function AnalysisStatusBanner({ stage, coverageRatio = 1, isExtrapolated 
         )}
         {playerCount !== undefined && (
           <div className="flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] text-muted-foreground">
-            {playerCount} Spieler erkannt
+            {playerCount > 32 ? `${playerCount} Tracks (unrealistisch)` : `${playerCount} Spieler zugeordnet`}
           </div>
         )}
         {framesAnalyzed !== undefined && (
