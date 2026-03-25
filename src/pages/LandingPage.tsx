@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Play, ArrowDown } from "lucide-react";
+import { ChevronRight, Play, ArrowDown, Smartphone, Zap, Shield, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -19,11 +19,12 @@ import { TransparencySection } from "@/components/landing/TransparencySection";
 import { Footer } from "@/components/landing/Footer";
 
 export default function LandingPage() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const de = language === "de";
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
-      {/* Nav — tighter, more confident */}
+      {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
           <Link to="/" className="font-display text-lg font-bold tracking-tight flex items-center gap-1.5">
@@ -34,8 +35,8 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-6">
             <a href="#how-it-works" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">{t("landing.howItWorks")}</a>
             <a href="#features" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">{t("landing.features")}</a>
+            <a href="#demo" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">Demo</a>
             <a href="#pricing" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">{t("landing.pricing")}</a>
-            <a href="#faq" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">{t("landing.faq")}</a>
           </div>
           <div className="flex items-center gap-2">
             <LanguageToggle />
@@ -50,48 +51,59 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero — Asymmetric Split Layout */}
-      <section className="relative pt-24 pb-12 md:pt-28 md:pb-20 overflow-hidden min-h-[90vh] flex items-center">
-        {/* Background texture */}
+      {/* Hero — Bold, emotional */}
+      <section className="relative pt-24 pb-8 md:pt-28 md:pb-16 overflow-hidden min-h-[92vh] flex items-center">
         <div className="absolute inset-0 field-grid opacity-[0.04]" />
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/[0.03] to-transparent" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/[0.04] rounded-full blur-[100px]" />
+        <div className="absolute top-0 right-0 w-2/3 h-full bg-gradient-to-l from-primary/[0.04] to-transparent" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-primary/[0.06] rounded-full blur-[120px]" />
+        <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-primary/[0.03] rounded-full blur-[80px]" />
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
-            {/* Left — Text */}
             <div className="max-w-xl">
-              {/* Beta tag */}
+              {/* Beta badge */}
               <motion.div
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-[11px] font-semibold mb-6 font-display"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-semibold mb-6 font-display"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                {t("landing.betaTag")}
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                {de ? "Early Access — Jetzt kostenlos testen" : "Early Access — Try free now"}
               </motion.div>
 
               {/* Headline */}
               <motion.h1
-                className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold tracking-tight mb-5 font-display leading-[1.08]"
+                className="text-4xl md:text-5xl lg:text-[3.75rem] font-bold tracking-tight mb-6 font-display leading-[1.06]"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.1 }}
               >
-                {t("landing.heroLine1")}
-                <br />
-                <span className="gradient-text">{t("landing.heroLine2")}</span>
+                {de ? (
+                  <>
+                    Dein Spiel.<br />
+                    <span className="gradient-text">Deine Daten.</span><br />
+                    Dein Vorteil.
+                  </>
+                ) : (
+                  <>
+                    Your match.<br />
+                    <span className="gradient-text">Your data.</span><br />
+                    Your edge.
+                  </>
+                )}
               </motion.h1>
 
               {/* Subhead */}
               <motion.p
-                className="text-base text-muted-foreground mb-8 leading-relaxed max-w-md"
+                className="text-lg text-muted-foreground mb-8 leading-relaxed max-w-md"
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.25 }}
               >
-                {t("landing.heroDesc2")}
+                {de
+                  ? "Smartphone aufstellen. KI analysiert Taktik, Pressing und Schwachstellen. Coaching-Report in Minuten — nicht Stunden."
+                  : "Set up your smartphone. AI analyzes tactics, pressing and weaknesses. Coaching report in minutes — not hours."}
               </motion.p>
 
               {/* CTAs */}
@@ -110,30 +122,28 @@ export default function LandingPage() {
                 <Button variant="heroOutline" size="lg" asChild>
                   <a href="#demo">
                     <Play className="mr-1 h-3.5 w-3.5" />
-                    {t("landing.seeDemo")}
+                    {de ? "Live-Demo testen" : "Try live demo"}
                   </a>
                 </Button>
               </motion.div>
 
-              {/* Social proof line */}
+              {/* Proof points */}
               <motion.div
-                className="mt-8 flex items-center gap-4 text-xs text-muted-foreground"
+                className="mt-10 grid grid-cols-3 gap-4"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6, duration: 0.5 }}
               >
-                <div className="flex -space-x-2">
-                  {[
-                    "bg-primary/20 text-primary",
-                    "bg-accent/20 text-accent",
-                    "bg-warning/20 text-foreground",
-                  ].map((cls, i) => (
-                    <div key={i} className={`w-7 h-7 rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold ${cls}`}>
-                      {["FC", "SV", "SC"][i]}
-                    </div>
-                  ))}
-                </div>
-                <span>{t("landing.trustClubs")}</span>
+                {[
+                  { icon: Smartphone, text: de ? "1 Smartphone reicht" : "1 smartphone is enough" },
+                  { icon: Zap, text: de ? "Report in ~2 Min" : "Report in ~2 min" },
+                  { icon: Shield, text: de ? "DSGVO-konform" : "GDPR compliant" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <item.icon className="h-4 w-4 text-primary shrink-0" />
+                    <span className="font-medium">{item.text}</span>
+                  </div>
+                ))}
               </motion.div>
             </div>
 
@@ -145,7 +155,7 @@ export default function LandingPage() {
 
           {/* Scroll indicator */}
           <motion.div
-            className="hidden md:flex justify-center mt-16"
+            className="hidden md:flex justify-center mt-12"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 2, duration: 0.5 }}
@@ -162,30 +172,49 @@ export default function LandingPage() {
 
       <KeyNumbers />
       <WhyFieldIQ />
-      <TransparencySection />
-      <DemoSection />
       <HowItWorks />
+      <TransparencySection />
       <AnalyticsShowcase />
+      <DemoSection />
       <FeatureCards />
       <TrustSection />
       <PricingSection />
       <FAQSection />
 
-      {/* Final CTA — less padding, tighter */}
-      <section className="py-20 md:py-28 relative overflow-hidden">
+      {/* Final CTA */}
+      <section className="py-24 md:py-36 relative overflow-hidden">
         <div className="absolute inset-0 field-grid opacity-[0.04]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/[0.04] rounded-full blur-[100px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/[0.06] rounded-full blur-[120px]" />
         <div className="container mx-auto px-4 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl md:text-5xl font-bold font-display mb-4">{t("landing.finalCtaTitle")}</h2>
-            <p className="text-muted-foreground mb-8 max-w-md mx-auto">{t("landing.finalCtaDesc")}</p>
+            <motion.div
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-semibold mb-6"
+              initial={{ scale: 0.9 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+            >
+              <Trophy className="h-3.5 w-3.5" />
+              {de ? "30 Tage kostenlos — keine Kreditkarte" : "30 days free — no credit card"}
+            </motion.div>
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold font-display mb-5 leading-tight">
+              {de ? (
+                <>Bereit, dein Team<br /><span className="gradient-text">besser zu machen?</span></>
+              ) : (
+                <>Ready to make<br /><span className="gradient-text">your team better?</span></>
+              )}
+            </h2>
+            <p className="text-muted-foreground mb-8 max-w-lg mx-auto text-base">
+              {de
+                ? "Nächstes Spiel, nächste Chance. Starte jetzt und sieh, was deine KI über dein Team herausfindet."
+                : "Next match, next chance. Start now and see what AI discovers about your team."}
+            </p>
             <Button variant="hero" size="xl" asChild>
               <Link to="/login">
-                {t("landing.finalCtaBtn")}
+                {de ? "Jetzt kostenlos starten" : "Start free now"}
                 <ChevronRight className="ml-1 h-5 w-5" />
               </Link>
             </Button>
