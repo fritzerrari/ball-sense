@@ -433,6 +433,50 @@ function DashboardState({ onReload, de }: { onReset: () => void; onReload: () =>
             </div>
           </div>
 
+          {/* Opponent History Profile */}
+          <div className="rounded-2xl border border-accent/30 bg-card/50 p-4 overflow-hidden">
+            <div className="h-1 -mx-4 -mt-4 mb-4 bg-gradient-to-r from-accent to-primary/50" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-accent-foreground" />
+                <span className="text-sm font-semibold font-display">{de ? "Gegner-Profil: SV Beispielburg" : "Opponent Profile: SV Beispielburg"}</span>
+              </div>
+              <span className="text-[9px] bg-accent/10 text-accent-foreground px-2 py-0.5 rounded-full border border-accent/30">
+                {de ? "3 Spiele analysiert" : "3 matches analyzed"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+              {[
+                { label: de ? "Bilanz" : "Record", value: "2S / 0U / 1N", sub: de ? "67% Siegquote" : "67% win rate", color: "text-primary" },
+                { label: de ? "⌀ Tore" : "⌀ Goals", value: "2.3 : 1.0", sub: de ? "Erzielt : Kassiert" : "Scored : Conceded" },
+                { label: de ? "⌀ Ballbesitz" : "⌀ Possession", value: "56%", sub: de ? "Eigener Durchschnitt" : "Own average" },
+                { label: de ? "Angriffsseite" : "Attack side", value: de ? "Rechts" : "Right", sub: de ? "Stärkste Seite" : "Strongest side" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-xl border border-border/50 bg-muted/30 p-2.5">
+                  <p className="text-[9px] uppercase tracking-widest text-muted-foreground">{s.label}</p>
+                  <p className={`text-sm font-bold font-display mt-0.5 ${s.color ?? ""}`}>{s.value}</p>
+                  <p className="text-[9px] text-muted-foreground">{s.sub}</p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 mb-3">
+              <p className="text-[10px] font-semibold text-destructive mb-1">{de ? "Schwachstellen bei Spielen gegen diesen Gegner" : "Weaknesses in matches against this opponent"}</p>
+              <div className="space-y-1">
+                {[
+                  de ? "Linke Defensivseite in der 2. Halbzeit anfällig" : "Left defensive side vulnerable in 2nd half",
+                  de ? "Konterabsicherung nach Ballverlusten im Aufbau" : "Counter protection after build-up ball losses",
+                ].map((w) => (
+                  <p key={w} className="text-[10px] text-foreground/80 flex items-start gap-1.5">
+                    <span className="text-destructive/60 mt-0.5">•</span>{w}
+                  </p>
+                ))}
+              </div>
+            </div>
+            <p className="text-[9px] text-muted-foreground text-center">
+              {de ? "Basiert ausschließlich auf eigenen Spieldaten — keine externen Quellen." : "Based exclusively on your own match data — no external sources."}
+            </p>
+          </div>
+
           {/* KI Insights */}
           <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-4">
             <div className="flex items-center gap-2 mb-3">

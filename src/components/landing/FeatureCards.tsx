@@ -141,8 +141,8 @@ export function FeatureCards() {
       icon: Eye,
       title: language === "de" ? "Gegner-Scouting" : "Opponent scouting",
       desc: language === "de"
-        ? "Analysiere den Gegner aus früheren Spielen: Bevorzugte Angriffsseite, Pressing-Verhalten, Schwachstellen — automatischer Scouting-Report mit Taktik-Empfehlung."
-        : "Analyze opponents from previous matches: Preferred attack side, pressing behavior, weaknesses — automatic scouting report with tactical recommendations.",
+        ? "Automatisches Gegner-Profil aus deinen eigenen Spielen: Bilanz, Siegquote, bevorzugte Angriffsseite, Schwachstellen und taktische Empfehlungen — ohne fremde Daten. Je mehr Spiele, desto präziser."
+        : "Automatic opponent profile from your own matches: record, win rate, preferred attack side, weaknesses and tactical recommendations — no external data. More matches = more precision.",
       span: "sm:col-span-2",
       accent: "from-primary/20 to-primary/5",
     },
