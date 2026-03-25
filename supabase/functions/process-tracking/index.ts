@@ -1225,8 +1225,8 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           data_source: "fieldiq",
           raw_metrics: {
             tracked_player_count: fieldTracks.length,
-            cameras_used: sessions.length,
-            camera_indices: [...cameraContributions.keys()],
+            cameras_used: actualCamerasUsed,
+            camera_indices: [...uniqueCameraIndices],
             raw_tracks_only: true,
             coverage_ratio: coverageRatio,
             extrapolated: needsExtrapolation,
@@ -1367,7 +1367,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       status: "done",
       processing_progress: {
         phase: "complete", progress: 100,
-        detail: `${stageLabel} · ${totalStatsCount} Spieler · ${sessions.length} Kamera(s)`,
+        detail: `${stageLabel} · ${totalStatsCount} Spieler · ${actualCamerasUsed} Kamera(s)`,
         analysis_stage: analysisStage,
         total_tracks: trackProfiles.length,
         field_tracks: trackProfiles.filter(t => t.sidelineRatio < 0.45).length,
@@ -1375,7 +1375,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
         updated_at: new Date().toISOString(),
       },
     }).eq("id", matchId);
-    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${totalStatsCount} stats (${playerStats.length} assigned + fallback), ${sessions.length} camera(s), ${trackProfiles.length} tracks`);
+    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${totalStatsCount} stats (${playerStats.length} assigned + fallback), ${actualCamerasUsed} camera(s), ${trackProfiles.length} tracks`);
   } catch (err) {
     console.error("[process-tracking] Error:", err);
     await updateProgress("error", 0, err instanceof Error ? err.message : "Verarbeitung fehlgeschlagen");
