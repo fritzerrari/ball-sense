@@ -84,7 +84,10 @@ export default function RecordingGuard({ isRecording, frameCount, onVisibilityLo
 }
 
 /** Minimum frames required before stop is allowed */
-export const MIN_FRAMES_FOR_ANALYSIS = 5;
+export const MIN_FRAMES_FOR_ANALYSIS = 20;
+
+/** Recommended frames for good analysis (~full half) */
+export const RECOMMENDED_FRAMES = 30;
 
 /** Check if we have enough frames */
 export function canStopRecording(frameCount: number): boolean {

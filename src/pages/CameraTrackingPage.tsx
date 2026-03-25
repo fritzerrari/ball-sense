@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
 import { startVideoRecorder, type VideoRecorderHandle } from "@/lib/video-recorder";
-import RecordingGuard, { canStopRecording } from "@/components/RecordingGuard";
+import RecordingGuard, { canStopRecording, MIN_FRAMES_FOR_ANALYSIS, RECOMMENDED_FRAMES } from "@/components/RecordingGuard";
 import CameraSetupOverlay from "@/components/CameraSetupOverlay";
 import StopConfirmDialog from "@/components/StopConfirmDialog";
 import MatchEventQuickBar from "@/components/MatchEventQuickBar";
@@ -16,11 +16,21 @@ import CameraCodeEntry from "@/components/CameraCodeEntry";
 
 type Phase = "code" | "setup" | "ready" | "recording" | "analyzing" | "done";
 
+/** Check if user is authenticated */
+function useIsAuthenticated() {
+  const [isAuth, setIsAuth] = useState<boolean | null>(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setIsAuth(!!data.session?.user);
+    });
+  }, []);
+  return isAuth;
+}
+
 export default function CameraTrackingPage() {
   const { id: matchIdParam } = useParams();
   const [searchParams] = useSearchParams();
 
-  // If no matchId in URL, start with code entry phase
   const [phase, setPhase] = useState<Phase>(matchIdParam ? "setup" : "code");
   const [matchId, setMatchId] = useState<string | null>(matchIdParam ?? null);
   const [sessionToken, setSessionToken] = useState(searchParams.get("token") ?? "");
@@ -36,6 +46,9 @@ export default function CameraTrackingPage() {
   const videoRecorderRef = useRef<VideoRecorderHandle | null>(null);
   const [recordingStartTime, setRecordingStartTime] = useState(0);
   const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
+
+  const isAuthenticated = useIsAuthenticated();
+  const isHelper = !!sessionToken && !isAuthenticated;
 
   const handleCodeSuccess = useCallback((data: { matchId: string; cameraIndex: number; sessionToken: string }) => {
     setMatchId(data.matchId);
@@ -69,7 +82,7 @@ export default function CameraTrackingPage() {
       }, 300);
     }
 
-    if (hasHighlights && streamRef.current) {
+    if (hasHighlights && !isHelper && streamRef.current) {
       videoRecorderRef.current = startVideoRecorder(streamRef.current);
     }
 
@@ -82,7 +95,7 @@ export default function CameraTrackingPage() {
       setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
-  }, [hasHighlights]);
+  }, [hasHighlights, isHelper]);
 
   const handleSetupComplete = useCallback(async () => {
     await initCamera();
@@ -91,6 +104,76 @@ export default function CameraTrackingPage() {
   const handleReadyStart = useCallback(() => {
     startRecording();
   }, [startRecording]);
+
+  // ── Upload frames via edge function (anonymous helper) ──
+  const uploadViaEdgeFunction = useCallback(async (
+    frames: string[],
+    durationSec: number,
+    phase: string,
+  ) => {
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          action: "upload-frames",
+          session_token: sessionToken,
+          match_id: matchId,
+          frames,
+          duration_sec: durationSec,
+          phase,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? "Upload fehlgeschlagen");
+    }
+    return res.json();
+  }, [sessionToken, matchId]);
+
+  // ── Upload frames directly (authenticated user) ──
+  const uploadDirect = useCallback(async (
+    frames: string[],
+    durationSec: number,
+    phaseStr: string,
+  ) => {
+    const framesJson = JSON.stringify({
+      frames,
+      duration_sec: durationSec,
+      phase: phaseStr,
+      captured_at: new Date().toISOString(),
+    });
+    await supabase.storage
+      .from("match-frames")
+      .upload(`${matchId}.json`, new Blob([framesJson], { type: "application/json" }), { upsert: true });
+
+    const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
+      match_id: matchId!,
+      status: "queued",
+      progress: 0,
+    }).select().single();
+    if (jobError) throw jobError;
+
+    await supabase.from("matches").update({ status: "processing" }).eq("id", matchId!);
+
+    const { error: fnError } = await supabase.functions.invoke("analyze-match", {
+      body: {
+        match_id: matchId,
+        job_id: job.id,
+        frames,
+        duration_sec: durationSec,
+        phase: phaseStr,
+      },
+    });
+    if (fnError) throw fnError;
+
+    return { job_id: job.id };
+  }, [matchId]);
 
   const triggerHalftimeAnalysis = useCallback(async () => {
     if (!matchId || !liveCaptureRef.current) return;
@@ -103,34 +186,11 @@ export default function CameraTrackingPage() {
 
     setHalftimeSending(true);
     try {
-      const framesJson = JSON.stringify({
-        frames: snapshot.frames,
-        duration_sec: snapshot.durationSec,
-        phase: "halftime",
-        captured_at: new Date().toISOString(),
-      });
-      await supabase.storage
-        .from("match-frames")
-        .upload(`${matchId}.json`, new Blob([framesJson], { type: "application/json" }), { upsert: true });
-
-      const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
-        match_id: matchId,
-        status: "queued",
-        progress: 0,
-      }).select().single();
-      if (jobError) throw jobError;
-
-      await supabase.from("matches").update({ status: "processing" }).eq("id", matchId);
-
-      supabase.functions.invoke("analyze-match", {
-        body: {
-          match_id: matchId,
-          job_id: job.id,
-          frames: snapshot.frames,
-          duration_sec: snapshot.durationSec,
-          phase: "halftime",
-        },
-      });
+      if (isHelper) {
+        await uploadViaEdgeFunction(snapshot.frames, snapshot.durationSec, "halftime");
+      } else {
+        await uploadDirect(snapshot.frames, snapshot.durationSec, "halftime");
+      }
 
       setHalftimeSent(true);
       if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
@@ -140,11 +200,11 @@ export default function CameraTrackingPage() {
     } finally {
       setHalftimeSending(false);
     }
-  }, [matchId]);
+  }, [matchId, isHelper, uploadViaEdgeFunction, uploadDirect]);
 
   const requestStop = useCallback(() => {
     if (!canStopRecording(frameCount)) {
-      toast.warning(`Mindestens 5 Frames nötig (aktuell: ${frameCount})`);
+      toast.warning(`Mindestens ${MIN_FRAMES_FOR_ANALYSIS} Frames nötig (aktuell: ${frameCount})`);
       return;
     }
     setShowStopConfirm(true);
@@ -173,38 +233,14 @@ export default function CameraTrackingPage() {
     setProgress(20);
 
     try {
-      const framesJson = JSON.stringify({
-        frames: captureResult.frames,
-        duration_sec: captureResult.durationSec,
-        phase: "full",
-        captured_at: new Date().toISOString(),
-      });
-      await supabase.storage
-        .from("match-frames")
-        .upload(`${matchId}.json`, new Blob([framesJson], { type: "application/json" }), { upsert: true });
-
       setProgress(40);
 
-      const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
-        match_id: matchId,
-        status: "queued",
-        progress: 0,
-      }).select().single();
-      if (jobError) throw jobError;
+      if (isHelper) {
+        await uploadViaEdgeFunction(captureResult.frames, captureResult.durationSec, "full");
+      } else {
+        await uploadDirect(captureResult.frames, captureResult.durationSec, "full");
+      }
 
-      await supabase.from("matches").update({ status: "processing" }).eq("id", matchId);
-
-      const { error: fnError } = await supabase.functions.invoke("analyze-match", {
-        body: {
-          match_id: matchId,
-          job_id: job.id,
-          frames: captureResult.frames,
-          duration_sec: captureResult.durationSec,
-          phase: "full",
-        },
-      });
-
-      if (fnError) throw fnError;
       setProgress(100);
       setPhase("done");
       if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
@@ -213,14 +249,16 @@ export default function CameraTrackingPage() {
       toast.error(err.message ?? "Analyse fehlgeschlagen");
       setPhase("setup");
     }
-  }, [matchId, sessionToken]);
+  }, [matchId, isHelper, uploadViaEdgeFunction, uploadDirect]);
 
-  // Code entry phase (no login required)
+  // Code entry phase
   if (phase === "code") {
     return <CameraCodeEntry onSuccess={handleCodeSuccess} />;
   }
 
   const showHalftimeButton = phase === "recording" && frameCount >= 3 && !halftimeSent;
+  const progressPct = Math.min(100, Math.round((frameCount / RECOMMENDED_FRAMES) * 100));
+  const elapsedMin = recordingStartTime ? Math.floor((Date.now() - recordingStartTime) / 60000) : 0;
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
@@ -255,13 +293,38 @@ export default function CameraTrackingPage() {
 
         {phase === "recording" && (
           <>
+            {/* Recording indicator */}
             <div className="absolute top-4 left-4 flex items-center gap-2 bg-destructive/90 rounded-full px-3 py-1.5">
               <div className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
               <span className="text-xs text-white font-medium">Aufnahme</span>
             </div>
-            <div className="absolute top-4 right-4 bg-black/60 rounded-full px-3 py-1.5">
-              <span className="text-xs text-white font-medium">{frameCount} Frames</span>
+
+            {/* Frame counter + progress */}
+            <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
+              <div className="bg-black/60 rounded-full px-3 py-1.5">
+                <span className="text-xs text-white font-medium">{frameCount} / {RECOMMENDED_FRAMES} Frames</span>
+              </div>
+              {elapsedMin > 0 && (
+                <div className="bg-black/40 rounded-full px-2 py-0.5">
+                  <span className="text-[10px] text-white/60">{elapsedMin} Min.</span>
+                </div>
+              )}
             </div>
+
+            {/* Frame progress bar */}
+            <div className="absolute top-14 left-4 right-4">
+              <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{
+                    width: `${progressPct}%`,
+                    backgroundColor: progressPct < 66 ? "rgb(245, 158, 11)" : "rgb(34, 197, 94)",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Halftime info */}
             {halftimeSent && (
               <div className="absolute bottom-4 left-4 flex flex-col gap-2">
                 <div className="flex items-center gap-2 bg-primary/90 rounded-full px-3 py-1.5">
@@ -274,12 +337,16 @@ export default function CameraTrackingPage() {
                 </Link>
               </div>
             )}
-            {hasHighlights && matchId && (
+
+            {/* Event quick bar — ALWAYS shown during recording */}
+            {matchId && (
               <div className="absolute bottom-4 right-4">
                 <MatchEventQuickBar
                   matchId={matchId}
                   recorderRef={videoRecorderRef}
                   recordingStartTime={recordingStartTime}
+                  sessionToken={isHelper ? sessionToken : undefined}
+                  highlightsEnabled={hasHighlights && !isHelper}
                 />
               </div>
             )}
@@ -327,7 +394,11 @@ export default function CameraTrackingPage() {
               disabled={!canStopRecording(frameCount)}
             >
               <Square className="h-5 w-5" />
-              {canStopRecording(frameCount) ? "Stoppen & Endanalyse" : `Noch ${5 - frameCount} Frames…`}
+              {canStopRecording(frameCount)
+                ? frameCount < RECOMMENDED_FRAMES
+                  ? `Früh stoppen (${frameCount}/${RECOMMENDED_FRAMES})`
+                  : "Stoppen & Endanalyse"
+                : `Noch ${MIN_FRAMES_FOR_ANALYSIS - frameCount} Frames…`}
             </Button>
           </>
         )}
