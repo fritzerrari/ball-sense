@@ -11,7 +11,7 @@ const plans = [
 ];
 
 export function PricingSection() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   return (
     <section id="pricing" className="py-24 md:py-36 relative overflow-hidden">
