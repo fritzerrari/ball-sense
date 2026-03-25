@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { useParams, Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import {
   ArrowLeft, Brain, Lightbulb, Target, Shield, Zap,
   ClipboardList, AlertTriangle, TrendingUp, Calendar,
@@ -14,6 +14,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
 
 const CATEGORY_ICONS: Record<string, typeof Target> = {
   offense: Target,
@@ -155,6 +157,7 @@ export default function MatchReport() {
   const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
   const chances = analysisResults.find(r => r.result_type === "chances");
   const matchStructure = analysisResults.find(r => r.result_type === "match_structure");
+  const framePositions = analysisResults.find(r => r.result_type === "frame_positions");
   const isProcessing = job?.status && !["complete", "failed"].includes(job.status);
   const hasReport = sections.length > 0;
 
@@ -316,6 +319,16 @@ export default function MatchReport() {
                   })}
                 </div>
               </div>
+            )}
+
+            {/* Tactical Replay */}
+            {framePositions?.data?.frames?.length > 0 && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <TacticalReplay
+                  frames={framePositions.data.frames}
+                  intervalSec={framePositions.data.interval_sec ?? 30}
+                />
+              </Suspense>
             )}
 
             {/* Danger Zones + Chances */}
