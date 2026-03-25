@@ -98,6 +98,7 @@ export default function CameraTrackingPage() {
   const [highlightClipCount, setHighlightClipCount] = useState(0);
   const [highlightsEnabled, setHighlightsEnabled] = useState(false);
   const [liveStats, setLiveStats] = useState<LiveSnapshot | null>(null);
+  const [aiStatsState, setAiStatsState] = useState<{ total: number; successful: number; errors: number }>({ total: 0, successful: 0, errors: 0 });
   const [lineupCounts, setLineupCounts] = useState<LineupCounts>({ home: 0, away: 0 });
   const [isPaused, setIsPaused] = useState(false);
   const [autoCalibAttempted, setAutoCalibAttempted] = useState(false);
