@@ -335,18 +335,18 @@ function DashboardState({ onReload, de }: { onReset: () => void; onReload: () =>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="bg-card/80 border-2 border-primary/30 shadow-lg shadow-primary/10 p-1.5 rounded-xl backdrop-blur-sm flex h-auto flex-wrap justify-start">
-          <TabsTrigger value="overview" className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
-            <Brain className="w-4 h-4" /> {de ? "Übersicht" : "Overview"}
+        <TabsList className="bg-card/80 border border-primary/20 shadow-sm p-1 rounded-xl backdrop-blur-sm grid grid-cols-4 w-full h-auto">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm gap-1.5 px-2 sm:px-4 py-2 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
+            <Brain className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">{de ? "Übersicht" : "Overview"}</span><span className="sm:hidden">{de ? "Übersicht" : "Overview"}</span>
           </TabsTrigger>
-          <TabsTrigger value="replay" className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
-            <Eye className="w-4 h-4" /> {de ? "Spielzug-Replay" : "Tactical Replay"}
+          <TabsTrigger value="replay" className="text-xs sm:text-sm gap-1.5 px-2 sm:px-4 py-2 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
+            <Eye className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">{de ? "Replay" : "Replay"}</span><span className="sm:hidden">Replay</span>
           </TabsTrigger>
-          <TabsTrigger value="training" className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
-            <Dumbbell className="w-4 h-4" /> {de ? "Trainingsplan" : "Training Plan"}
+          <TabsTrigger value="training" className="text-xs sm:text-sm gap-1.5 px-2 sm:px-4 py-2 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
+            <Dumbbell className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">{de ? "Training" : "Training"}</span><span className="sm:hidden">Training</span>
           </TabsTrigger>
-          <TabsTrigger value="report" className="text-sm gap-2 px-4 py-2.5 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
-            <FileText className="w-4 h-4" /> {de ? "KI-Berichte" : "AI Reports"}
+          <TabsTrigger value="report" className="text-xs sm:text-sm gap-1.5 px-2 sm:px-4 py-2 font-semibold rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
+            <FileText className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">{de ? "Berichte" : "Reports"}</span><span className="sm:hidden">{de ? "Report" : "Report"}</span>
           </TabsTrigger>
         </TabsList>
 
