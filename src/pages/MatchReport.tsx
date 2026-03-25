@@ -399,7 +399,7 @@ export default function MatchReport() {
               </Suspense>
             )}
 
-            {/* Opponent Scouting */}
+            {/* Opponent Scouting (AI-generated from current match) */}
             {opponentScouting && (() => {
               try {
                 const scoutData = JSON.parse(opponentScouting.content);
@@ -410,6 +410,13 @@ export default function MatchReport() {
                 );
               } catch { return null; }
             })()}
+
+            {/* Opponent History Profile (aggregated from past matches) */}
+            {opponentProfile && opponentProfile.matchCount >= 1 && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <OpponentHistoryProfile profile={opponentProfile} />
+              </Suspense>
+            )}
 
             {/* Danger Zones + Chances */}
             {(dangerZones || chances) && (
