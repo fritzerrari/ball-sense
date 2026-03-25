@@ -64,12 +64,20 @@ serve(async (req) => {
       progress: 10,
     }).eq("id", job_id);
 
-    // Get match info
+    // Get match info with field calibration data
     const { data: match } = await supabase
       .from("matches")
-      .select("*, fields(name, width_m, height_m)")
+      .select("*, fields(name, width_m, height_m, calibration)")
       .eq("id", match_id)
       .single();
+
+    // Extract calibration context for better analysis
+    const fieldCalibration = match?.fields?.calibration as any;
+    const coverage = fieldCalibration?.coverage ?? "full";
+    const fieldType = fieldCalibration?.field_type ?? "unknown";
+    const calibrationNote = coverage !== "full"
+      ? `\nWICHTIG: Die Kamera zeigt nur einen Teilausschnitt des Feldes (${coverage === "left_half" ? "linke Hälfte" : coverage === "right_half" ? "rechte Hälfte" : "individueller Ausschnitt"}). Positionsangaben normalisieren auf das GESAMTE Feld.`
+      : "";
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -104,7 +112,8 @@ Kontext:
 - ${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"}
 - Datum: ${match?.date ?? "unbekannt"}
 - Platzgröße: ${match?.fields?.width_m ?? 105}x${match?.fields?.height_m ?? 68}m
-- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten
+- Feldtyp: ${fieldType !== "unknown" ? fieldType : "Standard-Großfeld"}
+- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten${calibrationNote}
 
 Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Spielerverteilung und Formationen
@@ -112,8 +121,12 @@ Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Erkennbare Muster und Spielphasen
 - Ballpositionen und Druckzonen
 - Für JEDEN Frame: Schätze die ungefähren Positionen (x,y in 0-100% des Spielfelds) aller erkennbaren Spieler beider Teams und des Balls. x=0 ist die linke Torlinie, x=100 die rechte. y=0 oben, y=100 unten. Gib auch eine kurze Beschreibung der Szene pro Frame.
+- Für JEDEN Frame: Schätze den sichtbaren Feldausschnitt (visible_area). Wenn die Kamera geschwenkt oder gezoomt wurde, zeigen verschiedene Frames unterschiedliche Bereiche.
 
-WICHTIG: Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.`,
+WICHTIG: 
+- Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.
+- Wenn ein Frame eine Nahaufnahme zeigt (< 30% Feldabdeckung), markiere ihn als "detail" Frame.
+- Frames mit schlechter Qualität oder ohne erkennbares Spielfeld als "unusable" markieren.`,
       },
     ];
 
@@ -211,8 +224,18 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                     items: {
                       type: "object",
                       properties: {
-                        frame_index: { type: "integer", description: "0-based index of the frame" },
+                      frame_index: { type: "integer", description: "0-based index of the frame" },
                         label: { type: "string", description: "Short description of what happens in this frame, e.g. 'Angriff über links'" },
+                        frame_type: { type: "string", enum: ["tactical", "detail", "unusable"], description: "tactical = full field view, detail = close-up/zoom, unusable = blurry or no field visible" },
+                        visible_area: {
+                          type: "object",
+                          description: "Estimated visible portion of the pitch in this frame",
+                          properties: {
+                            description: { type: "string", description: "e.g. 'Full pitch', 'Left half + center', 'Penalty area close-up'" },
+                            estimated_coverage_pct: { type: "number", description: "Estimated percentage of total pitch visible (0-100)" },
+                          },
+                          required: ["description", "estimated_coverage_pct"],
+                        },
                         ball: {
                           type: "object",
                           properties: {
@@ -235,7 +258,7 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                           },
                         },
                       },
-                      required: ["frame_index", "ball", "players"],
+                      required: ["frame_index", "ball", "players", "frame_type", "visible_area"],
                     },
                   },
                   visual_quality: { type: "string", enum: ["good", "moderate", "poor"] },
