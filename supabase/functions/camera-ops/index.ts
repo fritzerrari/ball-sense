@@ -12,14 +12,108 @@ async function hashToken(token: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function getAdminClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+}
+
+async function validateSession(supabaseAdmin: any, sessionToken: string, matchId: string) {
+  const tokenHash = await hashToken(sessionToken);
+  const { data: session, error } = await supabaseAdmin
+    .from("camera_access_sessions")
+    .select("id, match_id, club_id, expires_at")
+    .eq("session_token_hash", tokenHash)
+    .eq("match_id", matchId)
+    .maybeSingle();
+
+  if (error || !session) return null;
+  if (new Date(session.expires_at) < new Date()) return null;
+
+  // Update last_used_at
+  await supabaseAdmin
+    .from("camera_access_sessions")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("id", session.id);
+
+  return session;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, session_token, match_id, ...payload } = await req.json();
+    const body = await req.json();
+    const { action, session_token, match_id, ...payload } = body;
 
+    const supabaseAdmin = getAdminClient();
+
+    // ── ACTION: send-command (trainer → helper, requires auth) ──
+    if (action === "send-command") {
+      const authHeader = req.headers.get("authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Authorization required" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { session_id, command } = payload;
+      if (!session_id || !command) {
+        return new Response(JSON.stringify({ error: "session_id and command required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Verify trainer belongs to same club as session
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("club_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const { data: session } = await supabaseAdmin
+        .from("camera_access_sessions")
+        .select("id, club_id")
+        .eq("id", session_id)
+        .maybeSingle();
+
+      if (!session || !profile || session.club_id !== profile.club_id) {
+        return new Response(JSON.stringify({ error: "Access denied" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await supabaseAdmin
+        .from("camera_access_sessions")
+        .update({ command })
+        .eq("id", session_id);
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // All other actions require session_token + match_id
     if (!session_token || !match_id) {
       return new Response(JSON.stringify({ error: "session_token and match_id required" }), {
         status: 400,
@@ -27,39 +121,51 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
-
-    // Validate session token
-    const tokenHash = await hashToken(session_token);
-    const { data: session, error: sessionError } = await supabaseAdmin
-      .from("camera_access_sessions")
-      .select("id, match_id, club_id, expires_at")
-      .eq("session_token_hash", tokenHash)
-      .eq("match_id", match_id)
-      .maybeSingle();
-
-    if (sessionError || !session) {
-      return new Response(JSON.stringify({ error: "Invalid session token" }), {
+    const session = await validateSession(supabaseAdmin, session_token, match_id);
+    if (!session) {
+      return new Response(JSON.stringify({ error: "Invalid or expired session" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (new Date(session.expires_at) < new Date()) {
-      return new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // ── ACTION: heartbeat ──
+    if (action === "heartbeat") {
+      const { phase, frame_count } = payload;
+      await supabaseAdmin
+        .from("camera_access_sessions")
+        .update({
+          last_used_at: new Date().toISOString(),
+          status_data: {
+            phase: phase ?? "unknown",
+            frame_count: frame_count ?? 0,
+            updated_at: new Date().toISOString(),
+          },
+        })
+        .eq("id", session.id);
 
-    // Update last_used_at
-    await supabaseAdmin
-      .from("camera_access_sessions")
-      .update({ last_used_at: new Date().toISOString() })
-      .eq("id", session.id);
+      // Return any pending command
+      const { data: current } = await supabaseAdmin
+        .from("camera_access_sessions")
+        .select("command")
+        .eq("id", session.id)
+        .maybeSingle();
+
+      const pendingCommand = current?.command ?? null;
+
+      // Clear command after reading
+      if (pendingCommand) {
+        await supabaseAdmin
+          .from("camera_access_sessions")
+          .update({ command: null })
+          .eq("id", session.id);
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, command: pendingCommand }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // ── ACTION: upload-frames ──
     if (action === "upload-frames") {
@@ -72,7 +178,10 @@ Deno.serve(async (req) => {
         });
       }
 
-      // 1. Upload frames JSON to storage
+      // Use phase in filename for halftime support
+      const suffix = phase && phase !== "full" ? `_${phase}` : "";
+      const filePath = `${match_id}${suffix}.json`;
+
       const framesJson = JSON.stringify({
         frames,
         duration_sec: duration_sec ?? 0,
@@ -80,21 +189,23 @@ Deno.serve(async (req) => {
         captured_at: new Date().toISOString(),
       });
 
+      console.log(`Uploading ${frames.length} frames (${(framesJson.length / 1024 / 1024).toFixed(2)} MB) to ${filePath}`);
+
       const { error: uploadError } = await supabaseAdmin.storage
         .from("match-frames")
-        .upload(`${match_id}.json`, new Blob([framesJson], { type: "application/json" }), {
+        .upload(filePath, new Blob([framesJson], { type: "application/json" }), {
           upsert: true,
         });
 
       if (uploadError) {
         console.error("Frame upload error:", uploadError);
-        return new Response(JSON.stringify({ error: "Frame upload failed" }), {
+        return new Response(JSON.stringify({ error: "Frame upload failed", detail: uploadError.message }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // 2. Create analysis job
+      // Create analysis job
       const { data: job, error: jobError } = await supabaseAdmin
         .from("analysis_jobs")
         .insert({ match_id, status: "queued", progress: 0 })
@@ -103,16 +214,16 @@ Deno.serve(async (req) => {
 
       if (jobError) {
         console.error("Job creation error:", jobError);
-        return new Response(JSON.stringify({ error: "Job creation failed" }), {
+        return new Response(JSON.stringify({ error: "Job creation failed", detail: jobError.message }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // 3. Update match status
+      // Update match status
       await supabaseAdmin.from("matches").update({ status: "processing" }).eq("id", match_id);
 
-      // 4. Trigger analysis (fire-and-forget)
+      // Trigger analysis (fire-and-forget)
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -175,7 +286,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("camera-ops error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error", detail: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
