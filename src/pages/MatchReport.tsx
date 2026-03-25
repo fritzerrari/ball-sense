@@ -486,6 +486,45 @@ export default function MatchReport() {
           )}
         </div>
 
+        {/* No stats warning with reprocess button */}
+        {!hasStats && uploads && uploads.length > 0 && match.status === "done" && (
+          <div className="glass-card border-amber-500/20 bg-amber-500/5 p-5 space-y-3">
+            <div className="flex items-start gap-3">
+              <Zap className="h-5 w-5 mt-0.5 shrink-0 text-amber-500" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">Keine Analysedaten vorhanden</p>
+                <p className="text-xs text-muted-foreground">
+                  Es wurden {uploads.length} Kamera-Upload(s) gefunden, aber die Verarbeitung hat keine Spielerstatistiken generiert.
+                  Dies kann bei kurzen Aufnahmen oder schwieriger Felderkennung passieren. Klicke auf "Neu verarbeiten" um die Analyse mit verbessertem Algorithmus erneut zu starten.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="heroOutline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  toast.info("Neuverarbeitung gestartet...");
+                  await supabase.from("matches").update({ status: "processing" }).eq("id", id);
+                  const { data: sess } = await supabase.auth.getSession();
+                  const token = sess.session?.access_token;
+                  if (token) {
+                    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-tracking`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ matchId: id, action: "full" }),
+                    });
+                  }
+                  refetchPlayerStats();
+                  refetchTeamStats();
+                } catch { toast.error("Neuverarbeitung fehlgeschlagen"); }
+              }}
+            >
+              <Zap className="h-4 w-4 mr-1.5" /> Neu verarbeiten
+            </Button>
+          </div>
+        )}
+
         {/* Unified Analysis Status Banner */}
         {hasStats && (
           <AnalysisStatusBanner
