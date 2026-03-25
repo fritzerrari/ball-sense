@@ -1089,6 +1089,8 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           extrapolated: needsExtrapolation,
           tactical_estimated: t?.is_estimated ?? true,
           ball_detections_available: ballPositions.length >= 10,
+          analysis_stage: mode === "incremental" ? "prognose" : (needsExtrapolation ? "vorläufig" : "final"),
+          recalculation_needed: needsExtrapolation,
         },
       };
     });
