@@ -10,6 +10,12 @@ interface AnalysisStatusBannerProps {
   matchStatus?: string;
   /** Compact inline mode for use inside cards */
   compact?: boolean;
+  /** Actual progress from match processing_progress (overrides stage default) */
+  actualProgress?: number;
+  /** Number of AI frames analyzed */
+  framesAnalyzed?: number;
+  /** Number of cameras used */
+  camerasUsed?: number;
 }
 
 const iconMap = {
@@ -48,8 +54,8 @@ const colorMap = {
   },
 };
 
-export function AnalysisStatusBanner({ stage, coverageRatio = 1, isExtrapolated = false, playerCount, matchStatus, compact = false }: AnalysisStatusBannerProps) {
-  const info = getAnalysisStatusInfo(stage);
+export function AnalysisStatusBanner({ stage, coverageRatio = 1, isExtrapolated = false, playerCount, matchStatus, compact = false, actualProgress, framesAnalyzed, camerasUsed }: AnalysisStatusBannerProps) {
+  const info = getAnalysisStatusInfo(stage, actualProgress);
   const colors = colorMap[info.color];
   const Icon = iconMap[info.icon];
 
