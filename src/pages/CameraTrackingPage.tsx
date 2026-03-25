@@ -246,11 +246,13 @@ export default function CameraTrackingPage() {
     return () => clearInterval(interval);
   }, [phase, elapsedSec, isPaused, stateKey]);
 
-  // Periodic micro-batch sync during tracking — only sends NEW frames since last sync
+  // Periodic micro-batch sync during tracking — ONLY in batch mode to prevent dual uploads
   const lastSyncFrameCount = useRef(0);
   useEffect(() => {
     if (phase !== "tracking" || isPaused) return;
-    const SYNC_INTERVAL_MS = 30_000; // 30s instead of 10s
+    // Only sync micro-batches in batch mode — live mode uses chunk streaming exclusively
+    if (uploadMode !== "batch") return;
+    const SYNC_INTERVAL_MS = 30_000;
     const syncMicroBatch = async () => {
       const token = localStorage.getItem(sessionKey);
       if (!liveEngineRef.current || !trackerRef.current || !id || !token) return;
@@ -280,7 +282,7 @@ export default function CameraTrackingPage() {
     };
     const interval = setInterval(syncMicroBatch, SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [phase, isPaused, id, cam, sessionKey]);
+  }, [phase, isPaused, id, cam, sessionKey, uploadMode]);
 
   // Auto-load model when entering camera phase
   useEffect(() => {

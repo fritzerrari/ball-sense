@@ -946,7 +946,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
     if (sessions.length > 1) { for (const tp of trackProfiles) { tp.cameraCount = sessions.length; } }
     await updateProgress("tracking", 55, `${tracks.size} Tracks erkannt (${sampledFrames.length} Frames verarbeitet)`);
 
-    // ── Auto-Discovery Mode ──
+    // ── Auto-Discovery Mode (NO DB persistence — ephemeral only) ──
     if (useAutoDiscovery && trackProfiles.length > 0) {
       // Adaptive minimum track length: scale with available frames
       const minTrackLen = Math.max(3, Math.floor(sampledFrames.length * 0.15));
@@ -959,33 +959,35 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       
       console.log(`[process-tracking] Auto-Discovery: ${trackProfiles.length} total tracks, ${fieldTracks.length} field tracks, ${candidateTracks.length} player candidates (minLen=${minTrackLen})`);
       
+      // HARD CAP: max 16 per team (realistic squad + subs), prevent 63-player explosions
+      const MAX_PER_TEAM = 16;
       const sortedByY = [...candidateTracks].sort((a, b) => a.cy - b.cy);
       const medianIdx = Math.max(1, Math.floor(sortedByY.length / 2));
-      const homeGroup = sortedByY.slice(0, medianIdx);
-      const awayGroup = sortedByY.slice(medianIdx);
+      const homeGroup = sortedByY.slice(0, medianIdx).slice(0, MAX_PER_TEAM);
+      const awayGroup = sortedByY.slice(medianIdx).slice(0, MAX_PER_TEAM);
 
-      const autoLineups: any[] = [];
+      // Create EPHEMERAL lineups — NOT persisted to DB
+      // This prevents match_lineups table pollution with "Spieler X" rows
+      const autoLineups: LineupEntry[] = [];
       homeGroup.forEach((t, i) => {
         autoLineups.push({
-          match_id: matchId, player_id: null, player_name: `Spieler ${i + 1}`,
+          id: `auto_home_${i}`, player_id: null, player_name: `Spieler ${i + 1}`,
           team: "home", starting: true, shirt_number: i + 1, excluded_from_tracking: false,
+          subbed_in_min: null, subbed_out_min: null,
         });
       });
       awayGroup.forEach((t, i) => {
         autoLineups.push({
-          match_id: matchId, player_id: null, player_name: `Spieler ${i + 1}`,
+          id: `auto_away_${i}`, player_id: null, player_name: `Spieler ${i + 1}`,
           team: "away", starting: true, shirt_number: i + 1, excluded_from_tracking: false,
+          subbed_in_min: null, subbed_out_min: null,
         });
       });
 
-      if (autoLineups.length > 0) {
-        const { data: inserted } = await supabase.from("match_lineups").insert(autoLineups).select();
-        if (inserted) {
-          trackableLineups = inserted as LineupEntry[];
-        }
-      }
+      // Use ephemeral lineups directly (no DB insert!)
+      trackableLineups = autoLineups;
 
-      console.log(`[process-tracking] Auto-Discovery: ${homeGroup.length} home, ${awayGroup.length} away players detected`);
+      console.log(`[process-tracking] Auto-Discovery: ${homeGroup.length} home, ${awayGroup.length} away players (ephemeral, max ${MAX_PER_TEAM}/team)`);
       await updateProgress("tracking", 60, `Auto-Erkennung: ${homeGroup.length} + ${awayGroup.length} Spieler erkannt`);
     }
 
@@ -1321,8 +1323,13 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           frames_analyzed: mergedFrames.length,
           data_quality_score: Math.min(100, Math.round(
             coverageRatio * 40 +
-            Math.min(1, players.length / 14) * 30 +
-            Math.min(1, mergedFrames.length / 100) * 30
+            // Penalize unrealistic player counts (>22 = both full squads + subs is suspicious)
+            Math.min(1, Math.min(players.length, 22) / 14) * 30 +
+            Math.min(1, mergedFrames.length / 100) * 20 +
+            // Penalty: if player count exceeds realistic 22, score drops
+            (players.length > 22 ? -15 : 0) +
+            // Penalty: if auto-discovered with no ball data
+            (!hasBallData ? -10 : 0)
           )),
         },
       });
