@@ -859,10 +859,19 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
 
     // ── Auto-Discovery Mode ──
     if (useAutoDiscovery && trackProfiles.length > 0) {
+      // Adaptive minimum track length: scale with available frames
+      const minTrackLen = Math.max(3, Math.floor(sampledFrames.length * 0.15));
       const fieldTracks = trackProfiles.filter(t => t.sidelineRatio < 0.45 && t.edgeRatio < 0.4);
-      const playerTracks = fieldTracks.filter(t => t.positions.length > 20);
-      const sortedByY = [...playerTracks].sort((a, b) => a.cy - b.cy);
-      const medianIdx = Math.floor(sortedByY.length / 2);
+      const playerTracks = fieldTracks.filter(t => t.positions.length >= minTrackLen);
+      
+      // If still no tracks pass the filter, relax sideline filter
+      const candidateTracks = playerTracks.length > 0 ? playerTracks 
+        : fieldTracks.filter(t => t.positions.length >= Math.max(2, Math.floor(sampledFrames.length * 0.08)));
+      
+      console.log(`[process-tracking] Auto-Discovery: ${trackProfiles.length} total tracks, ${fieldTracks.length} field tracks, ${candidateTracks.length} player candidates (minLen=${minTrackLen})`);
+      
+      const sortedByY = [...candidateTracks].sort((a, b) => a.cy - b.cy);
+      const medianIdx = Math.max(1, Math.floor(sortedByY.length / 2));
       const homeGroup = sortedByY.slice(0, medianIdx);
       const awayGroup = sortedByY.slice(medianIdx);
 
