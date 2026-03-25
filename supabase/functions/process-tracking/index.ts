@@ -1130,6 +1130,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           likely_official_tracks_ignored: likelyOfficials.length,
           coverage_ratio: coverageRatio,
           extrapolated: needsExtrapolation,
+          analysis_stage: mode === "incremental" ? "prognose" : (needsExtrapolation ? "vorläufig" : "final"),
         },
       });
     }
