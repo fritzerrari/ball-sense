@@ -15,49 +15,37 @@ serve(async (req) => {
   );
 
   try {
-    const { match_id, job_id } = await req.json();
+    const { match_id, job_id, frames, duration_sec } = await req.json();
     if (!match_id || !job_id) {
       return new Response(JSON.stringify({ error: "match_id and job_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Update job status to analyzing
+    if (!frames || !Array.isArray(frames) || frames.length === 0) {
+      await supabase.from("analysis_jobs").update({
+        status: "failed",
+        error_message: "Keine Frames empfangen",
+      }).eq("id", job_id);
+      return new Response(JSON.stringify({ error: "No frames provided" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Update job status
     await supabase.from("analysis_jobs").update({
       status: "analyzing",
       started_at: new Date().toISOString(),
       progress: 10,
     }).eq("id", job_id);
 
-    // Get match info
+    // Get match info for context
     const { data: match } = await supabase
       .from("matches")
       .select("*, fields(name, width_m, height_m)")
       .eq("id", match_id)
       .single();
 
-    // Get video
-    const { data: video } = await supabase
-      .from("match_videos")
-      .select("*")
-      .eq("match_id", match_id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!video) {
-      await supabase.from("analysis_jobs").update({
-        status: "failed",
-        error_message: "Kein Video gefunden",
-      }).eq("id", job_id);
-      return new Response(JSON.stringify({ error: "No video found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    await supabase.from("analysis_jobs").update({ progress: 25, video_id: video.id }).eq("id", job_id);
-
-    // Call Lovable AI Gateway for match analysis
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       await supabase.from("analysis_jobs").update({
@@ -69,18 +57,52 @@ serve(async (req) => {
       });
     }
 
-    const matchContext = `
-Match: ${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"}
-Datum: ${match?.date ?? "unbekannt"}
-Anstoß: ${match?.kickoff ?? "unbekannt"}
-Platz: ${match?.fields?.name ?? "unbekannt"} (${match?.fields?.width_m ?? 105}x${match?.fields?.height_m ?? 68}m)
-Video-Dauer: ca. ${video.duration_sec ? Math.round(video.duration_sec / 60) : "?"} Minuten
-Video-Größe: ${video.file_size_bytes ? Math.round(video.file_size_bytes / 1048576) : "?"} MB
-`;
+    // Select subset of frames if too many (max ~20 for API limits)
+    const maxFrames = 20;
+    let selectedFrames = frames as string[];
+    if (selectedFrames.length > maxFrames) {
+      const step = selectedFrames.length / maxFrames;
+      selectedFrames = Array.from({ length: maxFrames }, (_, i) =>
+        frames[Math.min(Math.floor(i * step), frames.length - 1)]
+      );
+    }
+
+    await supabase.from("analysis_jobs").update({ progress: 25 }).eq("id", job_id);
+
+    // Build multi-image message content
+    const userContent: any[] = [
+      {
+        type: "text",
+        text: `Analysiere diese ${selectedFrames.length} Standbilder eines Fußballspiels (alle ${Math.round((duration_sec ?? 0) / selectedFrames.length)} Sekunden aufgenommen).
+
+Kontext:
+- ${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"}
+- Datum: ${match?.date ?? "unbekannt"}
+- Platzgröße: ${match?.fields?.width_m ?? 105}x${match?.fields?.height_m ?? 68}m
+- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten
+
+Analysiere was du auf den Bildern TATSÄCHLICH siehst:
+- Spielerverteilung und Formationen
+- Angriffsrichtungen und Raumbesetzung
+- Erkennbare Muster und Spielphasen
+- Ballpositionen und Druckzonen
+
+WICHTIG: Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.`,
+      },
+    ];
+
+    // Add frames as images
+    for (const frame of selectedFrames) {
+      userContent.push({
+        type: "image_url",
+        image_url: {
+          url: `data:image/jpeg;base64,${frame}`,
+        },
+      });
+    }
 
     await supabase.from("analysis_jobs").update({ progress: 40 }).eq("id", job_id);
 
-    // Use tool calling for structured output
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -88,23 +110,23 @@ Video-Größe: ${video.file_size_bytes ? Math.round(video.file_size_bytes / 1048
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
-            content: `Du bist ein erfahrener Fußball-Analyst. Analysiere das Spiel basierend auf den verfügbaren Informationen.
-Erstelle eine realistische, nützliche Analyse für einen Trainer. Fokussiere dich auf:
-- Spielstruktur und Momentum
-- Angriffsrichtungen und Gefährdungszonen
-- Taktische Muster
-- Chancen und Abschlüsse
+            content: `Du bist ein erfahrener Fußball-Analyst. Du analysierst Standbilder eines Fußballspiels.
+Fokussiere dich auf das, was du TATSÄCHLICH auf den Bildern erkennst:
+- Spielerverteilung auf dem Feld
+- Angriffsrichtungen und Raumbesetzung
+- Ballposition (wenn sichtbar)
+- Formationsstruktur
+- Druckphasen und Momentum
 
-WICHTIG: Generiere KEINE fake-präzisen Metriken. Wenn du etwas nicht sicher weißt, markiere es als geschätzt.
-Alle Bewertungen sollen plausibel und hilfreich für die Trainingsplanung sein.`,
+Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als solche.`,
           },
           {
             role: "user",
-            content: `Analysiere folgendes Fußballspiel und erstelle strukturierte Ergebnisse:\n\n${matchContext}`,
+            content: userContent,
           },
         ],
         tools: [
@@ -112,13 +134,12 @@ Alle Bewertungen sollen plausibel und hilfreich für die Trainingsplanung sein.`
             type: "function",
             function: {
               name: "submit_analysis",
-              description: "Submit structured match analysis results",
+              description: "Submit structured match analysis based on observed frames",
               parameters: {
                 type: "object",
                 properties: {
                   match_structure: {
                     type: "object",
-                    description: "Overall match structure analysis",
                     properties: {
                       dominant_team: { type: "string", enum: ["home", "away", "balanced"] },
                       tempo: { type: "string", enum: ["high", "medium", "low"] },
@@ -139,24 +160,11 @@ Alle Bewertungen sollen plausibel und hilfreich für die Trainingsplanung sein.`
                   },
                   danger_zones: {
                     type: "object",
-                    description: "Areas of danger and opportunity",
                     properties: {
-                      home_attack_zones: {
-                        type: "array",
-                        items: { type: "string", enum: ["left", "center", "right"] },
-                      },
-                      away_attack_zones: {
-                        type: "array",
-                        items: { type: "string", enum: ["left", "center", "right"] },
-                      },
-                      home_vulnerable_zones: {
-                        type: "array",
-                        items: { type: "string" },
-                      },
-                      away_vulnerable_zones: {
-                        type: "array",
-                        items: { type: "string" },
-                      },
+                      home_attack_zones: { type: "array", items: { type: "string", enum: ["left", "center", "right"] } },
+                      away_attack_zones: { type: "array", items: { type: "string", enum: ["left", "center", "right"] } },
+                      home_vulnerable_zones: { type: "array", items: { type: "string" } },
+                      away_vulnerable_zones: { type: "array", items: { type: "string" } },
                     },
                     required: ["home_attack_zones", "away_attack_zones"],
                   },
@@ -183,12 +191,17 @@ Alle Bewertungen sollen plausibel und hilfreich für die Trainingsplanung sein.`
                       required: ["zone", "frequency", "description"],
                     },
                   },
+                  visual_quality: {
+                    type: "string",
+                    description: "How well could you actually see the game in the frames? good/moderate/poor",
+                    enum: ["good", "moderate", "poor"],
+                  },
                   confidence: {
                     type: "number",
-                    description: "Overall confidence 0-1 in the analysis quality",
+                    description: "Overall confidence 0-1 in the analysis based on what was visible",
                   },
                 },
-                required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "confidence"],
+                required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "visual_quality", "confidence"],
               },
             },
           },
@@ -201,22 +214,18 @@ Alle Bewertungen sollen plausibel und hilfreich für die Trainingsplanung sein.`
       const errText = await analysisResponse.text();
       console.error("AI gateway error:", analysisResponse.status, errText);
 
-      if (analysisResponse.status === 429) {
+      const errorMessages: Record<number, string> = {
+        429: "Rate limit erreicht. Bitte später erneut versuchen.",
+        402: "AI-Kontingent aufgebraucht.",
+      };
+
+      if (errorMessages[analysisResponse.status]) {
         await supabase.from("analysis_jobs").update({
           status: "failed",
-          error_message: "Rate limit erreicht. Bitte später erneut versuchen.",
+          error_message: errorMessages[analysisResponse.status],
         }).eq("id", job_id);
-        return new Response(JSON.stringify({ error: "Rate limited" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (analysisResponse.status === 402) {
-        await supabase.from("analysis_jobs").update({
-          status: "failed",
-          error_message: "AI-Kontingent aufgebraucht.",
-        }).eq("id", job_id);
-        return new Response(JSON.stringify({ error: "Payment required" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ error: errorMessages[analysisResponse.status] }), {
+          status: analysisResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -226,14 +235,12 @@ Alle Bewertungen sollen plausibel und hilfreich für die Trainingsplanung sein.`
     const aiResult = await analysisResponse.json();
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
 
-    if (!toolCall) {
-      throw new Error("No tool call response from AI");
-    }
+    if (!toolCall) throw new Error("No tool call response from AI");
 
     const analysis = JSON.parse(toolCall.function.arguments);
     await supabase.from("analysis_jobs").update({ progress: 70 }).eq("id", job_id);
 
-    // Store analysis results by type
+    // Store analysis results
     const resultTypes = [
       { type: "match_structure", data: analysis.match_structure },
       { type: "danger_zones", data: analysis.danger_zones },
@@ -247,7 +254,7 @@ Alle Bewertungen sollen plausibel und hilfreich für die Trainingsplanung sein.`
         match_id,
         result_type: result.type,
         data: result.data,
-        confidence: analysis.confidence ?? 0.6,
+        confidence: analysis.confidence ?? 0.5,
       });
     }
 
@@ -264,7 +271,7 @@ Alle Bewertungen sollen plausibel und hilfreich für die Trainingsplanung sein.`
       body: JSON.stringify({ match_id, job_id }),
     });
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, frames_analyzed: selectedFrames.length, visual_quality: analysis.visual_quality }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
