@@ -12,15 +12,19 @@ import CameraSetupOverlay from "@/components/CameraSetupOverlay";
 import StopConfirmDialog from "@/components/StopConfirmDialog";
 import MatchEventQuickBar from "@/components/MatchEventQuickBar";
 import { useModuleAccess } from "@/hooks/use-module-access";
+import CameraCodeEntry from "@/components/CameraCodeEntry";
 
-type Phase = "setup" | "ready" | "recording" | "analyzing" | "done";
+type Phase = "code" | "setup" | "ready" | "recording" | "analyzing" | "done";
 
 export default function CameraTrackingPage() {
-  const { id: matchId } = useParams();
+  const { id: matchIdParam } = useParams();
   const [searchParams] = useSearchParams();
-  const sessionToken = searchParams.get("token") ?? "";
 
-  const [phase, setPhase] = useState<Phase>("setup");
+  // If no matchId in URL, start with code entry phase
+  const [phase, setPhase] = useState<Phase>(matchIdParam ? "setup" : "code");
+  const [matchId, setMatchId] = useState<string | null>(matchIdParam ?? null);
+  const [sessionToken, setSessionToken] = useState(searchParams.get("token") ?? "");
+
   const [progress, setProgress] = useState(0);
   const [frameCount, setFrameCount] = useState(0);
   const [halftimeSent, setHalftimeSent] = useState(false);
@@ -32,6 +36,12 @@ export default function CameraTrackingPage() {
   const videoRecorderRef = useRef<VideoRecorderHandle | null>(null);
   const [recordingStartTime, setRecordingStartTime] = useState(0);
   const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
+
+  const handleCodeSuccess = useCallback((data: { matchId: string; cameraIndex: number; sessionToken: string }) => {
+    setMatchId(data.matchId);
+    setSessionToken(data.sessionToken);
+    setPhase("setup");
+  }, []);
 
   const initCamera = useCallback(async () => {
     try {
@@ -59,7 +69,6 @@ export default function CameraTrackingPage() {
       }, 300);
     }
 
-    // Start video recorder for highlights if module is enabled
     if (hasHighlights && streamRef.current) {
       videoRecorderRef.current = startVideoRecorder(streamRef.current);
     }
@@ -73,7 +82,7 @@ export default function CameraTrackingPage() {
       setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
-  }, []);
+  }, [hasHighlights]);
 
   const handleSetupComplete = useCallback(async () => {
     await initCamera();
@@ -206,6 +215,11 @@ export default function CameraTrackingPage() {
     }
   }, [matchId, sessionToken]);
 
+  // Code entry phase (no login required)
+  if (phase === "code") {
+    return <CameraCodeEntry onSuccess={handleCodeSuccess} />;
+  }
+
   const showHalftimeButton = phase === "recording" && frameCount >= 3 && !halftimeSent;
 
   return (
@@ -221,7 +235,6 @@ export default function CameraTrackingPage() {
       <div className="relative flex-1 bg-black">
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
 
-        {/* Setup overlay with camera tips */}
         {phase === "setup" && (
           <CameraSetupOverlay
             onDismiss={() => initCamera()}
@@ -261,7 +274,6 @@ export default function CameraTrackingPage() {
                 </Link>
               </div>
             )}
-            {/* Highlight Quick Bar */}
             {hasHighlights && matchId && (
               <div className="absolute bottom-4 right-4">
                 <MatchEventQuickBar
