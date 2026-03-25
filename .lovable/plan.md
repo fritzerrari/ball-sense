@@ -1,70 +1,106 @@
 
-Ziel: System zuerst stabil machen (keine Hänger/Fehler), dann Live-Flow sauber und schnell machen.
 
-1) Sofort-Hotfix für aktuelle Fehler (Root Cause aus Logs)
-- `generate-insights` reparieren: Das Tool-Schema ist aktuell ungültig (400 INVALID_ARGUMENT bei `training_recommendations.items.required`).  
-  -> In `supabase/functions/generate-insights/index.ts` das Schema korrigieren (`items.type = "object"` + konsistente `properties/required`).
-- Doppeltes Triggern vermeiden: `generate-insights` wird serverseitig bereits gestartet, der zusätzliche Client-Trigger in `src/pages/ProcessingPage.tsx` erzeugt Race Conditions.  
-  -> Client-Trigger entfernen, Seite nur noch Status pollen.
+# Hyper-Professional Coaching Cockpit -- Complete Upgrade
 
-2) „Keine Frames gefunden“ robust lösen
-- Ursache: Retry/Reprocess lädt nur `${match_id}.json`, Helper-Flow schreibt aber oft `${match_id}_h1.json`, `${match_id}_h2.json`, `${match_id}_chunk_n.json`.
-- Fix in `supabase/functions/analyze-match/index.ts`:
-  - Fallback-Reihenfolge beim Laden:
-    1. `${match_id}.json`
-    2. Merge aus `_h1` + `_h2`
-    3. Merge aller `_chunk_*`
-  - Wenn Frames gefunden -> normal analysieren; nur dann „Keine Frames gefunden“ zurückgeben.
-- Fix in `supabase/functions/camera-ops/index.ts`:
-  - Bei `upload-frames` und `append-frames` zusätzlich eine kanonische Datei `${match_id}.json` fortlaufend pflegen (aggregierter Stand), damit Retry immer eine sichere Quelle hat.
+## What I Found
 
-3) Job-Orchestrierung stabilisieren (kein „durcheinander“)
-- Live-Partial-Jobs entkoppeln, damit sie nicht den finalen Job verdrängen:
-  - DB-Migration: `analysis_jobs.job_kind` (`final` | `live_partial`) + Index.
-  - UI (`ProcessingPage`, `MatchReport`) zeigt/pollt nur `job_kind = 'final'`.
-- Idempotenz einbauen:
-  - Vor neuem finalen Job prüfen, ob bereits ein aktiver finaler Job läuft (`queued|analyzing|interpreting`), dann vorhandenen Job zurückgeben statt neu anzulegen.
+The analysis pipeline WORKS (4 frames analyzed, insights generated, report sections stored). But the output is mediocre:
+- Generic insights like "Zentrum als Kampfzone" without actionable depth
+- Flat card-list layout -- no visual hierarchy, no drama, no cockpit feel
+- No match rating, no tactical grades, no momentum visualization
+- Coaching conclusions are text-only paragraphs
+- Missing: comparative gauges, risk scores, drill-down interactions, executive scorecards
 
-4) Freigabe „Datenübertragung“ vom Hauptbildschirm
-- DB-Migration: in `camera_access_sessions` `transfer_authorized boolean default false`, `transfer_authorized_at timestamptz`.
-- Trainer-Flow:
-  - In `src/components/CameraCodeShare.tsx` (bzw. Code-Step in `NewMatch`) aktive Helper-Session anzeigen + Schalter „Datenübertragung freigeben“.
-- Helper-Flow (`src/pages/CameraTrackingPage.tsx`):
-  - Nach Code-Eingabe/Kamera-Init sofort Heartbeat starten.
-  - Wenn `transfer_authorized = false`: klarer Wartezustand („Warte auf Freigabe vom Trainer“), keine Aufnahme/Uploads.
-  - Nach Freigabe: Aufnahme-Start sofort möglich.
-- Remote-Panel (`src/components/CameraRemotePanel.tsx`):
-  - Freigabestatus sichtbar, Start/Halbzeit/Stop nur bei freigegebener Session.
+## The Upgrade Plan
 
-5) Live-Sichtbarkeit und Performance verbessern
-- Kamera-Preview früher sichtbar:
-  - In Setup-Phase Kamera direkt initialisieren, damit Trainer vor Spielbeginn Thumbnail sieht.
-- Delta-Sync effizienter:
-  - Statt nur starrem 45s-Timer: upload wenn neue Frames vorliegen + kurzer Fallback-Timer.
-- Heartbeat leichter:
-  - Thumbnail stärker komprimieren (kleineres Format/Qualität), Text-Heartbeat weiter regelmäßig.
-- Mobiles Feedback erweitern:
-  - „Erfasst / synchronisiert / ausstehend / letzter Sync“ als klare Statuszeile.
+### 1. Massively Improved AI Prompt (generate-insights)
 
-6) Technische Details (betroffene Dateien)
-- Edge Functions:
-  - `supabase/functions/generate-insights/index.ts`
-  - `supabase/functions/analyze-match/index.ts`
-  - `supabase/functions/camera-ops/index.ts`
-- Frontend:
-  - `src/pages/ProcessingPage.tsx`
-  - `src/pages/CameraTrackingPage.tsx`
-  - `src/components/CameraRemotePanel.tsx`
-  - `src/components/CameraCodeShare.tsx`
-  - `src/pages/NewMatch.tsx` (Code-Step Integration)
-- Migrationen:
-  - `analysis_jobs.job_kind` (+ Index)
-  - `camera_access_sessions.transfer_authorized`, `transfer_authorized_at`
+The current prompt is too generic. New prompt will demand:
 
-7) Abnahme-Tests (E2E)
-- Kurzaufnahme (30–60s): kein Hänger, kein 85/90%-Stall, Abschluss auf `complete`.
-- Retry ohne Neuaufnahme: funktioniert über Storage-Fallback.
-- Halbzeit-Flow: finale Analyse nutzt beide Hälften (nicht nur H2).
-- Trainer sieht Thumbnail vor Spielstart.
-- Ohne Freigabe kein Upload/Start; nach Freigabe sofort live.
-- Keine doppelten Insights-Jobs/keine widersprüchlichen Statusanzeigen.
+- **Match Rating** (1-10 scale with sub-scores for offense, defense, transitions, discipline)
+- **Tactical Grade Card** (A-F grades for 6 dimensions: pressing, build-up, final third, defensive shape, transitions, set pieces)
+- **Momentum Phases** with minute-by-minute momentum scores (-100 to +100) for visualization
+- **Risk Matrix** identifying specific vulnerabilities with severity + urgency scores
+- **Player Spotlight** (MVP + concern player with reasoning)
+- **Opponent DNA Profile** (play style fingerprint: possession-based? counter? press-heavy?)
+- **Concrete Next-Match Actions** (3 "do" + 3 "don't" for the next match)
+- **Training Week Plan** (not just exercises, but a 3-session micro-cycle with session goals)
+
+Updated tool schema will capture all these structured fields.
+
+### 2. Cockpit-Grade Match Report UI (MatchReport.tsx)
+
+Complete visual overhaul:
+
+**A. Hero Scorecard Header**
+- Full-width gradient header with match rating (large animated number), team logos, date
+- Sub-score gauges (offense/defense/transition) as radial progress rings
+- Tactical grade badges (A-F) in a horizontal strip
+
+**B. Momentum Timeline**
+- Full-width area chart showing momentum flow across the match
+- Color-coded: green (home dominance) to red (away pressure)
+- Key events overlaid as markers (goals, substitutions, tactical shifts)
+
+**C. Tactical Grade Matrix**
+- 6-cell grid with A-F grades, each with color coding (A=emerald, F=red)
+- Click to expand with detailed explanation
+- Animated entrance with staggered delays
+
+**D. Risk Radar**
+- Visual risk indicators with severity bars
+- Each risk links to relevant training recommendation
+- Urgency badges (immediate / next week / monitor)
+
+**E. Player Spotlight Cards**
+- MVP card with glow effect and key stats
+- Concern player card with warning styling
+- Direct link to player profile
+
+**F. Opponent DNA Fingerprint**
+- Radar/spider chart showing opponent play style dimensions
+- Next-match "Do / Don't" list with checkmark/x icons
+
+**G. Training Micro-Cycle**
+- 3-session timeline with session goals, drills, and linked patterns
+- Visual progression (recovery -> intensity -> tactical)
+
+**H. Enhanced Existing Components**
+- Pressing chart, transitions, pass map stay but get glass-card styling
+- Section transitions with subtle animations
+- Collapsible sections for information density control
+
+### 3. New Components to Create
+
+| Component | Purpose |
+|---|---|
+| `MatchScorecard.tsx` | Hero header with rating, grades, sub-scores |
+| `MomentumTimeline.tsx` | Full-width momentum area chart |
+| `TacticalGradeMatrix.tsx` | 6-cell A-F grade grid |
+| `RiskRadar.tsx` | Vulnerability matrix with severity |
+| `PlayerSpotlight.tsx` | MVP + concern player cards |
+| `OpponentDNA.tsx` | Spider chart + do/don't list |
+| `TrainingMicroCycle.tsx` | 3-session training week plan |
+
+### 4. Files Modified
+
+| File | Change |
+|---|---|
+| `supabase/functions/generate-insights/index.ts` | Completely rewritten prompt + expanded tool schema for richer output |
+| `src/pages/MatchReport.tsx` | Complete layout overhaul with new component composition |
+| 7 new components above | New files |
+| `src/components/PressingChart.tsx` | Glass-card styling upgrade |
+| `src/components/TransitionAnalysis.tsx` | Glass-card styling upgrade |
+| `src/components/PassDirectionMap.tsx` | Glass-card styling upgrade |
+
+### 5. No Database Migration Needed
+
+All new data fits into existing `report_sections.content` (JSON strings) and `analysis_results.data` (jsonb). The AI output gets richer but storage stays the same.
+
+### 6. Implementation Order
+
+1. Upgrade `generate-insights` prompt + schema (the brain)
+2. Create 7 new cockpit components (the visuals)
+3. Rewrite `MatchReport.tsx` layout (the composition)
+4. Style upgrades for existing components
+
