@@ -521,35 +521,34 @@ export default function CameraTrackingPage() {
 
     const now = Date.now();
     const last = lastCalibrationInputRef.current;
-    if (last && now - last.ts < 350 && Math.abs(last.x - x) < 0.01 && Math.abs(last.y - y) < 0.01) {
+    // Stronger debounce: 500ms + 3% distance threshold
+    if (last && now - last.ts < 500 && Math.abs(last.x - x) < 0.03 && Math.abs(last.y - y) < 0.03) {
       return;
     }
     lastCalibrationInputRef.current = { x, y, ts: now };
 
+    // Check if tapping on existing point to delete it
     setCalibrationPoints((prev) => {
+      const hitIdx = prev.findIndex(pt => Math.abs(pt.x - x) < 0.05 && Math.abs(pt.y - y) < 0.05);
+      if (hitIdx >= 0) {
+        // Remove tapped point
+        const next = [...prev];
+        next.splice(hitIdx, 1);
+        try { navigator.vibrate?.(50); } catch {}
+        return next;
+      }
       if (prev.length >= 4) return prev;
+      // Vibration feedback
+      try { navigator.vibrate?.(30); } catch {}
       return [...prev, { x, y }];
     });
   }, [savingCalibration, showInlineCalibration]);
 
+  // Single unified handler — NO onClick, NO onTouchEnd
   const handleInlineCalibrationTap = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     addInlineCalibrationPoint(e.clientX, e.clientY);
-  }, [addInlineCalibrationPoint]);
-
-  const handleInlineCalibrationClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addInlineCalibrationPoint(e.clientX, e.clientY);
-  }, [addInlineCalibrationPoint]);
-
-  const handleInlineCalibrationTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    const touch = e.changedTouches[0];
-    if (!touch) return;
-    e.preventDefault();
-    e.stopPropagation();
-    addInlineCalibrationPoint(touch.clientX, touch.clientY);
   }, [addInlineCalibrationPoint]);
 
   const handleAutoDetectInline = useCallback(async () => {
@@ -587,7 +586,7 @@ export default function CameraTrackingPage() {
         return;
       }
 
-      if (Array.isArray(data?.corners) && data.corners.length === 4) {
+      if (Array.isArray(data?.corners) && data.corners.length >= 2) {
         const points = data.corners
           .map((corner) => {
             if (!corner || typeof corner !== "object") return null;
@@ -602,14 +601,38 @@ export default function CameraTrackingPage() {
           })
           .filter((point): point is { x: number; y: number } => !!point);
 
-        if (points.length === 4) {
-          setCalibrationPoints(points);
-          toast.success("Eckpunkte erkannt — Kalibrierung wird gespeichert…");
-          return;
+        if (points.length >= 2) {
+          // Complete missing corners client-side if backend returned 2-3
+          let finalPoints = points;
+          if (points.length === 2) {
+            const dx = points[1].x - points[0].x;
+            const dy = points[1].y - points[0].y;
+            const ratio = 68 / 105;
+            const perpX = -dy * ratio;
+            const perpY = dx * ratio;
+            finalPoints = [
+              points[0], points[1],
+              { x: Math.max(0, Math.min(1, points[1].x + perpX)), y: Math.max(0, Math.min(1, points[1].y + perpY)) },
+              { x: Math.max(0, Math.min(1, points[0].x + perpX)), y: Math.max(0, Math.min(1, points[0].y + perpY)) },
+            ];
+          } else if (points.length === 3) {
+            const p4x = points[0].x + (points[2].x - points[1].x);
+            const p4y = points[0].y + (points[2].y - points[1].y);
+            finalPoints = [...points, { x: Math.max(0, Math.min(1, p4x)), y: Math.max(0, Math.min(1, p4y)) }];
+          }
+
+          if (finalPoints.length === 4) {
+            setCalibrationPoints(finalPoints);
+            toast.success(points.length < 4
+              ? `${points.length} Ecken erkannt, ${4 - points.length} ergänzt — Kalibrierung wird gespeichert…`
+              : "Eckpunkte erkannt — Kalibrierung wird gespeichert…"
+            );
+            return;
+          }
         }
       }
 
-      toast.error("Ecken konnten nicht sicher erkannt werden — bitte manuell tippen");
+      toast.error("Ecken konnten nicht erkannt werden — bitte manuell die 4 Eckpunkte antippen");
     } catch (error) {
       console.error("[Calibration] Auto-detect failed", error);
       toast.error(error instanceof Error ? error.message : "Automatische Erkennung fehlgeschlagen");
@@ -702,27 +725,34 @@ export default function CameraTrackingPage() {
         className="absolute inset-0 z-10 cursor-crosshair touch-none bg-transparent"
         style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
         onPointerDown={handleInlineCalibrationTap}
-        onClick={handleInlineCalibrationClick}
-        onTouchStart={(e) => {
-          if (savingCalibration) return;
-          e.preventDefault();
-        }}
-        onTouchEnd={handleInlineCalibrationTouchEnd}
         onContextMenu={(e) => e.preventDefault()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-          }
-        }}
       />
+
+      {/* Connection lines between points */}
+      {calibrationPoints.length >= 2 && (
+        <svg className="pointer-events-none absolute inset-0 z-15 w-full h-full">
+          {calibrationPoints.map((pt, i) => {
+            const next = calibrationPoints[(i + 1) % calibrationPoints.length];
+            if (i >= calibrationPoints.length - 1 && calibrationPoints.length < 4) return null;
+            return (
+              <line
+                key={`line-${i}`}
+                x1={`${pt.x * 100}%`} y1={`${pt.y * 100}%`}
+                x2={`${next.x * 100}%`} y2={`${next.y * 100}%`}
+                stroke="hsl(var(--primary))" strokeWidth="2" strokeDasharray="6 3" opacity="0.7"
+              />
+            );
+          })}
+        </svg>
+      )}
 
       {calibrationPoints.map((pt, i) => (
         <div
           key={i}
-          className="pointer-events-none absolute z-20 h-6 w-6 -ml-3 -mt-3 rounded-full border-2 border-primary bg-primary/30 flex items-center justify-center"
-          style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%` }}
+          className="pointer-events-none absolute z-20 flex items-center justify-center rounded-full border-2 border-primary bg-primary/30"
+          style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%`, width: 40, height: 40, marginLeft: -20, marginTop: -20 }}
         >
-          <span className="text-[9px] font-bold text-primary-foreground">{i + 1}</span>
+          <span className="text-xs font-bold text-primary-foreground">{i + 1}</span>
         </div>
       ))}
 

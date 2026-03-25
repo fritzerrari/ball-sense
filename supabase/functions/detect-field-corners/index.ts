@@ -76,13 +76,52 @@ const sanitizeFeatures = (value: unknown): string[] => {
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 };
 
+/**
+ * Complete missing corners using standard pitch aspect ratio (105:68).
+ */
+const completeCorners = (corners: DetectedCorner[]): DetectedCorner[] | null => {
+  if (corners.length === 4) return corners;
+  if (corners.length < 2) return null;
+
+  if (corners.length === 2) {
+    const dx = corners[1].x - corners[0].x;
+    const dy = corners[1].y - corners[0].y;
+    const ratio = 68 / 105;
+    const perpX = -dy * ratio;
+    const perpY = dx * ratio;
+    return [
+      corners[0],
+      corners[1],
+      { x: Math.max(0, Math.min(100, corners[1].x + perpX)), y: Math.max(0, Math.min(100, corners[1].y + perpY)) },
+      { x: Math.max(0, Math.min(100, corners[0].x + perpX)), y: Math.max(0, Math.min(100, corners[0].y + perpY)) },
+    ];
+  }
+
+  if (corners.length === 3) {
+    // Infer 4th corner: p4 = p1 + (p3 - p2)
+    const p4x = corners[0].x + (corners[2].x - corners[1].x);
+    const p4y = corners[0].y + (corners[2].y - corners[1].y);
+    return [
+      ...corners,
+      { x: Math.max(0, Math.min(100, p4x)), y: Math.max(0, Math.min(100, p4y)) },
+    ];
+  }
+
+  return null;
+};
+
 const normalizeResponse = (value: unknown): LayoutResponse => {
   if (!value || typeof value !== "object") return FALLBACK_RESPONSE;
 
   const candidate = value as Record<string, unknown>;
-  const corners = Array.isArray(candidate.corners)
+  let corners = Array.isArray(candidate.corners)
     ? candidate.corners.map(sanitizeCorner).filter((corner): corner is DetectedCorner => !!corner)
     : null;
+
+  // Try to complete partial corners
+  if (corners && corners.length >= 2 && corners.length < 4) {
+    corners = completeCorners(corners);
+  }
 
   return {
     corners: corners && corners.length === 4 ? corners : null,
@@ -124,50 +163,39 @@ serve(async (req) => {
             content: [
               {
                 type: "text",
-                text: `Analyze this image. Your primary tasks:
+                text: `Analyze this image of a potential football/soccer pitch. Your tasks:
 
-Task 0 (CRITICAL): Determine if this is a REAL football/soccer pitch.
-- A real pitch has: grass (natural or artificial), painted white lines, goals or goal posts, recognizable field markings (penalty area, center circle, touchlines).
-- If this is NOT a real pitch (e.g. a living room, parking lot, random photo, indoor non-sport area, diagram, screenshot of a game), set isRealPitch=false and pitchRejectionReason to a short explanation (e.g. "No grass or field markings visible", "This appears to be a video game screenshot").
-- If isRealPitch=false, set all other fields to null/empty and return immediately.
+Task 0 (CRITICAL): Is this a REAL football/soccer pitch?
+- Real pitch: grass (natural/artificial), white lines, goals, field markings.
+- NOT a real pitch: living room, parking lot, screenshot, diagram → set isRealPitch=false with pitchRejectionReason.
 
-Task 1: Determine if the image shows the FULL pitch or only a PARTIAL view.
-- Full view: all 4 corners (touchline × goal line intersections) are visible or clearly inferable.
-- Partial view: only part of the pitch is visible (e.g. one half, one third, a zoomed section).
-- Set isPartialView=true if partial. Set visiblePortion to describe what's visible (e.g. "left_half", "right_half", "left_third", "penalty_area_only", "center_section").
+Task 1: Full or partial view?
+- Full: all 4 corners visible/inferable. Partial: only part visible.
 
-Task 2: Identify the 4 field corners (touchline × goal line intersections).
-- Return as percentages 0-100 relative to image size, order: top-left, top-right, bottom-right, bottom-left.
-- For PARTIAL views: return the 4 corners of the VISIBLE playing area (not the full pitch corners), so the user can calibrate the visible section.
-- Only return corners when they are reasonably visible or inferable from line geometry.
+Task 2: Identify field corners (touchline × goal line intersections).
+- Return as percentages 0-100 relative to image dimensions.
+- Order: top-left, top-right, bottom-right, bottom-left.
+- IMPORTANT: Always try to return at least 2-3 corners even if some are estimated/inferred.
+- For partial views: return corners of the VISIBLE playing area.
 
-Task 3: Estimate field dimensions.
-- suggestedDimensions: dimensions of the VISIBLE area in meters.
-- inferredFullDimensions: estimated FULL pitch dimensions based on visible markings.
-  - Use reference measurements: penalty area = 16.5m deep × 40.3m wide, goal area = 5.5m × 18.3m, center circle radius = 9.15m, penalty spot = 11m from goal line.
-  - Example: if only penalty area is visible → inferred full pitch ≈ 105×68m.
-  - For youth/small pitches, scale proportionally.
-- If only a partial view: suggestedDimensions = visible area size, inferredFullDimensions = estimated full pitch.
-- If full view: both should be the same.
+Task 3: Estimate dimensions.
+- suggestedDimensions: visible area in meters.
+- inferredFullDimensions: full pitch estimate (standard: 105×68m).
+- Reference: penalty area=16.5m×40.3m, center circle radius=9.15m, penalty spot=11m.
 
-Task 4: List visible reference features.
-- detectedFeatures: only these values: goal, penalty_area, goal_area, center_circle, halfway_line, corner_flag, touchline, goal_line.
+Task 4: List visible features from: goal, penalty_area, goal_area, center_circle, halfway_line, corner_flag, touchline, goal_line.
 
-Rules:
-- Confidence must be one of: high, medium, low.
-- fieldType examples: "Full pitch", "Half pitch", "Penalty area", "Small-sided pitch", "Futsal court".
-
-Return ONLY a JSON object with this exact shape:
+Return ONLY a JSON object:
 {
   "isRealPitch": true,
   "pitchRejectionReason": null,
   "isPartialView": false,
   "visiblePortion": null,
-  "corners": [{"x":0,"y":0},{"x":0,"y":0},{"x":0,"y":0},{"x":0,"y":0}] | null,
-  "suggestedDimensions": {"width":105,"height":68} | null,
-  "inferredFullDimensions": {"width":105,"height":68} | null,
-  "fieldType": "Full pitch" | null,
-  "confidence": "high" | "medium" | "low" | null,
+  "corners": [{"x":0,"y":0},{"x":0,"y":0},{"x":0,"y":0},{"x":0,"y":0}],
+  "suggestedDimensions": {"width":105,"height":68},
+  "inferredFullDimensions": {"width":105,"height":68},
+  "fieldType": "Full pitch",
+  "confidence": "high",
   "detectedFeatures": ["goal", "penalty_area"]
 }
 

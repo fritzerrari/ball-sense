@@ -125,12 +125,19 @@ export default function MatchReport() {
   const [newCode, setNewCode] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
 
-  // Realtime subscription for live stats updates
+  // Realtime subscription + faster polling for live/processing matches
   const isLive = match?.status === "live" || match?.status === "processing";
   const hasPartialData = (playerStats ?? []).some((s: any) => s.period === "partial");
 
   useEffect(() => {
     if (!id || !isLive) return;
+    
+    // Fast polling every 2s during processing
+    const pollInterval = setInterval(() => {
+      refetchPlayerStats();
+      refetchTeamStats();
+    }, 2000);
+    
     const channel = supabase
       .channel(`live-stats-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "player_match_stats", filter: `match_id=eq.${id}` }, () => {
@@ -141,7 +148,10 @@ export default function MatchReport() {
         refetchTeamStats();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel); 
+    };
   }, [id, isLive, refetchPlayerStats, refetchTeamStats]);
 
   const handleGenerateCode = async () => {
