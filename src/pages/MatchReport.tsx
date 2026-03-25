@@ -208,6 +208,14 @@ export default function MatchReport() {
     (s.raw_metrics as any)?.ball_detections_available === true
   );
 
+  // Analysis stage determination
+  const analysisStage = getAnalysisStage(
+    match?.status ?? "setup",
+    hasPartialData ? "partial" : "full",
+    isExtrapolated,
+    homeTeamStats?.quality_score,
+  );
+
   // Enrich goals/assists from match events (manual input is more accurate than estimation)
   const homeGoalsFromEvents = (events ?? []).filter((e: any) => e.team === "home" && e.event_type === "goal").length;
   const awayGoalsFromEvents = (events ?? []).filter((e: any) => e.team === "away" && e.event_type === "goal").length;
