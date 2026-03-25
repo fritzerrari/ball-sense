@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff, CloudUpload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -15,6 +16,7 @@ interface CameraSession {
   status_data: {
     phase?: string;
     frame_count?: number;
+    synced_frames?: number;
     updated_at?: string;
     thumbnail?: string;
   } | null;
@@ -53,7 +55,6 @@ export default function CameraRemotePanel({ matchId }: Props) {
   useEffect(() => {
     loadSessions();
 
-    // Subscribe to realtime changes
     const channel = supabase
       .channel(`camera-sessions-${matchId}`)
       .on(
@@ -134,9 +135,10 @@ export default function CameraRemotePanel({ matchId }: Props) {
           const statusData = s.status_data ?? {};
           const currentPhase = statusData.phase ?? "unknown";
           const frameCount = statusData.frame_count ?? 0;
+          const syncedFrames = statusData.synced_frames ?? 0;
           const thumbnail = statusData.thumbnail as string | undefined;
           const lastSeen = s.last_used_at ? new Date(s.last_used_at) : null;
-          const isOnline = lastSeen && (Date.now() - lastSeen.getTime()) < 60000;
+          const isOnline = lastSeen && (Date.now() - lastSeen.getTime()) < 30000;
           const isRecording = currentPhase === "recording";
           const isPaused = currentPhase === "halftime_pause";
           const isReady = currentPhase === "ready";
@@ -160,18 +162,32 @@ export default function CameraRemotePanel({ matchId }: Props) {
                     {PHASE_LABELS[currentPhase] ?? currentPhase}
                   </Badge>
                 </div>
-                {isRecording && (
-                  <span className="text-xs text-muted-foreground">{frameCount} Frames</span>
-                )}
               </div>
 
-              {/* Live thumbnail preview */}
+              {/* Live thumbnail preview — shown in ready, recording, and halftime */}
               {thumbnail && isOnline && (
                 <div className="rounded overflow-hidden border border-border">
                   <img
                     src={`data:image/jpeg;base64,${thumbnail}`}
                     alt="Live-Vorschau"
                     className="w-full h-auto"
+                  />
+                </div>
+              )}
+
+              {/* Sync progress — shown during recording */}
+              {isRecording && frameCount > 0 && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <CloudUpload className="h-3 w-3" />
+                      <span>{syncedFrames} / {frameCount} Frames sync</span>
+                    </div>
+                    <span>{Math.round((syncedFrames / Math.max(frameCount, 1)) * 100)}%</span>
+                  </div>
+                  <Progress 
+                    value={(syncedFrames / Math.max(frameCount, 1)) * 100} 
+                    className="h-1.5" 
                   />
                 </div>
               )}

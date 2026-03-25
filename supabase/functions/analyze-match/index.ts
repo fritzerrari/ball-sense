@@ -143,6 +143,12 @@ WICHTIG:
 
     await supabase.from("analysis_jobs").update({ progress: 40 }).eq("id", job_id);
 
+    // Use lighter model for live partial analysis or very few frames
+    const isLightweight = (inlineFrames && inlineFrames.length < 5) || 
+      (await req.clone().json().catch(() => ({}))).phase === "live_partial";
+    const modelName = isLightweight ? "google/gemini-2.5-flash-lite" : "google/gemini-2.5-flash";
+    console.log(`Using model: ${modelName} (${selectedFrames.length} frames, lightweight: ${isLightweight})`);
+
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -150,7 +156,7 @@ WICHTIG:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: modelName,
         messages: [
           {
             role: "system",
