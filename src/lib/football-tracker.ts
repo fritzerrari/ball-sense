@@ -39,8 +39,8 @@ export type StabilityEvent = "bump" | "drift" | "zoom_change";
 export type StabilityCallback = (event: StabilityEvent, detail?: string) => void;
 
 const ANALYZE_FRAME_URL = `${typeof import.meta !== "undefined" ? import.meta.env?.VITE_SUPABASE_URL ?? "" : ""}/functions/v1/analyze-frame`;
-const AI_FRAME_INTERVAL_MS = 2500; // Send frame to AI every 2.5s
-const FALLBACK_REUSE_MS = 8000; // Reuse last AI result for up to 8s on failure
+const AI_FRAME_INTERVAL_MS = 5000; // Send frame to AI every 5s (reduced for stability)
+const FALLBACK_REUSE_MS = 15000; // Reuse last AI result for up to 15s on failure
 
 export class FootballTracker {
   private modelLoaded = false;
@@ -56,6 +56,7 @@ export class FootballTracker {
 
   // AI detection state
   private lastAIDetections: Detection[] = [];
+  private previousAIDetections: Detection[] = [];
   private lastAITimestamp = 0;
   private aiInFlight = false;
   private aiFrameCanvas: HTMLCanvasElement | null = null;
@@ -392,6 +393,7 @@ export class FootballTracker {
 
       const result = await resp.json();
       if (result.detections && Array.isArray(result.detections)) {
+        this.previousAIDetections = [...this.lastAIDetections];
         this.lastAIDetections = result.detections;
         this.lastAITimestamp = Date.now();
         this.fieldCoverage = result.field_coverage ?? 1;
@@ -411,11 +413,28 @@ export class FootballTracker {
   }
 
   /**
-   * Get current detections — real AI results or last known.
+   * Get current detections — real AI results with interpolation between frames.
    */
   private getCurrentDetections(): Detection[] {
     const age = Date.now() - this.lastAITimestamp;
     if (this.lastAIDetections.length > 0 && age < FALLBACK_REUSE_MS) {
+      // Simple linear interpolation: slightly shift positions based on age
+      // to avoid "frozen" overlays between AI calls
+      if (age > AI_FRAME_INTERVAL_MS && this.previousAIDetections.length > 0) {
+        const t = Math.min(1, age / FALLBACK_REUSE_MS);
+        return this.lastAIDetections.map((det, i) => {
+          const prev = this.previousAIDetections[i];
+          if (!prev || prev.label !== det.label) return det;
+          // Interpolate position: continue the motion direction
+          const dx = det.x - prev.x;
+          const dy = det.y - prev.y;
+          return {
+            ...det,
+            x: Math.max(0, Math.min(1, det.x + dx * t * 0.3)),
+            y: Math.max(0, Math.min(1, det.y + dy * t * 0.3)),
+          };
+        });
+      }
       return this.lastAIDetections;
     }
     // No recent detections — return empty (don't fabricate)
@@ -488,6 +507,7 @@ export class FootballTracker {
     this.frames = [];
     this.matchId = matchId;
     this.lastAIDetections = [];
+    this.previousAIDetections = [];
     this.lastAITimestamp = 0;
     this.aiErrorCount = 0;
     this.totalAIFrames = 0;
