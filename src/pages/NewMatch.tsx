@@ -232,6 +232,62 @@ export default function NewMatch() {
     await analyzeFrames(captureResult);
   }, [analyzeFrames]);
 
+  /** Send frames captured so far for halftime analysis WITHOUT stopping recording */
+  const triggerHalftimeAnalysis = useCallback(async () => {
+    if (!matchId || !liveCaptureRef.current) return;
+
+    const snapshot = liveCaptureRef.current.getSnapshot();
+    if (snapshot.frames.length < 3) {
+      toast.error("Noch zu wenige Frames für eine Analyse");
+      return;
+    }
+
+    setHalftimeSending(true);
+    try {
+      // Persist halftime frames
+      const framesJson = JSON.stringify({
+        frames: snapshot.frames,
+        duration_sec: snapshot.durationSec,
+        phase: "halftime",
+        captured_at: new Date().toISOString(),
+      });
+      await supabase.storage
+        .from("match-frames")
+        .upload(`${matchId}.json`, new Blob([framesJson], { type: "application/json" }), { upsert: true });
+
+      // Create halftime analysis job
+      const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
+        match_id: matchId,
+        status: "queued",
+        progress: 0,
+      }).select().single();
+      if (jobError) throw jobError;
+
+      await supabase.from("matches").update({ status: "processing" }).eq("id", matchId);
+
+      // Fire and forget
+      supabase.functions.invoke("analyze-match", {
+        body: {
+          match_id: matchId,
+          job_id: job.id,
+          frames: snapshot.frames,
+          duration_sec: snapshot.durationSec,
+          phase: "halftime",
+        },
+      });
+
+      setHalftimeSent(true);
+      if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+      toast.success("Halbzeit-Analyse gestartet! Aufnahme läuft weiter.");
+    } catch (err: any) {
+      toast.error(err.message ?? "Halbzeit-Analyse fehlgeschlagen");
+    } finally {
+      setHalftimeSending(false);
+    }
+  }, [matchId]);
+
+  const showHalftimeButton = isRecording && frameCount >= 3 && !halftimeSent;
+
   const canProceed = Boolean(date && fieldId);
 
   return (
