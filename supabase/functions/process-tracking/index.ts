@@ -1089,6 +1089,8 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           extrapolated: needsExtrapolation,
           tactical_estimated: t?.is_estimated ?? true,
           ball_detections_available: ballPositions.length >= 10,
+          analysis_stage: mode === "incremental" ? "prognose" : (needsExtrapolation ? "vorläufig" : "final"),
+          recalculation_needed: needsExtrapolation,
         },
       };
     });
@@ -1128,6 +1130,7 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           likely_official_tracks_ignored: likelyOfficials.length,
           coverage_ratio: coverageRatio,
           extrapolated: needsExtrapolation,
+          analysis_stage: mode === "incremental" ? "prognose" : (needsExtrapolation ? "vorläufig" : "final"),
         },
       });
     }
@@ -1165,6 +1168,9 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
     await updateProgress("finalize", 92, "Uploads werden finalisiert");
     for (const upload of uploads) { await supabase.from("tracking_uploads").update({ status: "done" }).eq("id", upload.id); }
 
+    const analysisStage = needsExtrapolation ? "vorläufig" : "final";
+    const stageLabel = analysisStage === "final" ? "Final – Qualitätsgeprüft" : "Vorläufig – Hochgerechnet";
+
     // Auto-trigger instant analysis
     if (matchContext?.home_club_id) {
       const { data: profile } = await supabase.from("profiles").select("user_id").eq("club_id", matchContext.home_club_id).limit(1).maybeSingle();
@@ -1174,14 +1180,29 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
           depth: "instant", status: "queued",
         });
         console.log(`[process-tracking] Auto-triggered instant analysis`);
+
+        // Notify user about analysis stage
+        await supabase.from("notifications").insert({
+          user_id: profile.user_id, match_id: matchId,
+          type: "analysis_complete",
+          title: `Analyse ${stageLabel}`,
+          body: analysisStage === "final"
+            ? `Die Match-Analyse ist vollständig abgeschlossen. Alle ${playerStats.length} Spieler wurden verarbeitet.`
+            : `Erste Ergebnisse liegen vor (${playerStats.length} Spieler). Daten basieren auf ${Math.round(coverageRatio * 100)}% Feldabdeckung – Hochrechnung aktiv.`,
+        });
       }
     }
 
     await supabase.from("matches").update({
       status: "done",
-      processing_progress: { phase: "complete", progress: 100, detail: "Verarbeitung abgeschlossen", updated_at: new Date().toISOString() },
+      processing_progress: {
+        phase: "complete", progress: 100,
+        detail: `${stageLabel} · ${playerStats.length} Spieler · ${sessions.length} Kamera(s)`,
+        analysis_stage: analysisStage,
+        updated_at: new Date().toISOString(),
+      },
     }).eq("id", matchId);
-    console.log(`[process-tracking] ✅ Complete: ${playerStats.length} players, ${sessions.length} camera(s)`);
+    console.log(`[process-tracking] ✅ Complete (${analysisStage}): ${playerStats.length} players, ${sessions.length} camera(s)`);
   } catch (err) {
     console.error("[process-tracking] Error:", err);
     await updateProgress("error", 0, err instanceof Error ? err.message : "Verarbeitung fehlgeschlagen");
