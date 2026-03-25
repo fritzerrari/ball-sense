@@ -586,7 +586,7 @@ export default function CameraTrackingPage() {
         return;
       }
 
-      if (Array.isArray(data?.corners) && data.corners.length === 4) {
+      if (Array.isArray(data?.corners) && data.corners.length >= 2) {
         const points = data.corners
           .map((corner) => {
             if (!corner || typeof corner !== "object") return null;
@@ -601,14 +601,38 @@ export default function CameraTrackingPage() {
           })
           .filter((point): point is { x: number; y: number } => !!point);
 
-        if (points.length === 4) {
-          setCalibrationPoints(points);
-          toast.success("Eckpunkte erkannt — Kalibrierung wird gespeichert…");
-          return;
+        if (points.length >= 2) {
+          // Complete missing corners client-side if backend returned 2-3
+          let finalPoints = points;
+          if (points.length === 2) {
+            const dx = points[1].x - points[0].x;
+            const dy = points[1].y - points[0].y;
+            const ratio = 68 / 105;
+            const perpX = -dy * ratio;
+            const perpY = dx * ratio;
+            finalPoints = [
+              points[0], points[1],
+              { x: Math.max(0, Math.min(1, points[1].x + perpX)), y: Math.max(0, Math.min(1, points[1].y + perpY)) },
+              { x: Math.max(0, Math.min(1, points[0].x + perpX)), y: Math.max(0, Math.min(1, points[0].y + perpY)) },
+            ];
+          } else if (points.length === 3) {
+            const p4x = points[0].x + (points[2].x - points[1].x);
+            const p4y = points[0].y + (points[2].y - points[1].y);
+            finalPoints = [...points, { x: Math.max(0, Math.min(1, p4x)), y: Math.max(0, Math.min(1, p4y)) }];
+          }
+
+          if (finalPoints.length === 4) {
+            setCalibrationPoints(finalPoints);
+            toast.success(points.length < 4
+              ? `${points.length} Ecken erkannt, ${4 - points.length} ergänzt — Kalibrierung wird gespeichert…`
+              : "Eckpunkte erkannt — Kalibrierung wird gespeichert…"
+            );
+            return;
+          }
         }
       }
 
-      toast.error("Ecken konnten nicht sicher erkannt werden — bitte manuell tippen");
+      toast.error("Ecken konnten nicht erkannt werden — bitte manuell die 4 Eckpunkte antippen");
     } catch (error) {
       console.error("[Calibration] Auto-detect failed", error);
       toast.error(error instanceof Error ? error.message : "Automatische Erkennung fehlgeschlagen");
