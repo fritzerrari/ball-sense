@@ -18,6 +18,12 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 
 const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
 const HighlightGallery = lazy(() => import("@/components/HighlightGallery"));
+const PressingChart = lazy(() => import("@/components/PressingChart"));
+const TransitionAnalysis = lazy(() => import("@/components/TransitionAnalysis"));
+const PassDirectionMap = lazy(() => import("@/components/PassDirectionMap"));
+const FormationTimeline = lazy(() => import("@/components/FormationTimeline"));
+const FatigueIndicator = lazy(() => import("@/components/FatigueIndicator"));
+const OpponentScoutReport = lazy(() => import("@/components/OpponentScoutReport"));
 
 const CATEGORY_ICONS: Record<string, typeof Target> = {
   offense: Target,
@@ -157,12 +163,17 @@ export default function MatchReport() {
   const summary = sections.find(s => s.section_type === "summary");
   const insights = sections.filter(s => s.section_type === "insight");
   const coaching = sections.find(s => s.section_type === "coaching");
-  const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
-  const chances = analysisResults.find(r => r.result_type === "chances");
-  const matchStructure = analysisResults.find(r => r.result_type === "match_structure");
-  const framePositions = analysisResults.find(r => r.result_type === "frame_positions");
-  const isProcessing = job?.status && !["complete", "failed"].includes(job.status);
-  const hasReport = sections.length > 0;
+    const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
+    const chances = analysisResults.find(r => r.result_type === "chances");
+    const matchStructure = analysisResults.find(r => r.result_type === "match_structure");
+    const framePositions = analysisResults.find(r => r.result_type === "frame_positions");
+    const pressingData = analysisResults.find(r => r.result_type === "pressing_data");
+    const transitions = analysisResults.find(r => r.result_type === "transitions");
+    const passDirections = analysisResults.find(r => r.result_type === "pass_directions");
+    const formationTimeline = analysisResults.find(r => r.result_type === "formation_timeline");
+    const opponentScouting = sections.find(s => s.section_type === "opponent_scouting");
+    const isProcessing = job?.status && !["complete", "failed"].includes(job.status);
+    const hasReport = sections.length > 0;
 
   return (
     <AppLayout>
@@ -340,6 +351,62 @@ export default function MatchReport() {
                 <HighlightGallery matchId={id} />
               </Suspense>
             )}
+
+            {/* Pressing Analysis */}
+            {pressingData?.data?.length > 0 && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <PressingChart
+                  data={pressingData.data}
+                  intervalSec={framePositions?.data?.interval_sec ?? 30}
+                />
+              </Suspense>
+            )}
+
+            {/* Transitions */}
+            {transitions?.data?.length > 0 && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <TransitionAnalysis
+                  data={transitions.data}
+                  intervalSec={framePositions?.data?.interval_sec ?? 30}
+                />
+              </Suspense>
+            )}
+
+            {/* Pass Direction Map */}
+            {passDirections?.data && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <PassDirectionMap data={passDirections.data} />
+              </Suspense>
+            )}
+
+            {/* Formation Timeline */}
+            {formationTimeline?.data?.length > 0 && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <FormationTimeline data={formationTimeline.data} />
+              </Suspense>
+            )}
+
+            {/* Fatigue Indicator */}
+            {framePositions?.data?.frames?.length >= 4 && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <FatigueIndicator
+                  frames={framePositions.data.frames}
+                  intervalSec={framePositions.data.interval_sec ?? 30}
+                />
+              </Suspense>
+            )}
+
+            {/* Opponent Scouting */}
+            {opponentScouting && (() => {
+              try {
+                const scoutData = JSON.parse(opponentScouting.content);
+                return (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <OpponentScoutReport data={scoutData} />
+                  </Suspense>
+                );
+              } catch { return null; }
+            })()}
 
             {/* Danger Zones + Chances */}
             {(dangerZones || chances) && (

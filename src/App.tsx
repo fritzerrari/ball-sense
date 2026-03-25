@@ -30,6 +30,7 @@ const LegalPage = lazy(() => import("./pages/LegalPage"));
 const InstallGuide = lazy(() => import("./pages/InstallGuide"));
 const FullGuide = lazy(() => import("./pages/FullGuide"));
 const TrendDashboard = lazy(() => import("./pages/TrendDashboard"));
+const PlayerCompare = lazy(() => import("./pages/PlayerCompare"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +76,7 @@ const App = () => (
                 <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/trends" element={<ProtectedRoute><TrendDashboard /></ProtectedRoute>} />
+                <Route path="/players/compare" element={<ProtectedRoute><PlayerCompare /></ProtectedRoute>} />
                 <Route path="/install" element={<InstallGuide />} />
                 <Route path="/guide" element={<FullGuide />} />
                 <Route path="/legal/:slug" element={<LegalPage />} />

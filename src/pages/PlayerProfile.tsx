@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
-import { useParams, Link } from "react-router-dom";
-import { Activity, ArrowLeft, ArrowRight, Gauge, Goal, Pencil, Shield, Trophy, User, Zap } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { Activity, ArrowLeft, ArrowRight, Gauge, Goal, Pencil, Shield, Trophy, User, Users, Zap } from "lucide-react";
 import { usePlayer, useUpdatePlayer, useUpdatePlayerConsent } from "@/hooks/use-players";
 import { usePlayerAllStats } from "@/hooks/use-match-stats";
 import { HeatmapField } from "@/components/HeatmapField";
@@ -29,6 +29,7 @@ export default function PlayerProfile() {
   const updatePlayer = useUpdatePlayer();
   const updatePlayerConsent = useUpdatePlayerConsent();
   const { isAdmin, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const [formName, setFormName] = useState("");
@@ -131,6 +132,7 @@ export default function PlayerProfile() {
               </div>
             </div>
             <div className="flex w-full flex-col gap-2 lg:w-auto">
+              <Button variant="heroOutline" size="sm" onClick={() => navigate(`/players/compare?p1=${player.id}`)} className="w-full lg:w-auto"><Users className="mr-1 h-4 w-4" /> Vergleichen</Button>
               <Button variant="heroOutline" size="sm" onClick={openEdit} className="w-full lg:w-auto"><Pencil className="mr-1 h-4 w-4" /> Bearbeiten</Button>
               {canManageConsent && <Button variant="heroOutline" size="sm" onClick={openConsent} className="w-full lg:w-auto">Einwilligung pflegen</Button>}
               {recentStats[0]?.matches?.id && <Button variant="heroOutline" size="sm" asChild><Link to={`/matches/${recentStats[0].matches.id}`}>Letztes Spiel <ArrowRight className="ml-1 h-4 w-4" /></Link></Button>}
