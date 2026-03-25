@@ -41,6 +41,8 @@ import { ConsentStatusBadge } from "@/components/ConsentStatusBadge";
 import { CoachSummary } from "@/components/CoachSummary";
 import { WhatIfBoard } from "@/components/WhatIfBoard";
 import { supabase } from "@/integrations/supabase/client";
+import { getAnalysisStage } from "@/lib/analysis-status";
+import { AnalysisStatusBanner, MetricStatusIndicator } from "@/components/AnalysisStatusBanner";
 
 const tabs = ["Übersicht", "Heim", "Auswärts", "Vergleich", "Berichte & Presse"];
 
