@@ -157,6 +157,7 @@ export default function MatchReport() {
   const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
   const chances = analysisResults.find(r => r.result_type === "chances");
   const matchStructure = analysisResults.find(r => r.result_type === "match_structure");
+  const framePositions = analysisResults.find(r => r.result_type === "frame_positions");
   const isProcessing = job?.status && !["complete", "failed"].includes(job.status);
   const hasReport = sections.length > 0;
 
