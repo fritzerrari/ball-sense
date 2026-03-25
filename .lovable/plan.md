@@ -1,122 +1,137 @@
 
 
-## Tiefenanalyse: Warum das System nicht funktioniert
+## Tiefenanalyse: Warum KPIs leer sind und Heatmaps falsch
 
-### Kernproblem identifiziert
+### Identifizierte Kernprobleme (aus DB-Analyse)
 
-**Die gesamte Tracking-Engine ist eine Simulation.** Die Datei `src/lib/football-tracker.ts` enthaelt diese Kommentare:
+**1. Alle taktischen KPIs sind 0 — Bug in `estimateTacticalStats`**
 
-```
-FootballTracker - Abstraction layer for on-device YOLO tracking.
-Currently runs as a scaffold/stub. Real ONNX inference will be plugged in later.
-```
+Die Funktion hat einen Guard `if (positions.length < 5 || minutesPlayed < 1) return empty`. Bei kurzen Aufnahmen (26 Sekunden) ist `minutes_played = 0` (gerundet von 0.43), daher werden ALLE taktischen Stats (Paesse, Zweikampfe, Ballkontakte, Schuesse) sofort auf 0 gesetzt — obwohl Ballpositions-Daten vorhanden sind (`ball_detections_available: true`).
 
-Die Methode `initStablePlayers()` erzeugt zufaellige Spielerpositionen, `updateStablePlayers()` bewegt sie zufaellig. Kein einziger Frame des Kamerabilds wird tatsaechlich analysiert. Deshalb:
+**2. Fortschrittsanzeige zeigt 100% Datenqualitaet trotz "Vorlaeufig"**
 
-- **Heatmap stimmt nicht**: Sie zeigt zufaellige Simulationsdaten, nicht die echte Spielerverteilung
-- **Schwachstellen-Heatmap falsch**: Basiert auf den gleichen simulierten Daten
-- **15 Spieler erkannt**: Es werden immer genau `homeSquadSize + awaySquadSize` simulierte Spieler erzeugt
-- **Analyse-Status immer gleich**: "Vorlaeufig 70%" ist ein fester Wert aus `getAnalysisStatusInfo()`, nicht match-spezifisch
-- **Plus-Markierungen stimmen nicht**: Overlay zeichnet simulierte Positionen, nicht echte
+`processing_progress.progress = 100` (= Verarbeitung abgeschlossen) wird als `actualProgress` an die `AnalysisStatusBanner` uebergeben. Die Banner-Logik zeigt dann "Datenqualitaet 100%" — aber das ist die PROCESSING-Fortschritt, nicht die DATEN-Qualitaet. Bei 39% Feldabdeckung sollte die Qualitaet ~39% sein, nicht 100%.
 
-### Loesung: 3-Phasen-Umbau
+**3. `analyze-frame` Edge Function hat NULL Logs**
+
+Das bedeutet: waehrend des Live-Trackings kommt kein einziger Frame-Analyse-Aufruf beim Server an. Moegliche Ursache: der `ANALYZE_FRAME_URL` im Client enthalt keinen API-Key/Authorization-Header. Die Edge Function erwartet das aber nicht explizit (kein Auth-Check), also ist es wahrscheinlicher ein CORS- oder URL-Problem bei der Konfiguration.
+
+**4. Heatmaps basieren auf nur 26 Frames mit 39% Abdeckung**
+
+Die Detections kommen zwar an (15 Tracks erkannt), aber die Dichte ist extrem gering. Dazu werden alle Tracks mit `assignment_confidence: 0.1` (minimaler Wert) zugeordnet — die Zuordnung ist also fast zufaellig.
+
+**5. Zwei separate Konzepte werden vermischt: Processing-Progress vs. Daten-Qualitaet**
+
+Der User sieht "100% Datenqualitaet" + "WIRD KORRIGIERT" + "39% Feld" gleichzeitig — das ist widersprüchlich und verwirrend.
 
 ---
 
-#### Phase 1 — Echte Frame-Analyse via Gemini Vision (Sofort)
+### Loesung
 
-Statt der Simulation wird jeder N-te Kameraframe an Gemini Vision gesendet, um echte Spielerpositionen zu erkennen.
+#### Fix 1: `minutesPlayed`-Guard in `estimateTacticalStats` reparieren
 
-**Neue Edge Function `analyze-frame`**:
-- Empfaengt ein Base64-Bild vom Kamerastream
-- Sendet es an `google/gemini-2.5-flash` mit einem Prompt der Spielerpositionen als JSON zurueckgibt
-- Gibt `{detections: [{x, y, team, label}...]}` zurueck
-- Wird alle 2-3 Sekunden aufgerufen (nicht jeden Frame — Rate-Limits beachten)
+Statt `minutesPlayed < 1` → `positions.length < 5` als einzigen Guard nutzen. Die Funktion kann auch bei Aufnahmen unter 1 Minute sinnvolle Proximity-Heuristiken berechnen, wenn genuegend Positionen vorhanden sind.
 
-**FootballTracker Umbau**:
-- `startTracking()` startet einen Intervall der alle 2-3s ein Standbild vom Video extrahiert
-- Dieses Bild wird an `analyze-frame` gesendet statt `updateStablePlayers()` aufzurufen
-- Zwischen den KI-Frames wird linear interpoliert (Positionen glaetten)
-- Fallback: wenn KI nicht antwortet (Timeout, Rate-Limit), letzten bekannten Frame wiederverwenden
-- Die Simulation (`initStablePlayers`, `updateStablePlayers`, `stablePlayers`) wird komplett entfernt
+**Datei**: `supabase/functions/process-tracking/index.ts` (Zeile 332)
 
-**Prompt-Design fuer Gemini Vision**:
+#### Fix 2: Datenqualitaet ≠ Processing-Progress trennen
+
+Neue Logik: Datenqualitaet = `coverageRatio * confidence * dataDensity`. Nicht mehr `processing_progress.progress` als `actualProgress` uebergeben. Stattdessen einen separaten `dataQuality`-Wert berechnen:
+- Coverage-Ratio (39% in diesem Fall)
+- Durchschnittliche Assignment-Confidence
+- Frame-Dichte (Frames pro Minute)
+
+In `MatchReport.tsx`: den Progress-Balken aus coverage_ratio berechnen, NICHT aus processing_progress.
+
+**Dateien**: `src/pages/MatchReport.tsx`, `src/components/AnalysisStatusBanner.tsx`
+
+#### Fix 3: `analyze-frame` Aufruf debuggen und reparieren
+
+Der `ANALYZE_FRAME_URL` in `football-tracker.ts` wird nur aufgerufen, wenn der Tracker laeuft. Aber es gibt keine Logs — das heisst der Aufruf scheitert still. Moegliche Ursachen:
+- Der Aufruf hat keinen Authorization-Header → Edge Function braucht keinen (kein Auth-Check im Code), aber die Supabase-Gateway koennte ihn blocken wenn `verify_jwt` nicht auf `false` steht
+- Die URL wird falsch zusammengesetzt wenn `VITE_SUPABASE_URL` leer ist
+
+Pruefen und fixen: `verify_jwt = false` in config.toml fuer `analyze-frame` sicherstellen + Anon-Key als Authorization-Header mitsenden.
+
+**Dateien**: `src/lib/football-tracker.ts`, `supabase/config.toml`
+
+#### Fix 4: `minutes_played` bei kurzen Aufnahmen korrekt berechnen
+
+Statt `Math.round(durationMs / 60000)` (= 0 bei 26s) → `Math.max(1, Math.round(durationMs / 60000))` oder Dezimalwert verwenden: `Math.round(durationMs / 6000) / 10` (= 0.4 min).
+
+**Datei**: `supabase/functions/process-tracking/index.ts`
+
+#### Fix 5: Datenqualitaets-Indikator richtig berechnen
+
+Neuer Qualitaetswert im Processing-Output:
 ```
-Analyze this football match frame. Return JSON with detected players:
-- x, y: normalized 0-1 position in image
-- team: "home" (darker/colored jersey) or "away" (lighter jersey) or "referee"
-- label: "person" or "ball"
-Only return players actually visible. Do NOT fabricate positions.
+data_quality = min(100, round(
+  coverageRatio * 40 +
+  (assignedPlayers / expectedPlayers) * 30 +
+  min(1, framesPerMinute / 60) * 30
+))
 ```
 
-#### Phase 2 — Match-spezifischer Analyse-Status (Sofort)
-
-**`AnalysisStatusBanner` korrigieren**:
-- Statt fester "70%" den echten `processing_progress.progress` Wert aus der DB nutzen
-- Zeige tatsaechliche Datenquellen: "X Frames analysiert, Y Spieler erkannt, Z% Feldabdeckung"
-- Wenn match.processing_progress vorhanden, zeige diese Werte statt generischer Stufen
-
-**`getAnalysisStatusInfo` anpassen**:
-- Progress-Wert nicht mehr hardcoden (35/70/100), sondern als Parameter aus dem Match uebernehmen
-- Bei "vorlaeufig": tatsaechlichen coverage_ratio * 100 als Progress verwenden
-
-#### Phase 3 — Heatmap und Schwachstellen-Analyse korrigieren (Folge)
-
-**Heatmap**:
-- Bleibt technisch gleich, zeigt aber jetzt echte Daten statt Simulation
-- `computeTrackStats()` im Backend bekommt echte Positionsdaten
-- Grid-Normalisierung bleibt, Darstellung passt sich automatisch an
-
-**Schwachstellen-Heatmap**:
-- `deriveWeaknessHeatmap()` arbeitet mit echten team_match_stats.formation_heatmap Werten
-- Keine Aenderung in der Logik noetig — das Problem war nur die Eingangsdaten-Qualitaet
+Dieser Wert wird im Banner als "Datenqualitaet" angezeigt statt der Processing-Progress.
 
 ---
 
 ### Technische Details
 
-**Neue Datei: `supabase/functions/analyze-frame/index.ts`**
+**estimateTacticalStats Guard-Fix (process-tracking):**
 ```typescript
-// Empfaengt Base64-Bild, sendet an Gemini Vision
-// Gibt Spielerpositionen zurueck
-// Rate-Limiting: max 30 Aufrufe/Minute pro Match
+// ALT: if (positions.length < 5 || minutesPlayed < 1) return empty;
+// NEU: nur Positionsanzahl pruefen, nicht Spielzeit
+if (positions.length < 5) return empty;
 ```
 
-**Geaenderte Datei: `src/lib/football-tracker.ts`**
-- Entferne: `stablePlayers`, `initStablePlayers`, `updateStablePlayers`, `ballX/Y/Vx/Vy`
-- Neu: `analyzeFrame()` — extrahiert Canvas-Bild, sendet an Edge Function
-- Neu: `interpolatePositions()` — glaettet zwischen KI-Frames
-- Intervall von 500ms (Simulation) auf 2500ms (KI-Analyse) anpassen
-- Zwischen KI-Frames: letzte bekannte Positionen beibehalten
+**minutes_played Fix:**
+```typescript
+// ALT: minutes_played: Math.round(durationMs / 60000),
+// NEU: Mindestens 1 Minute, damit Downstream-Logik nicht bricht
+minutes_played: Math.max(1, Math.round(durationMs / 60000)),
+```
 
-**Geaenderte Datei: `src/components/AnalysisStatusBanner.tsx`**
-- Neuer Prop: `actualProgress?: number` (aus processing_progress)
-- Zeige echten Progress statt hardcodiertem Stufenwert
+**Datenqualitaet statt Processing-Progress (MatchReport.tsx):**
+```typescript
+const dataQuality = Math.round(
+  coverageRatio * 40 +
+  Math.min(1, (playerStats?.length ?? 0) / 14) * 30 +
+  Math.min(1, (framesAnalyzed ?? 0) / 100) * 30
+);
 
-**Geaenderte Datei: `src/pages/MatchReport.tsx`**
-- Lese `match.processing_progress?.progress` und gebe es an AnalysisStatusBanner weiter
-- Lese echte Felder: tracked_player_count, cameras_used, coverage_ratio aus team_match_stats.raw_metrics
+<AnalysisStatusBanner
+  actualProgress={dataQuality}  // statt processing_progress.progress
+  ...
+/>
+```
 
-**Geaenderte Datei: `src/lib/analysis-status.ts`**
-- `getAnalysisStatusInfo()` akzeptiert optionalen `actualProgress` Parameter
-- Nutze diesen statt fester Werte
+**analyze-frame Auth-Header (football-tracker.ts):**
+```typescript
+const resp = await fetch(ANALYZE_FRAME_URL, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
+  },
+  body: JSON.stringify({ imageBase64, matchId, cameraIndex }),
+});
+```
 
 ### Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `supabase/functions/analyze-frame/index.ts` | Neue Edge Function fuer Echtzeit-Frame-Analyse |
-| `src/lib/football-tracker.ts` | Simulation entfernen, echte KI-Analyse einbauen |
-| `src/components/AnalysisStatusBanner.tsx` | Echten Progress-Wert anzeigen |
-| `src/pages/MatchReport.tsx` | Match-spezifische Daten an Banner weitergeben |
-| `src/lib/analysis-status.ts` | Dynamischen Progress-Wert unterstuetzen |
-| `src/lib/live-stats-engine.ts` | Anpassung an variable Frame-Rate (2.5s statt 0.5s) |
+| `supabase/functions/process-tracking/index.ts` | minutesPlayed Guard fix, minutes_played min 1, dataQuality Output |
+| `src/lib/football-tracker.ts` | apikey Header bei analyze-frame Aufruf |
+| `src/pages/MatchReport.tsx` | dataQuality berechnen statt processing_progress |
+| `src/components/AnalysisStatusBanner.tsx` | Label "Datenqualitaet" korrekt anzeigen |
+| `supabase/config.toml` | verify_jwt = false fuer analyze-frame pruefen |
 
 ### Prioritaet
 
-1. `analyze-frame` Edge Function (ohne diese laeuft nichts)
-2. `FootballTracker` Umbau (Simulation raus, echte Analyse rein)
-3. Analyse-Status match-spezifisch machen
-4. LiveStatsEngine an neue Frame-Rate anpassen
-5. Heatmap-Korrekturen (folgen automatisch aus echten Daten)
+1. minutesPlayed Guard + minutes_played Fix (sofort — behebt leere KPIs)
+2. analyze-frame Auth-Header (ohne das kommt keine echte AI-Analyse an)
+3. Datenqualitaet vs Processing-Progress trennen
+4. dataQuality-Formel implementieren
 
