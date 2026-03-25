@@ -1,6 +1,16 @@
 import { useMemo } from "react";
 import { Activity, Zap, Route, Timer, TrendingUp, Footprints } from "lucide-react";
-import { getPlayerColor } from "./PitchVisualization";
+// Color helper for player position visualization
+const POSITION_COLORS: Record<string, string> = {
+  TW: "hsl(200, 70%, 50%)", ST: "hsl(0, 70%, 55%)", MS: "hsl(30, 80%, 55%)",
+  ZM: "hsl(140, 50%, 45%)", IV: "hsl(220, 60%, 50%)", AV: "hsl(260, 50%, 55%)",
+  LM: "hsl(170, 60%, 45%)", RM: "hsl(310, 50%, 55%)", ZDM: "hsl(180, 45%, 45%)",
+  ZOM: "hsl(45, 70%, 50%)", LV: "hsl(90, 50%, 45%)", RV: "hsl(350, 50%, 50%)",
+};
+export function getPlayerColor(position: string | null): string {
+  if (!position) return "hsl(var(--muted-foreground))";
+  return POSITION_COLORS[position] ?? "hsl(var(--muted-foreground))";
+}
 
 interface PlayerRosterItem {
   id: string;

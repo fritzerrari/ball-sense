@@ -68,6 +68,102 @@ export type Database = {
           },
         ]
       }
+      analysis_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          match_id: string
+          progress: number | null
+          started_at: string | null
+          status: string
+          video_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          match_id: string
+          progress?: number | null
+          started_at?: string | null
+          status?: string
+          video_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          match_id?: string
+          progress?: number | null
+          started_at?: string | null
+          status?: string
+          video_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_jobs_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_jobs_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "match_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      analysis_results: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          data: Json
+          id: string
+          job_id: string
+          match_id: string
+          result_type: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          data?: Json
+          id?: string
+          job_id: string
+          match_id: string
+          result_type: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          data?: Json
+          id?: string
+          job_id?: string
+          match_id?: string
+          result_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_results_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_results_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_football_config: {
         Row: {
           api_league_id: number | null
@@ -903,6 +999,54 @@ export type Database = {
           },
         ]
       }
+      match_videos: {
+        Row: {
+          club_id: string
+          created_at: string
+          duration_sec: number | null
+          file_path: string
+          file_size_bytes: number | null
+          id: string
+          match_id: string
+          status: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          duration_sec?: number | null
+          file_path: string
+          file_size_bytes?: number | null
+          id?: string
+          match_id: string
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          duration_sec?: number | null
+          file_path?: string
+          file_size_bytes?: number | null
+          id?: string
+          match_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_videos_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_videos_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           away_club_id: string | null
@@ -1344,6 +1488,47 @@ export type Database = {
           },
         ]
       }
+      report_sections: {
+        Row: {
+          confidence: string | null
+          content: string
+          created_at: string
+          id: string
+          match_id: string
+          section_type: string
+          sort_order: number | null
+          title: string
+        }
+        Insert: {
+          confidence?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          match_id: string
+          section_type: string
+          sort_order?: number | null
+          title: string
+        }
+        Update: {
+          confidence?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          match_id?: string
+          section_type?: string
+          sort_order?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_sections_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       super_admins: {
         Row: {
           active: boolean
@@ -1473,6 +1658,57 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tracking_uploads_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_recommendations: {
+        Row: {
+          category: string | null
+          club_id: string
+          created_at: string
+          description: string
+          id: string
+          linked_pattern: string | null
+          match_id: string
+          priority: number | null
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          club_id: string
+          created_at?: string
+          description: string
+          id?: string
+          linked_pattern?: string | null
+          match_id: string
+          priority?: number | null
+          title: string
+        }
+        Update: {
+          category?: string | null
+          club_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          linked_pattern?: string | null
+          match_id?: string
+          priority?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_recommendations_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_recommendations_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "matches"
