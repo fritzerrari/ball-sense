@@ -569,7 +569,12 @@ export default function MatchReport() {
             stage={analysisStage}
             coverageRatio={coverageRatio}
             isExtrapolated={isExtrapolated}
-            playerCount={(playerStats ?? []).length}
+            playerCount={
+              // Use qualified player count from raw_metrics if available, otherwise cap display
+              homeTeamStats?.raw_metrics && typeof homeTeamStats.raw_metrics === "object"
+                ? (homeTeamStats.raw_metrics as any)?.tracked_player_count ?? (playerStats ?? []).filter((s: any) => s.player_id || (s.raw_metrics as any)?.assignment_confidence > 0.3).length
+                : (playerStats ?? []).length
+            }
             matchStatus={match.status}
             actualProgress={
               homeTeamStats?.raw_metrics && typeof homeTeamStats.raw_metrics === "object"
