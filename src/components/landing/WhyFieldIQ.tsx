@@ -20,6 +20,10 @@ const comparisons = {
       classic: "12 Torschüsse",
       fieldiq: "62% Angriffe über rechts — der Gegner liest euch",
     },
+    {
+      classic: "2 Stunden manuelle Aufstellung + Statistik-Eingabe",
+      fieldiq: "30 Sekunden Setup — die KI erkennt alles automatisch",
+    },
   ],
   en: [
     {
@@ -37,6 +41,10 @@ const comparisons = {
     {
       classic: "12 shots on goal",
       fieldiq: "62% attacks down the right — opponent reads your patterns",
+    },
+    {
+      classic: "2 hours manual lineup + stats entry",
+      fieldiq: "30-second setup — AI detects everything automatically",
     },
   ],
 };
@@ -104,7 +112,7 @@ export function WhyFieldIQ() {
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-1 block">
                       {classicLabel}
                     </span>
-                    <p className="text-sm text-muted-foreground line-through decoration-muted-foreground/30">
+                    <p className="text-sm text-muted-foreground/70 line-through decoration-muted-foreground/30">
                       {item.classic}
                     </p>
                   </div>

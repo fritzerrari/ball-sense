@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Smartphone, Hand, Sparkles, Clock, MousePointerClick, Bot } from "lucide-react";
+import { Smartphone, Hand, Sparkles, Clock, MousePointerClick, Bot, ChevronRight, Camera } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 export function TransparencySection() {
@@ -20,11 +20,12 @@ export function TransparencySection() {
         {
           icon: Smartphone,
           phase: "Vor dem Spiel",
-          time: "2 Minuten",
+          time: "30 Sekunden",
           steps: [
-            { text: "Smartphone aufstellen", type: "manual" as const },
-            { text: "Feld-Kalibrierung (4 Ecken antippen)", type: "manual" as const },
-            { text: "Aufstellung aus Kader wählen", type: "manual" as const },
+            { text: "1–3 Smartphones aufstellen (je nach Feldgröße)", type: "manual" as const },
+            { text: "6-stelligen Kamera-Code eingeben", type: "manual" as const },
+            { text: "Aufstellung aus Kader wählen", type: "optional" as const },
+            { text: "Oder: KI-Automatik — erkennt Spieler automatisch", type: "auto" as const },
           ],
         },
         {
@@ -32,6 +33,7 @@ export function TransparencySection() {
           phase: "Während des Spiels",
           time: "Optional",
           steps: [
+            { text: "Aufnahme starten — fertig", type: "manual" as const },
             { text: "Events antippen (Tor, Karte, Ecke, Chance)", type: "optional" as const },
             { text: "Löst automatisch Highlight-Clips aus", type: "auto" as const },
             { text: "Die KI analysiert durchgehend im Hintergrund", type: "auto" as const },
@@ -52,11 +54,12 @@ export function TransparencySection() {
         {
           icon: Smartphone,
           phase: "Before the match",
-          time: "2 minutes",
+          time: "30 seconds",
           steps: [
-            { text: "Set up your smartphone", type: "manual" as const },
-            { text: "Field calibration (tap 4 corners)", type: "manual" as const },
-            { text: "Select lineup from squad", type: "manual" as const },
+            { text: "Set up 1–3 smartphones (depending on pitch size)", type: "manual" as const },
+            { text: "Enter 6-digit camera code", type: "manual" as const },
+            { text: "Select lineup from squad", type: "optional" as const },
+            { text: "Or: AI auto-discovery — detects players automatically", type: "auto" as const },
           ],
         },
         {
@@ -64,6 +67,7 @@ export function TransparencySection() {
           phase: "During the match",
           time: "Optional",
           steps: [
+            { text: "Start recording — done", type: "manual" as const },
             { text: "Tap events (goal, card, corner, chance)", type: "optional" as const },
             { text: "Automatically triggers highlight clips", type: "auto" as const },
             { text: "AI analyzes continuously in the background", type: "auto" as const },
@@ -103,16 +107,31 @@ export function TransparencySection() {
           <p className="text-muted-foreground max-w-md mx-auto">{desc}</p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto relative">
+          {/* Desktop connectors between cards */}
+          <div className="hidden md:block absolute top-1/2 left-[33.33%] w-[1px] h-12 -translate-y-1/2 z-10">
+            <div className="w-full h-full bg-gradient-to-b from-transparent via-primary/30 to-transparent" />
+            <ChevronRight className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 text-primary/40" />
+          </div>
+          <div className="hidden md:block absolute top-1/2 left-[66.66%] w-[1px] h-12 -translate-y-1/2 z-10">
+            <div className="w-full h-full bg-gradient-to-b from-transparent via-primary/30 to-transparent" />
+            <ChevronRight className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 text-primary/40" />
+          </div>
+
           {phases.map((phase, i) => (
             <motion.div
               key={i}
-              className="rounded-2xl border border-border/50 bg-card/50 p-6 md:p-7 relative overflow-hidden group"
+              className="rounded-2xl border border-border/50 bg-card/50 p-6 md:p-7 relative overflow-hidden group hover:border-primary/20 transition-all duration-300"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.15 }}
             >
+              {/* Phase number watermark */}
+              <span className="absolute -top-3 -right-1 text-[80px] font-display font-bold text-foreground/[0.03] leading-none select-none pointer-events-none">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+
               {/* Phase header */}
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -144,6 +163,20 @@ export function TransparencySection() {
                   );
                 })}
               </div>
+
+              {/* Camera hint for first phase */}
+              {i === 0 && (
+                <div className="mt-4 pt-3 border-t border-border/30">
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <Camera className="h-3.5 w-3.5 text-primary/60 flex-shrink-0" />
+                    <span>
+                      {language === "de"
+                        ? "1 Kamera reicht — 2–3 für volle Abdeckung"
+                        : "1 camera is enough — 2–3 for full coverage"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
