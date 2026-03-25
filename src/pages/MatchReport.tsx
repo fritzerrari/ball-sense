@@ -112,10 +112,10 @@ function SectionHeader({ eyebrow, title, description }: { eyebrow: string; title
 export default function MatchReport() {
   const { id } = useParams();
   const { clubName, clubId, session } = useAuth();
-  const { data: match, isLoading } = useMatch(id);
+  const { data: match, isLoading, refetch: refetchMatch } = useMatch(id);
   const { data: playerStats, refetch: refetchPlayerStats } = usePlayerMatchStats(id);
   const { data: teamStats, refetch: refetchTeamStats } = useTeamMatchStats(id);
-  const { data: uploads } = useTrackingUploads(id);
+  const { data: uploads, refetch: refetchUploads } = useTrackingUploads(id);
   const { data: apiStats } = useApiFootballStats(id);
   const { data: events } = useMatchEvents(id);
   const [activeTab, setActiveTab] = useState("Übersicht");
@@ -131,13 +131,15 @@ export default function MatchReport() {
 
   useEffect(() => {
     if (!id || !isLive) return;
-    
-    // Fast polling every 2s during processing
+
+    // Fast polling every 2s during live/processing
     const pollInterval = setInterval(() => {
+      refetchMatch();
       refetchPlayerStats();
       refetchTeamStats();
+      refetchUploads();
     }, 2000);
-    
+
     const channel = supabase
       .channel(`live-stats-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "player_match_stats", filter: `match_id=eq.${id}` }, () => {
@@ -147,12 +149,19 @@ export default function MatchReport() {
       .on("postgres_changes", { event: "*", schema: "public", table: "team_match_stats", filter: `match_id=eq.${id}` }, () => {
         refetchTeamStats();
       })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches", filter: `id=eq.${id}` }, () => {
+        refetchMatch();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tracking_uploads", filter: `match_id=eq.${id}` }, () => {
+        refetchUploads();
+      })
       .subscribe();
-    return () => { 
+
+    return () => {
       clearInterval(pollInterval);
-      supabase.removeChannel(channel); 
+      supabase.removeChannel(channel);
     };
-  }, [id, isLive, refetchPlayerStats, refetchTeamStats]);
+  }, [id, isLive, refetchMatch, refetchPlayerStats, refetchTeamStats, refetchUploads]);
 
   const handleGenerateCode = async () => {
     if (!clubId || !session?.user?.id || !id) return;
@@ -201,6 +210,11 @@ export default function MatchReport() {
   const homePlayerStats = (playerStats ?? []).filter((s) => s.team === "home");
   const awayPlayerStats = (playerStats ?? []).filter((s) => s.team === "away");
   const hasStats = (playerStats?.length ?? 0) > 0;
+  const uploadCount = uploads?.length ?? 0;
+  const showProcessingRoadmap = Boolean(
+    id &&
+    (match?.status === "processing" || (match?.status === "live" && !hasStats) || (uploadCount > 0 && !hasStats && match?.status !== "done")),
+  );
   const homeAgg = aggregatePlayerMetrics(homePlayerStats);
   const awayAgg = aggregatePlayerMetrics(awayPlayerStats);
 
@@ -485,6 +499,14 @@ export default function MatchReport() {
             </div>
           )}
         </div>
+
+        {showProcessingRoadmap && id && (
+          <ProcessingRoadmap
+            matchId={id}
+            matchCreatedAt={match.created_at}
+            uploadCount={uploadCount}
+          />
+        )}
 
         {/* No stats warning with reprocess button */}
         {!hasStats && uploads && uploads.length > 0 && match.status === "done" && (

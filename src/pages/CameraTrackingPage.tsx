@@ -247,7 +247,7 @@ export default function CameraTrackingPage() {
   // 30-second micro-batch sync during tracking
   useEffect(() => {
     if (phase !== "tracking" || isPaused) return;
-    const SYNC_INTERVAL_MS = 30_000;
+    const SYNC_INTERVAL_MS = 10_000;
     const syncMicroBatch = async () => {
       const token = localStorage.getItem(sessionKey);
       if (!liveEngineRef.current || !trackerRef.current || !id || !token) return;
