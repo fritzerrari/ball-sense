@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon } from "lucide-react";
+import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
@@ -17,6 +17,8 @@ export default function CameraTrackingPage() {
   const [phase, setPhase] = useState<Phase>("ready");
   const [progress, setProgress] = useState(0);
   const [frameCount, setFrameCount] = useState(0);
+  const [halftimeSent, setHalftimeSent] = useState(false);
+  const [halftimeSending, setHalftimeSending] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
@@ -33,7 +35,6 @@ export default function CameraTrackingPage() {
         videoRef.current.play();
       }
 
-      // Start frame capture after short delay for video to render
       setTimeout(() => {
         if (videoRef.current) {
           liveCaptureRef.current = startLiveCapture(videoRef.current);
@@ -41,9 +42,9 @@ export default function CameraTrackingPage() {
       }, 500);
 
       setPhase("recording");
+      setHalftimeSent(false);
       if (navigator.vibrate) navigator.vibrate(50);
 
-      // Update frame count periodically
       const countInterval = setInterval(() => {
         setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
       }, 5000);
@@ -54,14 +55,66 @@ export default function CameraTrackingPage() {
     }
   }, []);
 
+  /** Send frames captured so far for halftime analysis WITHOUT stopping recording */
+  const triggerHalftimeAnalysis = useCallback(async () => {
+    if (!matchId || !liveCaptureRef.current) return;
+
+    const snapshot = liveCaptureRef.current.getSnapshot();
+    if (snapshot.frames.length < 3) {
+      toast.error("Noch zu wenige Frames für eine Analyse");
+      return;
+    }
+
+    setHalftimeSending(true);
+    try {
+      // Persist halftime frames
+      const framesJson = JSON.stringify({
+        frames: snapshot.frames,
+        duration_sec: snapshot.durationSec,
+        phase: "halftime",
+        captured_at: new Date().toISOString(),
+      });
+      await supabase.storage
+        .from("match-frames")
+        .upload(`${matchId}.json`, new Blob([framesJson], { type: "application/json" }), { upsert: true });
+
+      // Create halftime analysis job
+      const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
+        match_id: matchId,
+        status: "queued",
+        progress: 0,
+      }).select().single();
+      if (jobError) throw jobError;
+
+      await supabase.from("matches").update({ status: "processing" }).eq("id", matchId);
+
+      // Fire and forget - don't await the full analysis
+      supabase.functions.invoke("analyze-match", {
+        body: {
+          match_id: matchId,
+          job_id: job.id,
+          frames: snapshot.frames,
+          duration_sec: snapshot.durationSec,
+          phase: "halftime",
+        },
+      });
+
+      setHalftimeSent(true);
+      if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+      toast.success("Halbzeit-Analyse gestartet! Aufnahme läuft weiter.");
+    } catch (err: any) {
+      toast.error(err.message ?? "Halbzeit-Analyse fehlgeschlagen");
+    } finally {
+      setHalftimeSending(false);
+    }
+  }, [matchId]);
+
   const stopAndAnalyze = useCallback(async () => {
     if (!matchId) return;
 
-    // Stop capture
     const captureResult = liveCaptureRef.current?.stop();
     liveCaptureRef.current = null;
 
-    // Stop camera
     streamRef.current?.getTracks().forEach(t => t.stop());
     if (videoRef.current) videoRef.current.srcObject = null;
     if ((streamRef as any)._countInterval) clearInterval((streamRef as any)._countInterval);
@@ -76,7 +129,19 @@ export default function CameraTrackingPage() {
     setProgress(20);
 
     try {
-      // Create analysis job
+      // Persist full-match frames (overwrite halftime)
+      const framesJson = JSON.stringify({
+        frames: captureResult.frames,
+        duration_sec: captureResult.durationSec,
+        phase: "full",
+        captured_at: new Date().toISOString(),
+      });
+      await supabase.storage
+        .from("match-frames")
+        .upload(`${matchId}.json`, new Blob([framesJson], { type: "application/json" }), { upsert: true });
+
+      setProgress(40);
+
       const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
         match_id: matchId,
         status: "queued",
@@ -84,19 +149,15 @@ export default function CameraTrackingPage() {
       }).select().single();
       if (jobError) throw jobError;
 
-      setProgress(40);
-
-      // Update match status
       await supabase.from("matches").update({ status: "processing" }).eq("id", matchId);
 
-      // Send frames to analyze-match
       const { error: fnError } = await supabase.functions.invoke("analyze-match", {
         body: {
           match_id: matchId,
           job_id: job.id,
           frames: captureResult.frames,
           duration_sec: captureResult.durationSec,
-          session_token: sessionToken,
+          phase: "full",
         },
       });
 
@@ -104,12 +165,14 @@ export default function CameraTrackingPage() {
       setProgress(100);
       setPhase("done");
       if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
-      toast.success("Analyse gestartet!");
+      toast.success("Endanalyse gestartet!");
     } catch (err: any) {
       toast.error(err.message ?? "Analyse fehlgeschlagen");
       setPhase("ready");
     }
   }, [matchId, sessionToken]);
+
+  const showHalftimeButton = phase === "recording" && frameCount >= 3 && !halftimeSent;
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
@@ -134,6 +197,12 @@ export default function CameraTrackingPage() {
             <div className="absolute top-4 right-4 bg-black/60 rounded-full px-3 py-1.5">
               <span className="text-xs text-white font-medium">{frameCount} Frames</span>
             </div>
+            {halftimeSent && (
+              <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-primary/90 rounded-full px-3 py-1.5">
+                <CheckCircle2 className="h-3 w-3 text-white" />
+                <span className="text-xs text-white font-medium">HZ-Analyse läuft</span>
+              </div>
+            )}
           </>
         )}
         {phase === "done" && (
@@ -145,16 +214,34 @@ export default function CameraTrackingPage() {
         )}
       </div>
 
-      <div className="safe-area-pad border-t border-border bg-background p-4">
+      <div className="safe-area-pad border-t border-border bg-background p-4 space-y-2">
         {phase === "ready" && (
           <Button onClick={startRecording} size="lg" className="w-full gap-2 h-14 text-base">
             <Video className="h-5 w-5" /> Aufnahme starten
           </Button>
         )}
         {phase === "recording" && (
-          <Button onClick={stopAndAnalyze} size="lg" variant="destructive" className="w-full gap-2 h-14 text-base">
-            <Square className="h-5 w-5" /> Stoppen & Analysieren
-          </Button>
+          <>
+            {showHalftimeButton && (
+              <Button
+                onClick={triggerHalftimeAnalysis}
+                disabled={halftimeSending}
+                size="lg"
+                variant="secondary"
+                className="w-full gap-2 h-12 text-base border border-primary/30 bg-primary/10 hover:bg-primary/20"
+              >
+                {halftimeSending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Clock className="h-5 w-5 text-primary" />
+                )}
+                ⚽ Halbzeit-Analyse starten
+              </Button>
+            )}
+            <Button onClick={stopAndAnalyze} size="lg" variant="destructive" className="w-full gap-2 h-14 text-base">
+              <Square className="h-5 w-5" /> Stoppen & Endanalyse
+            </Button>
+          </>
         )}
         {phase === "analyzing" && (
           <div className="space-y-3">
@@ -166,7 +253,7 @@ export default function CameraTrackingPage() {
           </div>
         )}
         {phase === "done" && (
-          <Button onClick={() => { setFrameCount(0); setPhase("ready"); }} size="lg" variant="outline" className="w-full gap-2 h-14 text-base">
+          <Button onClick={() => { setFrameCount(0); setHalftimeSent(false); setPhase("ready"); }} size="lg" variant="outline" className="w-full gap-2 h-14 text-base">
             <Video className="h-5 w-5" /> Weitere Aufnahme
           </Button>
         )}
