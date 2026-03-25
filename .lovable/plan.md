@@ -1,116 +1,122 @@
 
 
-## Kamera-Flow Optimierung: Kalibrierung, Session-Wiederaufnahme & UX
+## Tiefenanalyse: Warum das System nicht funktioniert
 
-### Identifizierte Probleme
+### Kernproblem identifiziert
 
-1. **Keine automatische Kalibrierung nach Code-Eingabe**: Nach Login wird der User zur Camera-Phase geleitet, sieht den Kalibrierungs-Hinweis aber nur passiv. Es wird weder automatisch erkannt noch aktiv die Kalibrierung gestartet.
+**Die gesamte Tracking-Engine ist eine Simulation.** Die Datei `src/lib/football-tracker.ts` enthaelt diese Kommentare:
 
-2. **Kameras werden nach Analyse nicht freigegeben**: Camera-Sessions laufen 12h, aber nach Spielende/Upload gibt es keine Freigabe. Neue Codes koennen nicht generiert werden wenn das Limit (3 aktive Codes) erreicht ist.
+```
+FootballTracker - Abstraction layer for on-device YOLO tracking.
+Currently runs as a scaffold/stub. Real ONNX inference will be plugged in later.
+```
 
-3. **Keine Wiederaufnahme bei Unterbrechung**: Wenn der User versehentlich die App verlässt oder das Tracking pausiert, gibt es keinen einfachen Weg zurueck ins laufende Tracking. Die Session geht verloren.
+Die Methode `initStablePlayers()` erzeugt zufaellige Spielerpositionen, `updateStablePlayers()` bewegt sie zufaellig. Kein einziger Frame des Kamerabilds wird tatsaechlich analysiert. Deshalb:
 
-4. **UX insgesamt zu komplex**: Zu viele Schritte, zu wenig Orientierung fuer den Kamera-Operator am Spielfeldrand.
+- **Heatmap stimmt nicht**: Sie zeigt zufaellige Simulationsdaten, nicht die echte Spielerverteilung
+- **Schwachstellen-Heatmap falsch**: Basiert auf den gleichen simulierten Daten
+- **15 Spieler erkannt**: Es werden immer genau `homeSquadSize + awaySquadSize` simulierte Spieler erzeugt
+- **Analyse-Status immer gleich**: "Vorlaeufig 70%" ist ein fester Wert aus `getAnalysisStatusInfo()`, nicht match-spezifisch
+- **Plus-Markierungen stimmen nicht**: Overlay zeichnet simulierte Positionen, nicht echte
+
+### Loesung: 3-Phasen-Umbau
 
 ---
 
-### Loesung
+#### Phase 1 — Echte Frame-Analyse via Gemini Vision (Sofort)
 
-#### Teil 1: Auto-Kalibrierung nach Code-Eingabe
+Statt der Simulation wird jeder N-te Kameraframe an Gemini Vision gesendet, um echte Spielerpositionen zu erkennen.
 
-Wenn der User in die Camera-Phase kommt und der Platz NICHT kalibriert ist:
-- Sobald die Kamera bereit ist, automatisch `handleAutoDetectInline()` ausfuehren (KI-Erkennung)
-- Falls KI erfolgreich: Punkte setzen, automatisch speichern, Toast zeigen
-- Falls KI fehlschlaegt: `showInlineCalibration` automatisch aktivieren mit klarer Anweisung "Tippe die 4 Eckpunkte des Spielfelds an"
-- Kein manueller Klick auf "Kalibrieren" noetig
+**Neue Edge Function `analyze-frame`**:
+- Empfaengt ein Base64-Bild vom Kamerastream
+- Sendet es an `google/gemini-2.5-flash` mit einem Prompt der Spielerpositionen als JSON zurueckgibt
+- Gibt `{detections: [{x, y, team, label}...]}` zurueck
+- Wird alle 2-3 Sekunden aufgerufen (nicht jeden Frame — Rate-Limits beachten)
 
-**Datei**: `src/pages/CameraTrackingPage.tsx` — neuer `useEffect` der bei `cameraReady && !isCalibrated` auto-detect triggert
+**FootballTracker Umbau**:
+- `startTracking()` startet einen Intervall der alle 2-3s ein Standbild vom Video extrahiert
+- Dieses Bild wird an `analyze-frame` gesendet statt `updateStablePlayers()` aufzurufen
+- Zwischen den KI-Frames wird linear interpoliert (Positionen glaetten)
+- Fallback: wenn KI nicht antwortet (Timeout, Rate-Limit), letzten bekannten Frame wiederverwenden
+- Die Simulation (`initStablePlayers`, `updateStablePlayers`, `stablePlayers`) wird komplett entfernt
 
-#### Teil 2: Kamera-Freigabe nach Analyse
+**Prompt-Design fuer Gemini Vision**:
+```
+Analyze this football match frame. Return JSON with detected players:
+- x, y: normalized 0-1 position in image
+- team: "home" (darker/colored jersey) or "away" (lighter jersey) or "referee"
+- label: "person" or "ball"
+Only return players actually visible. Do NOT fabricate positions.
+```
 
-Nach Upload + Processing-Trigger:
-- Camera-Session als "completed" markieren (neuer `action: "release"` in `camera-ops`)
-- Backend deaktiviert die Session (setzt `expires_at` auf jetzt)
-- Frontend zeigt im "ended"-Screen: "Kamera freigegeben — kann fuer das naechste Spiel verwendet werden"
+#### Phase 2 — Match-spezifischer Analyse-Status (Sofort)
 
-**Dateien**: `supabase/functions/camera-ops/index.ts` (neuer `release` action), `src/pages/CameraTrackingPage.tsx` (Release nach Upload)
+**`AnalysisStatusBanner` korrigieren**:
+- Statt fester "70%" den echten `processing_progress.progress` Wert aus der DB nutzen
+- Zeige tatsaechliche Datenquellen: "X Frames analysiert, Y Spieler erkannt, Z% Feldabdeckung"
+- Wenn match.processing_progress vorhanden, zeige diese Werte statt generischer Stufen
 
-#### Teil 3: Session-Wiederaufnahme
+**`getAnalysisStatusInfo` anpassen**:
+- Progress-Wert nicht mehr hardcoden (35/70/100), sondern als Parameter aus dem Match uebernehmen
+- Bei "vorlaeufig": tatsaechlichen coverage_ratio * 100 als Progress verwenden
 
-- `localStorage` speichert zusaetzlich: `camera_tracking_state_{matchId}_{cam}` mit `{ phase, elapsedSec, isTracking }`
-- Beim Laden der Seite: wenn Session-Token gueltig UND gespeicherter State vorhanden, direkt in die richtige Phase springen
-- Neuer "Fortsetzen"-Button wenn Match-Status "live" ist und eine gueltige Session existiert
-- `handleGoBack` aus Tracking-Phase pausiert nur (bereits implementiert), aber speichert den State
+#### Phase 3 — Heatmap und Schwachstellen-Analyse korrigieren (Folge)
 
-**Datei**: `src/pages/CameraTrackingPage.tsx`
+**Heatmap**:
+- Bleibt technisch gleich, zeigt aber jetzt echte Daten statt Simulation
+- `computeTrackStats()` im Backend bekommt echte Positionsdaten
+- Grid-Normalisierung bleibt, Darstellung passt sich automatisch an
 
-#### Teil 4: UX-Vereinfachung
-
-- **Auth-Phase**: Groesserer Code-Input, automatischer Submit bei 6 Ziffern (kein Button-Klick noetig)
-- **Camera-Phase**: Fortschritts-Anzeige vereinfachen — "Kamera bereit ✓ → Platz wird erkannt... → Tracking bereit!"
-- **Tracking-Phase**: "Pause/Fortsetzen"-Button statt nur "Beenden"
-- **Ended-Phase**: "Neues Tracking starten" Button fuer dasselbe Spiel (zurueck zur Camera-Phase)
-- Wizard-Stepper-Labels uebersetzen: "Code → Kamera → Aufnahme"
+**Schwachstellen-Heatmap**:
+- `deriveWeaknessHeatmap()` arbeitet mit echten team_match_stats.formation_heatmap Werten
+- Keine Aenderung in der Logik noetig — das Problem war nur die Eingangsdaten-Qualitaet
 
 ---
 
 ### Technische Details
 
-**Auto-Kalibrierung Trigger:**
+**Neue Datei: `supabase/functions/analyze-frame/index.ts`**
 ```typescript
-useEffect(() => {
-  if (phase !== "camera" || !cameraReady || isCalibrated) return;
-  if (detectingCalibration || showInlineCalibration) return;
-  // Warte kurz bis Kamerabild stabil ist
-  const t = setTimeout(() => {
-    setShowInlineCalibration(true);
-    handleAutoDetectInline(); // KI versucht automatisch
-  }, 1500);
-  return () => clearTimeout(t);
-}, [phase, cameraReady, isCalibrated]);
+// Empfaengt Base64-Bild, sendet an Gemini Vision
+// Gibt Spielerpositionen zurueck
+// Rate-Limiting: max 30 Aufrufe/Minute pro Match
 ```
 
-**Session-Release (camera-ops):**
-```typescript
-if (action === "release") {
-  await supabase.from("camera_access_sessions")
-    .update({ expires_at: new Date().toISOString() })
-    .eq("match_id", matchId)
-    .eq("camera_index", cameraIndex)
-    .eq("session_token_hash", sessionHash);
-  return jsonResp({ success: true });
-}
-```
+**Geaenderte Datei: `src/lib/football-tracker.ts`**
+- Entferne: `stablePlayers`, `initStablePlayers`, `updateStablePlayers`, `ballX/Y/Vx/Vy`
+- Neu: `analyzeFrame()` — extrahiert Canvas-Bild, sendet an Edge Function
+- Neu: `interpolatePositions()` — glaettet zwischen KI-Frames
+- Intervall von 500ms (Simulation) auf 2500ms (KI-Analyse) anpassen
+- Zwischen KI-Frames: letzte bekannte Positionen beibehalten
 
-**Auto-Submit bei 6 Ziffern:**
-```typescript
-useEffect(() => {
-  if (CODE_REGEX.test(code) && !isAuthorizing) {
-    handleLogin();
-  }
-}, [code]);
-```
+**Geaenderte Datei: `src/components/AnalysisStatusBanner.tsx`**
+- Neuer Prop: `actualProgress?: number` (aus processing_progress)
+- Zeige echten Progress statt hardcodiertem Stufenwert
 
-**Tracking-State Persistenz:**
-```typescript
-// Beim Start: State speichern
-localStorage.setItem(stateKey, JSON.stringify({ phase: "tracking", elapsedSec }));
-// Bei Wiederherstellung: direkt in Tracking springen
-```
+**Geaenderte Datei: `src/pages/MatchReport.tsx`**
+- Lese `match.processing_progress?.progress` und gebe es an AnalysisStatusBanner weiter
+- Lese echte Felder: tracked_player_count, cameras_used, coverage_ratio aus team_match_stats.raw_metrics
+
+**Geaenderte Datei: `src/lib/analysis-status.ts`**
+- `getAnalysisStatusInfo()` akzeptiert optionalen `actualProgress` Parameter
+- Nutze diesen statt fester Werte
 
 ### Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/CameraTrackingPage.tsx` | Auto-Kalibrierung, Session-Resume, Auto-Submit, Pause-Button, UX |
-| `supabase/functions/camera-ops/index.ts` | Neuer `release` Action |
-| `src/pages/CameraTrackingPage.tsx` | "Neues Tracking starten" in Ended-Phase |
+| `supabase/functions/analyze-frame/index.ts` | Neue Edge Function fuer Echtzeit-Frame-Analyse |
+| `src/lib/football-tracker.ts` | Simulation entfernen, echte KI-Analyse einbauen |
+| `src/components/AnalysisStatusBanner.tsx` | Echten Progress-Wert anzeigen |
+| `src/pages/MatchReport.tsx` | Match-spezifische Daten an Banner weitergeben |
+| `src/lib/analysis-status.ts` | Dynamischen Progress-Wert unterstuetzen |
+| `src/lib/live-stats-engine.ts` | Anpassung an variable Frame-Rate (2.5s statt 0.5s) |
 
 ### Prioritaet
 
-1. Auto-Kalibrierung nach Kamera-Start (groesster UX-Gewinn)
-2. Auto-Submit bei 6 Ziffern
-3. Session-Wiederaufnahme bei Unterbrechung
-4. Kamera-Freigabe nach Analyse
-5. Pause/Fortsetzen-Button
+1. `analyze-frame` Edge Function (ohne diese laeuft nichts)
+2. `FootballTracker` Umbau (Simulation raus, echte Analyse rein)
+3. Analyse-Status match-spezifisch machen
+4. LiveStatsEngine an neue Frame-Rate anpassen
+5. Heatmap-Korrekturen (folgen automatisch aus echten Daten)
 
