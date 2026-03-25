@@ -16,6 +16,7 @@ interface CameraSession {
     phase?: string;
     frame_count?: number;
     updated_at?: string;
+    thumbnail?: string;
   } | null;
   command: string | null;
 }
