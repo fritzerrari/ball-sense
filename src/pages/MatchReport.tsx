@@ -334,6 +334,13 @@ export default function MatchReport() {
               </Suspense>
             )}
 
+            {/* Video Highlights */}
+            {hasHighlights && id && (
+              <Suspense fallback={<SkeletonCard count={1} />}>
+                <HighlightGallery matchId={id} />
+              </Suspense>
+            )}
+
             {/* Danger Zones + Chances */}
             {(dangerZones || chances) && (
               <div className="grid gap-4 sm:grid-cols-2">
