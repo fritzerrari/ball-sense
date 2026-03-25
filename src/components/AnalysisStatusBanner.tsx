@@ -10,6 +10,12 @@ interface AnalysisStatusBannerProps {
   matchStatus?: string;
   /** Compact inline mode for use inside cards */
   compact?: boolean;
+  /** Actual progress from match processing_progress (overrides stage default) */
+  actualProgress?: number;
+  /** Number of AI frames analyzed */
+  framesAnalyzed?: number;
+  /** Number of cameras used */
+  camerasUsed?: number;
 }
 
 const iconMap = {
@@ -48,8 +54,8 @@ const colorMap = {
   },
 };
 
-export function AnalysisStatusBanner({ stage, coverageRatio = 1, isExtrapolated = false, playerCount, matchStatus, compact = false }: AnalysisStatusBannerProps) {
-  const info = getAnalysisStatusInfo(stage);
+export function AnalysisStatusBanner({ stage, coverageRatio = 1, isExtrapolated = false, playerCount, matchStatus, compact = false, actualProgress, framesAnalyzed, camerasUsed }: AnalysisStatusBannerProps) {
+  const info = getAnalysisStatusInfo(stage, actualProgress);
   const colors = colorMap[info.color];
   const Icon = iconMap[info.icon];
 
@@ -101,6 +107,16 @@ export function AnalysisStatusBanner({ stage, coverageRatio = 1, isExtrapolated 
         {playerCount !== undefined && (
           <div className="flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] text-muted-foreground">
             {playerCount} Spieler erkannt
+          </div>
+        )}
+        {framesAnalyzed !== undefined && (
+          <div className="flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] text-muted-foreground">
+            {framesAnalyzed} Frames analysiert
+          </div>
+        )}
+        {camerasUsed !== undefined && camerasUsed > 0 && (
+          <div className="flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] text-muted-foreground">
+            {camerasUsed} Kamera{camerasUsed > 1 ? "s" : ""}
           </div>
         )}
         {stage === "prognose" && (

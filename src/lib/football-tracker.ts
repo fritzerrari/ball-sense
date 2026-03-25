@@ -1,6 +1,7 @@
 /**
- * FootballTracker - Abstraction layer for on-device YOLO tracking.
- * Currently runs as a scaffold/stub. Real ONNX inference will be plugged in later.
+ * FootballTracker — Real-time player detection via Gemini Vision AI.
+ * Captures video frames every ~2.5s, sends to analyze-frame edge function,
+ * and returns real detected player positions.
  */
 
 import { HighlightRecorder } from "./highlight-recorder";
@@ -24,15 +25,6 @@ export interface TrackingFrame {
 type ProgressCallback = (pct: number) => void;
 type DetectionCallback = (frame: TrackingFrame) => void;
 
-interface StablePlayer {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  team: "home" | "away";
-}
-
 export type UploadMode = "batch" | "live";
 
 interface LiveStreamConfig {
@@ -46,21 +38,31 @@ interface LiveStreamConfig {
 export type StabilityEvent = "bump" | "drift" | "zoom_change";
 export type StabilityCallback = (event: StabilityEvent, detail?: string) => void;
 
+const ANALYZE_FRAME_URL = `${typeof import.meta !== "undefined" ? import.meta.env?.VITE_SUPABASE_URL ?? "" : ""}/functions/v1/analyze-frame`;
+const AI_FRAME_INTERVAL_MS = 2500; // Send frame to AI every 2.5s
+const FALLBACK_REUSE_MS = 8000; // Reuse last AI result for up to 8s on failure
+
 export class FootballTracker {
   private modelLoaded = false;
   private tracking = false;
   private paused = false;
   private frames: TrackingFrame[] = [];
   private intervalId: number | null = null;
+  private aiIntervalId: number | null = null;
   private startTime = 0;
   private videoElement: HTMLVideoElement | null = null;
-  private stablePlayers: StablePlayer[] = [];
-  private ballX = 0.5;
-  private ballY = 0.5;
-  private ballVx = 0.01;
-  private ballVy = 0.005;
   private homeSquadSize = 0;
   private awaySquadSize = 0;
+
+  // AI detection state
+  private lastAIDetections: Detection[] = [];
+  private lastAITimestamp = 0;
+  private aiInFlight = false;
+  private aiFrameCanvas: HTMLCanvasElement | null = null;
+  private fieldCoverage = 1;
+  private aiErrorCount = 0;
+  private totalAIFrames = 0;
+  private successfulAIFrames = 0;
 
   // Live streaming state
   private uploadMode: UploadMode = "batch";
@@ -90,6 +92,10 @@ export class FootballTracker {
   private lastBallZone: "left" | "center" | "right" = "center";
   private lastBallZoneTime = 0;
 
+  // Match context for AI calls
+  private matchId = "";
+  private cameraIndex = 0;
+
   setSquadSizes(home: number, away: number) {
     this.homeSquadSize = home;
     this.awaySquadSize = away;
@@ -111,9 +117,18 @@ export class FootballTracker {
     return this.highlightRecorder;
   }
 
+  getFieldCoverage(): number {
+    return this.fieldCoverage;
+  }
+
+  getAIStats() {
+    return { total: this.totalAIFrames, successful: this.successfulAIFrames, errors: this.aiErrorCount };
+  }
+
   async loadModel(onProgress?: ProgressCallback): Promise<void> {
-    for (let i = 0; i <= 100; i += 2) {
-      await new Promise(r => setTimeout(r, 30));
+    // No actual model to load — we use cloud AI. But simulate brief loading for UX continuity.
+    for (let i = 0; i <= 100; i += 5) {
+      await new Promise(r => setTimeout(r, 20));
       onProgress?.(i);
     }
     this.modelLoaded = true;
@@ -121,6 +136,7 @@ export class FootballTracker {
 
   async startCamera(videoElement: HTMLVideoElement, cameraIndex = 0): Promise<void> {
     this.videoElement = videoElement;
+    this.cameraIndex = cameraIndex;
     try {
       const constraints: MediaStreamConstraints = {
         video: {
@@ -155,7 +171,6 @@ export class FootballTracker {
 
   startZoomMonitoring() {
     if (this.zoomCheckIntervalId) return;
-    // Check every 10s instead of 60s
     this.zoomCheckIntervalId = window.setInterval(() => {
       if (!this.videoElement?.srcObject) return;
       const stream = this.videoElement.srcObject as MediaStream;
@@ -200,17 +215,12 @@ export class FootballTracker {
 
   startStabilityMonitoring() {
     if (this.stabilityIntervalId) return;
-
-    // Frame-difference analysis every 5s
     this.stabilityCanvas = document.createElement("canvas");
-    this.stabilityCanvas.width = 40; // small sampling grid
+    this.stabilityCanvas.width = 40;
     this.stabilityCanvas.height = 30;
-
     this.stabilityIntervalId = window.setInterval(() => {
       this.checkFrameDifference();
     }, 5_000);
-
-    // DeviceMotion for bump detection
     this.startDeviceMotionMonitoring();
   }
 
@@ -227,19 +237,14 @@ export class FootballTracker {
 
   private checkFrameDifference() {
     if (!this.videoElement || !this.videoElement.videoWidth || !this.stabilityCanvas) return;
-
     const ctx = this.stabilityCanvas.getContext("2d");
     if (!ctx) return;
-
     ctx.drawImage(this.videoElement, 0, 0, this.stabilityCanvas.width, this.stabilityCanvas.height);
     const currentData = ctx.getImageData(0, 0, this.stabilityCanvas.width, this.stabilityCanvas.height);
-
     if (!this.referenceImageData) {
       this.referenceImageData = currentData;
       return;
     }
-
-    // Calculate pixel difference
     let totalDiff = 0;
     const pixels = currentData.data.length / 4;
     for (let i = 0; i < currentData.data.length; i += 4) {
@@ -249,22 +254,15 @@ export class FootballTracker {
       totalDiff += (dr + dg + db) / (3 * 255);
     }
     const avgDiff = totalDiff / pixels;
-
     if (avgDiff > 0.15) {
       this.highDiffCount++;
       if (this.highDiffCount === 1) {
-        // Single spike = bump
         this.onStabilityEvent?.("bump", `Bewegung erkannt (${(avgDiff * 100).toFixed(0)}%)`);
       } else if (this.highDiffCount >= 3) {
-        // Continuous = drift/pan
         this.onStabilityEvent?.("drift", "Kamera-Position hat sich verändert");
       }
     } else {
-      // Reset if stable again
-      if (this.highDiffCount > 0) {
-        this.highDiffCount = 0;
-      }
-      // Update reference frame periodically when stable
+      if (this.highDiffCount > 0) this.highDiffCount = 0;
       this.referenceImageData = currentData;
     }
   }
@@ -272,18 +270,15 @@ export class FootballTracker {
   private startDeviceMotionMonitoring() {
     if (this.motionListenerActive) return;
     if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) return;
-
     const handler = (e: DeviceMotionEvent) => {
       const acc = e.acceleration;
       if (!acc) return;
       const magnitude = Math.sqrt((acc.x ?? 0) ** 2 + (acc.y ?? 0) ** 2 + (acc.z ?? 0) ** 2);
-      if (magnitude > 20) { // ~2g
+      if (magnitude > 20) {
         this.onStabilityEvent?.("bump", `Starker Stoß erkannt (${magnitude.toFixed(1)} m/s²)`);
-        // Trigger immediate zoom check
         this.checkZoomNow();
       }
     };
-
     window.addEventListener("devicemotion", handler);
     this.motionListenerActive = true;
     (this as any)._motionHandler = handler;
@@ -311,80 +306,111 @@ export class FootballTracker {
     } catch { /* ignore */ }
   }
 
-  /**
-   * Update the calibrated zoom after a recalibration.
-   */
   updateCalibratedZoom() {
     const zoom = this.getCurrentZoom();
     if (zoom != null) this.calibratedZoom = zoom;
     this.highDiffCount = 0;
-    this.referenceImageData = null; // Reset reference frame
+    this.referenceImageData = null;
   }
 
-  // ── Tracking simulation ──
+  // ── Real AI Frame Analysis ──
 
-  private initStablePlayers() {
-    this.stablePlayers = [];
-    let id = 0;
+  /**
+   * Capture current video frame as base64 JPEG for AI analysis.
+   */
+  private captureFrameBase64(): string | null {
+    if (!this.videoElement || !this.videoElement.videoWidth) return null;
+    if (!this.aiFrameCanvas) {
+      this.aiFrameCanvas = document.createElement("canvas");
+    }
+    // Resize to 640px wide for faster upload & analysis
+    const scale = Math.min(1, 640 / this.videoElement.videoWidth);
+    this.aiFrameCanvas.width = Math.round(this.videoElement.videoWidth * scale);
+    this.aiFrameCanvas.height = Math.round(this.videoElement.videoHeight * scale);
+    const ctx = this.aiFrameCanvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(this.videoElement, 0, 0, this.aiFrameCanvas.width, this.aiFrameCanvas.height);
+    // Get as JPEG base64 (strip data:image/jpeg;base64, prefix)
+    const dataUrl = this.aiFrameCanvas.toDataURL("image/jpeg", 0.7);
+    return dataUrl.split(",")[1] ?? null;
+  }
 
-    // If no squad sizes configured, use reasonable defaults based on simulation
-    // In real mode, these come from match lineups
-    const homeSize = this.homeSquadSize > 0 ? this.homeSquadSize : 7;
-    const awaySize = this.awaySquadSize > 0 ? this.awaySquadSize : 7;
+  /**
+   * Send frame to AI for real player detection.
+   */
+  private async analyzeCurrentFrame(): Promise<void> {
+    if (this.aiInFlight || !this.tracking || this.paused) return;
 
-    for (let i = 0; i < homeSize; i++) {
-      this.stablePlayers.push({
-        id: id++,
-        x: 0.1 + (i / Math.max(1, homeSize - 1)) * 0.8,
-        y: 0.15 + Math.random() * 0.3,
-        vx: (Math.random() - 0.5) * 0.008,
-        vy: (Math.random() - 0.5) * 0.005,
-        team: "home",
+    const base64 = this.captureFrameBase64();
+    if (!base64) return;
+
+    this.aiInFlight = true;
+    this.totalAIFrames++;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000); // 10s timeout
+
+      const resp = await fetch(ANALYZE_FRAME_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: base64,
+          matchId: this.matchId,
+          cameraIndex: this.cameraIndex,
+        }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
+
+      if (resp.status === 429) {
+        // Rate limited — back off, reuse last detections
+        console.warn("[Tracker] AI rate limited, reusing last detections");
+        this.aiErrorCount++;
+        return;
+      }
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        console.warn(`[Tracker] AI analysis failed (${resp.status}):`, errText);
+        this.aiErrorCount++;
+        return;
+      }
+
+      const result = await resp.json();
+      if (result.detections && Array.isArray(result.detections)) {
+        this.lastAIDetections = result.detections;
+        this.lastAITimestamp = Date.now();
+        this.fieldCoverage = result.field_coverage ?? 1;
+        this.successfulAIFrames++;
+        this.aiErrorCount = 0; // Reset error count on success
+      }
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        console.warn("[Tracker] AI analysis timed out");
+      } else {
+        console.warn("[Tracker] AI analysis error:", err);
+      }
+      this.aiErrorCount++;
+    } finally {
+      this.aiInFlight = false;
     }
-    for (let i = 0; i < awaySize; i++) {
-      this.stablePlayers.push({
-        id: id++,
-        x: 0.1 + (i / Math.max(1, awaySize - 1)) * 0.8,
-        y: 0.55 + Math.random() * 0.3,
-        vx: (Math.random() - 0.5) * 0.008,
-        vy: (Math.random() - 0.5) * 0.005,
-        team: "away",
-      });
-    }
-    this.ballX = 0.5;
-    this.ballY = 0.5;
-    this.ballVx = (Math.random() - 0.5) * 0.02;
-    this.ballVy = (Math.random() - 0.5) * 0.015;
   }
 
-  private updateStablePlayers() {
-    for (const p of this.stablePlayers) {
-      p.vx += (Math.random() - 0.5) * 0.004;
-      p.vy += (Math.random() - 0.5) * 0.003;
-      p.vx *= 0.92;
-      p.vy *= 0.92;
-      const maxV = 0.015;
-      p.vx = Math.max(-maxV, Math.min(maxV, p.vx));
-      p.vy = Math.max(-maxV, Math.min(maxV, p.vy));
-      p.x += p.vx;
-      p.y += p.vy;
-      if (p.x < 0.05) { p.x = 0.05; p.vx = Math.abs(p.vx); }
-      if (p.x > 0.95) { p.x = 0.95; p.vx = -Math.abs(p.vx); }
-      if (p.y < 0.05) { p.y = 0.05; p.vy = Math.abs(p.vy); }
-      if (p.y > 0.95) { p.y = 0.95; p.vy = -Math.abs(p.vy); }
+  /**
+   * Get current detections — real AI results or last known.
+   */
+  private getCurrentDetections(): Detection[] {
+    const age = Date.now() - this.lastAITimestamp;
+    if (this.lastAIDetections.length > 0 && age < FALLBACK_REUSE_MS) {
+      return this.lastAIDetections;
     }
-    this.ballVx += (Math.random() - 0.5) * 0.006;
-    this.ballVy += (Math.random() - 0.5) * 0.006;
-    this.ballVx *= 0.9;
-    this.ballVy *= 0.9;
-    this.ballX += this.ballVx;
-    this.ballY += this.ballVy;
-    if (this.ballX < 0.02 || this.ballX > 0.98) this.ballVx *= -1;
-    if (this.ballY < 0.02 || this.ballY > 0.98) this.ballVy *= -1;
-    this.ballX = Math.max(0.02, Math.min(0.98, this.ballX));
-    this.ballY = Math.max(0.02, Math.min(0.98, this.ballY));
+    // No recent detections — return empty (don't fabricate)
+    return [];
   }
+
+  // ── Live Stream & Upload ──
 
   configureLiveStream(config: LiveStreamConfig) {
     this.uploadMode = "live";
@@ -400,14 +426,12 @@ export class FootballTracker {
     if (!this.liveConfig) return;
     const { matchId, cameraIndex, supabaseUrl, sessionToken, onChunkSent } = this.liveConfig;
     const url = `${supabaseUrl}/functions/v1/stream-tracking`;
-
     try {
       const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ matchId, cameraIndex, sequence: seq, frames, sessionToken }),
       });
-
       if (resp.ok) {
         this.chunksOk++;
         this.pendingChunks = this.pendingChunks.filter(c => c.seq !== seq);
@@ -442,13 +466,20 @@ export class FootballTracker {
     }
   }
 
+  // ── Tracking Lifecycle ──
+
   startTracking(canvasElement: HTMLCanvasElement | null, matchId: string, onDetections?: DetectionCallback): void {
     if (!this.modelLoaded) throw new Error("Modell nicht geladen");
     this.tracking = true;
     this.paused = false;
     this.startTime = Date.now();
     this.frames = [];
-    this.initStablePlayers();
+    this.matchId = matchId;
+    this.lastAIDetections = [];
+    this.lastAITimestamp = 0;
+    this.aiErrorCount = 0;
+    this.totalAIFrames = 0;
+    this.successfulAIFrames = 0;
 
     if (this.uploadMode === "live" && this.liveConfig) {
       this.startLiveInterval();
@@ -459,32 +490,26 @@ export class FootballTracker {
       this.highlightRecorder.start(this.videoElement.srcObject as MediaStream, this.startTime);
     }
 
+    // AI analysis interval — every 2.5s, send frame to Gemini Vision
+    this.aiIntervalId = window.setInterval(() => {
+      if (!this.paused && this.tracking) {
+        this.analyzeCurrentFrame();
+      }
+    }, AI_FRAME_INTERVAL_MS);
+
+    // Trigger first analysis immediately after a brief delay for camera stability
+    setTimeout(() => {
+      if (this.tracking && !this.paused) {
+        this.analyzeCurrentFrame();
+      }
+    }, 500);
+
+    // Detection broadcast interval — emit current detections every 500ms for smooth UI
     const loop = () => {
       if (!this.tracking) return;
       if (!this.paused) {
-        this.updateStablePlayers();
         const now = Date.now();
-
-        const detections: Detection[] = this.stablePlayers.map(p => ({
-          id: p.id,
-          x: p.x,
-          y: p.y,
-          w: 0.02 + Math.random() * 0.005,
-          h: 0.04 + Math.random() * 0.01,
-          confidence: 0.75 + Math.random() * 0.25,
-          label: "person",
-          team: p.team,
-        }));
-
-        detections.push({
-          id: 999,
-          x: this.ballX,
-          y: this.ballY,
-          w: 0.01,
-          h: 0.01,
-          confidence: 0.6 + Math.random() * 0.3,
-          label: "ball",
-        });
+        const detections = this.getCurrentDetections();
 
         const frame: TrackingFrame = { timestamp: now - this.startTime, detections };
         this.frames.push(frame);
@@ -508,30 +533,18 @@ export class FootballTracker {
     const ball = frame.detections.find(d => d.label === "ball");
     if (!ball) return;
 
-    // Goal detection: ball in end zones
     const newZone: "left" | "center" | "right" =
       ball.x < 0.05 ? "left" : ball.x > 0.95 ? "right" : "center";
 
     if (newZone !== "center" && this.lastBallZone === "center") {
-      // Ball entered goal zone
       this.lastBallZoneTime = frame.timestamp;
     } else if (newZone === "center" && this.lastBallZone !== "center") {
-      // Ball left goal zone quickly = possible goal
       const duration = frame.timestamp - this.lastBallZoneTime;
       if (duration < 3000 && duration > 200) {
         this.highlightRecorder.triggerHighlight("goal");
       }
     }
     this.lastBallZone = newZone;
-
-    // Sprint detection: player speed proxy (velocity magnitude)
-    for (const p of this.stablePlayers) {
-      const speed = Math.sqrt(p.vx ** 2 + p.vy ** 2);
-      if (speed > 0.013) { // High speed threshold
-        this.highlightRecorder.triggerHighlight("sprint");
-        break; // One sprint highlight at a time
-      }
-    }
   }
 
   pauseTracking(): void {
@@ -548,6 +561,10 @@ export class FootballTracker {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (this.aiIntervalId) {
+      clearInterval(this.aiIntervalId);
+      this.aiIntervalId = null;
     }
     if (this.liveIntervalId) {
       clearInterval(this.liveIntervalId);
@@ -584,7 +601,7 @@ export class FootballTracker {
     return this.frames.length;
   }
 
-  /** Return a copy of all frames collected so far (non-destructive, for incremental uploads) */
+  /** Return a copy of all frames collected so far */
   getRecentFrames(): TrackingFrame[] {
     return [...this.frames];
   }
@@ -622,12 +639,14 @@ export class FootballTracker {
       framesCount: this.frames.length,
       durationSec: this.getElapsedSeconds(),
       createdAt: new Date().toISOString(),
+      aiStats: this.getAIStats(),
+      fieldCoverage: this.fieldCoverage,
     };
 
     const jsonString = JSON.stringify(sessionData);
     const blob = new Blob([jsonString], { type: "application/json" });
     const sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
-    console.log(`[Tracker] Upload vorbereitet: ${this.frames.length} Frames, ${sizeMB} MB`);
+    console.log(`[Tracker] Upload vorbereitet: ${this.frames.length} Frames, ${sizeMB} MB, AI: ${this.successfulAIFrames}/${this.totalAIFrames} erfolgreich`);
     onProgress?.("compress", 100);
 
     const objectPath = `${matchId}/cam_${cameraIndex}.json`;

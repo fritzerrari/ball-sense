@@ -37,7 +37,7 @@ export function getAnalysisStage(
   return "prognose";
 }
 
-export function getAnalysisStatusInfo(stage: AnalysisStage): AnalysisStatus {
+export function getAnalysisStatusInfo(stage: AnalysisStage, actualProgress?: number): AnalysisStatus {
   switch (stage) {
     case "prognose":
       return {
@@ -46,7 +46,7 @@ export function getAnalysisStatusInfo(stage: AnalysisStage): AnalysisStatus {
         description: "Live-Hochrechnung basierend auf bisherigen Daten. Werte werden laufend aktualisiert und können sich ändern.",
         color: "amber",
         icon: "clock",
-        progress: 35,
+        progress: actualProgress ?? 35,
       };
     case "vorläufig":
       return {
@@ -55,7 +55,7 @@ export function getAnalysisStatusInfo(stage: AnalysisStage): AnalysisStatus {
         description: "Erste vollständige Berechnung aus den vorliegenden Tracking-Daten. Werte sind stabil, können aber bei neuer Datenlage nachberechnet werden.",
         color: "blue",
         icon: "refresh",
-        progress: 70,
+        progress: actualProgress ?? 70,
       };
     case "final":
       return {
@@ -64,7 +64,7 @@ export function getAnalysisStatusInfo(stage: AnalysisStage): AnalysisStatus {
         description: "Alle Daten vollständig verarbeitet, korrigiert und qualitätsgeprüft.",
         color: "emerald",
         icon: "check",
-        progress: 100,
+        progress: actualProgress ?? 100,
       };
   }
 }
