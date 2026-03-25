@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye, Pause, Play } from "lucide-react";
+import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye, Pause, Play, CloudUpload, Wifi } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
@@ -38,6 +38,7 @@ export default function CameraTrackingPage() {
 
   const [progress, setProgress] = useState(0);
   const [frameCount, setFrameCount] = useState(0);
+  const [syncedFrames, setSyncedFrames] = useState(0);
   const [halfNumber, setHalfNumber] = useState(1);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -51,6 +52,7 @@ export default function CameraTrackingPage() {
   const deltaUploadRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastUploadedIndexRef = useRef(0);
   const chunkIndexRef = useRef(0);
+  const deltaRetryCountRef = useRef(0);
 
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
@@ -80,7 +82,10 @@ export default function CameraTrackingPage() {
   const sendHeartbeat = useCallback(async (currentPhase: string, currentFrameCount: number) => {
     if (!isHelper || !matchId || !sessionToken) return;
     try {
-      const thumbnail = currentPhase === "recording" ? captureThumbnail() : null;
+      // Send thumbnail in ALL phases where camera is active
+      const thumbnail = (currentPhase === "recording" || currentPhase === "ready" || currentPhase === "halftime_pause")
+        ? captureThumbnail()
+        : null;
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
         {
@@ -136,19 +141,28 @@ export default function CameraTrackingPage() {
       if (res.ok) {
         lastUploadedIndexRef.current += newFrames.length;
         chunkIndexRef.current += 1;
+        deltaRetryCountRef.current = 0;
+        setSyncedFrames(lastUploadedIndexRef.current);
+      } else {
+        deltaRetryCountRef.current += 1;
       }
     } catch {
-      // Non-critical, will retry next interval
+      deltaRetryCountRef.current += 1;
+      // Will retry next interval (max 3 retries before backing off)
     }
   }, [matchId, isHelper, sessionToken]);
 
-  // Heartbeat interval during recording/halftime
+  // ── Heartbeat interval — starts as soon as camera is active (ready/recording/halftime) ──
   useEffect(() => {
     if (!isHelper || (phase !== "recording" && phase !== "halftime_pause" && phase !== "ready")) return;
     
+    // Send initial heartbeat immediately
+    const fc = liveCaptureRef.current?.getFrameCount() ?? frameCount;
+    sendHeartbeat(phase, fc);
+
     const interval = setInterval(async () => {
-      const fc = liveCaptureRef.current?.getFrameCount() ?? frameCount;
-      const cmd = await sendHeartbeat(phase, fc);
+      const currentFc = liveCaptureRef.current?.getFrameCount() ?? frameCount;
+      const cmd = await sendHeartbeat(phase, currentFc);
       if (cmd === "stop") {
         setShowStopConfirm(true);
       } else if (cmd === "halftime" && phase === "recording") {
@@ -157,7 +171,7 @@ export default function CameraTrackingPage() {
         if (phase === "ready") startRecording();
         else startSecondHalf();
       }
-    }, 15000);
+    }, 10000); // 10s interval (was 15s)
 
     heartbeatRef.current = interval;
     return () => clearInterval(interval);
@@ -196,8 +210,10 @@ export default function CameraTrackingPage() {
     setPhase("recording");
     setRecordingStartTime(Date.now());
     setFrameCount(0);
+    setSyncedFrames(0);
     lastUploadedIndexRef.current = 0;
     chunkIndexRef.current = 0;
+    deltaRetryCountRef.current = 0;
     if (navigator.vibrate) navigator.vibrate(50);
 
     const countInterval = setInterval(() => {
@@ -205,11 +221,13 @@ export default function CameraTrackingPage() {
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
 
-    // Incremental delta upload every ~2.5 min (5 frames at 30s interval)
+    // Delta upload every 45s (was 150s) with retry backoff
     if (isHelper) {
       deltaUploadRef.current = setInterval(() => {
-        uploadDelta();
-      }, 150000); // 2.5 minutes
+        if (deltaRetryCountRef.current < 3) {
+          uploadDelta();
+        }
+      }, 45000);
     }
   }, [hasHighlights, isHelper, uploadDelta]);
 
@@ -318,6 +336,7 @@ export default function CameraTrackingPage() {
       setPhase("halftime_pause");
       setHalfNumber(2);
       setFrameCount(0);
+      setSyncedFrames(0);
       if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
       toast.success("1. Halbzeit hochgeladen — Analyse läuft!");
     } catch (err: any) {
@@ -344,6 +363,9 @@ export default function CameraTrackingPage() {
     setPhase("recording");
     setRecordingStartTime(Date.now());
     setFrameCount(0);
+    setSyncedFrames(0);
+    lastUploadedIndexRef.current = 0;
+    chunkIndexRef.current = 0;
     if (navigator.vibrate) navigator.vibrate(50);
 
     const countInterval = setInterval(() => {
@@ -441,6 +463,12 @@ export default function CameraTrackingPage() {
               <ImageIcon className="inline h-3 w-3 mr-1" />
               Alle 30 Sek. wird ein Standbild erfasst
             </p>
+            {isHelper && (
+              <div className="flex items-center gap-1.5 bg-primary/20 rounded-full px-3 py-1">
+                <Wifi className="h-3 w-3 text-primary" />
+                <span className="text-xs text-primary">Live-Verbindung aktiv</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -454,11 +482,17 @@ export default function CameraTrackingPage() {
               </span>
             </div>
 
-            {/* Frame counter + progress */}
+            {/* Frame counter + sync status */}
             <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
               <div className="bg-black/60 rounded-full px-3 py-1.5">
                 <span className="text-xs text-white font-medium">{frameCount} Frames</span>
               </div>
+              {isHelper && syncedFrames > 0 && (
+                <div className="flex items-center gap-1 bg-primary/80 rounded-full px-2 py-0.5">
+                  <CloudUpload className="h-2.5 w-2.5 text-white" />
+                  <span className="text-[10px] text-white">{syncedFrames} sync</span>
+                </div>
+              )}
               {elapsedMin > 0 && (
                 <div className="bg-black/40 rounded-full px-2 py-0.5">
                   <span className="text-[10px] text-white/60">{elapsedMin} Min.</span>
@@ -593,7 +627,7 @@ export default function CameraTrackingPage() {
                 <FileText className="h-5 w-5" /> Zur Analyse
               </Button>
             </Link>
-            <Button onClick={() => { setFrameCount(0); setHalfNumber(1); setPhase("setup"); }} size="lg" variant="outline" className="w-full gap-2 h-12 text-sm">
+            <Button onClick={() => { setFrameCount(0); setSyncedFrames(0); setHalfNumber(1); setPhase("setup"); }} size="lg" variant="outline" className="w-full gap-2 h-12 text-sm">
               <Video className="h-4 w-4" /> Weitere Aufnahme
             </Button>
           </div>

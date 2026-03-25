@@ -137,8 +137,17 @@ Deno.serve(async (req) => {
         frame_count: frame_count ?? 0,
         updated_at: new Date().toISOString(),
       };
-      // Include thumbnail if provided (small base64 JPEG ~10KB)
       if (thumbnail) statusUpdate.thumbnail = thumbnail;
+
+      // Preserve synced_frames from existing status_data
+      const { data: currentSession } = await supabaseAdmin
+        .from("camera_access_sessions")
+        .select("status_data")
+        .eq("id", session.id)
+        .maybeSingle();
+      
+      const existingSyncedFrames = (currentSession?.status_data as any)?.synced_frames ?? 0;
+      statusUpdate.synced_frames = existingSyncedFrames;
 
       await supabaseAdmin
         .from("camera_access_sessions")
@@ -182,7 +191,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Use phase in filename for halftime support
       const suffix = phase && phase !== "full" ? `_${phase}` : "";
       const filePath = `${match_id}${suffix}.json`;
 
@@ -318,8 +326,75 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Update synced_frames in session status_data
+      const { data: currentSession } = await supabaseAdmin
+        .from("camera_access_sessions")
+        .select("status_data")
+        .eq("id", session.id)
+        .maybeSingle();
+      
+      const currentStatusData = (currentSession?.status_data as any) ?? {};
+      const previousSynced = currentStatusData.synced_frames ?? 0;
+      const newSyncedTotal = previousSynced + frames.length;
+
+      await supabaseAdmin
+        .from("camera_access_sessions")
+        .update({
+          status_data: { ...currentStatusData, synced_frames: newSyncedTotal },
+        })
+        .eq("id", session.id);
+
+      // Check if enough frames for a live partial analysis (>= 5 total synced)
+      if (newSyncedTotal >= 5 && (chunk_index ?? 0) % 3 === 2) {
+        // Every 3rd chunk after threshold: trigger lightweight partial analysis
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+        // Collect all chunks for this match
+        const allFrames: string[] = [];
+        for (let i = 0; i <= (chunk_index ?? 0); i++) {
+          const chunkPath = `${match_id}_chunk_${i}.json`;
+          const { data: chunkData } = await supabaseAdmin.storage
+            .from("match-frames")
+            .download(chunkPath);
+          if (chunkData) {
+            try {
+              const parsed = JSON.parse(await chunkData.text());
+              if (parsed.frames) allFrames.push(...parsed.frames);
+            } catch { /* skip corrupt chunks */ }
+          }
+        }
+
+        if (allFrames.length >= 5) {
+          console.log(`Triggering live partial analysis with ${allFrames.length} frames`);
+          
+          const { data: job } = await supabaseAdmin
+            .from("analysis_jobs")
+            .insert({ match_id, status: "queued", progress: 0 })
+            .select()
+            .single();
+
+          if (job) {
+            fetch(`${supabaseUrl}/functions/v1/analyze-match`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({
+                match_id,
+                job_id: job.id,
+                frames: allFrames,
+                duration_sec: allFrames.length * 30,
+                phase: "live_partial",
+              }),
+            }).catch((err) => console.error("live partial analyze error:", err));
+          }
+        }
+      }
+
       return new Response(
-        JSON.stringify({ success: true, chunk_index: chunk_index ?? 0, frames_in_chunk: frames.length }),
+        JSON.stringify({ success: true, chunk_index: chunk_index ?? 0, frames_in_chunk: frames.length, synced_total: newSyncedTotal }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
