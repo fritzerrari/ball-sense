@@ -134,7 +134,7 @@ export default function MatchReport() {
 
       await supabase.from("matches").update({ status: "processing" }).eq("id", id);
 
-      // Trigger analysis
+      // Trigger analysis — frames will be loaded from storage by the edge function
       await supabase.functions.invoke("analyze-match", {
         body: { match_id: id, job_id: newJob.id },
       });

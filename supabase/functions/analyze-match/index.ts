@@ -15,21 +15,46 @@ serve(async (req) => {
   );
 
   try {
-    const { match_id, job_id, frames, duration_sec } = await req.json();
+    const { match_id, job_id, frames: inlineFrames, duration_sec: inlineDuration } = await req.json();
     if (!match_id || !job_id) {
       return new Response(JSON.stringify({ error: "match_id and job_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    let frames = inlineFrames as string[] | undefined;
+    let duration_sec = inlineDuration as number | undefined;
+
+    // If no inline frames, load from Storage (retry/reprocess case)
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
-      await supabase.from("analysis_jobs").update({
-        status: "failed",
-        error_message: "Keine Frames empfangen",
-      }).eq("id", job_id);
-      return new Response(JSON.stringify({ error: "No frames provided" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.log("No inline frames, loading from storage...");
+      const { data: fileData, error: dlError } = await supabase.storage
+        .from("match-frames")
+        .download(`${match_id}.json`);
+
+      if (dlError || !fileData) {
+        await supabase.from("analysis_jobs").update({
+          status: "failed",
+          error_message: "Keine Frames gefunden. Bitte Video erneut hochladen.",
+        }).eq("id", job_id);
+        return new Response(JSON.stringify({ error: "No frames available" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const parsed = JSON.parse(await fileData.text());
+      frames = parsed.frames;
+      duration_sec = parsed.duration_sec;
+
+      if (!frames || frames.length === 0) {
+        await supabase.from("analysis_jobs").update({
+          status: "failed",
+          error_message: "Gespeicherte Frames sind leer.",
+        }).eq("id", job_id);
+        return new Response(JSON.stringify({ error: "Stored frames empty" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Update job status
@@ -39,7 +64,7 @@ serve(async (req) => {
       progress: 10,
     }).eq("id", job_id);
 
-    // Get match info for context
+    // Get match info
     const { data: match } = await supabase
       .from("matches")
       .select("*, fields(name, width_m, height_m)")
@@ -57,19 +82,19 @@ serve(async (req) => {
       });
     }
 
-    // Select subset of frames if too many (max ~20 for API limits)
+    // Select subset of frames (max ~20)
     const maxFrames = 20;
-    let selectedFrames = frames as string[];
+    let selectedFrames = frames!;
     if (selectedFrames.length > maxFrames) {
       const step = selectedFrames.length / maxFrames;
       selectedFrames = Array.from({ length: maxFrames }, (_, i) =>
-        frames[Math.min(Math.floor(i * step), frames.length - 1)]
+        frames![Math.min(Math.floor(i * step), frames!.length - 1)]
       );
     }
 
     await supabase.from("analysis_jobs").update({ progress: 25 }).eq("id", job_id);
 
-    // Build multi-image message content
+    // Build multi-image message
     const userContent: any[] = [
       {
         type: "text",
@@ -91,13 +116,10 @@ WICHTIG: Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlic
       },
     ];
 
-    // Add frames as images
     for (const frame of selectedFrames) {
       userContent.push({
         type: "image_url",
-        image_url: {
-          url: `data:image/jpeg;base64,${frame}`,
-        },
+        image_url: { url: `data:image/jpeg;base64,${frame}` },
       });
     }
 
@@ -115,19 +137,10 @@ WICHTIG: Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlic
           {
             role: "system",
             content: `Du bist ein erfahrener Fußball-Analyst. Du analysierst Standbilder eines Fußballspiels.
-Fokussiere dich auf das, was du TATSÄCHLICH auf den Bildern erkennst:
-- Spielerverteilung auf dem Feld
-- Angriffsrichtungen und Raumbesetzung
-- Ballposition (wenn sichtbar)
-- Formationsstruktur
-- Druckphasen und Momentum
-
+Fokussiere dich auf das, was du TATSÄCHLICH auf den Bildern erkennst.
 Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als solche.`,
           },
-          {
-            role: "user",
-            content: userContent,
-          },
+          { role: "user", content: userContent },
         ],
         tools: [
           {
@@ -191,15 +204,8 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                       required: ["zone", "frequency", "description"],
                     },
                   },
-                  visual_quality: {
-                    type: "string",
-                    description: "How well could you actually see the game in the frames? good/moderate/poor",
-                    enum: ["good", "moderate", "poor"],
-                  },
-                  confidence: {
-                    type: "number",
-                    description: "Overall confidence 0-1 in the analysis based on what was visible",
-                  },
+                  visual_quality: { type: "string", enum: ["good", "moderate", "poor"] },
+                  confidence: { type: "number" },
                 },
                 required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "visual_quality", "confidence"],
               },
@@ -213,12 +219,10 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
     if (!analysisResponse.ok) {
       const errText = await analysisResponse.text();
       console.error("AI gateway error:", analysisResponse.status, errText);
-
       const errorMessages: Record<number, string> = {
         429: "Rate limit erreicht. Bitte später erneut versuchen.",
         402: "AI-Kontingent aufgebraucht.",
       };
-
       if (errorMessages[analysisResponse.status]) {
         await supabase.from("analysis_jobs").update({
           status: "failed",
@@ -228,13 +232,11 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
           status: analysisResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
       throw new Error(`AI gateway error: ${analysisResponse.status}`);
     }
 
     const aiResult = await analysisResponse.json();
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
-
     if (!toolCall) throw new Error("No tool call response from AI");
 
     const analysis = JSON.parse(toolCall.function.arguments);
@@ -250,28 +252,21 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
 
     for (const result of resultTypes) {
       await supabase.from("analysis_results").insert({
-        job_id,
-        match_id,
+        job_id, match_id,
         result_type: result.type,
         data: result.data,
         confidence: analysis.confidence ?? 0.5,
       });
     }
 
+    // Set status to interpreting — ProcessingPage will trigger generate-insights from client side
     await supabase.from("analysis_jobs").update({ progress: 85, status: "interpreting" }).eq("id", job_id);
 
-    // Trigger insights generation
-    const insightsUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-insights`;
-    await fetch(insightsUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ match_id, job_id }),
-    });
-
-    return new Response(JSON.stringify({ success: true, frames_analyzed: selectedFrames.length, visual_quality: analysis.visual_quality }), {
+    return new Response(JSON.stringify({
+      success: true,
+      frames_analyzed: selectedFrames.length,
+      visual_quality: analysis.visual_quality,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

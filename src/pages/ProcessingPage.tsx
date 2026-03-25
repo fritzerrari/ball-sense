@@ -24,13 +24,14 @@ export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [insightsTriggered, setInsightsTriggered] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("analysis_jobs")
-        .select("status, progress, error_message")
+        .select("id, status, progress, error_message")
         .eq("match_id", id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -40,39 +41,46 @@ export default function ProcessingPage() {
         setStatus(data.status as JobStatus);
         setProgress(data.progress ?? 0);
         if (data.error_message) setErrorMessage(data.error_message);
+
+        // When analyze-match completes (status=interpreting), trigger generate-insights from client
+        if (data.status === "interpreting" && !insightsTriggered) {
+          setInsightsTriggered(true);
+          supabase.functions.invoke("generate-insights", {
+            body: { match_id: id, job_id: data.id },
+          }).catch((err) => console.error("generate-insights trigger error:", err));
+        }
+
         if (data.status === "complete" || data.status === "failed") clearInterval(interval);
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [id]);
+  }, [id, insightsTriggered]);
 
   const handleRetry = async () => {
     if (!id) return;
     setRetrying(true);
+    setInsightsTriggered(false);
     try {
-      // Get the latest job
-      const { data: job } = await supabase
-        .from("analysis_jobs")
-        .select("id")
-        .eq("match_id", id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Create new job
+      const { data: newJob, error: jobError } = await supabase.from("analysis_jobs").insert({
+        match_id: id,
+        status: "queued",
+        progress: 0,
+      }).select().single();
+      if (jobError) throw jobError;
 
-      if (job) {
-        // Reset job status
-        await supabase.from("analysis_jobs").update({
-          status: "queued",
-          progress: 0,
-          error_message: null,
-          started_at: null,
-        }).eq("id", job.id);
+      await supabase.from("matches").update({ status: "processing" }).eq("id", id);
 
-        setStatus("queued");
-        setProgress(0);
-        setErrorMessage(null);
-        toast.info("Analyse wird erneut gestartet…");
-      }
+      // Trigger analyze-match WITHOUT frames — edge function loads from storage
+      const { error: fnError } = await supabase.functions.invoke("analyze-match", {
+        body: { match_id: id, job_id: newJob.id },
+      });
+      if (fnError) console.error("retry analyze-match error:", fnError);
+
+      setStatus("queued");
+      setProgress(0);
+      setErrorMessage(null);
+      toast.info("Analyse wird erneut gestartet…");
     } catch {
       toast.error("Retry fehlgeschlagen");
     } finally {

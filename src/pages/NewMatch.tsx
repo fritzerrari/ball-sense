@@ -83,14 +83,30 @@ export default function NewMatch() {
     }
   };
 
-  /** Send captured frames to analyze-match and navigate to processing */
+  /** Persist frames to Storage, then send to analyze-match */
   const analyzeFrames = useCallback(async (captureResult: FrameCaptureResult) => {
     if (!matchId || !clubId) return;
 
-    setStatusText("Analyse wird gestartet…");
-    setUploadProgress(80);
+    setStatusText("Frames werden gespeichert…");
+    setUploadProgress(75);
 
     try {
+      // Persist frames to Storage for retry/reprocess
+      const framesJson = JSON.stringify({
+        frames: captureResult.frames,
+        duration_sec: captureResult.durationSec,
+        captured_at: new Date().toISOString(),
+      });
+      const { error: storageError } = await supabase.storage
+        .from("match-frames")
+        .upload(`${matchId}.json`, new Blob([framesJson], { type: "application/json" }), {
+          upsert: true,
+        });
+      if (storageError) console.error("Frame storage error:", storageError);
+
+      setStatusText("Analyse wird gestartet…");
+      setUploadProgress(85);
+
       // Create analysis job
       const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
         match_id: matchId,
@@ -114,7 +130,6 @@ export default function NewMatch() {
       });
       if (fnError) {
         console.error("analyze-match error:", fnError);
-        // Don't block — the job is created, ProcessingPage will show status
       }
 
       setUploadProgress(100);

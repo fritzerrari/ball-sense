@@ -111,7 +111,7 @@ function ActiveMatchBanner({ match, clubName }: { match: any; clubName: string |
     const progress = match.processing_progress as any;
     const pct = progress?.percent ?? null;
     return (
-      <Link to={`/matches/${match.id}`} className="block">
+      <Link to={`/matches/${match.id}/processing`} className="block">
         <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 sm:p-5 transition-all hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/5">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
