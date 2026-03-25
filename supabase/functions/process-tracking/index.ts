@@ -729,16 +729,26 @@ async function runProcessing(supabase: any, matchId: string, mode: "full" | "inc
       return;
     }
 
-    // Deduplicate uploads: keep only the newest per (camera_index, upload_mode)
-    const deduped = new Map<string, any>();
+    // Deduplicate uploads: per camera_index, prefer batch over live
+    const cameraUploads = new Map<number, any[]>();
     for (const u of uploads) {
-      const key = `${u.camera_index}_${u.upload_mode}`;
-      const existing = deduped.get(key);
-      if (!existing || new Date(u.uploaded_at) > new Date(existing.uploaded_at)) {
-        deduped.set(key, u);
+      const arr = cameraUploads.get(u.camera_index) || [];
+      arr.push(u);
+      cameraUploads.set(u.camera_index, arr);
+    }
+    const prioritized: any[] = [];
+    for (const [camIdx, camUploads] of cameraUploads) {
+      const batch = camUploads.filter(u => u.upload_mode === "batch").sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
+      const live = camUploads.filter(u => u.upload_mode !== "batch").sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
+      if (batch.length > 0) {
+        prioritized.push(batch[0]);
+        console.log(`[process-tracking] Camera ${camIdx}: using batch upload (${batch[0].frames_count ?? '?'} frames), ignoring ${live.length} live upload(s)`);
+      } else if (live.length > 0) {
+        prioritized.push(live[0]);
+        console.log(`[process-tracking] Camera ${camIdx}: using live upload as fallback (no batch available)`);
       }
     }
-    uploads = [...deduped.values()];
+    uploads = prioritized;
     const uniqueCameraIndices = new Set(uploads.map((u: any) => u.camera_index));
     const actualCamerasUsed = uniqueCameraIndices.size;
 

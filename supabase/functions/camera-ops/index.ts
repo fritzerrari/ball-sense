@@ -155,17 +155,20 @@ serve(async (req) => {
       const filePath = String(body.filePath ?? "").trim();
       const framesCount = Number(body.framesCount ?? 0);
       const durationSec = Number(body.durationSec ?? 0);
+      const uploadMode = String(body.uploadMode ?? "batch");
       if (!filePath || filePath.length > 255) {
         return new Response(JSON.stringify({ error: "Ungültiger Dateipfad" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      await supabase.from("tracking_uploads").insert({
+      await supabase.from("tracking_uploads").upsert({
         match_id: matchId,
         camera_index: cameraIndex,
+        upload_mode: uploadMode,
         file_path: filePath,
         status: "uploaded",
         frames_count: Number.isFinite(framesCount) ? framesCount : null,
         duration_sec: Number.isFinite(durationSec) ? durationSec : null,
-      });
+        uploaded_at: new Date().toISOString(),
+      }, { onConflict: "match_id,camera_index,upload_mode" });
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -195,32 +198,17 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Upload fehlgeschlagen: " + uploadErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Upsert upload entry — deduplicate by match_id + camera_index + upload_mode
-      const { data: existing } = await supabase.from("tracking_uploads")
-        .select("id")
-        .eq("match_id", matchId)
-        .eq("camera_index", cameraIndex)
-        .eq("upload_mode", "batch")
-        .maybeSingle();
-
-      if (existing) {
-        await supabase.from("tracking_uploads").update({
-          file_path: filePath,
-          status: "uploaded",
-          frames_count: Number.isFinite(framesCount) ? framesCount : null,
-          duration_sec: Number.isFinite(durationSec) ? durationSec : null,
-          uploaded_at: new Date().toISOString(),
-        }).eq("id", existing.id);
-      } else {
-        await supabase.from("tracking_uploads").insert({
-          match_id: matchId,
-          camera_index: cameraIndex,
-          file_path: filePath,
-          status: "uploaded",
-          frames_count: Number.isFinite(framesCount) ? framesCount : null,
-          duration_sec: Number.isFinite(durationSec) ? durationSec : null,
-        });
-      }
+      // Upsert upload entry — deduplicate by unique index (match_id, camera_index, upload_mode)
+      await supabase.from("tracking_uploads").upsert({
+        match_id: matchId,
+        camera_index: cameraIndex,
+        upload_mode: "batch",
+        file_path: filePath,
+        status: "uploaded",
+        frames_count: Number.isFinite(framesCount) ? framesCount : null,
+        duration_sec: Number.isFinite(durationSec) ? durationSec : null,
+        uploaded_at: new Date().toISOString(),
+      }, { onConflict: "match_id,camera_index,upload_mode" });
 
       console.log(`[camera-ops] Upload registered: ${filePath}`);
       return new Response(JSON.stringify({ success: true, filePath }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
