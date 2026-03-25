@@ -124,6 +124,8 @@ export default function MatchReport() {
   const [sortAsc, setSortAsc] = useState(false);
   const [newCode, setNewCode] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const [forceShowRoadmap, setForceShowRoadmap] = useState(false);
 
   // Realtime subscription + faster polling for live/processing matches
   const isLive = match?.status === "live" || match?.status === "processing";
@@ -213,7 +215,7 @@ export default function MatchReport() {
   const uploadCount = uploads?.length ?? 0;
   const showProcessingRoadmap = Boolean(
     id &&
-    (match?.status === "processing" || (match?.status === "live" && !hasStats) || (uploadCount > 0 && !hasStats && match?.status !== "done")),
+    (forceShowRoadmap || match?.status === "processing" || (match?.status === "live" && !hasStats) || (uploadCount > 0 && !hasStats && match?.status !== "done")),
   );
   const homeAgg = aggregatePlayerMetrics(homePlayerStats);
   const awayAgg = aggregatePlayerMetrics(awayPlayerStats);
@@ -524,26 +526,40 @@ export default function MatchReport() {
             <Button
               variant="heroOutline"
               size="sm"
+              disabled={isReprocessing}
               onClick={async () => {
                 try {
+                  if (!id) return;
+                  setIsReprocessing(true);
+                  setForceShowRoadmap(true);
                   toast.info("Neuverarbeitung gestartet...");
-                  await supabase.from("matches").update({ status: "processing" }).eq("id", id);
-                  const { data: sess } = await supabase.auth.getSession();
-                  const token = sess.session?.access_token;
-                  if (token) {
-                    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-tracking`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                      body: JSON.stringify({ matchId: id, action: "full" }),
-                    });
-                  }
-                  refetchPlayerStats();
-                  refetchTeamStats();
-                } catch { toast.error("Neuverarbeitung fehlgeschlagen"); }
+
+                  const { error } = await supabase.functions.invoke("process-tracking", {
+                    body: { matchId: id, action: "retry" },
+                  });
+                  if (error) throw error;
+
+                  await Promise.all([
+                    refetchMatch(),
+                    refetchUploads(),
+                    refetchPlayerStats(),
+                    refetchTeamStats(),
+                  ]);
+
+                  toast.success("Neuverarbeitung läuft");
+                } catch {
+                  setForceShowRoadmap(false);
+                  toast.error("Neuverarbeitung fehlgeschlagen");
+                } finally {
+                  setIsReprocessing(false);
+                }
               }}
             >
-              <Zap className="h-4 w-4 mr-1.5" /> Neu verarbeiten
+              {isReprocessing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Zap className="h-4 w-4 mr-1.5" />} Neu verarbeiten
             </Button>
+            {(forceShowRoadmap || isReprocessing) && (
+              <p className="text-xs text-muted-foreground">Verarbeitung wurde ausgelöst – der Fortschritt erscheint jetzt im Analyse-Block.</p>
+            )}
           </div>
         )}
 

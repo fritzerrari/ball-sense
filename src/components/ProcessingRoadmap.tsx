@@ -69,17 +69,10 @@ export function ProcessingRoadmap({ matchId, matchCreatedAt, uploadCount = 1 }: 
   const handleRetry = useCallback(async () => {
     setIsRetrying(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) { toast.error("Bitte erneut anmelden"); return; }
-
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-tracking`;
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ matchId, action: "retry" }),
+      const { error } = await supabase.functions.invoke("process-tracking", {
+        body: { matchId, action: "retry" },
       });
-      if (resp.ok) {
+      if (!error) {
         toast.success("Verarbeitung wird erneut gestartet");
         setDbProgress({ phase: "upload", progress: 0, detail: "Erneut gestartet", updated_at: new Date().toISOString() });
         setElapsed(0);
