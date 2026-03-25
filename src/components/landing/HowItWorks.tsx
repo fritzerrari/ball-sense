@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
-import { Smartphone, Play, FileBarChart } from "lucide-react";
+import { Smartphone, Brain, FileBarChart } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 const steps = [
   { icon: Smartphone, titleKey: "landing.step1Title", descKey: "landing.step1Desc", num: "01" },
-  { icon: Play, titleKey: "landing.step2Title", descKey: "landing.step2Desc", num: "02" },
+  { icon: Brain, titleKey: "landing.step2Title", descKey: "landing.step2Desc", num: "02" },
   { icon: FileBarChart, titleKey: "landing.step3Title", descKey: "landing.step3Desc", num: "03" },
 ];
 
@@ -16,7 +16,6 @@ export function HowItWorks() {
       <div className="absolute inset-0 field-grid opacity-[0.04]" />
 
       <div className="container mx-auto px-4 relative z-10">
-        {/* Left-aligned header */}
         <div className="grid lg:grid-cols-3 gap-8 lg:gap-12 max-w-6xl mx-auto mb-16">
           <motion.div
             className="lg:col-span-1"
@@ -42,7 +41,6 @@ export function HowItWorks() {
           </motion.div>
         </div>
 
-        {/* Steps — horizontal cards with large numbers */}
         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4">
           {steps.map((step, i) => (
             <motion.div
@@ -54,7 +52,6 @@ export function HowItWorks() {
               transition={{ duration: 0.5, delay: i * 0.15 }}
               whileHover={{ y: -4 }}
             >
-              {/* Large bg number */}
               <span className="absolute -top-4 -right-2 text-[120px] font-display font-bold text-foreground/[0.03] leading-none select-none pointer-events-none">
                 {step.num}
               </span>
@@ -67,7 +64,6 @@ export function HowItWorks() {
                 <p className="text-sm text-muted-foreground leading-relaxed">{t(step.descKey)}</p>
               </div>
 
-              {/* Connecting arrow for desktop */}
               {i < 2 && (
                 <div className="hidden md:block absolute top-1/2 -right-2 translate-x-full -translate-y-1/2 z-10">
                   <div className="w-4 h-px bg-border" />
