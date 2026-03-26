@@ -337,6 +337,7 @@ export default function CameraTrackingPage() {
     durationSec: number,
     phaseStr: string,
   ) => {
+    // 1. Upload phase-specific file (_h1, _h2, or canonical for full)
     const suffix = phaseStr !== "full" ? `_${phaseStr}` : "";
     const filePath = `${matchId}${suffix}.json`;
 
@@ -350,20 +351,50 @@ export default function CameraTrackingPage() {
       .from("match-frames")
       .upload(filePath, new Blob([framesJson], { type: "application/json" }), { upsert: true });
 
+    // 2. Update canonical file (merge H1+H2 or write full)
+    const canonicalPath = `${matchId}.json`;
+    if (phaseStr !== "full") {
+      // Merge: load existing canonical frames (if any) and append new ones
+      let existingFrames: string[] = [];
+      try {
+        const { data: existing } = await supabase.storage
+          .from("match-frames")
+          .download(canonicalPath);
+        if (existing) {
+          const parsed = JSON.parse(await existing.text());
+          existingFrames = parsed.frames ?? [];
+        }
+      } catch { /* no existing canonical — first half */ }
+
+      const mergedJson = JSON.stringify({
+        frames: [...existingFrames, ...frames],
+        duration_sec: durationSec,
+        phase: "merged",
+        captured_at: new Date().toISOString(),
+      });
+      await supabase.storage
+        .from("match-frames")
+        .upload(canonicalPath, new Blob([mergedJson], { type: "application/json" }), { upsert: true });
+    }
+
+    // 3. Determine job_kind: intermediate for H1, final for H2/full
+    const jobKind = phaseStr === "h1" ? "h1_intermediate" : "final";
+
     const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
       match_id: matchId!,
       status: "queued",
       progress: 0,
+      job_kind: jobKind,
     }).select().single();
     if (jobError) throw jobError;
 
     await supabase.from("matches").update({ status: "processing" }).eq("id", matchId!);
 
+    // 4. Invoke analyze-match WITHOUT inline frames — it loads from storage
     const { error: fnError } = await supabase.functions.invoke("analyze-match", {
       body: {
         match_id: matchId,
         job_id: job.id,
-        frames,
         duration_sec: durationSec,
         phase: phaseStr,
       },
