@@ -490,6 +490,44 @@ export type Database = {
         }
         Relationships: []
       }
+      benchmark_opt_ins: {
+        Row: {
+          club_id: string
+          created_at: string
+          id: string
+          league: string | null
+          opted_in: boolean
+          opted_in_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          id?: string
+          league?: string | null
+          opted_in?: boolean
+          opted_in_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          id?: string
+          league?: string | null
+          opted_in?: boolean
+          opted_in_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "benchmark_opt_ins_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       camera_access_codes: {
         Row: {
           active: boolean
@@ -1880,6 +1918,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      get_league_benchmarks: {
+        Args: { _club_id: string; _league: string }
+        Returns: Json
       }
       get_user_club_id: { Args: { _user_id: string }; Returns: string }
       has_role: {

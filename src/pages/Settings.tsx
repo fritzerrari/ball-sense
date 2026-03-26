@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Building2, CreditCard, Save, Loader2, Check, KeyRound, Copy, ShieldCheck, Trash2, Power } from "lucide-react";
+import { Building2, CreditCard, Save, Loader2, Check, KeyRound, Copy, ShieldCheck, Trash2, Power, BarChart3 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
@@ -11,6 +11,8 @@ import { UpgradeModal } from "@/components/UpgradeModal";
 import { useMonthlyMatchCount } from "@/hooks/use-match-stats";
 import { ClubLogoUpload } from "@/components/ClubLogoUpload";
 import { useTranslation } from "@/lib/i18n";
+import { Switch } from "@/components/ui/switch";
+import { useBenchmarkOptIn } from "@/hooks/use-benchmark";
 
 async function hashCode(code: string) {
   const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
@@ -251,6 +253,10 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Benchmark Opt-in — Pro only */}
+        <BenchmarkOptInSection />
+
+
         <div className="glass-card space-y-4 p-6">
           <h2 className="text-lg font-semibold font-display flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-primary" /> {t("settings.planBilling")}
@@ -303,5 +309,45 @@ export default function SettingsPage() {
 
       <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} currentPlan={plan} />
     </AppLayout>
+  );
+}
+
+function BenchmarkOptInSection() {
+  const { optedIn, loading, isPro, toggle, toggling } = useBenchmarkOptIn();
+  const { t, language } = useTranslation();
+
+  if (!isPro) return null;
+
+  return (
+    <div className="glass-card space-y-4 p-6">
+      <h2 className="text-lg font-semibold font-display flex items-center gap-2">
+        <BarChart3 className="h-5 w-5 text-primary" />
+        {language === "de" ? "Liga-Benchmark" : "League Benchmark"}
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        {language === "de"
+          ? "Nimm anonym am Liga-Benchmark teil. Deine aggregierten Werte (Ballbesitz, Laufdistanz, Tempo) werden mit dem Liga-Durchschnitt verglichen. Es werden keine einzelnen Vereinsdaten weitergegeben — nur Durchschnitte ab mindestens 5 Teilnehmern."
+          : "Participate anonymously in the league benchmark. Your aggregated stats (possession, distance, speed) are compared to the league average. No individual club data is shared — only averages with at least 5 participants."}
+      </p>
+      <div className="flex items-center gap-3">
+        <Switch
+          checked={optedIn}
+          onCheckedChange={toggle}
+          disabled={loading || toggling}
+        />
+        <span className="text-sm text-foreground">
+          {optedIn
+            ? (language === "de" ? "Teilnahme aktiv" : "Participation active")
+            : (language === "de" ? "Nicht teilnehmen" : "Not participating")}
+        </span>
+      </div>
+      {optedIn && (
+        <p className="text-xs text-muted-foreground">
+          {language === "de"
+            ? "Du kannst die Teilnahme jederzeit deaktivieren. Deine Daten werden dann nicht mehr in den Benchmark einbezogen."
+            : "You can deactivate participation at any time. Your data will no longer be included in the benchmark."}
+        </p>
+      )}
+    </div>
   );
 }

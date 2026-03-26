@@ -5,10 +5,11 @@ import AppLayout from "@/components/AppLayout";
 import { useTranslation } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, BarChart3, AlertTriangle, Brain, Target, Zap } from "lucide-react";
+import { TrendingUp, BarChart3, AlertTriangle, Brain, Target, Zap, Users } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine } from "recharts";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonCard } from "@/components/SkeletonCard";
+import { useBenchmarkOptIn, useLeagueBenchmarks } from "@/hooks/use-benchmark";
 
 interface AnalysisData {
   match_id: string;
@@ -376,9 +377,95 @@ export default function TrendDashboard() {
                 </div>
               </CardContent>
             </Card>
+            <LeagueBenchmarkSection language={language} trendData={trendData} />
           </>
         )}
       </div>
     </AppLayout>
+  );
+}
+
+function LeagueBenchmarkSection({ language, trendData }: { language: string; trendData: Array<{ dominance: number; tempo: number }> }) {
+  const { optedIn, isPro } = useBenchmarkOptIn();
+  const { data: benchmarks, isLoading } = useLeagueBenchmarks();
+
+  if (!isPro || !optedIn) return null;
+
+  if (isLoading) return <SkeletonCard />;
+
+  if (!benchmarks || benchmarks.error) {
+    const msg = benchmarks?.error === "insufficient_participants"
+      ? (language === "de"
+          ? `Noch nicht genug Teilnehmer (${benchmarks?.count ?? 0}/5). Mindestens 5 Vereine in deiner Liga müssen teilnehmen.`
+          : `Not enough participants yet (${benchmarks?.count ?? 0}/5). At least 5 clubs in your league must participate.`)
+      : (language === "de" ? "Benchmark nicht verfügbar." : "Benchmark not available.");
+
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-display flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            {language === "de" ? "Liga-Benchmark" : "League Benchmark"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{msg}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Own averages from trendData
+  const ownDominance = trendData.length > 0
+    ? Math.round(trendData.reduce((s, d) => s + d.dominance, 0) / trendData.length)
+    : null;
+
+  const items = [
+    {
+      label: language === "de" ? "Ballbesitz" : "Possession",
+      league: benchmarks.avg_possession_pct ?? 0,
+      own: null as number | null, // no direct match from trendData
+    },
+    {
+      label: language === "de" ? "Ø Laufdistanz (km)" : "Avg distance (km)",
+      league: benchmarks.avg_avg_distance_km ?? 0,
+      own: null,
+    },
+    {
+      label: language === "de" ? "Top-Speed (km/h)" : "Top speed (km/h)",
+      league: benchmarks.avg_top_speed_kmh ?? 0,
+      own: null,
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-display flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          {language === "de" ? "Liga-Benchmark" : "League Benchmark"}
+          <Badge variant="outline" className="text-[10px]">
+            {benchmarks.participants} {language === "de" ? "Vereine" : "clubs"}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {items.map((item) => (
+            <div key={item.label} className="flex items-center justify-between">
+              <span className="text-sm text-foreground">{item.label}</span>
+              <span className="text-sm font-medium text-primary">
+                {language === "de" ? "Liga-Ø" : "League avg"}: {item.league}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          {language === "de"
+            ? "Nur aggregierte, anonyme Durchschnittswerte. Kein Rückschluss auf einzelne Vereine."
+            : "Only aggregated, anonymous averages. No individual club data is disclosed."}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
