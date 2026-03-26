@@ -212,7 +212,7 @@ export default function NewMatch() {
                   value={awayName}
                   onChange={(e) => setAwayName(e.target.value)}
                   placeholder="z.B. FC Musterstadt"
-                  className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50"
+                  className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 h-12 text-sm text-foreground placeholder:text-muted-foreground/50"
                 />
               </div>
               <div>
@@ -221,7 +221,7 @@ export default function NewMatch() {
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground"
+                  className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 h-12 text-sm text-foreground"
                 />
               </div>
             </div>
@@ -231,7 +231,7 @@ export default function NewMatch() {
               <select
                 value={fieldId}
                 onChange={(e) => setFieldId(e.target.value)}
-                className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground"
+                className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 h-12 text-sm text-foreground"
               >
                 {!fields?.length && <option value="">Kein Platz</option>}
                 {(fields ?? []).map((f) => (
@@ -241,9 +241,9 @@ export default function NewMatch() {
             </div>
 
             <Button
-              onClick={handleCreateMatch}
+              onClick={() => { if (navigator.vibrate) navigator.vibrate(20); handleCreateMatch(); }}
               disabled={!canProceed || creating}
-              className="w-full gap-2 h-14 text-base"
+              className="w-full gap-2 h-12 md:h-14 text-base sticky bottom-20 md:static z-10 shadow-lg md:shadow-none active:scale-[0.98] transition-transform"
             >
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
               Weiter

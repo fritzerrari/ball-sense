@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, Play, ArrowDown, Smartphone, Zap, Shield, Trophy } from "lucide-react";
+import { ChevronRight, Play, ArrowDown, Smartphone, Zap, Shield, Trophy, Menu, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -16,14 +17,30 @@ import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
 import { WhyFieldIQ } from "@/components/landing/WhyFieldIQ";
 import { TransparencySection } from "@/components/landing/TransparencySection";
+import { CompareInline } from "@/components/landing/CompareInline";
 import { Footer } from "@/components/landing/Footer";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 export default function LandingPage() {
   const { t, language } = useTranslation();
   const de = language === "de";
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const navLinks = [
+    { href: "#how-it-works", label: t("landing.howItWorks") },
+    { href: "#features", label: t("landing.features") },
+    { href: "#demo", label: "Demo" },
+    { href: "#pricing", label: t("landing.pricing") },
+  ];
+
+  const scrollTo = (href: string) => {
+    setMobileNavOpen(false);
+    const el = document.querySelector(href);
+    el?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="min-h-screen bg-background overflow-x-hidden scroll-smooth">
       {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
@@ -33,37 +50,74 @@ export default function LandingPage() {
             <span className="gradient-text">IQ</span>
           </Link>
           <div className="hidden md:flex items-center gap-6">
-            <a href="#how-it-works" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">{t("landing.howItWorks")}</a>
-            <a href="#features" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">{t("landing.features")}</a>
-            <a href="#demo" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">Demo</a>
-            <a href="#pricing" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">{t("landing.pricing")}</a>
+            {navLinks.map((link) => (
+              <button
+                key={link.href}
+                onClick={() => scrollTo(link.href)}
+                className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {link.label}
+              </button>
+            ))}
           </div>
           <div className="flex items-center gap-2">
             <LanguageToggle />
             <ThemeToggle />
-            <Button variant="ghost" size="sm" asChild className="text-xs">
+            <Button variant="ghost" size="sm" asChild className="text-xs hidden sm:inline-flex">
               <Link to="/login">{t("landing.signIn")}</Link>
             </Button>
             <Button size="sm" asChild className="hidden sm:inline-flex text-xs h-8 px-4">
               <Link to="/login">{t("landing.tryFree")}</Link>
             </Button>
+            {/* Mobile hamburger */}
+            <button
+              className="md:hidden p-2 -mr-2 text-foreground"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </nav>
 
-      {/* Hero — Bold, emotional */}
-      <section className="relative pt-24 pb-8 md:pt-28 md:pb-16 overflow-hidden min-h-[92vh] flex items-center">
+      {/* Mobile Nav Sheet */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent side="right" className="w-72 bg-background border-border p-6">
+          <div className="flex flex-col gap-6 mt-8">
+            {navLinks.map((link) => (
+              <button
+                key={link.href}
+                onClick={() => scrollTo(link.href)}
+                className="text-left text-base font-medium text-foreground hover:text-primary transition-colors"
+              >
+                {link.label}
+              </button>
+            ))}
+            <hr className="border-border" />
+            <Button variant="ghost" asChild className="justify-start">
+              <Link to="/login" onClick={() => setMobileNavOpen(false)}>{t("landing.signIn")}</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/login" onClick={() => setMobileNavOpen(false)}>{t("landing.tryFree")}</Link>
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Hero */}
+      <section className="relative pt-20 pb-8 md:pt-28 md:pb-16 overflow-hidden min-h-[85vh] md:min-h-[92vh] flex items-center">
         <div className="absolute inset-0 field-grid opacity-[0.04]" />
         <div className="absolute top-0 right-0 w-2/3 h-full bg-gradient-to-l from-primary/[0.04] to-transparent" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-primary/[0.06] rounded-full blur-[120px]" />
         <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-primary/[0.03] rounded-full blur-[80px]" />
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-8 items-center">
             <div className="max-w-xl">
               {/* Beta badge */}
               <motion.div
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-semibold mb-6 font-display"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-semibold mb-4 md:mb-6 font-display"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5 }}
@@ -74,7 +128,7 @@ export default function LandingPage() {
 
               {/* Headline */}
               <motion.h1
-                className="text-4xl md:text-5xl lg:text-[3.75rem] font-bold tracking-tight mb-6 font-display leading-[1.06]"
+                className="text-3xl md:text-5xl lg:text-[3.75rem] font-bold tracking-tight mb-4 md:mb-6 font-display leading-[1.06]"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.1 }}
@@ -96,7 +150,7 @@ export default function LandingPage() {
 
               {/* Subhead */}
               <motion.p
-                className="text-lg text-muted-foreground mb-8 leading-relaxed max-w-md"
+                className="text-base md:text-lg text-muted-foreground mb-6 md:mb-8 leading-relaxed max-w-md"
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.25 }}
@@ -108,19 +162,19 @@ export default function LandingPage() {
 
               {/* CTAs */}
               <motion.div
-                className="flex flex-wrap items-center gap-3"
+                className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3"
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.35 }}
               >
-                <Button variant="hero" size="lg" asChild>
+                <Button variant="hero" size="lg" asChild className="h-12">
                   <Link to="/login">
                     {t("landing.startFreeTrial")}
                     <ChevronRight className="ml-1 h-4 w-4" />
                   </Link>
                 </Button>
-                <Button variant="heroOutline" size="lg" asChild>
-                  <a href="#demo">
+                <Button variant="heroOutline" size="lg" asChild className="h-12">
+                  <a href="#demo" onClick={(e) => { e.preventDefault(); scrollTo("#demo"); }}>
                     <Play className="mr-1 h-3.5 w-3.5" />
                     {de ? "Live-Demo testen" : "Try live demo"}
                   </a>
@@ -129,7 +183,7 @@ export default function LandingPage() {
 
               {/* Proof points */}
               <motion.div
-                className="mt-10 grid grid-cols-3 gap-4"
+                className="mt-8 md:mt-10 flex flex-wrap gap-4 md:grid md:grid-cols-3 md:gap-4"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6, duration: 0.5 }}
@@ -148,7 +202,7 @@ export default function LandingPage() {
             </div>
 
             {/* Right — Product Mockup */}
-            <div className="lg:pl-4">
+            <div className="lg:pl-4 hidden md:block">
               <HeroSlider />
             </div>
           </div>
@@ -170,19 +224,21 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Optimized section order for conversion */}
       <KeyNumbers />
       <WhyFieldIQ />
       <HowItWorks />
+      <FeatureCards />
       <TransparencySection />
+      <CompareInline />
       <AnalyticsShowcase />
       <DemoSection />
-      <FeatureCards />
       <TrustSection />
       <PricingSection />
       <FAQSection />
 
       {/* Final CTA */}
-      <section className="py-24 md:py-36 relative overflow-hidden">
+      <section className="py-16 md:py-36 relative overflow-hidden">
         <div className="absolute inset-0 field-grid opacity-[0.04]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/[0.06] rounded-full blur-[120px]" />
         <div className="container mx-auto px-4 text-center relative z-10">
@@ -200,14 +256,14 @@ export default function LandingPage() {
               <Trophy className="h-3.5 w-3.5" />
               {de ? "30 Tage kostenlos — keine Kreditkarte" : "30 days free — no credit card"}
             </motion.div>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold font-display mb-5 leading-tight">
+            <h2 className="text-2xl md:text-5xl lg:text-6xl font-bold font-display mb-5 leading-tight">
               {de ? (
                 <>Bereit, dein Team<br /><span className="gradient-text">besser zu machen?</span></>
               ) : (
                 <>Ready to make<br /><span className="gradient-text">your team better?</span></>
               )}
             </h2>
-            <p className="text-muted-foreground mb-8 max-w-lg mx-auto text-base">
+            <p className="text-muted-foreground mb-8 max-w-lg mx-auto text-sm md:text-base">
               {de
                 ? "Nächstes Spiel, nächste Chance. Starte jetzt und sieh, was deine KI über dein Team herausfindet."
                 : "Next match, next chance. Start now and see what AI discovers about your team."}
