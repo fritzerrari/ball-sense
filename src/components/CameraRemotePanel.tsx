@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff, CloudUpload, ShieldCheck, ShieldOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import WalkieTalkie from "@/components/WalkieTalkie";
 
 interface CameraSession {
   id: string;
@@ -149,6 +150,8 @@ export default function CameraRemotePanel({ matchId }: Props) {
   if (sessions.length === 0) return null;
 
   return (
+    <>
+    <WalkieTalkie matchId={matchId} userId="trainer" userName="Trainer" />
     <Card>
       <CardContent className="pt-5 space-y-4">
         <div className="flex items-center gap-2">
@@ -297,5 +300,6 @@ export default function CameraRemotePanel({ matchId }: Props) {
         })}
       </CardContent>
     </Card>
+    </>
   );
 }
