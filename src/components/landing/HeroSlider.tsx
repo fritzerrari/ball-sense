@@ -6,7 +6,7 @@ import { HEATMAP_COLS, HEATMAP_ROWS } from "@/lib/constants";
 const slides = [
   { id: "tracking", label: "Live Tracking" },
   { id: "calibration", label: "Kalibrierung" },
-  { id: "analysis", label: "Datenübertragung" },
+  { id: "analysis", label: "Coach Report" },
 ];
 
 export function HeroSlider() {
