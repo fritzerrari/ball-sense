@@ -1,85 +1,122 @@
 
 
-# Zeiterfassung, API-Integration & Fehlerprüfung
+# Mobile-Optimierung, Landing Page Upgrade & UX-Verbesserungen
 
-## 1. Halbzeit-Zeiterfassung einbauen
+## Zusammenfassung
 
-**Problem**: Die Aufnahmezeit (`duration_sec`) wird zwar kalkuliert und im JSON gespeichert, aber nirgends pro Halbzeit persistent in der DB gespeichert. Für Berechnungen (Laufleistung/min, Intensitätskurven) fehlen exakte Zeitstempel.
+Drei Hauptbereiche: (1) Mobile Responsiveness fuer alle Screens, (2) Landing Page staerker als Sales-Tool aufbauen inkl. Vergleichstabelle und aktualisierter Slider-Bilder, (3) UX-Fuehrung fuer Trainer und Kamera-Helfer verbessern.
 
-**Fix** — DB-Migration:
-- Neue Spalten in `matches`:
-  - `h1_started_at timestamptz`
-  - `h1_ended_at timestamptz`
-  - `h2_started_at timestamptz`
-  - `h2_ended_at timestamptz`
-  - `recording_started_at timestamptz`
-  - `recording_ended_at timestamptz`
+---
 
-**Fix** — Frontend (`CameraTrackingPage.tsx`):
-- Bei `startRecording()`: Zeitstempel `recording_started_at` (und `h1_started_at` bei HZ1) in `matches` schreiben
-- Bei `triggerHalftime()`: `h1_ended_at` setzen
-- Bei `startSecondHalf()`: `h2_started_at` setzen
-- Bei `confirmStop()`: `h2_ended_at` bzw. `recording_ended_at` setzen
-- Für Helper: Zeitstempel über `camera-ops` Edge Function durchreichen
+## 1. Mobile Responsiveness
 
-**Fix** — Edge Functions:
-- `camera-ops/index.ts`: Neues Action `update-timing` oder Zeitstempel in `upload-frames` mitschicken, `matches` updaten
-- `generate-insights/index.ts`: Halbzeitdauern aus `matches` laden und im Prompt verwenden (z.B. "1. HZ: 47 Min, 2. HZ: 45 Min → Gesamtspielzeit: 92 Min")
-- `analyze-match/index.ts`: `duration_sec` pro Halbzeit präziser berechnen statt Schätzung
+### 1a. Landing Page Mobile
+- **Nav**: Hamburger-Menu fuer mobile Geraete (aktuell sind Nav-Links `hidden md:flex`, aber kein Mobile-Menu)
+- **Hero**: Headline von `text-4xl` auf `text-3xl` auf Mobile, Proof Points von `grid-cols-3` auf `grid-cols-1` mit kompakteren Abstaenden
+- **HeroSlider**: Aspect Ratio auf Mobile verkleinern, Floating Badges repositionieren damit sie nicht abgeschnitten werden
+- **Sections** (KeyNumbers, WhyFieldIQ, HowItWorks etc.): `py-24 md:py-36` ist ok, aber innere Grids pruefen und auf `gap-4` statt `gap-8` auf Mobile reduzieren
 
-## 2. API-Football besser integrieren + Alternativen
+### 1b. Dashboard Mobile
+- Quick Stats Grid: `grid-cols-1` statt `sm:grid-cols-3` auf kleinen Screens (bereits `sm:grid-cols-3`, ok)
+- Header: Club Logo + Name + Plan Badge stapeln statt horizontal bei engem Platz
+- Training Recommendations Cards: Kompaktere Darstellung auf Mobile
 
-**Aktueller Stand**: API-Football ist vollständig eingebaut (Suche, Config, Sync Fixtures, Sync Player Stats, Standings). Problem: API-Football deckt Regionalliga und darunter NICHT zuverlässig ab.
+### 1c. Admin Page Mobile
+- Tabs (`TabsList`): Horizontal scroll statt Umbruch — `overflow-x-auto flex-nowrap` hinzufuegen
+- Tabellen in Admin-Tabs: Horizontales Scrollen ermoeglichen oder Card-Layout fuer Mobile
+- Match-Liste, Player-Liste: Card-basiertes Layout statt Tabelle auf Mobile
 
-**Alternative**: **OpenLigaDB** (kostenlos, open-source, Deutschland-fokussiert):
-- Deckt 1.-3. Liga ab, aber NICHT Regionalliga oder tiefer
-- Kein API-Key nötig — einfache REST-Calls
-- Limitiert auf Ergebnisse/Tabellen — keine Spielerstatistiken
+### 1d. NewMatch Wizard Mobile
+- Form-Inputs: Touch-optimierte Hoehe (min `h-12`)
+- "Weiter"-Button: Sticky am unteren Rand auf Mobile (`sticky bottom-20`)
+- Aufnahme-Optionen (MatchRecordingChoice): Groessere Touch-Targets
 
-**Realistisches Fazit**: Für Regionalliga und tiefer existiert KEINE externe API mit detaillierten Statistiken. Die eigene Kamera-Analyse IST die einzige Datenquelle. Das ist ein USP.
+### 1e. CameraTrackingPage Mobile
+- Recording Controls: Groessere Buttons (min 48px Touch-Target)
+- Timer-Display: Prominenter, zentraler platziert
+- Event-Buttons: 2-Spalten-Grid statt horizontal scroll, groessere Icons
 
-**Was implementiert wird**:
-- OpenLigaDB als Fallback für 1.-3. Liga einbauen (kostenlos, kein Key nötig)
-  - Neue Edge Function `openligadb/index.ts` mit Endpunkten: Spielergebnisse, Tabelle
-  - In `AdminApiFootball.tsx`: Tab/Section für OpenLigaDB-Anbindung (Liga auswählen)
-  - Ergebnisse automatisch mit eigenen Matches abgleichen (Datum + Gegner → Score eintragen)
-- API-Football bleibt für höhere Ligen als Premium-Option
-- Im MatchReport: Wenn API-Daten vorhanden, merge mit eigenen Daten; sonst eigene Analyse als alleinige Quelle klar kennzeichnen
+---
 
-## 3. Match Events tatsächlich in Analyse verwenden
+## 2. Landing Page Sales-Upgrade
 
-**Problem geprüft**: `generate-insights` lädt jetzt `match_events`, ABER:
-- Die Events werden nur als Text-Kontext übergeben — sie beeinflussen nicht die strukturierten Felder (Momentum, Grades)
-- Die Event-Buttons speichern zwar korrekt in die DB, aber die `minute`-Berechnung basiert auf `recordingStartTime` (relativer Timer), nicht auf der tatsächlichen Spielminute
+### 2a. Vergleichstabelle direkt auf Landing Page
+- Die Compare-Seite (`/compare`) existiert, ist aber NICHT von der Landing Page verlinkt
+- Einen kompakten **Inline-Vergleich** als neue Sektion auf der Landing Page einbauen (zwischen FeatureCards und TrustSection)
+- 4 Spalten: FieldIQ vs GPS-Westen vs Kamerasysteme vs Manuelle Apps
+- 5-6 wichtigste Zeilen (Kosten, Hardware, Setup-Zeit, Taktik-Analyse, DSGVO)
+- "Vollstaendigen Vergleich ansehen" Link zu `/compare`
 
-**Fix**:
-- `generate-insights`: Prompt explizit anweisen, dass die match_events FAKTISCH sind und Momentum-Scores, Match-Rating und Risk-Matrix darauf basieren MÜSSEN
-- `MatchEventQuickBar.tsx`: Minute-Berechnung verbessern — bei Halbzeit 2 die Offset-Minute (45+) addieren
-- Neue Event-Buttons hinzufügen: `foul`, `red_card`, `offside`, `free_kick` (mehr Daten = bessere Analyse)
+### 2b. Feature-Aufzaehlung prominenter
+- FeatureCards existieren mit 4 Gruppen — aber die Section hat kein `id="features"` (Nav-Link zeigt darauf)
+- `id="features"` hinzufuegen
+- Auf Mobile: Feature-Gruppen als Accordion statt volle Hoehe
 
-## 4. Elapsed-Time-Display während Aufnahme
+### 2c. Landing Page Reihenfolge optimieren
+Aktuelle Reihenfolge: KeyNumbers → WhyFieldIQ → HowItWorks → Transparency → Analytics → Demo → Features → Trust → Pricing → FAQ
 
-**Problem**: Die Aufnahme zeigt nur Frame-Count, keine Uhrzeit/Timer.
+Optimierte Reihenfolge fuer bessere Conversion:
+1. KeyNumbers (Social Proof)
+2. WhyFieldIQ (Differenzierung)
+3. HowItWorks (Einfachheit)
+4. **FeatureCards** (vorziehen — Features frueher zeigen)
+5. TransparencySection
+6. **CompareInline** (NEU — Vergleich mit Wettbewerb)
+7. AnalyticsShowcase
+8. DemoSection
+9. TrustSection
+10. PricingSection
+11. FAQSection
 
-**Fix** in `CameraTrackingPage.tsx`:
-- Live-Timer-Anzeige im Recording-Overlay: `MM:SS` seit Aufnahmestart
-- Bei 2. HZ: `45:00 + MM:SS`
-- Timer-Ref mit `setInterval(1000)` für Live-Update
+### 2d. Mobile Nav Menu
+- Hamburger-Icon auf Mobile, Sheet-basiertes Menu mit Links zu Sektionen + Login/Register
+
+---
+
+## 3. HeroSlider Bilder aktualisieren
+
+Die drei Slides (TrackingSlide, CalibrationSlide, DataTransferSlide) sind reine SVG/Code-Animationen — keine eingebetteten Bilder. Die Inhalte sind technisch korrekt (Heatmap-Feld, Kalibrierungspunkte, Datensync-Animation).
+
+**Fix**: Die Slides sind inhaltlich ok, aber das visuelle Design muss aufpoliert werden:
+- Slide 1 (Tracking): Spieler-Dots groesser machen, Team-Farben deutlicher, "LIVE"-Badge prominenter
+- Slide 2 (Kalibrierung): Phone-Mockup realistischer, Schritte deutlicher
+- Slide 3 (Datentransfer): Ergebnis-Dashboard statt nur Sync-Animation — zeigen was der Coach am Ende SIEHT (Report-Preview mit Grades/Scores)
+
+---
+
+## 4. UX-Fuehrung verbessern
+
+### 4a. Kamera-Helfer Flow
+- `CameraTrackingPage` Phase "setup": Deutlichere Schritt-fuer-Schritt Anleitung mit Illustrations
+- Kamera-Ausrichtungstipps visuell zeigen (Querformat-Hinweis mit Icon)
+- Nach Aufnahmestart: Staerkeres visuelles Feedback (gruener Puls-Ring um Record-Button)
+
+### 4b. Trainer Flow (NewMatch)
+- Bei Step "info": Hilfstexte unter jedem Feld (Tooltip oder Subtext)
+- Bei Step "choice": Empfehlung hervorheben ("Empfohlen" Badge auf "Selbst filmen")
+- Nach Spiel-Erstellung: Toast mit Next-Step Hinweis
+
+### 4c. Haptik-Verbesserungen
+- `navigator.vibrate(30)` bei Button-Presses auf Mobile (Event-Buttons, Record Start/Stop)
+- Micro-Animationen: Scale-Bounce auf Touch (Button `active:scale-95` Transition)
+- Smooth Scroll bei Section-Navigation auf Landing Page
+
+---
 
 ## Dateien
 
-| Datei | Änderung |
+| Datei | Aenderung |
 |---|---|
-| DB-Migration | 6 neue Spalten in `matches` für Timing |
-| `src/pages/CameraTrackingPage.tsx` | Zeitstempel bei Start/Stop/Halbzeit schreiben, Live-Timer-Anzeige |
-| `src/components/MatchEventQuickBar.tsx` | Mehr Event-Buttons, korrekte Minutenberechnung für 2. HZ |
-| `supabase/functions/camera-ops/index.ts` | Timing-Daten bei upload-frames in matches schreiben |
-| `supabase/functions/generate-insights/index.ts` | Spielzeit aus matches laden, match_events stärker gewichten |
-| `supabase/functions/openligadb/index.ts` | Neue Edge Function für OpenLigaDB (kostenlos, kein Key) |
-| `src/components/AdminApiFootball.tsx` | OpenLigaDB-Tab ergänzen |
+| `src/pages/LandingPage.tsx` | Mobile Hamburger-Menu, Section-Reihenfolge, CompareInline einbinden, Smooth Scroll |
+| `src/components/landing/HeroSlider.tsx` | Slide 3 als Report-Preview, Mobile-Optimierung der Floating Badges |
+| `src/components/landing/FeatureCards.tsx` | `id="features"`, Mobile Accordion |
+| `src/components/landing/CompareInline.tsx` | **NEU** — Kompakte Vergleichstabelle fuer Landing Page |
+| `src/pages/Admin.tsx` | TabsList `overflow-x-auto`, Mobile Card-Layouts |
+| `src/pages/NewMatch.tsx` | Touch-optimierte Inputs, Sticky CTA, Hilfe-Texte |
+| `src/pages/CameraTrackingPage.tsx` | Groessere Buttons, Querformat-Hinweis, Vibration-Feedback |
+| `src/components/MatchEventQuickBar.tsx` | 2-Spalten-Grid auf Mobile, groessere Touch-Targets |
+| `src/pages/Dashboard.tsx` | Mobile Header-Stack, kompaktere Recommendations |
+| `src/components/AppLayout.tsx` | Kleinere Touch-Target Fixes |
 
-## Nicht implementiert (mit Begründung)
-
-- **Automatische Tor/Foul-Erkennung per Kamera**: Bereits im `analyze-match`-Prompt angewiesen, visuelle Hinweise zu suchen (Jubel, Referee-Gesten). Mehr ist mit Standbild-Analyse (alle 30s) nicht zuverlässig möglich — das wäre Video-Analyse in Echtzeit, was die aktuelle Architektur nicht hergibt.
-- **Ballbesitz-Tracking**: Nicht aus 30s-Standbildern ableitbar. Wird geschätzt basierend auf Spielerpositionsverteilung (bereits im Prompt).
+Keine DB-Migration noetig.
 
