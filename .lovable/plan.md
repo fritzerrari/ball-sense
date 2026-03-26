@@ -1,108 +1,67 @@
 
 
-# Daten-Synergie, Confidence-Transparenz & Game-Changer
+# Kalibrierung, Auswechslungen, Nacherfassung & Feature-Updates
 
-## Analyse: Was wir haben vs. was wir daraus noch nicht machen
+## Erkenntnisse aus der Code-Pruefung
 
-### Vorhandene Datenquellen
-- Spieler-Tracking (Positionen, Speed, Distanz, Sprints)
-- Manuelle Events (Tore, Karten, Fouls, Freistoesse)
-- KI-Taktik-Insights (Pressing, Formationen, Momentum, Opponent DNA)
-- Halbzeit-Timing (exakte Dauer pro Halbzeit)
-- Gegner-Historie (akkumuliertes Scouting-Profil)
-- Training Recommendations (pro Spiel)
-- Spieler-Vergleich (Radar-Charts)
-- Trend-Dashboard (Dominanz/Tempo ueber Saison)
+### Kalibrierung
+Die Feldkalibrierung (`FieldCalibration.tsx`) existiert als separate Seite unter `/fields/:id/calibrate`, ist aber **nicht in den Aufnahme-Workflow integriert**. Laut Memory wird die Kalibrierung beim Aufnahmestart automatisch ueber `detect-field-corners` gemacht — der User muss also NICHT manuell kalibrieren. **Problem**: Das wird dem User nirgends kommuniziert. Er sieht "Kalibrierung" in der Platz-Verwaltung und denkt er muss das tun.
 
-### Was FEHLT an Cross-Korrelation
+### Auswechslungen
+- `MatchEventQuickBar` (Kamera-Helfer): Hat NUR 8 Basis-Events (Tor, Chance, Gelb, Rot, Ecke, Foul, Abseits, Freistoss). **Keine Auswechslung.**
+- `LiveEventTicker` (Trainer-View): Hat 20+ Events aber ebenfalls **keine Auswechslung** als Event-Typ.
+- i18n hat Strings fuer "substitution" und "Auswechslung", aber die UI existiert nicht.
 
-**1. Spielvorbereitung (PRE-Match) — DER GAME-CHANGER**
-Aktuell: ALLES ist Post-Match. Kein Tool nutzt die akkumulierten Daten VOR dem naechsten Spiel.
-- Gegner-DNA aus Historie + eigene Formkurve + Trend-Schwaechen = automatischer **Matchplan-Vorschlag**
-- "Gegen diesen Gegner habt ihr 3x gespielt, 2x links angegriffen, 1x verloren weil Pressing-Hoehe in HZ2 abfiel"
-- Formations-Empfehlung basierend auf Gegner-Stil und eigener Staerke
+### Nacherfassung
+Es gibt **keine Post-Match-Event-Editierung**. Wenn Events vergessen wurden, gibt es keinen Weg sie nachzutragen.
 
-**2. Auswechslungs-Impact**
-Daten vorhanden: `subbed_in_min`, `subbed_out_min` in `match_lineups` + Momentum-Timeline
-Nicht verknuepft: Wie veraendert sich Momentum/Pressing/Tempo NACH einer Einwechslung?
-
-**3. Spieler-Formkurve (Saison-Verlauf)**
-Daten vorhanden: `player_match_stats` ueber viele Spiele
-Nicht visualisiert: Individuelle Leistungskurve (Rating, Distanz, Sprints pro Spiel als Linie)
-
-**4. Set-Piece-Conversion**
-Daten vorhanden: Events `corner`, `free_kick` + `goal` mit Minuten
-Nicht berechnet: Wie viele Standards fuehren zu Toren? Effizienz-Rate.
-
-**5. Ermuedungs-Korrelation mit Gegentoren**
-Daten vorhanden: Fatigue-Indicator (Sprint-Frequenz pro 15-Min-Intervall) + Gegentor-Minuten
-Nicht verknuepft: Fallen Gegentore mit Ermuedungsphasen zusammen?
-
-**6. Heim/Auswaerts-Splits**
-Daten vorhanden: `matches` hat Heim-Club
-Nicht analysiert: Systematische Heim-/Auswaerts-Unterschiede in Dominanz, Pressing, Ergebnis
+### Spielvorbereitung
+`MatchPrep.tsx` zeigt keinen Hinweis wenn keine Spiele vorhanden sind — es wuerde einfach eine leere/generische Vorbereitung generieren.
 
 ---
 
-## Confidence-Anzeige: Verkaufsfoerdernd oder kontraproduktiv?
+## Plan
 
-**Ergebnis der Pruefung: VERKAUFSFOERDERND — wenn richtig geframt.**
+### 1. Auswechslung als Event-Typ hinzufuegen
 
-- Bereits implementiert: `confidence: "high" | "medium" | "estimated"` pro Insight mit Labels "Belastbar", "Eingeschraenkt", "Geschaetzt"
-- Das System zeigt bereits DataQualityBadges und AnalysisStage (Prognose/Vorlaeufig/Final)
-- **Das ist ein USP, kein Problem.** Kein Konkurrent-Tool zeigt Transparenz. Trainer vertrauen dem System MEHR, wenn es ehrlich sagt "diese Zahl ist eine Schaetzung"
+**`LiveEventTicker.tsx`**: Neue Kategorie "Wechsel" mit Event-Typ `substitution`. Spezial-UI: Zwei Spieler-Selects (Raus + Rein) statt nur einem.
 
-**Was noch fehlt:**
-- Pro Metrik ein kurzer Tooltip WARUM die Confidence so ist (z.B. "Basiert auf 12 von 15 analysierten Frames" oder "Spieler war nur in 60% der Frames sichtbar")
-- Ein globaler **Analyse-Guetesiegel** pro Match: "Datenqualitaet: 87% — Feldabdeckung gut, 2 Spieler zeitweise verdeckt"
+**`MatchEventQuickBar.tsx`**: Auswechslungs-Button hinzufuegen (Icon: ArrowRightLeft). Bei Klick: Einfaches Modal mit "Wer raus?" und "Wer rein?" Dropdown (oder Freitext wenn keine Spieler geladen).
 
----
+### 2. Post-Match Nacherfassung
 
-## Der Game-Changer: KI-Matchvorbereitung
+**Neue Komponente `PostMatchEventEditor.tsx`**:
+- Oeffnet sich im MatchReport als "Events nacherfassen" Button
+- Tabelle aller bisherigen Events mit Loeschen-Option
+- "Event hinzufuegen" Form: Typ, Minute, Team, Spieler, Notiz
+- Auswechslungen nachtraeglich erfassen
+- Speichert direkt in `match_events` Tabelle
 
-**Warum das ein Ass im Aermel ist:**
-- KEIN Tool im Amateurfussball bietet automatisierte Spielvorbereitung
-- GPS-Westen liefern NUR koerperliche Daten — keine taktische Vorbereitung
-- Profi-Systeme (Wyscout, InStat) kosten 5-stellig und haben keine Regionalliga-Daten
+**Spielbericht-Foto Upload**:
+- Im PostMatchEventEditor: Button "Spielbericht abfotografieren"
+- Foto wird hochgeladen, KI (Gemini Vision) extrahiert: Tore, Karten, Auswechslungen, Ergebnis
+- Extrahierte Events werden als Vorschlag angezeigt, User bestaetigt
+- Neuer Edge Function `parse-match-report-photo` fuer die OCR/Extraktion
 
-**Wie es funktioniert:**
-1. Trainer waehlt naechsten Gegner
-2. System zieht: Alle bisherigen Spiele gegen diesen Gegner (Opponent History), eigene Formkurve (Trend Dashboard), aktuelle Schwaechen (Risk Matrix der letzten 3 Spiele), Gegner-DNA (Spider-Chart Werte)
-3. KI generiert: Formations-Empfehlung, taktische Schwerpunkte, Warnung vor Gegner-Staerken, Aufstellung-Vorschlag basierend auf Spieler-Form
+### 3. Kalibrierung kommunizieren
 
----
+**`CameraSetupOverlay.tsx`**: Neuen Tipp hinzufuegen: "Kalibrierung passiert automatisch — du musst nichts tun. Die KI erkennt das Spielfeld im ersten Frame."
 
-## Implementierungsplan
+**`NewMatch.tsx`**: Nach Spiel-Erstellung Info-Toast: "Die Feldkalibrierung laeuft automatisch beim Aufnahmestart."
 
-### 1. KI-Matchvorbereitung (Game-Changer)
-- Neue Seite `src/pages/MatchPrep.tsx` — erreichbar von Dashboard + vor Spielerstellung
-- Neuer Edge Function `supabase/functions/match-preparation/index.ts`
-  - Laedt: Gegner-Historie, eigene letzte 5 Spiele (Tactical Grades, Risk Matrix), Spieler-Formkurven
-  - KI-Prompt: "Erstelle taktische Spielvorbereitung gegen [Gegner] basierend auf bisherigen Daten"
-  - Output: Formations-Empfehlung, 3 taktische Schwerpunkte, Aufstellungs-Tipps, Warnungen
-- DB: Neue Tabelle `match_preparations` (match_id, club_id, opponent_name, preparation_data jsonb, created_at)
+### 4. Spielvorbereitung: Leerzustand
 
-### 2. Confidence-Tooltips erweitern
-- `generate-insights` Prompt ergaenzen: Pro Insight eine `confidence_reason` (1 Satz) zurueckgeben
-- MatchReport UI: Tooltip bei Hover auf Confidence-Badge zeigt Reason
-- Globaler "Analyse-Guetesiegel" Header im MatchReport basierend auf data_quality_score + Frame-Coverage
+**`MatchPrep.tsx`**: Wenn `recentOpponents` leer ist (keine Spiele vorhanden), zeige EmptyState: "Erstelle zuerst mindestens ein Spiel, damit die KI auf Daten zurueckgreifen kann. Die Spielvorbereitung basiert auf deiner Spielhistorie."
 
-### 3. Spieler-Formkurve
-- Neue Komponente `src/components/PlayerFormCurve.tsx`
-- LineChart: Rating/Distanz/Sprints ueber letzte 10 Spiele
-- Einbinden in `PlayerProfile.tsx`
+### 5. Feature-Seite & Demo aktualisieren
 
-### 4. Auswechslungs-Impact
-- `generate-insights` Prompt erweitern: Lineup-Daten (wer wurde wann ein-/ausgewechselt) mitgeben
-- Neues Feld im Cockpit: "Substitution Impact" — Momentum-Delta vor/nach Wechsel
+**`FeatureCards.tsx`**: Neue Features in bestehende Gruppen aufnehmen:
+- Reports & Coaching: "KI-Spielvorbereitung" (Brain Icon) — "Automatischer Matchplan mit Formations-Empfehlung, Gegner-Warnungen und Aufstellungs-Tipps."
+- Reports & Coaching: "Spielbericht-Scan" (Camera Icon) — "Spielbericht abfotografieren und Events automatisch nacherfassen."
+- Aufnahme & Setup: "Walkie-Talkie" (Radio Icon) — "Push-to-Talk Kommunikation zwischen Trainer und Kameramann."
+- Aufnahme & Setup: "Auto-Kalibrierung" erwaehnen im bestehenden Kalibrierungs-Feature
 
-### 5. Set-Piece-Effizienz
-- Berechnung in `match-analysis.ts`: Standards zaehlen, Tore innerhalb 2 Min nach Standard = Conversion
-- Anzeige als kleine Stat-Card im MatchReport
-
-### 6. Ermuedungs-Gegentor-Korrelation
-- In TrendDashboard: Overlay von Gegentor-Minuten auf Fatigue-Kurve
-- Automatische Warnung wenn >50% der Gegentore in Ermuedungsphasen fallen
+**`DemoSection.tsx`**: Auswechslungs-Event in Demo-Daten aufnehmen.
 
 ---
 
@@ -110,15 +69,15 @@ Nicht analysiert: Systematische Heim-/Auswaerts-Unterschiede in Dominanz, Pressi
 
 | Datei | Aenderung |
 |---|---|
-| `src/pages/MatchPrep.tsx` | **NEU** — KI-Spielvorbereitung |
-| `supabase/functions/match-preparation/index.ts` | **NEU** — Aggregiert Historie + generiert Matchplan |
-| DB-Migration | Neue Tabelle `match_preparations` |
-| `src/components/PlayerFormCurve.tsx` | **NEU** — Individuelle Leistungskurve |
-| `src/pages/PlayerProfile.tsx` | PlayerFormCurve einbinden |
-| `supabase/functions/generate-insights/index.ts` | confidence_reason + Lineup-Daten fuer Sub-Impact |
-| `src/pages/MatchReport.tsx` | Confidence-Tooltips, Guetesiegel-Header, Set-Piece-Stat |
-| `src/lib/match-analysis.ts` | Set-Piece-Conversion Berechnung |
-| `src/pages/TrendDashboard.tsx` | Ermuedungs-Gegentor-Overlay |
-| `src/App.tsx` | Route `/match-prep/:opponentName?` |
-| `src/pages/Dashboard.tsx` | Link zur Spielvorbereitung |
+| `src/components/MatchEventQuickBar.tsx` | Auswechslungs-Button + Mini-Dialog |
+| `src/components/LiveEventTicker.tsx` | Substitution-Event mit Doppel-Spieler-Select |
+| `src/components/PostMatchEventEditor.tsx` | **NEU** — Nacherfassung + Spielbericht-Foto |
+| `supabase/functions/parse-match-report-photo/index.ts` | **NEU** — Gemini Vision OCR fuer Spielberichte |
+| `src/pages/MatchReport.tsx` | PostMatchEventEditor einbinden |
+| `src/components/CameraSetupOverlay.tsx` | Auto-Kalibrierungs-Hinweis |
+| `src/pages/MatchPrep.tsx` | Empty State wenn keine Spiele vorhanden |
+| `src/components/landing/FeatureCards.tsx` | Neue Features (Spielvorbereitung, Walkie-Talkie, Scan) |
+| `src/pages/NewMatch.tsx` | Toast-Hinweis zur Auto-Kalibrierung |
+
+Keine DB-Migration noetig — `match_events` unterstuetzt bereits beliebige `event_type` Werte.
 
