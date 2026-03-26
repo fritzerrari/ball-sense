@@ -37,11 +37,11 @@ export function WhyFieldIQ() {
             </span>
             <h2 className="text-3xl md:text-5xl font-bold font-display leading-tight mb-4">
               {de ? (
-                <>Andere zeigen dir <span className="line-through text-muted-foreground/50">was</span> passiert ist.<br />
-                <span className="gradient-text">Wir zeigen dir warum.</span></>
+                <>Die anderen liefern <span className="line-through text-muted-foreground/50">Zahlen</span>.<br />
+                <span className="gradient-text">Wir liefern Antworten.</span></>
               ) : (
-                <>Others show you <span className="line-through text-muted-foreground/50">what</span> happened.<br />
-                <span className="gradient-text">We show you why.</span></>
+                <>Others deliver <span className="line-through text-muted-foreground/50">numbers</span>.<br />
+                <span className="gradient-text">We deliver answers.</span></>
               )}
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto text-base">
