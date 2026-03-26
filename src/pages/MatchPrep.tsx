@@ -136,8 +136,24 @@ export default function MatchPrep() {
         </Card>
 
         {/* Active Preparation */}
-        {prep && (
+        {prep && activePrep && (
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            {/* PDF Export Button */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={exporting}
+                onClick={() => exportPdf(activePrep.id, "match_prep", {
+                  opponentName: activePrep.opponent_name,
+                  clubName: clubName ?? undefined,
+                })}
+              >
+                {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                PDF exportieren
+              </Button>
+            </div>
             {/* Formation Recommendation */}
             <Card className="relative overflow-hidden border-primary/20">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary/50" />
