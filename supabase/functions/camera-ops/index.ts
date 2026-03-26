@@ -360,6 +360,9 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+      // DON'T send inline frames — let analyze-match load from canonical file
+      // which contains ALL accumulated frames (H1 + H2 + chunks merged).
+      // This prevents the bug where only the latest upload's frames are analyzed.
       fetch(`${supabaseUrl}/functions/v1/analyze-match`, {
         method: "POST",
         headers: {
@@ -369,7 +372,6 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           match_id,
           job_id: job.id,
-          frames,
           duration_sec: duration_sec ?? 0,
           phase: phase ?? "full",
         }),
