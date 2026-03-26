@@ -194,13 +194,7 @@ WICHTIG:
     const modelName = isLightweight ? "google/gemini-2.5-flash-lite" : "google/gemini-2.5-flash";
     console.log(`Using model: ${modelName} (${selectedFrames.length} frames, lightweight: ${isLightweight})`);
 
-    const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const aiRequestBody = JSON.stringify({
         model: modelName,
         messages: [
           {
@@ -436,6 +430,30 @@ KAMERA-PERSPEKTIVE ERKENNEN:
         tool_choice: { type: "function", function: { name: "submit_analysis" } },
       }),
     });
+
+    // Retry logic for transient network errors (connection reset, timeout)
+    const MAX_RETRIES = 3;
+    let analysisResponse: Response | null = null;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: aiRequestBody,
+        });
+        break; // success — exit retry loop
+      } catch (fetchErr) {
+        console.error(`AI fetch attempt ${attempt}/${MAX_RETRIES} failed:`, fetchErr);
+        if (attempt === MAX_RETRIES) throw fetchErr;
+        // Exponential backoff: 2s, 4s
+        await new Promise(r => setTimeout(r, 2000 * attempt));
+      }
+    }
+
+    if (!analysisResponse) throw new Error("AI gateway fetch failed after retries");
 
     if (!analysisResponse.ok) {
       const errText = await analysisResponse.text();
