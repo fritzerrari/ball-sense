@@ -1014,6 +1014,48 @@ export type Database = {
           },
         ]
       }
+      match_preparations: {
+        Row: {
+          club_id: string
+          created_at: string
+          id: string
+          match_id: string | null
+          opponent_name: string
+          preparation_data: Json
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          id?: string
+          match_id?: string | null
+          opponent_name: string
+          preparation_data?: Json
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          id?: string
+          match_id?: string | null
+          opponent_name?: string
+          preparation_data?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_preparations_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_preparations_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_videos: {
         Row: {
           club_id: string

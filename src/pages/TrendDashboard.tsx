@@ -4,8 +4,9 @@ import { useAuth } from "@/components/AuthProvider";
 import AppLayout from "@/components/AppLayout";
 import { useTranslation } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, BarChart3, AlertTriangle, Brain, Target } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from "recharts";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, BarChart3, AlertTriangle, Brain, Target, Zap } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine } from "recharts";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 
@@ -56,6 +57,21 @@ export default function TrendDashboard() {
         .in("match_id", matchIds)
         .in("result_type", ["tactical_insights", "frame_positions"]);
       return (data ?? []) as AnalysisData[];
+    },
+    enabled: matchIds.length > 0,
+  });
+
+  // Fetch match events for fatigue-goal correlation
+  const { data: matchEvents } = useQuery({
+    queryKey: ["trend-events", matchIds],
+    queryFn: async () => {
+      if (!matchIds.length) return [];
+      const { data } = await supabase
+        .from("match_events")
+        .select("match_id, minute, event_type, team")
+        .in("match_id", matchIds)
+        .in("event_type", ["goal", "conceded_goal"]);
+      return data ?? [];
     },
     enabled: matchIds.length > 0,
   });
@@ -231,6 +247,78 @@ export default function TrendDashboard() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Fatigue-Goal Correlation */}
+            {(() => {
+              const allConceded = (matchEvents ?? []).filter(
+                (e: any) => e.event_type === "goal" && e.team === "away" || e.event_type === "conceded_goal"
+              );
+              if (allConceded.length < 2) return null;
+
+              const fatigueWindows = [35, 40, 45, 75, 80, 85, 90];
+              const inFatigue = allConceded.filter((e: any) =>
+                fatigueWindows.some((fp) => Math.abs(e.minute - fp) <= 5)
+              ).length;
+              const pct = Math.round((inFatigue / allConceded.length) * 100);
+              const isSignificant = pct > 50;
+
+              // Build minute distribution
+              const minuteBuckets: Record<number, number> = {};
+              allConceded.forEach((e: any) => {
+                const bucket = Math.floor(e.minute / 15) * 15;
+                minuteBuckets[bucket] = (minuteBuckets[bucket] || 0) + 1;
+              });
+              const bucketData = [0, 15, 30, 45, 60, 75, 90].map((m) => ({
+                label: `${m}'`,
+                count: minuteBuckets[m] || 0,
+                isFatigue: m >= 30 && m <= 45 || m >= 75,
+              }));
+
+              return (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-display flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-destructive" />
+                      {language === "de" ? "Ermüdungs-Gegentor-Korrelation" : "Fatigue-Goal Correlation"}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-2xl font-bold font-display">{pct}%</span>
+                      <span className="text-xs text-muted-foreground">
+                        {language === "de"
+                          ? `der Gegentore (${inFatigue}/${allConceded.length}) fallen in typische Ermüdungsphasen`
+                          : `of goals conceded (${inFatigue}/${allConceded.length}) fall in fatigue windows`}
+                      </span>
+                      {isSignificant && (
+                        <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px]">
+                          {language === "de" ? "Auffällig" : "Significant"}
+                        </Badge>
+                      )}
+                    </div>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <BarChart data={bucketData}>
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                        <Tooltip contentStyle={{ fontSize: 12, background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                        <Bar dataKey="count" name={language === "de" ? "Gegentore" : "Goals conceded"} radius={[4, 4, 0, 0]}>
+                          {bucketData.map((d, i) => (
+                            <Cell key={i} fill={d.isFatigue ? "hsl(var(--destructive))" : "hsl(var(--primary) / 0.5)"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    {isSignificant && (
+                      <p className="text-xs text-destructive mt-2">
+                        ⚠️ {language === "de"
+                          ? "Mehr als die Hälfte der Gegentore fallen in Ermüdungsphasen. Fitness-Schwerpunkt und taktische Anpassungen in Minute 35-45 und 75-90 empfohlen."
+                          : "Over half of goals conceded fall in fatigue phases. Consider fitness focus and tactical adjustments in minutes 35-45 and 75-90."}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {/* Top recurring insights */}
             {topInsights.length > 0 && (

@@ -47,10 +47,10 @@ const CATEGORY_ICONS: Record<string, typeof Target> = {
   general: Lightbulb,
 };
 
-const CONFIDENCE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  high: { bg: "bg-emerald-500/10", text: "text-emerald-500", label: "Belastbar" },
-  medium: { bg: "bg-amber-500/10", text: "text-amber-500", label: "Eingeschränkt" },
-  estimated: { bg: "bg-orange-500/10", text: "text-orange-500", label: "Geschätzt" },
+const CONFIDENCE_STYLES: Record<string, { bg: string; text: string; label: string; reason: string }> = {
+  high: { bg: "bg-emerald-500/10", text: "text-emerald-500", label: "Belastbar", reason: "Hohe Datendichte und konsistente Muster erkannt" },
+  medium: { bg: "bg-amber-500/10", text: "text-amber-500", label: "Eingeschränkt", reason: "Teilweise Datenlücken, Muster plausibel aber nicht eindeutig" },
+  estimated: { bg: "bg-orange-500/10", text: "text-orange-500", label: "Geschätzt", reason: "Wenig Datenpunkte, KI-Hochrechnung auf Basis verfügbarer Frames" },
 };
 
 interface ReportSection {
@@ -250,6 +250,27 @@ export default function MatchReport() {
         {/* ═══════════ COCKPIT REPORT ═══════════ */}
         {hasReport && (
           <>
+            {/* ANALYSE-GÜTESIEGEL */}
+            {(() => {
+              const totalSections = sections.length;
+              const highConf = sections.filter(s => s.confidence === "high").length;
+              const qualityPct = totalSections > 0 ? Math.round((highConf / totalSections) * 100) : 0;
+              const qualityLabel = qualityPct >= 80 ? "Sehr gut" : qualityPct >= 60 ? "Gut" : qualityPct >= 40 ? "Ausreichend" : "Eingeschränkt";
+              const qualityColor = qualityPct >= 80 ? "text-emerald-500" : qualityPct >= 60 ? "text-primary" : qualityPct >= 40 ? "text-amber-500" : "text-orange-500";
+              return (
+                <div className="flex items-center justify-between rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-medium text-muted-foreground">Analyse-Qualität</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-sm font-bold font-display ${qualityColor}`}>{qualityPct}% {qualityLabel}</span>
+                    <span className="text-[10px] text-muted-foreground">{highConf}/{totalSections} Insights mit hoher Confidence</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* 1. HERO SCORECARD */}
             {matchRating && (
               <MatchScorecard
@@ -328,7 +349,11 @@ export default function MatchReport() {
                                   )}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
-                                <Badge variant="outline" className={`mt-2 text-[10px] ${conf.bg} ${conf.text} border-0`}>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`mt-2 text-[10px] ${conf.bg} ${conf.text} border-0 cursor-help`}
+                                  title={conf.reason}
+                                >
                                   {conf.label}
                                 </Badge>
                               </div>

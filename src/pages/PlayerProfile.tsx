@@ -6,6 +6,7 @@ import { usePlayerAllStats } from "@/hooks/use-match-stats";
 import { HeatmapField } from "@/components/HeatmapField";
 import { PlayerCharts } from "@/components/PlayerCharts";
 import { PerformanceAnalysis } from "@/components/PerformanceAnalysis";
+import PlayerFormCurve from "@/components/PlayerFormCurve";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { POSITION_LABELS, POSITIONS } from "@/lib/constants";
 import { mergeHeatmaps } from "@/lib/stats";
@@ -144,6 +145,13 @@ export default function PlayerProfile() {
 
         <div><h2 className="mb-3 text-lg font-semibold font-display">Letzte Spiele</h2>{recentStats.length > 0 ? <div className="glass-card overflow-x-auto"><table className="min-w-[860px] w-full text-sm"><thead><tr className="border-b border-border"><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Datum</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Gegner</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">km</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Top</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Pässe</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Pass%</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Zwk%</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Ballgew.</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Tore</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Ass.</th><th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Rating</th></tr></thead><tbody>{recentStats.map((st: any) => { const duelRate = st.duels_total ? Math.round(((st.duels_won ?? 0) / st.duels_total) * 100) : null; return <tr key={st.id} className="border-b border-border/50 transition-colors hover:bg-muted/20"><td className="px-3 py-3"><Link to={`/matches/${st.match_id}`} className="transition-colors hover:text-primary">{st.matches?.date ? new Date(st.matches.date).toLocaleDateString("de-DE") : "—"}</Link></td><td className="px-3 py-3 text-muted-foreground">{st.matches?.away_club_name ?? "—"}</td><td className="px-3 py-3 font-semibold">{st.distance_km?.toFixed(1) ?? "—"}</td><td className="px-3 py-3">{st.top_speed_kmh?.toFixed(1) ?? "—"}</td><td className="px-3 py-3">{st.passes_total ?? 0}</td><td className="px-3 py-3">{st.pass_accuracy ? `${Math.round(st.pass_accuracy)}%` : "—"}</td><td className="px-3 py-3">{duelRate !== null ? `${duelRate}%` : "—"}</td><td className="px-3 py-3">{st.ball_recoveries ?? 0}</td><td className="px-3 py-3 font-semibold">{st.goals ?? 0}</td><td className="px-3 py-3">{st.assists ?? 0}</td><td className="px-3 py-3">{st.rating ? st.rating.toFixed(1) : "—"}</td></tr>; })}</tbody></table></div> : <div className="glass-card p-8 text-center"><Activity className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" /><p className="text-sm text-muted-foreground">Statistiken werden nach dem ersten Tracking sichtbar.</p></div>}</div>
 
+        <PlayerFormCurve data={recentStats.map((st: any) => ({
+          date: st.matches?.date ?? "",
+          opponent: st.matches?.away_club_name ?? "?",
+          rating: st.rating,
+          distance_km: st.distance_km,
+          sprint_count: st.sprint_count,
+        }))} />
         <PlayerCharts stats={stats as any[]} />
         <PerformanceAnalysis type="player" playerId={id} playerName={player.name} />
 
