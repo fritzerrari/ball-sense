@@ -1081,6 +1081,10 @@ export type Database = {
           created_at: string
           date: string
           field_id: string
+          h1_ended_at: string | null
+          h1_started_at: string | null
+          h2_ended_at: string | null
+          h2_started_at: string | null
           home_club_id: string
           home_formation: string | null
           id: string
@@ -1088,6 +1092,8 @@ export type Database = {
           match_type: string
           opponent_consent_confirmed: boolean
           processing_progress: Json | null
+          recording_ended_at: string | null
+          recording_started_at: string | null
           status: string
           track_opponent: boolean
         }
@@ -1100,6 +1106,10 @@ export type Database = {
           created_at?: string
           date: string
           field_id: string
+          h1_ended_at?: string | null
+          h1_started_at?: string | null
+          h2_ended_at?: string | null
+          h2_started_at?: string | null
           home_club_id: string
           home_formation?: string | null
           id?: string
@@ -1107,6 +1117,8 @@ export type Database = {
           match_type?: string
           opponent_consent_confirmed?: boolean
           processing_progress?: Json | null
+          recording_ended_at?: string | null
+          recording_started_at?: string | null
           status?: string
           track_opponent?: boolean
         }
@@ -1119,6 +1131,10 @@ export type Database = {
           created_at?: string
           date?: string
           field_id?: string
+          h1_ended_at?: string | null
+          h1_started_at?: string | null
+          h2_ended_at?: string | null
+          h2_started_at?: string | null
           home_club_id?: string
           home_formation?: string | null
           id?: string
@@ -1126,6 +1142,8 @@ export type Database = {
           match_type?: string
           opponent_consent_confirmed?: boolean
           processing_progress?: Json | null
+          recording_ended_at?: string | null
+          recording_started_at?: string | null
           status?: string
           track_opponent?: boolean
         }

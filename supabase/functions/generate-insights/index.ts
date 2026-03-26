@@ -40,6 +40,33 @@ serve(async (req) => {
       .eq("match_id", match_id)
       .order("minute", { ascending: true });
 
+    // Calculate actual half durations from timing columns
+    let timingContext = "";
+    if (match) {
+      const h1Start = match.h1_started_at ? new Date(match.h1_started_at) : null;
+      const h1End = match.h1_ended_at ? new Date(match.h1_ended_at) : null;
+      const h2Start = match.h2_started_at ? new Date(match.h2_started_at) : null;
+      const h2End = match.h2_ended_at ? new Date(match.h2_ended_at) : null;
+      const recStart = match.recording_started_at ? new Date(match.recording_started_at) : null;
+      const recEnd = match.recording_ended_at ? new Date(match.recording_ended_at) : null;
+
+      const parts: string[] = [];
+      if (h1Start && h1End) {
+        const h1Min = Math.round((h1End.getTime() - h1Start.getTime()) / 60000);
+        parts.push(`1. Halbzeit: ${h1Min} Minuten`);
+      }
+      if (h2Start && h2End) {
+        const h2Min = Math.round((h2End.getTime() - h2Start.getTime()) / 60000);
+        parts.push(`2. Halbzeit: ${h2Min} Minuten`);
+      }
+      if (recStart && recEnd) {
+        const totalMin = Math.round((recEnd.getTime() - recStart.getTime()) / 60000);
+        parts.push(`Gesamtaufnahme: ${totalMin} Minuten`);
+      }
+      if (parts.length > 0) {
+        timingContext = `\n\nSPIELZEIT-DATEN (exakte Messung):\n${parts.join("\n")}`;
+      }
+    }
     const { data: results } = await supabase
       .from("analysis_results")
       .select("*")
@@ -75,9 +102,8 @@ serve(async (req) => {
       const eventLines = matchEvents.map((e: any) =>
         `Min ${e.minute}: ${e.event_type} (${e.team})${e.player_name ? ` — ${e.player_name}` : ""}${e.notes ? ` [${e.notes}]` : ""}`
       );
-      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}`;
+      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nWICHTIG: Diese Events sind GROUND TRUTH. Tore MÜSSEN im Momentum-Score als Spitzen erscheinen. Karten MÜSSEN in der Discipline-Bewertung berücksichtigt werden. Das Match-Rating MUSS die tatsächlichen Ereignisse widerspiegeln.`;
     }
-
     await supabase.from("analysis_jobs").update({ progress: 90 }).eq("id", job_id);
 
     const insightsResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -126,7 +152,7 @@ REGELN:
           },
           {
             role: "user",
-            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}`,
+            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}${timingContext}`,
           },
         ],
         tools: [

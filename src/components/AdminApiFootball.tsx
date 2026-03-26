@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Search, Loader2, RefreshCw, Globe, Trophy, Users, Calendar,
-  CheckCircle2, AlertCircle, Zap, AlertTriangle, BarChart3,
+  CheckCircle2, AlertCircle, Zap, AlertTriangle, BarChart3, Database,
 } from "lucide-react";
 
 interface ApiConfig {
@@ -180,7 +181,17 @@ export default function AdminApiFootball() {
   const endDate = apiUsage?.subscription?.end ?? null;
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="api-football" className="space-y-6">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="api-football" className="gap-1.5">
+          <Zap className="h-3.5 w-3.5" /> API-Football
+        </TabsTrigger>
+        <TabsTrigger value="openligadb" className="gap-1.5">
+          <Database className="h-3.5 w-3.5" /> OpenLigaDB
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="api-football" className="space-y-6">
       {/* API Usage Card */}
       <div className={`glass-card p-5 space-y-4 ${isCritical ? "border-destructive/50" : isWarning ? "border-yellow-500/50" : ""}`}>
         <div className="flex items-center justify-between">
@@ -452,7 +463,12 @@ export default function AdminApiFootball() {
           </p>
         </div>
       </div>
-    </div>
+    </TabsContent>
+
+      <TabsContent value="openligadb">
+        <OpenLigaDBPanel />
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -490,6 +506,182 @@ function ClubSelector({ onSave }: { onSave: (clubId: string) => void }) {
             <span>{c.name}</span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// OpenLigaDB Panel (free, no API key needed)
+function OpenLigaDBPanel() {
+  const [selectedLeague, setSelectedLeague] = useState("bl1");
+  const [loading, setLoading] = useState(false);
+  const [tableData, setTableData] = useState<any[] | null>(null);
+  const [matchesData, setMatchesData] = useState<any[] | null>(null);
+  const [leagueName, setLeagueName] = useState("");
+
+  const leagues = [
+    { key: "bl1", name: "1. Bundesliga" },
+    { key: "bl2", name: "2. Bundesliga" },
+    { key: "bl3", name: "3. Liga" },
+  ];
+
+  async function callOpenLigaDB(action: string, params: Record<string, any> = {}) {
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openligadb`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...params }),
+      },
+    );
+    if (!resp.ok) throw new Error("OpenLigaDB request failed");
+    return resp.json();
+  }
+
+  const fetchTable = async () => {
+    setLoading(true);
+    try {
+      const data = await callOpenLigaDB("table", { league: selectedLeague });
+      setTableData(data.table ?? []);
+      setLeagueName(data.league ?? "");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMatches = async () => {
+    setLoading(true);
+    try {
+      const data = await callOpenLigaDB("current_matchday", { league: selectedLeague });
+      setMatchesData(data.matches ?? []);
+      setLeagueName(data.league ?? "");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="glass-card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Database className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold font-display">OpenLigaDB</h3>
+          <Badge variant="secondary" className="text-[10px]">Kostenlos</Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          OpenLigaDB liefert Ergebnisse und Tabellen für 1.–3. Liga (Deutschland). Kein API-Key nötig.
+          Für Regionalliga und tiefer ist die eigene Kamera-Analyse die einzige Datenquelle.
+        </p>
+
+        <div className="flex gap-2 flex-wrap">
+          {leagues.map((l) => (
+            <Button
+              key={l.key}
+              variant={selectedLeague === l.key ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedLeague(l.key)}
+              className="text-xs"
+            >
+              {l.name}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={fetchTable} disabled={loading} className="gap-1.5 text-xs">
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trophy className="h-3 w-3" />}
+            Tabelle laden
+          </Button>
+          <Button variant="outline" size="sm" onClick={fetchMatches} disabled={loading} className="gap-1.5 text-xs">
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Calendar className="h-3 w-3" />}
+            Spieltag laden
+          </Button>
+        </div>
+      </div>
+
+      {tableData && (
+        <div className="glass-card overflow-x-auto">
+          <div className="p-4 border-b border-border flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">Tabelle — {leagueName}</span>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs">#</th>
+                <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs">Team</th>
+                <th className="text-center py-2 px-3 text-muted-foreground font-medium text-xs">Sp</th>
+                <th className="text-center py-2 px-3 text-muted-foreground font-medium text-xs">S</th>
+                <th className="text-center py-2 px-3 text-muted-foreground font-medium text-xs">U</th>
+                <th className="text-center py-2 px-3 text-muted-foreground font-medium text-xs">N</th>
+                <th className="text-center py-2 px-3 text-muted-foreground font-medium text-xs">Diff</th>
+                <th className="text-center py-2 px-3 text-muted-foreground font-medium text-xs font-bold">Pkt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.map((t: any) => (
+                <tr key={t.team_name} className="border-b border-border/50 hover:bg-muted/20">
+                  <td className="py-2 px-3 font-medium text-xs">{t.rank}</td>
+                  <td className="py-2 px-3 flex items-center gap-2">
+                    {t.team_logo && <img src={t.team_logo} alt="" className="w-4 h-4 object-contain" />}
+                    <span className="text-xs font-medium">{t.team_name}</span>
+                  </td>
+                  <td className="py-2 px-3 text-center text-xs text-muted-foreground">{t.matches}</td>
+                  <td className="py-2 px-3 text-center text-xs text-muted-foreground">{t.won}</td>
+                  <td className="py-2 px-3 text-center text-xs text-muted-foreground">{t.draw}</td>
+                  <td className="py-2 px-3 text-center text-xs text-muted-foreground">{t.lost}</td>
+                  <td className="py-2 px-3 text-center text-xs text-muted-foreground">{t.goal_diff > 0 ? `+${t.goal_diff}` : t.goal_diff}</td>
+                  <td className="py-2 px-3 text-center text-xs font-bold">{t.points}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {matchesData && (
+        <div className="glass-card">
+          <div className="p-4 border-b border-border flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">Aktueller Spieltag — {leagueName}</span>
+          </div>
+          <div className="divide-y divide-border/50">
+            {matchesData.map((m: any) => (
+              <div key={m.match_id} className="flex items-center justify-between p-3 hover:bg-muted/20">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {m.home_logo && <img src={m.home_logo} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                  <span className="text-xs font-medium truncate">{m.home_team}</span>
+                </div>
+                <div className="px-3 text-center shrink-0">
+                  {m.is_finished ? (
+                    <span className="text-sm font-bold">{m.home_goals} : {m.away_goals}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">–:–</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                  <span className="text-xs font-medium truncate text-right">{m.away_team}</span>
+                  {m.away_logo && <img src={m.away_logo} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="glass-card p-4 flex items-start gap-3">
+        <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p className="font-medium text-foreground">Hinweis zur Datenverfügbarkeit</p>
+          <p>
+            OpenLigaDB deckt nur 1.–3. Liga ab. Für <strong>Regionalliga und tiefer</strong> existiert keine externe API.
+            Hier ist die eigene Kamera-Analyse von FieldIQ die <strong>einzige und beste Datenquelle</strong> — das ist euer USP.
+          </p>
+        </div>
       </div>
     </div>
   );

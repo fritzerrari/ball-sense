@@ -36,3 +36,6 @@ verify_jwt = false
 
 [functions.camera-ops]
 verify_jwt = false
+
+[functions.openligadb]
+verify_jwt = false

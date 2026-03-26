@@ -31,7 +31,6 @@ async function validateSession(supabaseAdmin: any, sessionToken: string, matchId
   if (error || !session) return null;
   if (new Date(session.expires_at) < new Date()) return null;
 
-  // Update last_used_at
   await supabaseAdmin
     .from("camera_access_sessions")
     .update({ last_used_at: new Date().toISOString() })
@@ -40,7 +39,6 @@ async function validateSession(supabaseAdmin: any, sessionToken: string, matchId
   return session;
 }
 
-/** Merge new frames into the canonical ${matchId}.json file for reliable retries */
 async function updateCanonicalFrameFile(supabaseAdmin: any, matchId: string, newFrames: string[]) {
   try {
     const { data: existing } = await supabaseAdmin.storage
@@ -73,7 +71,6 @@ async function updateCanonicalFrameFile(supabaseAdmin: any, matchId: string, new
       .upload(`${matchId}.json`, new Blob([canonicalJson], { type: "application/json" }), { upsert: true });
   } catch (err) {
     console.error("canonical frame file update error:", err);
-    // Non-critical — chunks are still available as fallback
   }
 }
 
@@ -119,7 +116,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Verify trainer belongs to same club as session
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("club_id")
@@ -150,7 +146,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── ACTION: authorize-transfer (trainer authorizes data transfer for a session) ──
+    // ── ACTION: authorize-transfer ──
     if (action === "authorize-transfer") {
       const authHeader = req.headers.get("authorization");
       if (!authHeader) {
@@ -230,6 +226,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── ACTION: update-timing ──
+    if (action === "update-timing") {
+      const { timing } = payload;
+      if (!timing || typeof timing !== "object") {
+        return new Response(JSON.stringify({ error: "timing object required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Only allow known timing fields
+      const allowed = ["h1_started_at", "h1_ended_at", "h2_started_at", "h2_ended_at", "recording_started_at", "recording_ended_at"];
+      const safe: Record<string, string> = {};
+      for (const key of allowed) {
+        if (timing[key]) safe[key] = timing[key];
+      }
+
+      if (Object.keys(safe).length > 0) {
+        await supabaseAdmin.from("matches").update(safe).eq("id", match_id);
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // ── ACTION: heartbeat ──
     if (action === "heartbeat") {
       const { phase, frame_count, thumbnail } = payload;
@@ -240,7 +263,6 @@ Deno.serve(async (req) => {
       };
       if (thumbnail) statusUpdate.thumbnail = thumbnail;
 
-      // Preserve synced_frames from existing status_data
       const { data: currentSession } = await supabaseAdmin
         .from("camera_access_sessions")
         .select("status_data")
@@ -258,7 +280,6 @@ Deno.serve(async (req) => {
         })
         .eq("id", session.id);
 
-      // Return any pending command + transfer authorization status
       const { data: current } = await supabaseAdmin
         .from("camera_access_sessions")
         .select("command, transfer_authorized")
@@ -268,7 +289,6 @@ Deno.serve(async (req) => {
       const pendingCommand = current?.command ?? null;
       const transferAuthorized = current?.transfer_authorized ?? false;
 
-      // Clear command after reading
       if (pendingCommand) {
         await supabaseAdmin
           .from("camera_access_sessions")
@@ -319,10 +339,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Also update canonical file for reliable retries
       await updateCanonicalFrameFile(supabaseAdmin, match_id, frames);
 
-      // Create analysis job with job_kind = final
       const { data: job, error: jobError } = await supabaseAdmin
         .from("analysis_jobs")
         .insert({ match_id, status: "queued", progress: 0, job_kind: "final" })
@@ -337,10 +355,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Update match status
       await supabaseAdmin.from("matches").update({ status: "processing" }).eq("id", match_id);
 
-      // Trigger analysis (fire-and-forget)
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -397,7 +413,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── ACTION: append-frames (incremental upload during recording) ──
+    // ── ACTION: append-frames ──
     if (action === "append-frames") {
       const { frames, chunk_index } = payload;
 
@@ -431,10 +447,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Also update canonical file
       await updateCanonicalFrameFile(supabaseAdmin, match_id, frames);
 
-      // Update synced_frames in session status_data
       const { data: currentSession } = await supabaseAdmin
         .from("camera_access_sessions")
         .select("status_data")
@@ -452,12 +466,10 @@ Deno.serve(async (req) => {
         })
         .eq("id", session.id);
 
-      // Check if enough frames for a live partial analysis (>= 5 total synced)
       if (newSyncedTotal >= 5 && (chunk_index ?? 0) % 3 === 2) {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-        // Collect all chunks for this match
         const allFrames: string[] = [];
         for (let i = 0; i <= (chunk_index ?? 0); i++) {
           const chunkPath = `${match_id}_chunk_${i}.json`;

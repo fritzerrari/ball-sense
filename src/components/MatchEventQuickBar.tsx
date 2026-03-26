@@ -13,13 +13,19 @@ interface Props {
   sessionToken?: string;
   /** Whether highlight video extraction is available */
   highlightsEnabled?: boolean;
+  /** Current half number (1 or 2) — used to offset minutes */
+  halfNumber?: number;
 }
 
 const EVENT_BUTTONS = [
   { type: "goal" as const, label: "Tor", icon: "⚽" },
   { type: "shot_on_target" as const, label: "Chance", icon: "⚡" },
-  { type: "yellow_card" as const, label: "Karte", icon: "🟡" },
+  { type: "yellow_card" as const, label: "Gelb", icon: "🟡" },
+  { type: "red_card" as const, label: "Rot", icon: "🔴" },
   { type: "corner" as const, label: "Ecke", icon: "📐" },
+  { type: "foul" as const, label: "Foul", icon: "🦵" },
+  { type: "offside" as const, label: "Abseits", icon: "🚩" },
+  { type: "free_kick" as const, label: "Freistoß", icon: "🎯" },
 ] as const;
 
 type EventType = typeof EVENT_BUTTONS[number]["type"];
@@ -30,6 +36,7 @@ export default function MatchEventQuickBar({
   recordingStartTime,
   sessionToken,
   highlightsEnabled = false,
+  halfNumber = 1,
 }: Props) {
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -37,7 +44,9 @@ export default function MatchEventQuickBar({
     if (saving) return;
     setSaving(eventType);
 
-    const minute = Math.max(1, Math.round((Date.now() - recordingStartTime) / 60000));
+    // Calculate minute with half offset
+    const elapsedMin = Math.max(1, Math.round((Date.now() - recordingStartTime) / 60000));
+    const minute = halfNumber === 2 ? 45 + elapsedMin : elapsedMin;
 
     try {
       // Extract highlight clip only if enabled
@@ -121,23 +130,23 @@ export default function MatchEventQuickBar({
     } finally {
       setSaving(null);
     }
-  }, [matchId, recorderRef, recordingStartTime, saving, sessionToken, highlightsEnabled]);
+  }, [matchId, recorderRef, recordingStartTime, saving, sessionToken, highlightsEnabled, halfNumber]);
 
   return (
-    <div className="flex gap-2 flex-wrap">
+    <div className="flex gap-1.5 flex-wrap justify-end max-w-[280px]">
       {EVENT_BUTTONS.map((btn) => (
         <Button
           key={btn.type}
-          size="lg"
+          size="sm"
           variant="secondary"
-          className="gap-1.5 text-sm h-12 min-w-[4rem] bg-background/80 backdrop-blur border border-border/50"
+          className="gap-1 text-xs h-9 min-w-[3.5rem] bg-background/80 backdrop-blur border border-border/50"
           disabled={saving !== null}
           onClick={() => handleEvent(btn.type)}
         >
           {saving === btn.type ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            <span className="text-base">{btn.icon}</span>
+            <span className="text-sm">{btn.icon}</span>
           )}
           {btn.label}
         </Button>
