@@ -33,6 +33,13 @@ serve(async (req) => {
       .eq("id", match_id)
       .single();
 
+    // Fetch manual match events (goals, cards, fouls, etc.)
+    const { data: matchEvents } = await supabase
+      .from("match_events")
+      .select("*")
+      .eq("match_id", match_id)
+      .order("minute", { ascending: true });
+
     const { data: results } = await supabase
       .from("analysis_results")
       .select("*")
@@ -61,6 +68,15 @@ serve(async (req) => {
 
     const analysisContext = relevantResults.map(r => `${r.result_type}: ${JSON.stringify(r.data)}`).join("\n\n");
     const matchInfo = `${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"} am ${match?.date ?? "?"}`;
+
+    // Build match events context
+    let eventsContext = "";
+    if (matchEvents && matchEvents.length > 0) {
+      const eventLines = matchEvents.map((e: any) =>
+        `Min ${e.minute}: ${e.event_type} (${e.team})${e.player_name ? ` — ${e.player_name}` : ""}${e.notes ? ` [${e.notes}]` : ""}`
+      );
+      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}`;
+    }
 
     await supabase.from("analysis_jobs").update({ progress: 90 }).eq("id", job_id);
 
@@ -110,7 +126,7 @@ REGELN:
           },
           {
             role: "user",
-            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}`,
+            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}`,
           },
         ],
         tools: [

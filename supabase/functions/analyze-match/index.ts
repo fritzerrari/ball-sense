@@ -207,7 +207,18 @@ WICHTIG:
             role: "system",
             content: `Du bist ein erfahrener Fußball-Analyst. Du analysierst Standbilder eines Fußballspiels.
 Fokussiere dich auf das, was du TATSÄCHLICH auf den Bildern erkennst.
-Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als solche.`,
+Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als solche.
+
+WICHTIGE REGELN ZUR SPIELERERKENNUNG:
+- Das Spielformat ist UNBEKANNT. Es kann 3v3, 4v4, 5v5, 7v7, 9v9, 11v11 oder jede andere Variante sein (auch Trainingsspiele).
+- Zähle die tatsächliche Anzahl erkannter Spieler pro Team. Gehe NICHT von 11v11 aus.
+- SCHLIESSE Schiedsrichter, Linienrichter und andere Offizielle AUS. Diese tragen typischerweise schwarze/dunkle Einheitskleidung, bewegen sich isoliert entlang der Seitenlinien oder stehen abseits des Spielgeschehens.
+- Wenn weniger Spieler sichtbar sind als logisch (z.B. 4 von geschätzt 7), notiere wie viele du SIEHST und schätze die Gesamtzahl basierend auf Formation und sichtbarem Feldausschnitt.
+
+KAMERA-PERSPEKTIVE ERKENNEN:
+- Bestimme die Kameraausrichtung: QUER (Seitenansicht von der Mittellinie), LÄNGS (hinter dem Tor), SCHRÄG (von der Eckfahne oder diagonal), TEILAUSSCHNITT (nur ein Bereich des Feldes sichtbar).
+- Die Perspektive beeinflusst massiv, wie x/y Koordinaten zu interpretieren sind.
+- Melde die erkannte Perspektive im Feld camera_perspective.`,
           },
           { role: "user", content: userContent },
         ],
@@ -390,10 +401,31 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
                       required: ["frame_index", "minute_approx", "home_formation", "away_formation"],
                     },
                   },
+                  camera_perspective: {
+                    type: "object",
+                    description: "Detected camera orientation and coverage",
+                    properties: {
+                      orientation: { type: "string", enum: ["landscape_side", "landscape_behind_goal", "diagonal", "partial"], description: "landscape_side=Seitenansicht von Mittellinie, landscape_behind_goal=hinter dem Tor, diagonal=Eckfahne/schräg, partial=nur Teilausschnitt" },
+                      coverage_description: { type: "string", description: "e.g. 'Volle Seitenansicht von der Mittellinie' oder 'Hälfte des Feldes von schräg links'" },
+                      estimated_pitch_coverage_pct: { type: "number", description: "Estimated percentage of pitch visible 0-100" },
+                    },
+                    required: ["orientation", "coverage_description", "estimated_pitch_coverage_pct"],
+                  },
+                  team_size_detected: {
+                    type: "object",
+                    description: "Detected team sizes (excluding referees)",
+                    properties: {
+                      home: { type: "integer", description: "Estimated total players in home team (e.g. 7 for 7v7)" },
+                      away: { type: "integer", description: "Estimated total players in away team" },
+                      format_label: { type: "string", description: "e.g. '7v7', '11v11', '5v5'" },
+                      officials_excluded: { type: "integer", description: "Number of officials/referees identified and excluded" },
+                    },
+                    required: ["home", "away", "format_label"],
+                  },
                   visual_quality: { type: "string", enum: ["good", "moderate", "poor"] },
                   confidence: { type: "number" },
                 },
-                required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "frame_positions", "pressing_data", "transitions", "pass_directions", "formation_timeline", "visual_quality", "confidence"],
+                required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "frame_positions", "pressing_data", "transitions", "pass_directions", "formation_timeline", "camera_perspective", "team_size_detected", "visual_quality", "confidence"],
               },
             },
           },
@@ -444,6 +476,8 @@ Sei ehrlich über die Grenzen deiner Analyse. Markiere geschätzte Werte als sol
       ...(analysis.transitions?.length ? [{ type: "transitions", data: analysis.transitions }] : []),
       ...(analysis.pass_directions ? [{ type: "pass_directions", data: analysis.pass_directions }] : []),
       ...(analysis.formation_timeline?.length ? [{ type: "formation_timeline", data: analysis.formation_timeline }] : []),
+      ...(analysis.camera_perspective ? [{ type: "camera_perspective", data: analysis.camera_perspective }] : []),
+      ...(analysis.team_size_detected ? [{ type: "team_size_detected", data: analysis.team_size_detected }] : []),
     ];
 
     for (const result of resultTypes) {

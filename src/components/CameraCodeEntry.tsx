@@ -14,9 +14,19 @@ export default function CameraCodeEntry({ onSuccess }: CameraCodeEntryProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const autoSubmittedRef = useRef(false);
 
-  // Auto-focus first input on mount
+  // Auto-fill from URL parameter ?code=XXXXXX
   useEffect(() => {
+    if (autoSubmittedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const urlCode = params.get("code")?.replace(/\D/g, "").slice(0, 6);
+    if (urlCode && urlCode.length === 6) {
+      autoSubmittedRef.current = true;
+      setDigits(urlCode.split(""));
+      setTimeout(() => submitCode(urlCode), 200);
+      return;
+    }
     setTimeout(() => inputRefs.current[0]?.focus(), 100);
   }, []);
 
