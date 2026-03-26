@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Users, Swords, Zap, Calendar, Clock, Plus, Loader2, CheckCircle2, AlertTriangle, Sparkles } from "lucide-react";
+import { ChevronRight, Users, Swords, Zap, Calendar, Clock, Plus, Loader2, CheckCircle2, AlertTriangle, Sparkles, Brain } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useMatches } from "@/hooks/use-matches";
 import { usePlayers } from "@/hooks/use-players";
@@ -86,6 +86,25 @@ export default function Dashboard() {
         </div>
 
         <PwaInstallPrompt />
+
+        {/* Match Preparation CTA */}
+        {hasMatches && (
+          <div className="glass-card p-4 flex items-center justify-between gap-3 border-primary/20 bg-primary/5">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Brain className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">KI-Spielvorbereitung</p>
+                <p className="text-xs text-muted-foreground truncate">Datenbasierter Matchplan für dein nächstes Spiel</p>
+              </div>
+            </div>
+            <Button variant="heroOutline" size="sm" asChild>
+              <Link to="/match-prep">Vorbereiten</Link>
+            </Button>
+          </div>
+        )}
+
         <MatchFlowGuide />
         <SetupChecklist hasPlayers={!!hasPlayers} hasFields={!!hasFields} />
 

@@ -32,6 +32,7 @@ const FullGuide = lazy(() => import("./pages/FullGuide"));
 const TrendDashboard = lazy(() => import("./pages/TrendDashboard"));
 const PlayerCompare = lazy(() => import("./pages/PlayerCompare"));
 const ComparePage = lazy(() => import("./pages/ComparePage"));
+const MatchPrep = lazy(() => import("./pages/MatchPrep"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,6 +84,7 @@ const App = () => (
                 <Route path="/guide" element={<FullGuide />} />
                 <Route path="/legal/:slug" element={<LegalPage />} />
                 <Route path="/compare" element={<ComparePage />} />
+                <Route path="/match-prep" element={<ProtectedRoute><MatchPrep /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
