@@ -13,6 +13,7 @@ import StopConfirmDialog from "@/components/StopConfirmDialog";
 import MatchEventQuickBar from "@/components/MatchEventQuickBar";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
+import WalkieTalkie from "@/components/WalkieTalkie";
 
 type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "analyzing" | "done";
 
@@ -515,6 +516,13 @@ export default function CameraTrackingPage() {
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
+      {matchId && (phase === "ready" || phase === "recording" || phase === "halftime_pause") && (
+        <WalkieTalkie
+          matchId={matchId}
+          userId={isHelper ? (sessionId ?? `helper-${sessionToken.slice(0, 8)}`) : "trainer"}
+          userName={isHelper ? `Kamera ${1}` : "Trainer"}
+        />
+      )}
       <RecordingGuard isRecording={phase === "recording"} frameCount={frameCount} />
       <StopConfirmDialog
         open={showStopConfirm}

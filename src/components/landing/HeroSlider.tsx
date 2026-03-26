@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Smartphone, Wifi, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
+import { Smartphone, Wifi, BarChart3, ChevronLeft, ChevronRight, Zap } from "lucide-react";
 import { HEATMAP_COLS, HEATMAP_ROWS } from "@/lib/constants";
 
 const slides = [
@@ -62,7 +62,7 @@ export function HeroSlider() {
         </div>
       </div>
 
-      {/* Floating badge — hidden on very small screens */}
+      {/* Floating badge */}
       <motion.div
         className="absolute -bottom-4 -left-4 rounded-xl border border-border bg-card shadow-lg px-3 py-2 md:px-4 md:py-2.5 flex items-center gap-2 hidden sm:flex"
         initial={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -91,14 +91,13 @@ export function HeroSlider() {
   );
 }
 
-/* ─── Slide 1: Live Tracking — Football field with cameras ─── */
+/* ─── Slide 1: Live Tracking — Enhanced visuals ─── */
 function TrackingSlide() {
   const grid = generateMockHeatmap();
   const maxVal = Math.max(...grid.flat(), 0.01);
   const cw = 105 / HEATMAP_COLS;
   const ch = 68 / HEATMAP_ROWS;
 
-  // Convert grid to heat spots
   const heatSpots: { x: number; y: number; intensity: number }[] = [];
   grid.forEach((row, rowIdx) => {
     row.forEach((val, colIdx) => {
@@ -116,9 +115,7 @@ function TrackingSlide() {
       exit={{ opacity: 0, x: -60 }}
       transition={{ duration: 0.4 }}
     >
-      {/* Football field with heatmap */}
       <div className="flex-1 relative rounded-xl overflow-hidden border border-border/30">
-        {/* Unified grass pitch via SVG */}
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid slice">
           <defs>
             <linearGradient id="sliderGrassBase" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -139,11 +136,9 @@ function TrackingSlide() {
             <filter id="sHeatBlur2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur in="SourceGraphic" stdDeviation="2" /></filter>
           </defs>
 
-          {/* Pitch background */}
           <rect x="0" y="0" width="105" height="68" fill="url(#sliderGrassBase)" />
           <rect x="0" y="0" width="105" height="68" fill="url(#sliderGrassStripes)" opacity="0.25" />
 
-          {/* Smooth heatmap - base layer */}
           <g filter="url(#sHeatBlur1)" opacity="0.5">
             {heatSpots.filter(s => s.intensity > 0.15).map((spot, i) => {
               const gid = spot.intensity > 0.8 ? "sHeatMax" : spot.intensity > 0.6 ? "sHeatHigh" : spot.intensity > 0.4 ? "sHeatMed" : spot.intensity > 0.2 ? "sHeatMedLow" : "sHeatLow";
@@ -151,7 +146,6 @@ function TrackingSlide() {
               return <ellipse key={`b${i}`} cx={spot.x} cy={spot.y} rx={r * 1.3} ry={r} fill={`url(#${gid})`} />;
             })}
           </g>
-          {/* Detail layer */}
           <g filter="url(#sHeatBlur2)" opacity="0.75">
             {heatSpots.map((spot, i) => {
               const gid = spot.intensity > 0.8 ? "sHeatMax" : spot.intensity > 0.6 ? "sHeatHigh" : spot.intensity > 0.4 ? "sHeatMed" : spot.intensity > 0.2 ? "sHeatMedLow" : "sHeatLow";
@@ -174,78 +168,98 @@ function TrackingSlide() {
             <circle cx="93" cy="34" r="0.4" fill="white" fillOpacity="0.35" stroke="none" />
             <path d="M 17.5 27.5 A 9.15 9.15 0 0 1 17.5 40.5" strokeWidth="0.25" />
             <path d="M 87.5 27.5 A 9.15 9.15 0 0 0 87.5 40.5" strokeWidth="0.25" />
-            <path d="M 1 2 A 1 1 0 0 0 2 1" strokeWidth="0.2" />
-            <path d="M 103 1 A 1 1 0 0 0 104 2" strokeWidth="0.2" />
-            <path d="M 1 66 A 1 1 0 0 1 2 67" strokeWidth="0.2" />
-            <path d="M 104 66 A 1 1 0 0 0 103 67" strokeWidth="0.2" />
           </g>
         </svg>
 
-        {/* Player dots */}
+        {/* Enhanced player dots — larger with team colors */}
         {mockPlayers.map((p, i) => (
           <motion.div
             key={i}
-            className="absolute w-4 h-4 md:w-3.5 md:h-3.5 rounded-full border-2 border-white/70 flex items-center justify-center shadow-md"
-            style={{ left: `${p.x}%`, top: `${p.y}%`, backgroundColor: p.team === "home" ? "hsl(var(--primary))" : "hsl(var(--destructive))" }}
+            className="absolute rounded-full border-2 border-white/80 flex items-center justify-center shadow-lg"
+            style={{
+              left: `${p.x}%`,
+              top: `${p.y}%`,
+              width: p.team === "home" ? "20px" : "18px",
+              height: p.team === "home" ? "20px" : "18px",
+              backgroundColor: p.team === "home" ? "hsl(185, 80%, 45%)" : "hsl(0, 75%, 55%)",
+              transform: "translate(-50%, -50%)",
+            }}
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.5 + i * 0.04, type: "spring" }}
+            transition={{ delay: 0.3 + i * 0.03, type: "spring" }}
           >
-            <span className="text-[6px] font-bold text-white">{p.num}</span>
+            <span className="text-[7px] font-bold text-white drop-shadow-sm">{p.num}</span>
           </motion.div>
         ))}
 
-        {/* Camera icons on sideline */}
-        {[15, 50, 85].map((pos, i) => (
+        {/* Camera positions with labels */}
+        {[
+          { pos: 15, label: "Cam 1" },
+          { pos: 50, label: "Cam 2" },
+          { pos: 85, label: "Cam 3" },
+        ].map((cam, i) => (
           <motion.div
             key={i}
-            className="absolute -bottom-0 flex flex-col items-center"
-            style={{ left: `${pos}%`, transform: "translateX(-50%)" }}
+            className="absolute -bottom-0 flex flex-col items-center gap-0.5"
+            style={{ left: `${cam.pos}%`, transform: "translateX(-50%)" }}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1 + i * 0.2 }}
+            transition={{ delay: 0.8 + i * 0.15 }}
           >
-            <div className="relative">
-              <Smartphone className="w-4 h-4 text-white/80" />
-              {/* Tracking cone */}
-              <motion.div
-                className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0"
-                style={{
-                  borderLeft: "12px solid transparent",
-                  borderRight: "12px solid transparent",
-                  borderBottom: "20px solid hsla(var(--primary), 0.15)",
-                }}
-                animate={{ opacity: [0.3, 0.6, 0.3] }}
-                transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
-              />
+            <motion.div
+              className="w-0 h-0 opacity-30"
+              style={{
+                borderLeft: "14px solid transparent",
+                borderRight: "14px solid transparent",
+                borderBottom: "24px solid hsl(185, 80%, 45%)",
+              }}
+              animate={{ opacity: [0.15, 0.35, 0.15] }}
+              transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+            />
+            <div className="flex flex-col items-center">
+              <Smartphone className="w-4 h-4 text-white/90" />
+              <span className="text-[7px] text-white/60 font-medium">{cam.label}</span>
             </div>
           </motion.div>
         ))}
+
+        {/* Prominent LIVE badge */}
+        <motion.div
+          className="absolute top-2 right-2 flex items-center gap-1.5 bg-primary rounded-full px-3 py-1 shadow-lg"
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1.2, type: "spring" }}
+        >
+          <div className="relative">
+            <div className="w-2.5 h-2.5 rounded-full bg-white" />
+            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-white animate-ping opacity-50" />
+          </div>
+          <span className="text-[10px] font-bold text-primary-foreground tracking-wider">LIVE</span>
+        </motion.div>
       </div>
 
       {/* Legend bar */}
       <div className="flex items-center justify-between mt-2 px-1">
-        <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
+        <div className="flex items-center gap-3 text-[9px] text-muted-foreground">
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-primary" />
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "hsl(185, 80%, 45%)" }} />
             <span>Heim</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-destructive" />
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "hsl(0, 75%, 55%)" }} />
             <span>Gast</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-primary font-semibold">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="uppercase tracking-wide">LIVE</span>
-          <span className="text-muted-foreground font-normal">· 67:32</span>
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+          <span className="font-mono">67:32</span>
+          <span>· 22 Spieler</span>
         </div>
       </div>
     </motion.div>
   );
 }
 
-/* ─── Slide 2: Calibration ─── */
+/* ─── Slide 2: Calibration — Enhanced phone mockup ─── */
 function CalibrationSlide() {
   return (
     <motion.div
@@ -257,56 +271,97 @@ function CalibrationSlide() {
     >
       <div className="text-[11px] font-semibold font-display text-foreground/80">Spielfeld kalibrieren</div>
 
-      {/* Phone mockup with field overlay */}
       <div className="flex-1 flex items-center justify-center gap-4">
-        <div className="relative w-36 h-52 rounded-2xl border-2 border-border bg-muted/30 overflow-hidden flex flex-col">
+        {/* Modern phone mockup with Dynamic Island */}
+        <div className="relative w-36 h-52 rounded-[20px] border-2 border-foreground/20 bg-foreground/5 overflow-hidden flex flex-col shadow-xl">
+          {/* Dynamic Island */}
+          <div className="flex justify-center pt-1.5">
+            <div className="w-14 h-3 rounded-full bg-foreground/80" />
+          </div>
+
           {/* Phone screen */}
-          <div className="flex-1 relative bg-gradient-to-b from-[hsl(140,30%,30%)] to-[hsl(140,25%,22%)] m-1.5 rounded-lg overflow-hidden">
-            {/* Field with corner markers */}
+          <div className="flex-1 relative bg-gradient-to-b from-[hsl(140,30%,30%)] to-[hsl(140,25%,22%)] mx-1.5 mb-1.5 mt-1 rounded-lg overflow-hidden">
             <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 140" preserveAspectRatio="xMidYMid meet">
               <rect x="10" y="15" width="80" height="110" fill="none" stroke="white" strokeWidth="0.8" opacity="0.4" />
-              {/* Corner dots with pulse */}
-              {[[10, 15], [90, 15], [90, 125], [10, 125]].map(([cx, cy], i) => (
-                <g key={i}>
-                  <circle cx={cx} cy={cy} r="4" fill="none" stroke="hsl(var(--primary))" strokeWidth="1" opacity="0.8">
-                    <animate attributeName="r" values="3;6;3" dur="2s" repeatCount="indefinite" begin={`${i * 0.3}s`} />
-                    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite" begin={`${i * 0.3}s`} />
-                  </circle>
-                  <circle cx={cx} cy={cy} r="2" fill="hsl(var(--primary))" />
-                </g>
-              ))}
-              {/* Dashed guides */}
-              <line x1="10" y1="15" x2="90" y2="125" stroke="hsl(var(--primary))" strokeWidth="0.3" strokeDasharray="3,3" opacity="0.4" />
-              <line x1="90" y1="15" x2="10" y2="125" stroke="hsl(var(--primary))" strokeWidth="0.3" strokeDasharray="3,3" opacity="0.4" />
+
+              {/* Corner dots with enhanced pulse */}
+              {[[10, 15], [90, 15], [90, 125], [10, 125]].map(([cx, cy], i) => {
+                const done = i < 2;
+                return (
+                  <g key={i}>
+                    {done ? (
+                      <>
+                        <circle cx={cx} cy={cy} r="5" fill="hsl(160, 84%, 39%)" opacity="0.25" />
+                        <circle cx={cx} cy={cy} r="3" fill="hsl(160, 84%, 39%)" />
+                        <text x={cx} y={(cy as number) + 1.5} textAnchor="middle" fill="white" fontSize="3.5" fontWeight="bold">✓</text>
+                      </>
+                    ) : (
+                      <>
+                        <circle cx={cx} cy={cy} r="4" fill="none" stroke="hsl(40, 90%, 60%)" strokeWidth="0.8" opacity="0.8">
+                          <animate attributeName="r" values="3;7;3" dur="1.5s" repeatCount="indefinite" begin={`${i * 0.3}s`} />
+                          <animate attributeName="opacity" values="0.8;0.15;0.8" dur="1.5s" repeatCount="indefinite" begin={`${i * 0.3}s`} />
+                        </circle>
+                        <circle cx={cx} cy={cy} r="2" fill="hsl(40, 90%, 60%)" />
+                      </>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Animated connection line between completed points */}
+              <line x1="10" y1="15" x2="90" y2="15" stroke="hsl(160, 84%, 39%)" strokeWidth="0.6" opacity="0.5" strokeDasharray="2,2">
+                <animate attributeName="stroke-dashoffset" values="0;4" dur="1s" repeatCount="indefinite" />
+              </line>
+
+              {/* Animated guide line to next point */}
+              <line x1="90" y1="15" x2="90" y2="125" stroke="hsl(40, 90%, 60%)" strokeWidth="0.4" strokeDasharray="3,3" opacity="0.4">
+                <animate attributeName="stroke-dashoffset" values="6;0" dur="1.5s" repeatCount="indefinite" />
+              </line>
             </svg>
           </div>
+
           {/* Home bar */}
           <div className="h-3 flex justify-center items-center">
-            <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+            <div className="w-10 h-1 rounded-full bg-foreground/15" />
           </div>
         </div>
 
-        {/* Instructions */}
-        <div className="space-y-3 max-w-[140px]">
+        {/* Instructions with progress bar */}
+        <div className="space-y-2 max-w-[140px]">
+          {/* Progress indicator */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-primary"
+                initial={{ width: "0%" }}
+                animate={{ width: "50%" }}
+                transition={{ delay: 0.5, duration: 0.8 }}
+              />
+            </div>
+            <span className="text-[10px] text-primary font-semibold">2/4</span>
+          </div>
+
           {[
             { step: "1", text: "Eckpunkt oben-links antippen", done: true },
             { step: "2", text: "Eckpunkt oben-rechts antippen", done: true },
-            { step: "3", text: "Eckpunkt unten-rechts antippen", done: false },
+            { step: "3", text: "Eckpunkt unten-rechts antippen", done: false, active: true },
             { step: "4", text: "Eckpunkt unten-links antippen", done: false },
           ].map((item, i) => (
             <motion.div
               key={i}
-              className="flex items-start gap-2"
+              className={`flex items-start gap-2 ${item.active ? "bg-primary/5 rounded-md px-1 py-0.5 -mx-1" : ""}`}
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 + i * 0.15 }}
             >
-              <div className={`w-4 h-4 rounded-full text-[8px] font-bold flex items-center justify-center shrink-0 mt-0.5 ${
-                item.done ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              <div className={`w-4.5 h-4.5 rounded-full text-[8px] font-bold flex items-center justify-center shrink-0 mt-0.5 ${
+                item.done ? "bg-primary text-primary-foreground" : item.active ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground"
               }`}>
                 {item.done ? "✓" : item.step}
               </div>
-              <span className={`text-[10px] leading-tight ${item.done ? "text-foreground" : "text-muted-foreground"}`}>{item.text}</span>
+              <span className={`text-[10px] leading-tight ${item.done ? "text-foreground" : item.active ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                {item.text}
+              </span>
             </motion.div>
           ))}
         </div>
@@ -317,7 +372,7 @@ function CalibrationSlide() {
   );
 }
 
-/* ─── Slide 3: Coach Report Preview ─── */
+/* ─── Slide 3: Coach Report Preview — Enhanced ─── */
 function DataTransferSlide() {
   const grades = [
     { label: "Spielkontrolle", grade: "B+", color: "text-primary" },
@@ -397,6 +452,19 @@ function DataTransferSlide() {
         </div>
       </motion.div>
 
+      {/* Training recommendation teaser */}
+      <motion.div
+        className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/15 px-2 py-1.5"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.2 }}
+      >
+        <Zap className="h-3 w-3 text-primary shrink-0" />
+        <span className="text-[9px] text-foreground leading-tight">
+          <strong>Training:</strong> Linke Seite unter Druck stabilisieren
+        </span>
+      </motion.div>
+
       <div className="flex items-center justify-center gap-4 text-[9px] text-muted-foreground">
         <span>📊 4 Kategorien bewertet</span>
         <span>⚡ in 2 Min erstellt</span>
@@ -407,7 +475,6 @@ function DataTransferSlide() {
 
 /* ─── Mock Data ─── */
 const mockPlayers = [
-  // Home team (positions as % of field)
   { x: 8, y: 48, num: 1, team: "home" },
   { x: 22, y: 25, num: 2, team: "home" },
   { x: 20, y: 42, num: 4, team: "home" },
@@ -419,7 +486,6 @@ const mockPlayers = [
   { x: 48, y: 48, num: 10, team: "home" },
   { x: 48, y: 78, num: 11, team: "home" },
   { x: 55, y: 48, num: 9, team: "home" },
-  // Away team (4-3-3)
   { x: 92, y: 48, num: 1, team: "away" },
   { x: 78, y: 20, num: 2, team: "away" },
   { x: 80, y: 38, num: 4, team: "away" },
