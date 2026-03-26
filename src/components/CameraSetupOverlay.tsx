@@ -23,10 +23,15 @@ const tips = [
     title: "Querformat & stabil",
     desc: "Handy quer halten oder anlehnen. Nicht schwenken oder zoomen.",
   },
+  {
+    icon: CheckCircle2,
+    title: "Auto-Kalibrierung",
+    desc: "Die KI erkennt das Spielfeld automatisch — du musst nichts kalibrieren.",
+  },
 ];
 
 export default function CameraSetupOverlay({ onDismiss, onStart }: CameraSetupOverlayProps) {
-  const [checked, setChecked] = useState<boolean[]>([false, false, false]);
+  const [checked, setChecked] = useState<boolean[]>([false, false, false, false]);
 
   const allChecked = checked.every(Boolean);
 

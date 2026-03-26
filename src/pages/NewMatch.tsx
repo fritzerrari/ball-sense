@@ -66,7 +66,7 @@ export default function NewMatch() {
       if (error) throw error;
       setMatchId(newMatch.id);
       setStep("choice");
-      toast.success("Spiel angelegt!");
+      toast.success("Spiel angelegt! Die Feldkalibrierung läuft automatisch beim Aufnahmestart.");
     } catch (err: any) {
       toast.error(err.message ?? "Fehler beim Erstellen");
     } finally {

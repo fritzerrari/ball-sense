@@ -85,8 +85,9 @@ const EVENT_CATEGORIES: EventCategory[] = [
     ],
   },
   {
-    label: "Sonstiges",
+    label: "Wechsel & Sonstiges",
     events: [
+      { type: "substitution", label: "Auswechslung", icon: <ArrowRightLeft className="h-4 w-4" />, color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30", needsPlayer: true },
       { type: "counter_attack", label: "Konter", icon: <Zap className="h-4 w-4" />, color: "bg-violet-500/20 text-violet-400 border-violet-500/30" },
       { type: "bad_pass", label: "Fehlpass", icon: <X className="h-4 w-4" />, color: "bg-red-500/20 text-red-400 border-red-500/30", needsPlayer: true },
       { type: "injury", label: "Verletzung", icon: <HeartPulse className="h-4 w-4" />, color: "bg-red-500/20 text-red-400 border-red-500/30", needsPlayer: true },
@@ -136,7 +137,7 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
       const min = parseInt(minute) || currentMinute;
       const player = activePlayers.find((p) => p.player_id === playerId);
 
-      await supabase.from("match_events").insert({
+      const insertData: any = {
         match_id: matchId,
         team,
         minute: min,
@@ -145,7 +146,12 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
         player_name: player?.player_name ?? (playerName || null),
         event_zone: zone || null,
         notes: notes || null,
-      });
+      };
+      if (selectedEvent.type === "substitution" && playerName) {
+        insertData.related_player_name = playerName;
+        insertData.notes = `Raus: ${player?.player_name ?? "?"}, Rein: ${playerName}`;
+      }
+      await supabase.from("match_events").insert(insertData);
 
       setRecentEvents((prev) => [
         { type: selectedEvent.type, label: selectedEvent.label, minute: min, team },
@@ -257,7 +263,9 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
 
               {selectedEvent.needsPlayer && (
                 <div>
-                  <label className="mb-1 block text-sm text-muted-foreground">Spieler</label>
+                  <label className="mb-1 block text-sm text-muted-foreground">
+                    {selectedEvent.type === "substitution" ? "Spieler raus" : "Spieler"}
+                  </label>
                   <select
                     value={playerId}
                     onChange={(e) => setPlayerId(e.target.value)}
@@ -266,6 +274,24 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
                     <option value="">Optional wählen...</option>
                     {activePlayers.map((p) => (
                       <option key={p.id} value={p.player_id ?? ""}>
+                        {p.player_name} {p.shirt_number ? `(#${p.shirt_number})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {selectedEvent.type === "substitution" && (
+                <div>
+                  <label className="mb-1 block text-sm text-muted-foreground">Spieler rein</label>
+                  <select
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground"
+                  >
+                    <option value="">Optional wählen...</option>
+                    {activePlayers.map((p) => (
+                      <option key={p.id} value={p.player_name ?? ""}>
                         {p.player_name} {p.shirt_number ? `(#${p.shirt_number})` : ""}
                       </option>
                     ))}
