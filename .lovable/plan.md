@@ -1,67 +1,48 @@
 
 
-# Kalibrierung, Auswechslungen, Nacherfassung & Feature-Updates
+# Pricing-Korrektur & Opt-in Benchmark-Feature
 
-## Erkenntnisse aus der Code-Pruefung
+## 1. "API-Zugang" aus Pricing entfernen
 
-### Kalibrierung
-Die Feldkalibrierung (`FieldCalibration.tsx`) existiert als separate Seite unter `/fields/:id/calibrate`, ist aber **nicht in den Aufnahme-Workflow integriert**. Laut Memory wird die Kalibrierung beim Aufnahmestart automatisch ueber `detect-field-corners` gemacht — der User muss also NICHT manuell kalibrieren. **Problem**: Das wird dem User nirgends kommuniziert. Er sieht "Kalibrierung" in der Platz-Verwaltung und denkt er muss das tun.
+**Problem**: PRO-Plan bewirbt "API-Zugang" — existiert nicht.
 
-### Auswechslungen
-- `MatchEventQuickBar` (Kamera-Helfer): Hat NUR 8 Basis-Events (Tor, Chance, Gelb, Rot, Ecke, Foul, Abseits, Freistoss). **Keine Auswechslung.**
-- `LiveEventTicker` (Trainer-View): Hat 20+ Events aber ebenfalls **keine Auswechslung** als Event-Typ.
-- i18n hat Strings fuer "substitution" und "Auswechslung", aber die UI existiert nicht.
+**Loesung**: Ersetzen durch ein realistisches Feature.
+- `src/lib/i18n.tsx`: `landing.plan3f4` von "API-Zugang" → "Datenexport (CSV/JSON)" (DE) / "Data export (CSV/JSON)" (EN)
+- `src/lib/constants.ts`: Keine Aenderung noetig (PLAN_CONFIG hat keine Feature-Listen)
+- `src/components/UpgradeModal.tsx`: Keine Aenderung (zeigt nur maxMatches)
 
-### Nacherfassung
-Es gibt **keine Post-Match-Event-Editierung**. Wenn Events vergessen wurden, gibt es keinen Weg sie nachzutragen.
+## 2. Pricing-Features praezisieren
 
-### Spielvorbereitung
-`MatchPrep.tsx` zeigt keinen Hinweis wenn keine Spiele vorhanden sind — es wuerde einfach eine leere/generische Vorbereitung generieren.
+- `landing.plan3f2`: "Alle Teams" → "Alle Vereinsteams" / "All club teams" — klarstellen dass NICHT vereinsuebergreifend
+- `landing.plan2f2`: "2 Teams" → "2 Vereinsteams" / "2 club teams"
 
----
+## 3. Opt-in Liga-Benchmark (Pro-Feature)
 
-## Plan
+### Konzept
+Vereine im Pro-Plan koennen sich freiwillig in einen anonymen Benchmark-Pool eintragen. Sie sehen dann ihre eigenen Werte (Pressing, Dominanz, Tempo) im Vergleich zum Liga-Durchschnitt aller teilnehmenden Vereine.
 
-### 1. Auswechslung als Event-Typ hinzufuegen
+### Datenbank
+- Neue Tabelle `benchmark_opt_ins`: `id`, `club_id`, `opted_in` (bool), `opted_in_at`, `league` (text)
+- RLS: Vereine sehen nur eigenen Opt-in Status
+- Neue View `benchmark_averages`: Aggregiert anonyme Durchschnitte aus `team_match_stats` + `analysis_results` fuer alle opted-in Clubs, gruppiert nach Liga — Superadmin-only SELECT auf Rohdaten, aber Aggregate via SECURITY DEFINER Function fuer Club-Members
 
-**`LiveEventTicker.tsx`**: Neue Kategorie "Wechsel" mit Event-Typ `substitution`. Spezial-UI: Zwei Spieler-Selects (Raus + Rein) statt nur einem.
+### Security-Definer Function `get_league_benchmarks`
+- Input: `_club_id`, `_league`
+- Prueft ob Club opted-in ist
+- Returned nur aggregierte Durchschnittswerte (AVG pressing, AVG possession, AVG distance etc.) — KEINE einzelnen Vereinsdaten
+- Mindestens 5 teilnehmende Vereine in der Liga noetig, sonst "Nicht genug Daten"
 
-**`MatchEventQuickBar.tsx`**: Auswechslungs-Button hinzufuegen (Icon: ArrowRightLeft). Bei Klick: Einfaches Modal mit "Wer raus?" und "Wer rein?" Dropdown (oder Freitext wenn keine Spieler geladen).
+### Frontend
+- **Settings-Seite**: Opt-in Toggle "Am Liga-Benchmark teilnehmen" (nur Pro-Plan sichtbar)
+- **TrendDashboard.tsx**: Neue Sektion "Liga-Vergleich" — eigene Werte vs Liga-Durchschnitt als Balkendiagramm
+- **Pricing**: Neues Feature in PRO ersetzen: `landing.plan3f4` → "Liga-Benchmark" statt "Datenexport"
 
-### 2. Post-Match Nacherfassung
-
-**Neue Komponente `PostMatchEventEditor.tsx`**:
-- Oeffnet sich im MatchReport als "Events nacherfassen" Button
-- Tabelle aller bisherigen Events mit Loeschen-Option
-- "Event hinzufuegen" Form: Typ, Minute, Team, Spieler, Notiz
-- Auswechslungen nachtraeglich erfassen
-- Speichert direkt in `match_events` Tabelle
-
-**Spielbericht-Foto Upload**:
-- Im PostMatchEventEditor: Button "Spielbericht abfotografieren"
-- Foto wird hochgeladen, KI (Gemini Vision) extrahiert: Tore, Karten, Auswechslungen, Ergebnis
-- Extrahierte Events werden als Vorschlag angezeigt, User bestaetigt
-- Neuer Edge Function `parse-match-report-photo` fuer die OCR/Extraktion
-
-### 3. Kalibrierung kommunizieren
-
-**`CameraSetupOverlay.tsx`**: Neuen Tipp hinzufuegen: "Kalibrierung passiert automatisch — du musst nichts tun. Die KI erkennt das Spielfeld im ersten Frame."
-
-**`NewMatch.tsx`**: Nach Spiel-Erstellung Info-Toast: "Die Feldkalibrierung laeuft automatisch beim Aufnahmestart."
-
-### 4. Spielvorbereitung: Leerzustand
-
-**`MatchPrep.tsx`**: Wenn `recentOpponents` leer ist (keine Spiele vorhanden), zeige EmptyState: "Erstelle zuerst mindestens ein Spiel, damit die KI auf Daten zurueckgreifen kann. Die Spielvorbereitung basiert auf deiner Spielhistorie."
-
-### 5. Feature-Seite & Demo aktualisieren
-
-**`FeatureCards.tsx`**: Neue Features in bestehende Gruppen aufnehmen:
-- Reports & Coaching: "KI-Spielvorbereitung" (Brain Icon) — "Automatischer Matchplan mit Formations-Empfehlung, Gegner-Warnungen und Aufstellungs-Tipps."
-- Reports & Coaching: "Spielbericht-Scan" (Camera Icon) — "Spielbericht abfotografieren und Events automatisch nacherfassen."
-- Aufnahme & Setup: "Walkie-Talkie" (Radio Icon) — "Push-to-Talk Kommunikation zwischen Trainer und Kameramann."
-- Aufnahme & Setup: "Auto-Kalibrierung" erwaehnen im bestehenden Kalibrierungs-Feature
-
-**`DemoSection.tsx`**: Auswechslungs-Event in Demo-Daten aufnehmen.
+### DSGVO-Konformitaet
+- Explizites Opt-in (kein Default-An)
+- Nur aggregierte, anonyme Durchschnitte werden geteilt
+- Kein Rueckschluss auf einzelne Vereine moeglich (Minimum 5 Teilnehmer)
+- Opt-out jederzeit moeglich
+- Datenschutzerklaerung muss ergaenzt werden (Hinweis in Legal-CMS)
 
 ---
 
@@ -69,15 +50,10 @@ Es gibt **keine Post-Match-Event-Editierung**. Wenn Events vergessen wurden, gib
 
 | Datei | Aenderung |
 |---|---|
-| `src/components/MatchEventQuickBar.tsx` | Auswechslungs-Button + Mini-Dialog |
-| `src/components/LiveEventTicker.tsx` | Substitution-Event mit Doppel-Spieler-Select |
-| `src/components/PostMatchEventEditor.tsx` | **NEU** — Nacherfassung + Spielbericht-Foto |
-| `supabase/functions/parse-match-report-photo/index.ts` | **NEU** — Gemini Vision OCR fuer Spielberichte |
-| `src/pages/MatchReport.tsx` | PostMatchEventEditor einbinden |
-| `src/components/CameraSetupOverlay.tsx` | Auto-Kalibrierungs-Hinweis |
-| `src/pages/MatchPrep.tsx` | Empty State wenn keine Spiele vorhanden |
-| `src/components/landing/FeatureCards.tsx` | Neue Features (Spielvorbereitung, Walkie-Talkie, Scan) |
-| `src/pages/NewMatch.tsx` | Toast-Hinweis zur Auto-Kalibrierung |
-
-Keine DB-Migration noetig — `match_events` unterstuetzt bereits beliebige `event_type` Werte.
+| `src/lib/i18n.tsx` | Feature-Texte korrigieren (plan3f2, plan3f4, plan2f2) |
+| `src/components/landing/PricingSection.tsx` | Keine Code-Aenderung (nutzt i18n keys) |
+| DB-Migration | Neue Tabelle `benchmark_opt_ins` + RLS + Function `get_league_benchmarks` |
+| `src/pages/Settings.tsx` | Benchmark Opt-in Toggle (Pro-only) |
+| `src/pages/TrendDashboard.tsx` | Liga-Vergleich Sektion |
+| `src/hooks/use-benchmark.ts` | **NEU** — Hook fuer Opt-in Status + Benchmark-Daten |
 
