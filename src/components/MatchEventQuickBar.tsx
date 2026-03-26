@@ -9,11 +9,8 @@ interface Props {
   matchId: string;
   recorderRef: React.MutableRefObject<VideoRecorderHandle | null>;
   recordingStartTime: number;
-  /** Session token for anonymous camera helpers (bypasses auth) */
   sessionToken?: string;
-  /** Whether highlight video extraction is available */
   highlightsEnabled?: boolean;
-  /** Current half number (1 or 2) — used to offset minutes */
   halfNumber?: number;
 }
 
@@ -44,18 +41,18 @@ export default function MatchEventQuickBar({
     if (saving) return;
     setSaving(eventType);
 
-    // Calculate minute with half offset
+    // Haptic feedback
+    if (navigator.vibrate) navigator.vibrate(30);
+
     const elapsedMin = Math.max(1, Math.round((Date.now() - recordingStartTime) / 60000));
     const minute = halfNumber === 2 ? 45 + elapsedMin : elapsedMin;
 
     try {
-      // Extract highlight clip only if enabled
       let clip: HighlightClip | null = null;
       if (highlightsEnabled && recorderRef.current) {
         clip = recorderRef.current.extractHighlight(eventType, minute);
       }
 
-      // Anonymous helper → route through edge function
       if (sessionToken) {
         const res = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
@@ -80,7 +77,6 @@ export default function MatchEventQuickBar({
           throw new Error(err.error ?? "Event konnte nicht gespeichert werden");
         }
       } else {
-        // Authenticated user → direct insert
         const { error: eventError } = await supabase.from("match_events").insert({
           match_id: matchId,
           event_type: eventType,
@@ -90,7 +86,6 @@ export default function MatchEventQuickBar({
         });
         if (eventError) throw eventError;
 
-        // Upload highlight clip if available
         if (clip) {
           const ext = clip.mimeType.includes("mp4") ? "mp4" : "webm";
           const filePath = `${matchId}/highlight_${eventType}_${minute}.${ext}`;
@@ -133,22 +128,22 @@ export default function MatchEventQuickBar({
   }, [matchId, recorderRef, recordingStartTime, saving, sessionToken, highlightsEnabled, halfNumber]);
 
   return (
-    <div className="flex gap-1.5 flex-wrap justify-end max-w-[280px]">
+    <div className="grid grid-cols-4 gap-1.5 w-full max-w-xs">
       {EVENT_BUTTONS.map((btn) => (
         <Button
           key={btn.type}
           size="sm"
           variant="secondary"
-          className="gap-1 text-xs h-9 min-w-[3.5rem] bg-background/80 backdrop-blur border border-border/50"
+          className="gap-0.5 text-[10px] md:text-xs h-10 md:h-9 min-w-0 bg-background/80 backdrop-blur border border-border/50 active:scale-95 transition-transform flex-col md:flex-row p-1 md:p-2"
           disabled={saving !== null}
           onClick={() => handleEvent(btn.type)}
         >
           {saving === btn.type ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <span className="text-sm">{btn.icon}</span>
+            <span className="text-base md:text-sm leading-none">{btn.icon}</span>
           )}
-          {btn.label}
+          <span className="leading-none">{btn.label}</span>
         </Button>
       ))}
     </div>

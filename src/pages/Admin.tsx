@@ -195,7 +195,7 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="users" className="space-y-4">
-          <TabsList className="w-full justify-start bg-muted/50 p-1 rounded-xl flex-wrap h-auto gap-1">
+          <TabsList className="w-full justify-start bg-muted/50 p-1 rounded-xl h-auto gap-1 overflow-x-auto flex-nowrap md:flex-wrap scrollbar-none">
             <TabsTrigger value="users" className="rounded-lg text-xs"><Users className="h-4 w-4 mr-1.5" /> Nutzer</TabsTrigger>
             <TabsTrigger value="clubs" className="rounded-lg text-xs"><Building2 className="h-4 w-4 mr-1.5" /> Vereine</TabsTrigger>
             <TabsTrigger value="matches" className="rounded-lg text-xs"><BarChart3 className="h-4 w-4 mr-1.5" /> Spiele</TabsTrigger>

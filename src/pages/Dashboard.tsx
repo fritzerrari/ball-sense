@@ -65,22 +65,22 @@ export default function Dashboard() {
     <AppLayout>
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
             {clubLogoUrl && (
-              <img src={clubLogoUrl} alt={clubName || "Logo"} className="w-12 h-12 rounded-xl object-cover border border-border shadow-sm" />
+              <img src={clubLogoUrl} alt={clubName || "Logo"} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border border-border shadow-sm" />
             )}
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold font-display">{t("dashboard.title")}</h1>
-              <p className="text-muted-foreground mt-1">
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-3xl font-bold font-display truncate">{t("dashboard.title")}</h1>
+              <p className="text-xs md:text-sm text-muted-foreground mt-0.5 truncate">
                 {clubName ? t("dashboard.welcome", { name: clubName }) : t("dashboard.welcomeDefault")}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             {clubPlan && <PlanBadge plan={clubPlan} />}
-            <Button variant="hero" size="sm" asChild className="hidden sm:inline-flex">
-              <Link to="/matches/new"><Plus className="mr-1 h-4 w-4" /> {t("dashboard.newMatch")}</Link>
+            <Button variant="hero" size="sm" asChild>
+              <Link to="/matches/new"><Plus className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">{t("dashboard.newMatch")}</span><span className="sm:hidden">Neu</span></Link>
             </Button>
           </div>
         </div>
