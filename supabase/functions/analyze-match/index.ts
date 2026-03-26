@@ -428,7 +428,7 @@ KAMERA-PERSPEKTIVE ERKENNEN:
           },
         ],
         tool_choice: { type: "function", function: { name: "submit_analysis" } },
-      }),
+      })
     );
 
     // Retry logic for transient network errors (connection reset, timeout)
