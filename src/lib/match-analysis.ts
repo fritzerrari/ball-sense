@@ -365,3 +365,77 @@ export function deriveConcededGoalAnalysis(
     phaseSignals,
   };
 }
+
+/**
+ * Set-Piece Conversion: Calculate how many standards lead to goals within 2 minutes.
+ */
+export interface SetPieceConversion {
+  totalSetPieces: number;
+  goalsFromSetPieces: number;
+  conversionRate: number;
+  details: { type: string; minute: number; convertedToGoal: boolean }[];
+}
+
+export function deriveSetPieceConversion(events: MatchEventLite[], team: string = "home"): SetPieceConversion {
+  const setPieceTypes = ["corner", "free_kick"];
+  const setPieces = events.filter(
+    (e) => setPieceTypes.includes(e.event_type) && e.team === team
+  );
+  const goals = events.filter(
+    (e) => e.event_type === "goal" && e.team === team
+  );
+
+  const details = setPieces.map((sp) => {
+    const convertedToGoal = goals.some(
+      (g) => g.minute >= sp.minute && g.minute <= sp.minute + 2
+    );
+    return { type: sp.event_type, minute: sp.minute, convertedToGoal };
+  });
+
+  const goalsFromSetPieces = details.filter((d) => d.convertedToGoal).length;
+  return {
+    totalSetPieces: setPieces.length,
+    goalsFromSetPieces,
+    conversionRate: setPieces.length > 0 ? Math.round((goalsFromSetPieces / setPieces.length) * 100) : 0,
+    details,
+  };
+}
+
+/**
+ * Fatigue-Goal Correlation: Check if conceded goals cluster in fatigue phases.
+ */
+export interface FatigueGoalCorrelation {
+  concededInFatiguePhase: number;
+  totalConceded: number;
+  correlationPct: number;
+  isSignificant: boolean;
+  fatiguePhaseMinutes: number[];
+  concededMinutes: number[];
+}
+
+export function deriveFatigueGoalCorrelation(
+  events: MatchEventLite[],
+  fatiguePhases: number[] = [35, 40, 45, 75, 80, 85, 90], // typical fatigue windows
+): FatigueGoalCorrelation {
+  const concededGoals = events.filter(
+    (e) => e.event_type === "goal" && e.team === "away" ||
+           e.event_type === "conceded_goal"
+  );
+  const concededMinutes = concededGoals.map((e) => e.minute);
+  
+  const concededInFatiguePhase = concededMinutes.filter((min) =>
+    fatiguePhases.some((fp) => Math.abs(min - fp) <= 5)
+  ).length;
+
+  const totalConceded = concededGoals.length;
+  const correlationPct = totalConceded > 0 ? Math.round((concededInFatiguePhase / totalConceded) * 100) : 0;
+
+  return {
+    concededInFatiguePhase,
+    totalConceded,
+    correlationPct,
+    isSignificant: correlationPct > 50 && totalConceded >= 2,
+    fatiguePhaseMinutes: fatiguePhases,
+    concededMinutes,
+  };
+}
