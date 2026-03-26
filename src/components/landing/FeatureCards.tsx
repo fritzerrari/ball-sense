@@ -4,6 +4,7 @@ import {
   Smartphone, Brain, Shield, Users, Zap, FileText, Dumbbell, Share2,
   Sparkles, TrendingUp, AlertTriangle, MessageSquare, ArrowUp,
   ArrowRightLeft, Eye, Layers, Battery, Target, Camera, ChevronDown,
+  Radio, ScanLine, ClipboardEdit,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -34,13 +35,18 @@ export function FeatureCards() {
         },
         {
           icon: Camera,
-          title: de ? "4-Punkt-Kalibrierung" : "4-point calibration",
-          desc: de ? "Eckpunkte antippen, KI verifiziert das Spielfeld. Automatische Perspektivkorrektur." : "Tap corner points, AI verifies the pitch. Automatic perspective correction.",
+          title: de ? "Auto-Kalibrierung" : "Auto calibration",
+          desc: de ? "Die KI erkennt das Spielfeld automatisch im ersten Frame — kein manuelles Setup nötig." : "AI detects the pitch automatically in the first frame — no manual setup needed.",
         },
         {
           icon: Zap,
           title: de ? "Sofort einsatzbereit" : "Instant setup",
           desc: de ? "Kein Setup, keine Schulung. In 2 Minuten startklar." : "No setup, no training. Ready in 2 minutes.",
+        },
+        {
+          icon: Radio,
+          title: de ? "Walkie-Talkie" : "Walkie-Talkie",
+          desc: de ? "Push-to-Talk Kommunikation zwischen Trainer und Kameramann — direkt in der App." : "Push-to-talk communication between coach and camera operator — directly in the app.",
         },
       ],
     },
@@ -67,6 +73,9 @@ export function FeatureCards() {
         { icon: Dumbbell, title: de ? "KI-Trainingsplan" : "AI training plan", desc: de ? "Automatische Trainingsempfehlungen basierend auf Analyse und Schwächen." : "Automatic training recommendations based on analysis and weaknesses." },
         { icon: TrendingUp, title: de ? "Match-Trend-Dashboard" : "Match trend dashboard", desc: de ? "Formkurve über mehrere Spiele — wiederkehrende Muster auf einen Blick." : "Form curve across matches — recurring patterns at a glance." },
         { icon: Share2, title: de ? "Export & Teilen" : "Export & share", desc: de ? "PDF, WhatsApp, E-Mail, X — Berichte sofort exportieren und teilen." : "PDF, WhatsApp, email, X — export and share reports instantly." },
+        { icon: Brain, title: de ? "KI-Spielvorbereitung" : "AI match preparation", desc: de ? "Automatischer Matchplan mit Formations-Empfehlung, Gegner-Warnungen und Aufstellungs-Tipps." : "Automatic match plan with formation recommendations, opponent warnings and lineup tips." },
+        { icon: ScanLine, title: de ? "Spielbericht-Scan" : "Match report scan", desc: de ? "Spielbericht abfotografieren und Events automatisch per KI nacherfassen." : "Photo-scan a match report and auto-import events via AI." },
+        { icon: ClipboardEdit, title: de ? "Event-Nacherfassung" : "Post-match events", desc: de ? "Events nach dem Spiel manuell nachtragen oder korrigieren." : "Manually add or correct events after the match." },
       ],
     },
     {

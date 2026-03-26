@@ -19,9 +19,9 @@ const EVENT_BUTTONS = [
   { type: "shot_on_target" as const, label: "Chance", icon: "⚡" },
   { type: "yellow_card" as const, label: "Gelb", icon: "🟡" },
   { type: "red_card" as const, label: "Rot", icon: "🔴" },
+  { type: "substitution" as const, label: "Wechsel", icon: "🔄" },
   { type: "corner" as const, label: "Ecke", icon: "📐" },
   { type: "foul" as const, label: "Foul", icon: "🦵" },
-  { type: "offside" as const, label: "Abseits", icon: "🚩" },
   { type: "free_kick" as const, label: "Freistoß", icon: "🎯" },
 ] as const;
 

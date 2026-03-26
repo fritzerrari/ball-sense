@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import PostMatchEventEditor from "@/components/PostMatchEventEditor";
 import { useMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -201,6 +202,7 @@ export default function MatchReport() {
           <div className="flex-1 min-w-0">
             <p className="text-xs text-muted-foreground">Match Report</p>
           </div>
+          {id && <PostMatchEventEditor matchId={id} onEventsChanged={loadReportData} />}
           <Button variant="outline" size="sm" onClick={handleReprocess} disabled={reprocessing || !!isProcessing} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${reprocessing ? "animate-spin" : ""}`} />
             Neu analysieren

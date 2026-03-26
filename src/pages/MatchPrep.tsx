@@ -321,10 +321,21 @@ export default function MatchPrep() {
           <Card className="py-12 text-center">
             <CardContent>
               <Brain className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-              <h2 className="font-semibold font-display text-lg">Erste Spielvorbereitung</h2>
+              <h2 className="font-semibold font-display text-lg">
+                {(recentOpponents ?? []).length === 0 ? "Noch keine Spieldaten" : "Erste Spielvorbereitung"}
+              </h2>
               <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-                Gib den nächsten Gegner ein und lass dir einen datenbasierten Matchplan generieren — basierend auf eurer Gegner-Historie und aktueller Teamform.
+                {(recentOpponents ?? []).length === 0
+                  ? "Erstelle zuerst mindestens ein Spiel mit Gegner, damit die KI auf Daten zurückgreifen kann. Die Spielvorbereitung basiert auf deiner Spielhistorie und Gegner-Profilen."
+                  : "Gib den nächsten Gegner ein und lass dir einen datenbasierten Matchplan generieren — basierend auf eurer Gegner-Historie und aktueller Teamform."}
               </p>
+              {(recentOpponents ?? []).length === 0 && (
+                <Link to="/matches/new">
+                  <Button variant="hero" size="sm" className="mt-4 gap-2">
+                    <Swords className="h-4 w-4" /> Erstes Spiel anlegen
+                  </Button>
+                </Link>
+              )}
             </CardContent>
           </Card>
         )}
