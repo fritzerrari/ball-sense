@@ -1,119 +1,132 @@
 
 
-# Kamera-Cleanup, Profi-PDF-Export & Taktik-Generator
+# Fix-Plan: Preview, 2. Halbzeit, System-Hardening + Tennis-Remix-Prompt
 
-## 1. Automatisches Cleanup: Kamera-Sessions nach Analyse loeschen
+## Probleme identifiziert
 
-**Problem**: `camera_access_sessions` sammeln sich an — werden nie geloescht.
+1. **Preview fehlt sporadisch**: `registerSW({ immediate: true })` in `main.tsx` registriert aggressiv einen Service Worker, der im Preview-Host stale Content cached und 401er auf `manifest.json` verursacht.
 
-**Loesung**: In `generate-insights/index.ts` nach erfolgreichem Abschluss (wo bereits Frames geloescht werden) auch die abgelaufenen Camera-Sessions fuer dieses Match loeschen:
+2. **2. Halbzeit geht verloren** (2 Root Causes):
+   - **Root Cause A**: `generate-insights` setzt nach JEDER Analyse (auch H1-Zwischenanalyse) den Match-Status auf `"done"` (Zeile 444) und löscht Frames, Sessions und Codes (Zeilen 465-499). Wenn H1 die Pipeline triggert, wird alles aufgeräumt bevor H2 überhaupt starten kann.
+   - **Root Cause B**: `uploadDirect` (authentifizierter User) schreibt `_h1.json` / `_h2.json` separat, aktualisiert aber NICHT die kanonische `${matchId}.json`. Wenn `analyze-match` für H2 läuft, fehlt H1 in den Inline-Frames und die kanonische Datei existiert nicht → nur H2 wird analysiert.
 
-```sql
-DELETE FROM camera_access_sessions WHERE match_id = X
+3. **`uploadDirect` sendet Inline-Frames**: Statt `analyze-match` die kanonische Datei laden zu lassen, werden Frames inline gesendet. Das ist inkonsistent mit dem Helper-Flow (camera-ops), der seit dem letzten Fix keine Inline-Frames mehr sendet.
+
+---
+
+## Umsetzung
+
+### Schritt 1: Preview-Stabilität (`src/main.tsx`)
+- PWA-Registrierung nur ausführen wenn NICHT im Preview-Host (`id-preview--` in hostname).
+- Verhindert SW-Interferenz in der Lovable-Preview.
+
+### Schritt 2: Cleanup nur bei Final-Analyse (`supabase/functions/generate-insights/index.ts`)
+- **Job-Kind prüfen**: Vor dem Cleanup den `job_kind` des aktuellen Jobs laden. Nur bei `job_kind = 'final'` oder wenn `recording_ended_at` gesetzt ist:
+  - Match auf `"done"` setzen
+  - Frames löschen
+  - Sessions/Codes aufräumen
+- Bei `live_partial` oder H1-Zwischenanalyse (kein `recording_ended_at`):
+  - Job auf `complete` setzen
+  - Match-Status NICHT auf `"done"` → bleibt auf `"processing"`
+  - KEIN Cleanup
+
+### Schritt 3: `uploadDirect` kanonische Datei pflegen (`src/pages/CameraTrackingPage.tsx`)
+- Nach dem Upload von `_h1.json` oder `_h2.json`: auch die kanonische `${matchId}.json` aktualisieren (bestehende Frames laden + neue anhängen, analog zu `updateCanonicalFrameFile` in camera-ops).
+- Inline-Frames NICHT mehr an `analyze-match` senden (wie im Helper-Flow). `analyze-match` lädt automatisch aus Storage.
+- `job_kind: "final"` nur bei Stop (Ende Spiel) setzen, bei H1 als Zwischenanalyse kennzeichnen.
+
+### Schritt 4: Job-Kind-Konsistenz
+- `uploadDirect` bei H1-Upload: `job_kind` auf `"h1_intermediate"` setzen (nicht `"final"`).
+- `uploadDirect` bei finalem Stop: `job_kind` auf `"final"` setzen.
+- `generate-insights` prüft `job_kind` und entscheidet Cleanup-Verhalten.
+
+---
+
+## Technische Details
+
+### `src/main.tsx`
+```text
+if (!window.location.hostname.includes("id-preview--")) {
+  registerSW({ immediate: true, ... });
+}
 ```
 
-Ebenso `tracking_uploads` auf `status = 'processed'` setzen und alte `camera_access_codes` mit `active = false` markieren wenn keine offenen Matches mehr existieren.
+### `generate-insights/index.ts` (Zeilen 436-499)
+```text
+// Job-Kind laden
+const { data: currentJob } = await supabase
+  .from("analysis_jobs")
+  .select("job_kind")
+  .eq("id", job_id)
+  .single();
 
-**Datei**: `supabase/functions/generate-insights/index.ts` — ca. 5 Zeilen nach dem Frame-Cleanup ergaenzen.
+const isFinalJob = currentJob?.job_kind === "final";
+const { data: matchTiming } = await supabase
+  .from("matches")
+  .select("recording_ended_at")
+  .eq("id", match_id)
+  .single();
+const isMatchFinished = !!matchTiming?.recording_ended_at;
+const shouldCleanup = isFinalJob || isMatchFinished;
 
----
+// Match-Status nur bei Final
+if (shouldCleanup) {
+  await supabase.from("matches").update({ status: "done" }).eq("id", match_id);
+  // ... Cleanup Frames, Sessions, Codes
+} else {
+  // Zwischenanalyse: Match bleibt auf "processing"
+}
+```
 
-## 2. Professioneller PDF-Export (Edge Function)
-
-**Neue Edge Function**: `supabase/functions/generate-pdf-report/index.ts`
-
-### Konzept
-Eine Edge Function die alle Report-Daten (Sections, Insights, Training, Taktik) aus der DB laedt und ein strukturiertes Markdown-Dokument generiert, das client-seitig als professionelles PDF gedruckt wird.
-
-### Ablauf
-1. Frontend ruft Edge Function auf mit `matchId` + `reportType` (full_report | training_plan | match_prep | halftime_tactics)
-2. Function laedt alle relevanten Daten (report_sections, training_recommendations, analysis_results, match_events, team_match_stats)
-3. KI (Lovable AI) generiert ein druckoptimiertes HTML-Dokument mit:
-   - **Deckblatt** mit Vereinsname, Gegner, Datum, Logo-Platzhalter
-   - **Inhaltsverzeichnis**
-   - **Executive Summary** auf einer Seite
-   - **Taktische Analyse** mit Seitenumbruechen zwischen Sektionen
-   - **Spieler-Bewertungen** als Tabelle
-   - **Trainingsplan** mit Wochenstruktur
-   - **Notiz-Bereich** (leere linierte Flaeche am Ende jeder Sektion)
-   - CSS Print-Styles: `@page`, `page-break-before`, professionelle Typografie
-4. Frontend oeffnet HTML in neuem Tab und triggert `window.print()` → PDF
-
-### Report-Typen
-| Typ | Inhalt |
-|---|---|
-| `full_report` | Kompletter Nachbericht mit allen Sektionen |
-| `training_plan` | Nur Trainingsempfehlungen + Mikrozyklus |
-| `match_prep` | Gegner-Analyse + Taktik-Empfehlung + Formation |
-| `halftime_tactics` | Halbzeit-Anpassungen + 2. HZ Taktik-Vorschlag |
-
-### PDF-Layout (CSS Print)
-- A4-Format, 20mm Margins
-- Vereinsfarben als Akzent (Header-Linie)
-- Saubere Seitenumbrueche (`page-break-before: always` vor jeder Hauptsektion)
-- Tabellen fuer Spielerdaten mit alternierenden Zeilen
-- Grafiken als Unicode-Balken (▓░) fuer Metriken
-- Notizbereich: gepunktete Linien mit "Eigene Notizen:" Header
-- Footer mit Seitenzahlen und "Generiert mit FieldIQ"
-
-**Dateien**: 
-- `supabase/functions/generate-pdf-report/index.ts` (NEU)
-- `supabase/config.toml` (Function-Config)
+### `CameraTrackingPage.tsx` — `uploadDirect`
+```text
+// 1. Upload phase-spezifische Datei (_h1, _h2, full)
+// 2. Kanonische Datei aktualisieren (merge)
+// 3. analyze-match OHNE inline frames aufrufen
+// 4. job_kind = phaseStr === "h1" ? "h1_intermediate" : "final"
+```
 
 ---
 
-## 3. PDF-Download-Buttons im Frontend
+## Tennis-Remix-Prompt
 
-**MatchReport.tsx**: Download-Dropdown im Header mit:
-- "Kompletter Report (PDF)"
-- "Trainingsplan (PDF)"
-- "Gegner-Briefing (PDF)"
+Hier ist der Prompt, den du in einem Remix des Projekts verwenden kannst:
 
-**MatchPrep Page**: "Vorbereitung als PDF" Button
-
-**Implementierung**: Eine `usePdfExport` Hook-Funktion die die Edge Function aufruft, das HTML empfaengt und per `window.open` + `print()` als PDF ausgibt.
-
-**Dateien**:
-- `src/hooks/use-pdf-export.ts` (NEU)
-- `src/pages/MatchReport.tsx` (Download-Buttons ergaenzen)
-- `src/pages/MatchPrep.tsx` (Download-Button)
-
----
-
-## 4. Halbzeit-Taktik & Gegner-Taktik-Generator
-
-**Problem**: Trainer wollen konkrete taktische Vorschlaege fuer die 2. Halbzeit oder den naechsten Gegner.
-
-**Loesung**: Der `generate-pdf-report` Endpoint mit `reportType = "halftime_tactics"` generiert:
-
-- **2. Halbzeit Taktik** (wenn Match-Status "live" oder "halftime"):
-  - Formations-Empfehlung basierend auf 1. HZ Analyse
-  - Konkrete Wechselvorschlaege (basierend auf Ermuedung + Performance)
-  - 3 taktische Anpassungen (z.B. "Pressing-Linie 10m hoeher", "Aussenverteidiger offensiver")
-  - Gegner-Schwachstellen die in 1. HZ aufgefallen sind
-
-- **Naechster Gegner** (wenn Match done + Gegner bekannt):
-  - Nutzt `match-preparation` Daten
-  - Optimale Formation gegen diesen Gegner
-  - Do/Don't Liste
-  - Set-Piece-Strategie
-
-Beide nutzen den bestehenden `match-preparation` Flow + eigene Analyse-Daten als KI-Kontext.
-
-**Datei**: Integriert in `generate-pdf-report/index.ts` (reportType-Switch)
+> **Prompt für Lovable (Tennis-Umbau):**
+>
+> Dieses Projekt ist ein KI-gestütztes Fußball-Analyse-Tool (FieldIQ). Ich möchte es komplett auf **Tennis** umbauen. Bitte folgende Änderungen durchführen:
+>
+> 1. **Branding**: App-Name von "FieldIQ" auf "CourtIQ" (oder ähnlich) ändern. Alle Referenzen in Landing Page, Manifest, Meta-Tags, Footer anpassen. Farbschema auf Tennis-typisch (Grün/Weiß/Gelb) umstellen.
+>
+> 2. **Spiellogik**: Matches haben keine Halbzeiten sondern **Sätze** (Sets) und **Games**. Ersetze `h1_started_at/h1_ended_at/h2_started_at/h2_ended_at` durch `sets`-Array mit Start/End-Zeiten. Ein Match hat 2-3 Sätze (Best of 3) oder 3-5 (Best of 5). Spielstand-Tracking: Games und Punkte (0, 15, 30, 40, Deuce, Advantage).
+>
+> 3. **Event-Typen**: Ersetze Fußball-Events (goal, card, foul, corner, offside, freekick, substitution, penalty) durch Tennis-Events: **ace, double_fault, winner, unforced_error, break_point, break, set_won, challenge, medical_timeout**. Passe `MatchEventQuickBar` entsprechend an.
+>
+> 4. **Analyse-Prompts**: Alle KI-Prompts in `analyze-match` und `generate-insights` Edge Functions auf Tennis umschreiben. Statt Formationen/Pressing/Ballbesitz analysiere: **Aufschlagquote, Return-Qualität, Netzangriffe, Laufwege, Platzabdeckung, Fehlerverteilung (Vorhand/Rückhand), Serve-and-Volley-Frequenz, Breakpoint-Conversion**. Taktische Grades: serve, return, net_play, baseline, mental_strength, fitness statt pressing/build_up/etc.
+>
+> 5. **Spielfeld-Visualisierung**: Ersetze das Fußballfeld (grünes Rechteck mit Mittelkreis/Strafraum) durch ein **Tennisfeld** (Court-Linien, Netz, Service-Boxen, Grundlinie). Passe `TacticalReplayField`, `HeatmapField`, `PassDirectionMap` an Tennis-Court-Geometrie an. Nur 2 Spieler (Singles) oder 4 (Doubles) statt 22.
+>
+> 6. **Formations entfernen**: Tennis hat keine Formationen. Entferne `FormationTimeline`, `formation_timeline` aus der Analyse. Ersetze durch **Positionierungs-Analyse**: Grundlinienposition, Netzposition, Aufschlagposition.
+>
+> 7. **Trainingsempfehlungen**: Statt Mannschaftstaktik → individuelle Trainingseinheiten: Aufschlagtraining, Return-Drills, Netzspiel-Übungen, Kondition, mentale Stärke.
+>
+> 8. **Gegner-DNA**: Statt possession_control/pressing_intensity → **serve_power, return_depth, net_approach_frequency, baseline_consistency, mental_resilience, fitness_level**.
+>
+> 9. **Datenbank**: Passe die `matches`-Tabelle an (Satz-Ergebnisse statt Halbzeiten, `sport_type = 'tennis'`). `players`-Tabelle: Position-Feld entfernen (oder auf "Singles"/"Doubles" ändern). Team-Konzept optional entfernen oder auf "Spieler" umstellen.
+>
+> 10. **Kamera-Tracking**: Aufnahme-Flow beibehalten, aber Satz-Pausen statt Halbzeit-Pause. Frame-Analyse soll Spielerposition auf dem Court erkennen (nur 2-4 Personen + Schiedsrichter).
+>
+> 11. **Landing Page**: Alle Fußball-Bilder und -Texte durch Tennis-Inhalte ersetzen. Features beschreiben: "Analysiere dein Tennismatch mit KI", "Aufschlag-Statistiken", "Gegner-Scouting für Tennis".
+>
+> 12. **Sprache**: Alle deutschen UI-Texte beibehalten, aber Fußball-Terminologie durch Tennis ersetzen (z.B. "Tor" → "Ass", "Ecke" → "Breakball", "Trainer" → "Coach/Spieler").
 
 ---
 
 ## Zusammenfassung Dateien
 
-| Datei | Aenderung |
+| Datei | Änderung |
 |---|---|
-| `supabase/functions/generate-insights/index.ts` | Camera-Sessions + Codes Cleanup nach Analyse |
-| `supabase/functions/generate-pdf-report/index.ts` | **NEU** — PDF-Report-Generator Edge Function |
-| `supabase/config.toml` | Function-Config fuer generate-pdf-report |
-| `src/hooks/use-pdf-export.ts` | **NEU** — Hook fuer PDF-Export |
-| `src/pages/MatchReport.tsx` | PDF-Download-Buttons im Header |
-| `src/pages/MatchPrep.tsx` | PDF-Download-Button |
-
-Keine DB-Migration noetig.
+| `src/main.tsx` | PWA nur außerhalb Preview registrieren |
+| `supabase/functions/generate-insights/index.ts` | Cleanup nur bei `final` Job / Match beendet |
+| `src/pages/CameraTrackingPage.tsx` | Kanonische Datei pflegen, keine Inline-Frames, job_kind differenzieren |
 
