@@ -1,106 +1,72 @@
 
 
-# Hyper-Professional Coaching Cockpit -- Complete Upgrade
+# Stabilisierung & Feature-Erweiterungen
 
-## What I Found
+## Probleme und Fixes
 
-The analysis pipeline WORKS (4 frames analyzed, insights generated, report sections stored). But the output is mediocre:
-- Generic insights like "Zentrum als Kampfzone" without actionable depth
-- Flat card-list layout -- no visual hierarchy, no drama, no cockpit feel
-- No match rating, no tactical grades, no momentum visualization
-- Coaching conclusions are text-only paragraphs
-- Missing: comparative gauges, risk scores, drill-down interactions, executive scorecards
+### 1. PWA-Installationshinweis trotz installierter App
+**Problem**: `Login.tsx` zeigt den Install-Screen basierend auf `isMobile && !isStandalone && !installSkipped`. Aber `isStandalone` wird nur einmal beim Mount gecheckt. Wenn der User die App bereits installiert hat und sie im Browser oeffnet, sieht er trotzdem den Screen. Zusaetzlich: `sessionStorage` wird bei jedem neuen Tab zurueckgesetzt.
 
-## The Upgrade Plan
+**Fix**: 
+- `isStandalone` Check ist korrekt (prueft `display-mode: standalone`). Wenn die App installiert ist und der User sie OEffnet, ist `isStandalone = true` — das funktioniert.
+- Das eigentliche Problem: Wenn der User die App im Browser oeffnet (nicht ueber die installierte PWA), wird der Hinweis erneut gezeigt weil `sessionStorage` pro Session ist.
+- Fix: `localStorage` statt `sessionStorage` fuer `pwa-install-skipped`, mit 30-Tage-Ablauf. Plus: Wenn App bereits installiert ist (`isStandalone`), zeige stattdessen 3 grosse Buttons: **Kamera**, **Login**, **Registrierung**.
 
-### 1. Massively Improved AI Prompt (generate-insights)
+**Datei**: `src/pages/Login.tsx`
 
-The current prompt is too generic. New prompt will demand:
+### 2. Match Events werden in der Analyse ignoriert
+**Problem**: `generate-insights` fetcht KEINE `match_events`. Die manuell erfassten Tore, Karten, Ecken werden nirgendwo in die KI-Analyse eingespeist.
 
-- **Match Rating** (1-10 scale with sub-scores for offense, defense, transitions, discipline)
-- **Tactical Grade Card** (A-F grades for 6 dimensions: pressing, build-up, final third, defensive shape, transitions, set pieces)
-- **Momentum Phases** with minute-by-minute momentum scores (-100 to +100) for visualization
-- **Risk Matrix** identifying specific vulnerabilities with severity + urgency scores
-- **Player Spotlight** (MVP + concern player with reasoning)
-- **Opponent DNA Profile** (play style fingerprint: possession-based? counter? press-heavy?)
-- **Concrete Next-Match Actions** (3 "do" + 3 "don't" for the next match)
-- **Training Week Plan** (not just exercises, but a 3-session micro-cycle with session goals)
+**Fix**: In `generate-insights/index.ts` vor dem AI-Call die `match_events` aus der DB laden und als zusaetzlichen Kontext mitgeben. Die Events enthalten: Tore, Torschuesse, Karten, Ecken — mit Minute und Team.
 
-Updated tool schema will capture all these structured fields.
+**Datei**: `supabase/functions/generate-insights/index.ts`
 
-### 2. Cockpit-Grade Match Report UI (MatchReport.tsx)
+### 3. Spielererkennung verbessern (flexible Teamgroessen)
+**Problem**: Der Prompt in `analyze-match` geht implizit von 11v11 aus. Bei 3v3, 5v5, 7v7 oder Trainingsspielen werden zu wenig oder zu viele Spieler erkannt. Schiedsrichter und Linienrichter werden mitgezaehlt.
 
-Complete visual overhaul:
+**Fix**: Prompt in `analyze-match/index.ts` erweitern:
+- Explizit anweisen: "Zaehle KEINE Schiedsrichter, Linienrichter oder andere Offizielle (typisch: schwarze Kleidung, isolierte Position)."
+- "Das Spielformat ist unbekannt. Erkenne die tatsaechliche Anzahl Spieler pro Team (3v3 bis 11v11). Melde die erkannte Teamgroesse."
+- Neues Feld `team_size_detected` im Schema (z.B. `{ home: 7, away: 7 }`)
+- "Wenn weniger Spieler sichtbar sind als erwartet, schaetze aufgrund der Formation und des sichtbaren Feldausschnitts die wahrscheinliche Gesamtzahl."
 
-**A. Hero Scorecard Header**
-- Full-width gradient header with match rating (large animated number), team logos, date
-- Sub-score gauges (offense/defense/transition) as radial progress rings
-- Tactical grade badges (A-F) in a horizontal strip
+**Datei**: `supabase/functions/analyze-match/index.ts`
 
-**B. Momentum Timeline**
-- Full-width area chart showing momentum flow across the match
-- Color-coded: green (home dominance) to red (away pressure)
-- Key events overlaid as markers (goals, substitutions, tactical shifts)
+### 4. Kamera-Orientierung erkennen
+**Problem**: Der Prompt fragt nicht nach der Kameraausrichtung (quer, laengs, schraeg). Das beeinflusst die Koordinaten-Interpretation massiv.
 
-**C. Tactical Grade Matrix**
-- 6-cell grid with A-F grades, each with color coding (A=emerald, F=red)
-- Click to expand with detailed explanation
-- Animated entrance with staggered delays
+**Fix**: Prompt erweitern mit:
+- "Erkenne die Kamera-Perspektive: Ist die Kamera QUER (Seitenansicht, typisch Mittellinie), LAENGS (hinter dem Tor), SCHRAEG (Eckfahne), oder TEILAUSSCHNITT (nur ein Bereich)? Dies bestimmt wie x/y Koordinaten zu interpretieren sind."
+- Neues Schema-Feld `camera_perspective` mit `{ orientation: "landscape_side" | "landscape_behind_goal" | "diagonal" | "partial", coverage_description: "...", estimated_pitch_coverage_pct: number }`
+- Der Insights-Prompt muss die Perspektive bei Positionsberechnungen beruecksichtigen.
 
-**D. Risk Radar**
-- Visual risk indicators with severity bars
-- Each risk links to relevant training recommendation
-- Urgency badges (immediate / next week / monitor)
+**Datei**: `supabase/functions/analyze-match/index.ts`
 
-**E. Player Spotlight Cards**
-- MVP card with glow effect and key stats
-- Concern player card with warning styling
-- Direct link to player profile
+### 5. Kamera-Code als direkter Deep-Link
+**Problem**: Aktuell wird der Code per WhatsApp mit einem Link zu `/camera` geteilt. Der Helfer muss den Code manuell eintippen.
 
-**F. Opponent DNA Fingerprint**
-- Radar/spider chart showing opponent play style dimensions
-- Next-match "Do / Don't" list with checkmark/x icons
+**Fix**: 
+- Code-Share URL aendern zu: `https://ball-sense.lovable.app/camera?code=XXXXXX`
+- In `CameraCodeEntry.tsx`: URL-Parameter `code` auslesen und automatisch submitten
+- In `CameraCodeShare.tsx`: WhatsApp-Link und Kopier-Funktion aktualisieren
 
-**G. Training Micro-Cycle**
-- 3-session timeline with session goals, drills, and linked patterns
-- Visual progression (recovery -> intensity -> tactical)
+**Dateien**: `src/components/CameraCodeShare.tsx`, `src/components/CameraCodeEntry.tsx`
 
-**H. Enhanced Existing Components**
-- Pressing chart, transitions, pass map stay but get glass-card styling
-- Section transitions with subtle animations
-- Collapsible sections for information density control
+### 6. Fehlercheck: `training_recommendations` Tabelle
+**Problem**: `generate-insights` macht `DELETE` und `INSERT` auf `training_recommendations`, aber die RLS-Policies erlauben nur `SELECT` fuer Club-Members. Der Service-Role-Key umgeht RLS, also funktioniert es serverseitig — aber pruefen ob die Tabelle korrekt existiert.
 
-### 3. New Components to Create
+**Status**: Tabelle existiert (Migration gefunden), Service-Role-Key wird verwendet — kein Problem.
 
-| Component | Purpose |
+## Implementation (6 Dateien)
+
+| Datei | Aenderung |
 |---|---|
-| `MatchScorecard.tsx` | Hero header with rating, grades, sub-scores |
-| `MomentumTimeline.tsx` | Full-width momentum area chart |
-| `TacticalGradeMatrix.tsx` | 6-cell A-F grade grid |
-| `RiskRadar.tsx` | Vulnerability matrix with severity |
-| `PlayerSpotlight.tsx` | MVP + concern player cards |
-| `OpponentDNA.tsx` | Spider chart + do/don't list |
-| `TrainingMicroCycle.tsx` | 3-session training week plan |
+| `src/pages/Login.tsx` | localStorage statt sessionStorage; installierte App: 3 Buttons statt Install-Screen |
+| `supabase/functions/generate-insights/index.ts` | match_events laden und als Kontext an AI uebergeben |
+| `supabase/functions/analyze-match/index.ts` | Prompt: flexible Teamgroesse, Schiri-Ausschluss, Kamera-Orientierung, neue Schema-Felder |
+| `src/components/CameraCodeShare.tsx` | Deep-Link mit Code in URL, WhatsApp-Text aktualisieren |
+| `src/components/CameraCodeEntry.tsx` | URL-Parameter `code` auslesen und auto-submit |
+| `src/components/MobileInstallFab.tsx` | Konsistenz mit neuem localStorage-Ansatz |
 
-### 4. Files Modified
-
-| File | Change |
-|---|---|
-| `supabase/functions/generate-insights/index.ts` | Completely rewritten prompt + expanded tool schema for richer output |
-| `src/pages/MatchReport.tsx` | Complete layout overhaul with new component composition |
-| 7 new components above | New files |
-| `src/components/PressingChart.tsx` | Glass-card styling upgrade |
-| `src/components/TransitionAnalysis.tsx` | Glass-card styling upgrade |
-| `src/components/PassDirectionMap.tsx` | Glass-card styling upgrade |
-
-### 5. No Database Migration Needed
-
-All new data fits into existing `report_sections.content` (JSON strings) and `analysis_results.data` (jsonb). The AI output gets richer but storage stays the same.
-
-### 6. Implementation Order
-
-1. Upgrade `generate-insights` prompt + schema (the brain)
-2. Create 7 new cockpit components (the visuals)
-3. Rewrite `MatchReport.tsx` layout (the composition)
-4. Style upgrades for existing components
+Keine DB-Migration noetig.
 
