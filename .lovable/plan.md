@@ -1,86 +1,119 @@
 
 
-# Match Report Redesign: Wow-Effekt, Interaktivitaet & besseres Tactical Replay
+# Kamera-Cleanup, Profi-PDF-Export & Taktik-Generator
 
-## Probleme (Screenshot + Feedback)
+## 1. Automatisches Cleanup: Kamera-Sessions nach Analyse loeschen
 
-1. **Tactical Replay**: Zu wenige Spieler (oft nur 5-8 statt 22), langsam, Positionen ungenau
-2. **Report-Layout**: Alles auf einer langen Seite — kein klarer Einstieg, keine Hierarchie
-3. **Zu komplex**: Trainer wollen schnelle Antworten, nicht 15 Karten durchscrollen
-4. **Fehlende Interaktivitaet**: Kein Drill-down von Uebersicht → Detail
+**Problem**: `camera_access_sessions` sammeln sich an — werden nie geloescht.
 
----
+**Loesung**: In `generate-insights/index.ts` nach erfolgreichem Abschluss (wo bereits Frames geloescht werden) auch die abgelaufenen Camera-Sessions fuer dieses Match loeschen:
 
-## Loesung: "Summary-First" mit Drill-Down Tabs
-
-### Neues Layout-Konzept
-
-```text
-┌─────────────────────────────────────────┐
-│  HERO SCORECARD (Rating + Ergebnis)     │
-├─────────────────────────────────────────┤
-│  3 QUICK-ACTION CARDS (klickbar)        │
-│  ┌──────┐ ┌──────┐ ┌──────┐            │
-│  │Top 3 │ │Sofort│ │Naech-│            │
-│  │Stärk.│ │fixen │ │stes  │            │
-│  └──────┘ └──────┘ │Spiel │            │
-│                     └──────┘            │
-├─────────────────────────────────────────┤
-│  TAB-NAVIGATION                         │
-│  [Uebersicht] [Taktik] [Spieler]        │
-│  [Gegner] [Training]                    │
-├─────────────────────────────────────────┤
-│  TAB-INHALT (je nach Auswahl)           │
-└─────────────────────────────────────────┘
+```sql
+DELETE FROM camera_access_sessions WHERE match_id = X
 ```
 
-**Tab-Inhalte:**
-- **Uebersicht**: Executive Summary + Momentum + Tactical Grades + Key Insights
-- **Taktik**: Pressing, Formationen, Passrichtung, Transitions, Tactical Replay, Heatmap
-- **Spieler**: MVP/Sorgenspieler, Ermuedung, Spieler-Vergleich
-- **Gegner**: Opponent DNA (Radar), Do/Don't, Scout-Report, Historie
-- **Training**: Mikrozyklus, Trainingsempfehlungen, Risiko-Matrix
+Ebenso `tracking_uploads` auf `status = 'processed'` setzen und alte `camera_access_codes` mit `active = false` markieren wenn keine offenen Matches mehr existieren.
 
-### Quick-Action Cards (NEU — der Wow-Faktor)
-
-Drei grosse, animierte Karten direkt unter dem Scorecard:
-
-1. **"Top 3 Staerken"** — gruene Karte, 3 Bullet-Points aus den Insights mit hoechstem Impact-Score
-2. **"Sofort verbessern"** — rote Karte, 3 dringendste Risiken (urgency=immediate)
-3. **"Spielplan fuers naechste Spiel"** — blaue Karte, Do-Actions kompakt
-
-Jede Karte ist klickbar und springt zum relevanten Tab.
+**Datei**: `supabase/functions/generate-insights/index.ts` — ca. 5 Zeilen nach dem Frame-Cleanup ergaenzen.
 
 ---
 
-## Tactical Replay Upgrade
+## 2. Professioneller PDF-Export (Edge Function)
 
-### Problem: Zu wenige Spieler
-Die KI liefert nur die erkannten Spieler (oft 8-12 von 22). Die restlichen fehlen komplett.
+**Neue Edge Function**: `supabase/functions/generate-pdf-report/index.ts`
 
-### Loesung: Intelligentes Auffuellen + Jersey-Nummern
-- **Mindestens 11 pro Team erzwingen**: Wenn weniger als 11 Spieler pro Team im Frame, fuelle mit "Ghost-Playern" auf Basis der erkannten Formation (z.B. wenn 4-3-3 erkannt, setze fehlende Positionen an typische Koordinaten)
-- **Ghost-Spieler**: Halbdurchsichtig (opacity 0.4), gepunktet umrandet — klar als "geschaetzt" markiert
-- **Jersey-Nummern**: Wenn vorhanden, als kleine Zahl im Kreis anzeigen
-- **Trails**: Kurze Bewegungslinien (letzte 3 Frames) hinter jedem Spieler fuer Dynamik-Gefuehl
-- **Ball-Trail**: Gestrichelte Linie fuer Ballbewegung
-- **Groesserer Darstellungsbereich**: Von `aspect-[105/68]` Card zu einem prominenteren Full-Width-Element
-- **Szenen-Leiste**: Klickbare Szenen-Thumbnails mit Vorschau-Text (statt nur kleine Pills)
+### Konzept
+Eine Edge Function die alle Report-Daten (Sections, Insights, Training, Taktik) aus der DB laedt und ein strukturiertes Markdown-Dokument generiert, das client-seitig als professionelles PDF gedruckt wird.
 
-### Aenderung im Analyse-Prompt
-Im `analyze-match` Edge Function: Explizit 22 Spieler pro Frame anfordern (11 home + 11 away). Wenn nicht alle erkennbar, soll die KI Schaetzpositionen basierend auf Formation und Spielsituation liefern, mit einem `estimated: true` Flag.
+### Ablauf
+1. Frontend ruft Edge Function auf mit `matchId` + `reportType` (full_report | training_plan | match_prep | halftime_tactics)
+2. Function laedt alle relevanten Daten (report_sections, training_recommendations, analysis_results, match_events, team_match_stats)
+3. KI (Lovable AI) generiert ein druckoptimiertes HTML-Dokument mit:
+   - **Deckblatt** mit Vereinsname, Gegner, Datum, Logo-Platzhalter
+   - **Inhaltsverzeichnis**
+   - **Executive Summary** auf einer Seite
+   - **Taktische Analyse** mit Seitenumbruechen zwischen Sektionen
+   - **Spieler-Bewertungen** als Tabelle
+   - **Trainingsplan** mit Wochenstruktur
+   - **Notiz-Bereich** (leere linierte Flaeche am Ende jeder Sektion)
+   - CSS Print-Styles: `@page`, `page-break-before`, professionelle Typografie
+4. Frontend oeffnet HTML in neuem Tab und triggert `window.print()` → PDF
+
+### Report-Typen
+| Typ | Inhalt |
+|---|---|
+| `full_report` | Kompletter Nachbericht mit allen Sektionen |
+| `training_plan` | Nur Trainingsempfehlungen + Mikrozyklus |
+| `match_prep` | Gegner-Analyse + Taktik-Empfehlung + Formation |
+| `halftime_tactics` | Halbzeit-Anpassungen + 2. HZ Taktik-Vorschlag |
+
+### PDF-Layout (CSS Print)
+- A4-Format, 20mm Margins
+- Vereinsfarben als Akzent (Header-Linie)
+- Saubere Seitenumbrueche (`page-break-before: always` vor jeder Hauptsektion)
+- Tabellen fuer Spielerdaten mit alternierenden Zeilen
+- Grafiken als Unicode-Balken (▓░) fuer Metriken
+- Notizbereich: gepunktete Linien mit "Eigene Notizen:" Header
+- Footer mit Seitenzahlen und "Generiert mit FieldIQ"
+
+**Dateien**: 
+- `supabase/functions/generate-pdf-report/index.ts` (NEU)
+- `supabase/config.toml` (Function-Config)
 
 ---
 
-## Dateien
+## 3. PDF-Download-Buttons im Frontend
+
+**MatchReport.tsx**: Download-Dropdown im Header mit:
+- "Kompletter Report (PDF)"
+- "Trainingsplan (PDF)"
+- "Gegner-Briefing (PDF)"
+
+**MatchPrep Page**: "Vorbereitung als PDF" Button
+
+**Implementierung**: Eine `usePdfExport` Hook-Funktion die die Edge Function aufruft, das HTML empfaengt und per `window.open` + `print()` als PDF ausgibt.
+
+**Dateien**:
+- `src/hooks/use-pdf-export.ts` (NEU)
+- `src/pages/MatchReport.tsx` (Download-Buttons ergaenzen)
+- `src/pages/MatchPrep.tsx` (Download-Button)
+
+---
+
+## 4. Halbzeit-Taktik & Gegner-Taktik-Generator
+
+**Problem**: Trainer wollen konkrete taktische Vorschlaege fuer die 2. Halbzeit oder den naechsten Gegner.
+
+**Loesung**: Der `generate-pdf-report` Endpoint mit `reportType = "halftime_tactics"` generiert:
+
+- **2. Halbzeit Taktik** (wenn Match-Status "live" oder "halftime"):
+  - Formations-Empfehlung basierend auf 1. HZ Analyse
+  - Konkrete Wechselvorschlaege (basierend auf Ermuedung + Performance)
+  - 3 taktische Anpassungen (z.B. "Pressing-Linie 10m hoeher", "Aussenverteidiger offensiver")
+  - Gegner-Schwachstellen die in 1. HZ aufgefallen sind
+
+- **Naechster Gegner** (wenn Match done + Gegner bekannt):
+  - Nutzt `match-preparation` Daten
+  - Optimale Formation gegen diesen Gegner
+  - Do/Don't Liste
+  - Set-Piece-Strategie
+
+Beide nutzen den bestehenden `match-preparation` Flow + eigene Analyse-Daten als KI-Kontext.
+
+**Datei**: Integriert in `generate-pdf-report/index.ts` (reportType-Switch)
+
+---
+
+## Zusammenfassung Dateien
 
 | Datei | Aenderung |
 |---|---|
-| `src/pages/MatchReport.tsx` | Komplett umstrukturieren: Hero + Quick-Actions + Tab-Navigation statt linearer Scroll |
-| `src/components/TacticalReplay.tsx` | Ghost-Spieler-Auffuellung, Trails, Jersey-Nummern, groessere Darstellung, Szenen-Leiste |
-| `src/components/MatchScorecard.tsx` | Ergebnis-Anzeige (Tore) prominenter, Vereinslogos wenn vorhanden |
-| `src/components/MatchInsightsPanel.tsx` | **NEU** — Quick-Action Cards (Top-Staerken, Sofort-Fixes, Spielplan) |
-| `supabase/functions/analyze-match/index.ts` | Prompt anpassen: 22 Spieler pro Frame erzwingen, `estimated` Flag |
+| `supabase/functions/generate-insights/index.ts` | Camera-Sessions + Codes Cleanup nach Analyse |
+| `supabase/functions/generate-pdf-report/index.ts` | **NEU** — PDF-Report-Generator Edge Function |
+| `supabase/config.toml` | Function-Config fuer generate-pdf-report |
+| `src/hooks/use-pdf-export.ts` | **NEU** — Hook fuer PDF-Export |
+| `src/pages/MatchReport.tsx` | PDF-Download-Buttons im Header |
+| `src/pages/MatchPrep.tsx` | PDF-Download-Button |
 
 Keine DB-Migration noetig.
 
