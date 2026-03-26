@@ -194,13 +194,7 @@ WICHTIG:
     const modelName = isLightweight ? "google/gemini-2.5-flash-lite" : "google/gemini-2.5-flash";
     console.log(`Using model: ${modelName} (${selectedFrames.length} frames, lightweight: ${isLightweight})`);
 
-    const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const aiRequestBody = JSON.stringify({
         model: modelName,
         messages: [
           {
