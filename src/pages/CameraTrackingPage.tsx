@@ -27,6 +27,15 @@ function useIsAuthenticated() {
   return isAuth;
 }
 
+/** Format seconds into MM:SS */
+function formatTimer(totalSeconds: number, isSecondHalf: boolean): string {
+  const offset = isSecondHalf ? 45 * 60 : 0;
+  const s = offset + totalSeconds;
+  const min = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
 export default function CameraTrackingPage() {
   const { id: matchIdParam } = useParams();
   const [searchParams] = useSearchParams();
@@ -42,6 +51,7 @@ export default function CameraTrackingPage() {
   const [halfNumber, setHalfNumber] = useState(1);
   const [transferAuthorized, setTransferAuthorized] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
@@ -51,6 +61,7 @@ export default function CameraTrackingPage() {
   const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const deltaUploadRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastUploadedIndexRef = useRef(0);
   const chunkIndexRef = useRef(0);
   const deltaRetryCountRef = useRef(0);
@@ -63,6 +74,46 @@ export default function CameraTrackingPage() {
     setSessionToken(data.sessionToken);
     setPhase("setup");
   }, []);
+
+  // ── Persist timing to DB ──
+  const updateMatchTiming = useCallback(async (fields: Record<string, string>) => {
+    if (!matchId) return;
+    if (isHelper && sessionToken) {
+      // Route through edge function for anonymous helpers
+      try {
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({
+              action: "update-timing",
+              session_token: sessionToken,
+              match_id: matchId,
+              timing: fields,
+            }),
+          },
+        );
+      } catch { /* non-critical */ }
+    } else {
+      await supabase.from("matches").update(fields as any).eq("id", matchId);
+    }
+  }, [matchId, isHelper, sessionToken]);
+
+  // ── Live timer ──
+  useEffect(() => {
+    if (phase === "recording" && recordingStartTime > 0) {
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(Math.floor((Date.now() - recordingStartTime) / 1000));
+      }, 1000);
+      return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    } else {
+      setElapsedSeconds(0);
+    }
+  }, [phase, recordingStartTime]);
 
   // ── Capture a small thumbnail for heartbeat ──
   const captureThumbnail = useCallback((): string | null => {
@@ -83,7 +134,6 @@ export default function CameraTrackingPage() {
   const sendHeartbeat = useCallback(async (currentPhase: string, currentFrameCount: number) => {
     if (!isHelper || !matchId || !sessionToken) return;
     try {
-      // Send thumbnail in ALL phases where camera is active
       const thumbnail = (currentPhase === "recording" || currentPhase === "ready" || currentPhase === "halftime_pause")
         ? captureThumbnail()
         : null;
@@ -107,7 +157,6 @@ export default function CameraTrackingPage() {
       );
       if (res.ok) {
         const data = await res.json();
-        // Update transfer authorization status from server
         if (data.transfer_authorized !== undefined) {
           setTransferAuthorized(data.transfer_authorized);
         }
@@ -153,15 +202,13 @@ export default function CameraTrackingPage() {
       }
     } catch {
       deltaRetryCountRef.current += 1;
-      // Will retry next interval (max 3 retries before backing off)
     }
   }, [matchId, isHelper, sessionToken]);
 
-  // ── Heartbeat interval — starts as soon as camera is active (ready/recording/halftime) ──
+  // ── Heartbeat interval ──
   useEffect(() => {
     if (!isHelper || (phase !== "recording" && phase !== "halftime_pause" && phase !== "ready")) return;
     
-    // Send initial heartbeat immediately
     const fc = liveCaptureRef.current?.getFrameCount() ?? frameCount;
     sendHeartbeat(phase, fc);
 
@@ -176,7 +223,7 @@ export default function CameraTrackingPage() {
         if (phase === "ready") startRecording();
         else startSecondHalf();
       }
-    }, 10000); // 10s interval (was 15s)
+    }, 10000);
 
     heartbeatRef.current = interval;
     return () => clearInterval(interval);
@@ -212,21 +259,29 @@ export default function CameraTrackingPage() {
       videoRecorderRef.current = startVideoRecorder(streamRef.current);
     }
 
+    const now = new Date().toISOString();
     setPhase("recording");
     setRecordingStartTime(Date.now());
     setFrameCount(0);
     setSyncedFrames(0);
+    setElapsedSeconds(0);
     lastUploadedIndexRef.current = 0;
     chunkIndexRef.current = 0;
     deltaRetryCountRef.current = 0;
     if (navigator.vibrate) navigator.vibrate(50);
+
+    // Persist timing
+    updateMatchTiming({
+      recording_started_at: now,
+      h1_started_at: now,
+    });
 
     const countInterval = setInterval(() => {
       setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
 
-    // Delta upload every 45s (was 150s) with retry backoff
+    // Delta upload every 45s
     if (isHelper) {
       deltaUploadRef.current = setInterval(() => {
         if (deltaRetryCountRef.current < 3) {
@@ -234,7 +289,7 @@ export default function CameraTrackingPage() {
         }
       }, 45000);
     }
-  }, [hasHighlights, isHelper, uploadDelta]);
+  }, [hasHighlights, isHelper, uploadDelta, updateMatchTiming]);
 
   const handleSetupComplete = useCallback(async () => {
     await initCamera();
@@ -330,6 +385,9 @@ export default function CameraTrackingPage() {
       return;
     }
 
+    // Persist h1_ended_at
+    updateMatchTiming({ h1_ended_at: new Date().toISOString() });
+
     setUploading(true);
     try {
       if (isHelper) {
@@ -346,14 +404,13 @@ export default function CameraTrackingPage() {
       toast.success("1. Halbzeit hochgeladen — Analyse läuft!");
     } catch (err: any) {
       toast.error(err.message ?? "Halbzeit-Upload fehlgeschlagen");
-      // Restart capture so no data is lost
       if (videoRef.current) {
         liveCaptureRef.current = startLiveCapture(videoRef.current);
       }
     } finally {
       setUploading(false);
     }
-  }, [matchId, isHelper, uploadViaEdgeFunction, uploadDirect, uploading]);
+  }, [matchId, isHelper, uploadViaEdgeFunction, uploadDirect, uploading, updateMatchTiming]);
 
   // ── Start second half ──
   const startSecondHalf = useCallback(() => {
@@ -365,19 +422,24 @@ export default function CameraTrackingPage() {
       videoRecorderRef.current = startVideoRecorder(streamRef.current);
     }
 
+    const now = new Date().toISOString();
     setPhase("recording");
     setRecordingStartTime(Date.now());
     setFrameCount(0);
     setSyncedFrames(0);
+    setElapsedSeconds(0);
     lastUploadedIndexRef.current = 0;
     chunkIndexRef.current = 0;
     if (navigator.vibrate) navigator.vibrate(50);
+
+    // Persist h2_started_at
+    updateMatchTiming({ h2_started_at: now });
 
     const countInterval = setInterval(() => {
       setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
-  }, [hasHighlights, isHelper]);
+  }, [hasHighlights, isHelper, updateMatchTiming]);
 
   const requestStop = useCallback(() => {
     if (!canStopRecording(frameCount)) {
@@ -401,6 +463,17 @@ export default function CameraTrackingPage() {
     if ((streamRef as any)._countInterval) clearInterval((streamRef as any)._countInterval);
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     if (deltaUploadRef.current) clearInterval(deltaUploadRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    // Persist end timing
+    const now = new Date().toISOString();
+    const timingFields: Record<string, string> = { recording_ended_at: now };
+    if (halfNumber === 2) {
+      timingFields.h2_ended_at = now;
+    } else {
+      timingFields.h1_ended_at = now;
+    }
+    updateMatchTiming(timingFields);
 
     if (!captureResult || captureResult.frames.length === 0) {
       toast.error("Keine Frames aufgenommen");
@@ -430,7 +503,7 @@ export default function CameraTrackingPage() {
       toast.error(err.message ?? "Analyse fehlgeschlagen");
       setPhase("setup");
     }
-  }, [matchId, halfNumber, isHelper, uploadViaEdgeFunction, uploadDirect]);
+  }, [matchId, halfNumber, isHelper, uploadViaEdgeFunction, uploadDirect, updateMatchTiming]);
 
   // Code entry phase
   if (phase === "code") {
@@ -438,7 +511,7 @@ export default function CameraTrackingPage() {
   }
 
   const progressPct = Math.min(100, Math.round((frameCount / RECOMMENDED_FRAMES) * 100));
-  const elapsedMin = recordingStartTime ? Math.floor((Date.now() - recordingStartTime) / 60000) : 0;
+  const timerDisplay = formatTimer(elapsedSeconds, halfNumber === 2);
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
@@ -485,12 +558,13 @@ export default function CameraTrackingPage() {
 
         {phase === "recording" && (
           <>
-            {/* Recording indicator */}
+            {/* Recording indicator with live timer */}
             <div className="absolute top-4 left-4 flex items-center gap-2 bg-destructive/90 rounded-full px-3 py-1.5">
               <div className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
               <span className="text-xs text-white font-medium">
                 {halfNumber === 2 ? "2. HZ" : "Aufnahme"}
               </span>
+              <span className="text-xs text-white/80 font-mono">{timerDisplay}</span>
             </div>
 
             {/* Frame counter + sync status */}
@@ -502,11 +576,6 @@ export default function CameraTrackingPage() {
                 <div className="flex items-center gap-1 bg-primary/80 rounded-full px-2 py-0.5">
                   <CloudUpload className="h-2.5 w-2.5 text-white" />
                   <span className="text-[10px] text-white">{syncedFrames} sync</span>
-                </div>
-              )}
-              {elapsedMin > 0 && (
-                <div className="bg-black/40 rounded-full px-2 py-0.5">
-                  <span className="text-[10px] text-white/60">{elapsedMin} Min.</span>
                 </div>
               )}
             </div>
@@ -524,7 +593,7 @@ export default function CameraTrackingPage() {
               </div>
             </div>
 
-            {/* Event quick bar — ALWAYS shown during recording */}
+            {/* Event quick bar */}
             {matchId && (
               <div className="absolute bottom-4 right-4">
                 <MatchEventQuickBar
@@ -533,6 +602,7 @@ export default function CameraTrackingPage() {
                   recordingStartTime={recordingStartTime}
                   sessionToken={isHelper ? sessionToken : undefined}
                   highlightsEnabled={hasHighlights && !isHelper}
+                  halfNumber={halfNumber}
                 />
               </div>
             )}
@@ -593,7 +663,7 @@ export default function CameraTrackingPage() {
               ⚽ Halbzeit — Hochladen & Pausieren
             </Button>
 
-            {/* Stop button — always active after 1 frame */}
+            {/* Stop button */}
             <Button
               onClick={requestStop}
               size="lg"
