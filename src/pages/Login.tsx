@@ -36,14 +36,16 @@ export default function Login() {
   const redirectTarget = searchParams.get("redirect") || "/dashboard";
 
   const [installSkipped, setInstallSkipped] = useState(() => {
-    return sessionStorage.getItem("pwa-install-skipped") === "true";
+    const skippedAt = Number(localStorage.getItem("pwa-install-skipped-at") ?? "0");
+    return skippedAt > 0 && Date.now() - skippedAt < 1000 * 60 * 60 * 24 * 30; // 30 days
   });
 
+  // If standalone (installed PWA), skip install screen entirely
   const showInstallScreen = isMobile && !isStandalone && !installSkipped;
 
   const handleSkipInstall = () => {
     setInstallSkipped(true);
-    sessionStorage.setItem("pwa-install-skipped", "true");
+    localStorage.setItem("pwa-install-skipped-at", String(Date.now()));
   };
 
   const handleInstallClick = async () => {
@@ -205,101 +207,47 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Install card */}
-          <div className="glass-card glow-border p-6 space-y-5">
-            <div className="space-y-2">
-              <div className="flex items-center justify-center">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Download className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-              <h1 className="text-xl font-semibold font-display">App installieren</h1>
-              <p className="text-sm text-muted-foreground">
-                Installiere FieldIQ für das beste Erlebnis — schneller Start, Vollbild und Offline-Zugriff.
-              </p>
-            </div>
-
-            {isIos ? (
-              <div className="space-y-3 text-left">
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Share className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">1. Teilen-Button tippen</p>
-                    <p className="text-xs text-muted-foreground">Unten in der Safari-Leiste</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Smartphone className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">2. „Zum Home-Bildschirm"</p>
-                    <p className="text-xs text-muted-foreground">Im Menü nach unten scrollen</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Download className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">3. „Hinzufügen" bestätigen</p>
-                    <p className="text-xs text-muted-foreground">Die App erscheint auf deinem Homescreen</p>
-                  </div>
-                </div>
-              </div>
-            ) : deferredPrompt ? (
-              <Button
-                variant="hero"
-                size="lg"
-                className="w-full text-base"
-                onClick={handleInstallClick}
-              >
-                <Download className="mr-2 h-5 w-5" />
-                App jetzt installieren
+          {/* 3 main action buttons */}
+          <div className="space-y-3">
+            <Link to="/camera" className="block">
+              <Button variant="hero" size="lg" className="w-full text-base gap-2">
+                <Camera className="h-5 w-5" />
+                Kamera
               </Button>
-            ) : (
-              <div className="space-y-3 text-left">
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-bold text-primary">⋮</span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">1. Browser-Menü öffnen</p>
-                    <p className="text-xs text-muted-foreground">Tippe oben rechts auf die drei Punkte (⋮)</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Download className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">2. „App installieren" wählen</p>
-                    <p className="text-xs text-muted-foreground">Oder „Zum Startbildschirm hinzufügen"</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Smartphone className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">3. „Installieren" bestätigen</p>
-                    <p className="text-xs text-muted-foreground">Die App erscheint auf deinem Startbildschirm</p>
-                  </div>
-                </div>
-              </div>
-            )}
+            </Link>
+            <Link to="/login?mode=login" className="block" onClick={handleSkipInstall}>
+              <Button variant="heroOutline" size="lg" className="w-full text-base gap-2">
+                <Lock className="h-5 w-5" />
+                Login
+              </Button>
+            </Link>
+            <Link to="/login?mode=register" className="block" onClick={handleSkipInstall}>
+              <Button variant="outline" size="lg" className="w-full text-base gap-2">
+                <Building2 className="h-5 w-5" />
+                Registrierung
+              </Button>
+            </Link>
           </div>
 
-          {/* Skip link */}
-          <button
-            onClick={handleSkipInstall}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Ohne App weiter
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          {/* Install hint (subtle, not blocking) */}
+          {!isStandalone && (
+            <div className="glass-card p-4 space-y-3">
+              <p className="text-xs text-muted-foreground">
+                💡 Tipp: Installiere FieldIQ als App für Vollbild und schnelleren Start.
+              </p>
+              {deferredPrompt ? (
+                <Button variant="ghost" size="sm" className="w-full gap-2" onClick={handleInstallClick}>
+                  <Download className="h-4 w-4" /> App installieren
+                </Button>
+              ) : (
+                <Link to="/install">
+                  <Button variant="ghost" size="sm" className="w-full gap-2">
+                    <Download className="h-4 w-4" /> Anleitung
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

@@ -92,7 +92,8 @@ export default function CameraCodeShare({ matchId, onDone }: CameraCodeShareProp
   }, []);
 
   const shareWhatsApp = useCallback((code: string) => {
-    const text = `🎥 FieldIQ Kamera-Code: ${code}\n\nÖffne die FieldIQ App und gib diesen Code ein, um die Kamera zu starten.\n\nhttps://ball-sense.lovable.app/camera`;
+    const deepLink = `https://ball-sense.lovable.app/camera?code=${code}`;
+    const text = `🎥 FieldIQ Kamera-Code: ${code}\n\nKlicke den Link, um die Kamera direkt zu starten:\n${deepLink}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }, []);
 
