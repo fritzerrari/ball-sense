@@ -534,13 +534,18 @@ export default function CameraTrackingPage() {
         )}
 
         {phase === "ready" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-white/70 gap-4">
-            <Camera className="h-16 w-16" />
-            <p className="text-lg font-medium">Kamera bereit</p>
-            <p className="text-sm text-white/40">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white/70 gap-4 px-6">
+            <Camera className="h-14 w-14 md:h-16 md:w-16" />
+            <p className="text-base md:text-lg font-medium text-center">Kamera bereit</p>
+            <p className="text-xs md:text-sm text-white/40 text-center">
               <ImageIcon className="inline h-3 w-3 mr-1" />
               Alle 30 Sek. wird ein Standbild erfasst
             </p>
+            {/* Landscape orientation hint */}
+            <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2 border border-white/20">
+              <span className="text-lg">📱↔️</span>
+              <span className="text-xs text-white/60">Querformat empfohlen</span>
+            </div>
             {isHelper && !transferAuthorized && (
               <div className="flex items-center gap-1.5 bg-destructive/20 rounded-full px-4 py-2 border border-destructive/30">
                 <Loader2 className="h-3.5 w-3.5 text-destructive animate-spin" />
@@ -558,11 +563,14 @@ export default function CameraTrackingPage() {
 
         {phase === "recording" && (
           <>
-            {/* Recording indicator with live timer */}
-            <div className="absolute top-4 left-4 flex items-center gap-2 bg-destructive/90 rounded-full px-3 py-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
-              <span className="text-xs text-white font-medium">
-                {halfNumber === 2 ? "2. HZ" : "Aufnahme"}
+            {/* Recording indicator with pulsing ring and live timer */}
+            <div className="absolute top-4 left-4 flex items-center gap-2 bg-destructive/90 rounded-full px-3 py-2 shadow-lg shadow-destructive/20">
+              <div className="relative">
+                <div className="h-3 w-3 rounded-full bg-white animate-pulse" />
+                <div className="absolute inset-0 h-3 w-3 rounded-full bg-white/30 animate-ping" />
+              </div>
+              <span className="text-xs text-white font-semibold">
+                {halfNumber === 2 ? "2. HZ" : "REC"}
               </span>
               <span className="text-xs text-white/80 font-mono">{timerDisplay}</span>
             </div>
@@ -593,9 +601,9 @@ export default function CameraTrackingPage() {
               </div>
             </div>
 
-            {/* Event quick bar */}
+            {/* Event quick bar — bottom center on mobile for thumb access */}
             {matchId && (
-              <div className="absolute bottom-4 right-4">
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0">
                 <MatchEventQuickBar
                   matchId={matchId}
                   recorderRef={videoRecorderRef}
@@ -636,9 +644,9 @@ export default function CameraTrackingPage() {
       <div className="safe-area-pad border-t border-border bg-background p-4 space-y-2">
         {phase === "ready" && (
           <Button
-            onClick={handleReadyStart}
+            onClick={() => { if (navigator.vibrate) navigator.vibrate(50); handleReadyStart(); }}
             size="lg"
-            className="w-full gap-2 h-14 text-base"
+            className="w-full gap-2 h-14 text-base active:scale-[0.97] transition-transform"
             disabled={isHelper && !transferAuthorized}
           >
             <Video className="h-5 w-5" />
