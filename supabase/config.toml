@@ -39,3 +39,6 @@ verify_jwt = false
 
 [functions.openligadb]
 verify_jwt = false
+
+[functions.generate-pdf-report]
+verify_jwt = false

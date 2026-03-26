@@ -471,6 +471,34 @@ REGELN:
     await supabase.storage.from("match-frames").remove(cleanupPaths);
     console.log(`Cleaned up frames for match ${match_id}`);
 
+    // Cleanup camera sessions for this match
+    await supabase.from("camera_access_sessions").delete().eq("match_id", match_id);
+    console.log(`Cleaned up camera sessions for match ${match_id}`);
+
+    // Mark tracking uploads as processed
+    await supabase.from("tracking_uploads").update({ status: "processed" }).eq("match_id", match_id);
+    console.log(`Marked tracking uploads as processed for match ${match_id}`);
+
+    // Deactivate camera codes that have no remaining active sessions
+    if (clubId) {
+      const { data: activeSessions } = await supabase
+        .from("camera_access_sessions")
+        .select("code_id")
+        .eq("club_id", clubId);
+      const activeCodeIds = new Set((activeSessions ?? []).map((s: any) => s.code_id));
+      const { data: allCodes } = await supabase
+        .from("camera_access_codes")
+        .select("id")
+        .eq("club_id", clubId)
+        .eq("active", true);
+      for (const code of allCodes ?? []) {
+        if (!activeCodeIds.has(code.id)) {
+          await supabase.from("camera_access_codes").update({ active: false }).eq("id", code.id);
+        }
+      }
+      console.log(`Cleaned up orphaned camera codes for club ${clubId}`);
+    }
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
