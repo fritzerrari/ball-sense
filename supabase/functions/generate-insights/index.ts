@@ -440,63 +440,83 @@ REGELN:
       completed_at: new Date().toISOString(),
     }).eq("id", job_id);
 
-    // Update match status
-    await supabase.from("matches").update({ status: "done" }).eq("id", match_id);
+    // Determine if this is a final job or intermediate (H1) analysis
+    const { data: currentJob } = await supabase
+      .from("analysis_jobs")
+      .select("job_kind")
+      .eq("id", job_id)
+      .single();
+    const isFinalJob = currentJob?.job_kind === "final";
 
-    // Notify all club members
-    if (clubId) {
-      const { data: clubProfiles } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("club_id", clubId);
+    const { data: matchTiming } = await supabase
+      .from("matches")
+      .select("recording_ended_at")
+      .eq("id", match_id)
+      .single();
+    const isMatchFinished = !!matchTiming?.recording_ended_at;
+    const shouldCleanup = isFinalJob || isMatchFinished;
 
-      const matchLabel = match?.away_club_name ?? "Spiel";
-      for (const profile of clubProfiles ?? []) {
-        await supabase.from("notifications").insert({
-          user_id: profile.user_id,
-          match_id: match_id,
-          type: "report_ready",
-          title: "Analyse fertig",
-          body: `Der Report für "${matchLabel}" am ${match?.date ?? ""} ist verfügbar.`,
-        });
-      }
-    }
+    if (shouldCleanup) {
+      // Final analysis: set done + full cleanup
+      await supabase.from("matches").update({ status: "done" }).eq("id", match_id);
 
-    // Cleanup frames
-    const cleanupPaths = [`${match_id}.json`];
-    for (let i = 0; i < 50; i++) {
-      cleanupPaths.push(`${match_id}_chunk_${i}.json`);
-    }
-    cleanupPaths.push(`${match_id}_h1.json`, `${match_id}_h2.json`);
-    await supabase.storage.from("match-frames").remove(cleanupPaths);
-    console.log(`Cleaned up frames for match ${match_id}`);
+      // Notify all club members
+      if (clubId) {
+        const { data: clubProfiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("club_id", clubId);
 
-    // Cleanup camera sessions for this match
-    await supabase.from("camera_access_sessions").delete().eq("match_id", match_id);
-    console.log(`Cleaned up camera sessions for match ${match_id}`);
-
-    // Mark tracking uploads as processed
-    await supabase.from("tracking_uploads").update({ status: "processed" }).eq("match_id", match_id);
-    console.log(`Marked tracking uploads as processed for match ${match_id}`);
-
-    // Deactivate camera codes that have no remaining active sessions
-    if (clubId) {
-      const { data: activeSessions } = await supabase
-        .from("camera_access_sessions")
-        .select("code_id")
-        .eq("club_id", clubId);
-      const activeCodeIds = new Set((activeSessions ?? []).map((s: any) => s.code_id));
-      const { data: allCodes } = await supabase
-        .from("camera_access_codes")
-        .select("id")
-        .eq("club_id", clubId)
-        .eq("active", true);
-      for (const code of allCodes ?? []) {
-        if (!activeCodeIds.has(code.id)) {
-          await supabase.from("camera_access_codes").update({ active: false }).eq("id", code.id);
+        const matchLabel = match?.away_club_name ?? "Spiel";
+        for (const profile of clubProfiles ?? []) {
+          await supabase.from("notifications").insert({
+            user_id: profile.user_id,
+            match_id: match_id,
+            type: "report_ready",
+            title: "Analyse fertig",
+            body: `Der Report für "${matchLabel}" am ${match?.date ?? ""} ist verfügbar.`,
+          });
         }
       }
-      console.log(`Cleaned up orphaned camera codes for club ${clubId}`);
+
+      // Cleanup frames
+      const cleanupPaths = [`${match_id}.json`];
+      for (let i = 0; i < 50; i++) {
+        cleanupPaths.push(`${match_id}_chunk_${i}.json`);
+      }
+      cleanupPaths.push(`${match_id}_h1.json`, `${match_id}_h2.json`);
+      await supabase.storage.from("match-frames").remove(cleanupPaths);
+      console.log(`Final cleanup: removed frames for match ${match_id}`);
+
+      // Cleanup camera sessions for this match
+      await supabase.from("camera_access_sessions").delete().eq("match_id", match_id);
+      console.log(`Final cleanup: removed camera sessions for match ${match_id}`);
+
+      // Mark tracking uploads as processed
+      await supabase.from("tracking_uploads").update({ status: "processed" }).eq("match_id", match_id);
+
+      // Deactivate camera codes that have no remaining active sessions
+      if (clubId) {
+        const { data: activeSessions } = await supabase
+          .from("camera_access_sessions")
+          .select("code_id")
+          .eq("club_id", clubId);
+        const activeCodeIds = new Set((activeSessions ?? []).map((s: any) => s.code_id));
+        const { data: allCodes } = await supabase
+          .from("camera_access_codes")
+          .select("id")
+          .eq("club_id", clubId)
+          .eq("active", true);
+        for (const code of allCodes ?? []) {
+          if (!activeCodeIds.has(code.id)) {
+            await supabase.from("camera_access_codes").update({ active: false }).eq("id", code.id);
+          }
+        }
+        console.log(`Final cleanup: deactivated orphaned camera codes for club ${clubId}`);
+      }
+    } else {
+      // Intermediate analysis (H1): keep match in "processing", NO cleanup
+      console.log(`Intermediate analysis for match ${match_id} — skipping cleanup, match stays in processing`);
     }
 
     return new Response(JSON.stringify({ success: true }), {
