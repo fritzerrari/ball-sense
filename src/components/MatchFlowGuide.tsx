@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Users, Map, Crosshair, Swords, Camera, BarChart3, ChevronRight, CheckCircle2, Rocket, BrainCircuit, ShieldAlert, Sparkles } from "lucide-react";
+import { Users, Map, Swords, Camera, BarChart3, ChevronRight, CheckCircle2, Rocket, BrainCircuit, ShieldAlert, Sparkles } from "lucide-react";
 import { usePlayers } from "@/hooks/use-players";
 import { useFields } from "@/hooks/use-fields";
 import { useMatches } from "@/hooks/use-matches";
@@ -21,7 +21,7 @@ export function MatchFlowGuide() {
 
   const hasPlayers = (players?.length ?? 0) > 0;
   const hasFields = (fields?.length ?? 0) > 0;
-  const hasCalibrated = (fields ?? []).some((f) => f.calibration != null);
+  
   const hasMatch = (matches?.length ?? 0) > 0;
   const hasTracking = (matches ?? []).some((m) => m.status === "done" || m.status === "processing");
   const hasDone = (matches ?? []).some((m) => m.status === "done");
@@ -32,7 +32,7 @@ export function MatchFlowGuide() {
   const steps: StepDef[] = [
     { key: "players", label: "Kader anlegen", description: "Mindestens 11 Spieler hinzufügen", icon: Users, href: "/players", done: hasPlayers },
     { key: "field", label: "Spielfeld erstellen", description: "Einen Platz mit Maßen anlegen", icon: Map, href: "/fields", done: hasFields },
-    { key: "calibrate", label: "Feld kalibrieren", description: "Foto hochladen & 4 Ecken markieren", icon: Crosshair, href: hasFields ? `/fields/${fields?.[0]?.id}/calibrate` : "/fields", done: hasCalibrated },
+    
     { key: "match", label: "Spiel anlegen", description: "Gegner, Datum & Aufstellung festlegen", icon: Swords, href: "/matches/new", done: hasMatch },
     { key: "track", label: "Tracking starten", description: "Smartphones positionieren & aufzeichnen", icon: Camera, href: hasMatch ? `/matches/${matches?.[0]?.id}` : "/matches", done: hasTracking },
     { key: "report", label: "Report ansehen", description: "Heatmaps, Laufdistanzen & Sprints", icon: BarChart3, href: hasDone ? `/matches/${(matches ?? []).find((m) => m.status === "done")?.id}` : "/matches", done: hasDone },

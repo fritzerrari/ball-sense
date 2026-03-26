@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  Brain,
   BrainCircuit,
   Download,
   Home,
@@ -51,6 +52,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.matches"), icon: Swords, href: "/matches" },
     { label: t("nav.squad"), icon: Users, href: "/players" },
     { label: t("nav.trends"), icon: TrendingUp, href: "/trends" },
+    { label: t("nav.matchPrep") ?? "Spielvorbereitung", icon: Brain, href: "/match-prep" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
   ];
 
