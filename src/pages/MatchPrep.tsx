@@ -10,9 +10,10 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Brain, Shield, Swords, Target, AlertTriangle, Users,
-  Loader2, ArrowLeft, Zap, ChevronRight, ClipboardList,
+  Loader2, ArrowLeft, Zap, ChevronRight, ClipboardList, Download,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Preparation {
   id: string;
@@ -28,6 +29,7 @@ export default function MatchPrep() {
   const [opponentName, setOpponentName] = useState(initialOpponent);
   const [generating, setGenerating] = useState(false);
   const [activePrep, setActivePrep] = useState<Preparation | null>(null);
+  const { exportPdf, exporting } = usePdfExport();
 
   // Fetch past preparations
   const { data: pastPreps, refetch } = useQuery({
