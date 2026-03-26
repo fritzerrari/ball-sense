@@ -4,11 +4,12 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import {
   ArrowLeft, Brain, Lightbulb, Target, Shield, Zap,
   ClipboardList, AlertTriangle, TrendingUp, Calendar,
-  Loader2, RefreshCw, ChevronRight,
+  Loader2, RefreshCw, ChevronRight, Swords, Users, Dumbbell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PostMatchEventEditor from "@/components/PostMatchEventEditor";
 import { useMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
@@ -19,7 +20,7 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 import { useOpponentHistory } from "@/hooks/use-opponent-history";
 import { motion } from "framer-motion";
 
-// New cockpit components
+// Cockpit components
 import MatchScorecard from "@/components/MatchScorecard";
 import MomentumTimeline from "@/components/MomentumTimeline";
 import TacticalGradeMatrix from "@/components/TacticalGradeMatrix";
@@ -27,6 +28,7 @@ import RiskRadar from "@/components/RiskRadar";
 import PlayerSpotlight from "@/components/PlayerSpotlight";
 import OpponentDNA from "@/components/OpponentDNA";
 import TrainingMicroCycle from "@/components/TrainingMicroCycle";
+import QuickActionCards from "@/components/QuickActionCards";
 
 // Lazy-loaded analysis components
 const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
@@ -85,7 +87,6 @@ interface AnalysisJob {
   progress: number;
 }
 
-// Helper to safely parse JSON section content
 function parseJson(content: string): any {
   try { return JSON.parse(content); } catch { return null; }
 }
@@ -103,6 +104,7 @@ export default function MatchReport() {
   const [job, setJob] = useState<AnalysisJob | null>(null);
   const [loadingReport, setLoadingReport] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     if (!id) return;
@@ -181,19 +183,19 @@ export default function MatchReport() {
   // Analysis results
   const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
   const chances = analysisResults.find(r => r.result_type === "chances");
-  const matchStructure = analysisResults.find(r => r.result_type === "match_structure");
   const framePositions = analysisResults.find(r => r.result_type === "frame_positions");
   const pressingData = analysisResults.find(r => r.result_type === "pressing_data");
   const transitions = analysisResults.find(r => r.result_type === "transitions");
   const passDirections = analysisResults.find(r => r.result_type === "pass_directions");
   const formationTimeline = analysisResults.find(r => r.result_type === "formation_timeline");
+  const teamSizeDetected = analysisResults.find(r => r.result_type === "team_size_detected")?.data;
 
   const isProcessing = job?.status && !["complete", "failed"].includes(job.status);
   const hasReport = sections.length > 0;
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-5">
         {/* Compact Nav */}
         <div className="flex items-center gap-3">
           <Link to="/matches" className="rounded-lg p-2 transition-colors hover:bg-muted">
@@ -209,12 +211,8 @@ export default function MatchReport() {
           </Button>
         </div>
 
-        {/* Camera Remote Control */}
-        {id && (
-          <Suspense fallback={null}>
-            <CameraRemotePanel matchId={id} />
-          </Suspense>
-        )}
+        {/* Camera Remote */}
+        {id && <Suspense fallback={null}><CameraRemotePanel matchId={id} /></Suspense>}
 
         {/* Processing state */}
         {isProcessing && (
@@ -252,28 +250,7 @@ export default function MatchReport() {
         {/* ═══════════ COCKPIT REPORT ═══════════ */}
         {hasReport && (
           <>
-            {/* ANALYSE-GÜTESIEGEL */}
-            {(() => {
-              const totalSections = sections.length;
-              const highConf = sections.filter(s => s.confidence === "high").length;
-              const qualityPct = totalSections > 0 ? Math.round((highConf / totalSections) * 100) : 0;
-              const qualityLabel = qualityPct >= 80 ? "Sehr gut" : qualityPct >= 60 ? "Gut" : qualityPct >= 40 ? "Ausreichend" : "Eingeschränkt";
-              const qualityColor = qualityPct >= 80 ? "text-emerald-500" : qualityPct >= 60 ? "text-primary" : qualityPct >= 40 ? "text-amber-500" : "text-orange-500";
-              return (
-                <div className="flex items-center justify-between rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    <span className="text-xs font-medium text-muted-foreground">Analyse-Qualität</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-sm font-bold font-display ${qualityColor}`}>{qualityPct}% {qualityLabel}</span>
-                    <span className="text-[10px] text-muted-foreground">{highConf}/{totalSections} Insights mit hoher Confidence</span>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* 1. HERO SCORECARD */}
+            {/* HERO SCORECARD */}
             {matchRating && (
               <MatchScorecard
                 rating={matchRating}
@@ -284,117 +261,224 @@ export default function MatchReport() {
               />
             )}
 
-            {/* 2. TACTICAL GRADES */}
-            {tacticalGrades && <TacticalGradeMatrix grades={tacticalGrades} />}
+            {/* QUICK-ACTION CARDS */}
+            <QuickActionCards
+              insights={insights}
+              riskMatrix={riskMatrix}
+              nextMatchActions={nextMatchActions}
+              onTabChange={setActiveTab}
+            />
 
-            {/* 3. MOMENTUM TIMELINE */}
-            {momentumData && <MomentumTimeline data={momentumData} />}
+            {/* TAB NAVIGATION */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+              <TabsList className="w-full grid grid-cols-5 h-11">
+                <TabsTrigger value="overview" className="gap-1.5 text-xs sm:text-sm">
+                  <Lightbulb className="h-3.5 w-3.5 hidden sm:block" />
+                  Übersicht
+                </TabsTrigger>
+                <TabsTrigger value="tactics" className="gap-1.5 text-xs sm:text-sm">
+                  <Swords className="h-3.5 w-3.5 hidden sm:block" />
+                  Taktik
+                </TabsTrigger>
+                <TabsTrigger value="players" className="gap-1.5 text-xs sm:text-sm">
+                  <Users className="h-3.5 w-3.5 hidden sm:block" />
+                  Spieler
+                </TabsTrigger>
+                <TabsTrigger value="opponent" className="gap-1.5 text-xs sm:text-sm">
+                  <Shield className="h-3.5 w-3.5 hidden sm:block" />
+                  Gegner
+                </TabsTrigger>
+                <TabsTrigger value="training" className="gap-1.5 text-xs sm:text-sm">
+                  <Dumbbell className="h-3.5 w-3.5 hidden sm:block" />
+                  Training
+                </TabsTrigger>
+              </TabsList>
 
-            {/* 4. EXECUTIVE SUMMARY */}
-            {summary && (
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-                <Card className="relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm">
-                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary/50" />
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Brain className="h-5 w-5 text-primary" />
-                      <h2 className="font-semibold font-display text-lg">Zusammenfassung</h2>
+              {/* ═══ OVERVIEW TAB ═══ */}
+              <TabsContent value="overview" className="space-y-4">
+                {/* Analysis Quality */}
+                {(() => {
+                  const totalSections = sections.length;
+                  const highConf = sections.filter(s => s.confidence === "high").length;
+                  const qualityPct = totalSections > 0 ? Math.round((highConf / totalSections) * 100) : 0;
+                  const qualityLabel = qualityPct >= 80 ? "Sehr gut" : qualityPct >= 60 ? "Gut" : qualityPct >= 40 ? "Ausreichend" : "Eingeschränkt";
+                  const qualityColor = qualityPct >= 80 ? "text-emerald-500" : qualityPct >= 60 ? "text-primary" : qualityPct >= 40 ? "text-amber-500" : "text-orange-500";
+                  return (
+                    <div className="flex items-center justify-between rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-medium text-muted-foreground">Analyse-Qualität</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-bold font-display ${qualityColor}`}>{qualityPct}% {qualityLabel}</span>
+                        <span className="text-[10px] text-muted-foreground">{highConf}/{totalSections} belastbar</span>
+                      </div>
                     </div>
-                    <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{summary.content}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
+                  );
+                })()}
 
-            {/* 5. KEY INSIGHTS with impact scores */}
-            {insights.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 }}
-                className="space-y-3"
-              >
-                <div className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-primary" />
-                  <h2 className="font-semibold font-display">Coaching-Insights</h2>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {insights.map((ins, idx) => {
-                    const parsed = parseJson(ins.content);
-                    const description = parsed?.description ?? ins.content;
-                    const impactScore = parsed?.impact_score;
-                    const category = parsed?.category;
-                    const Icon = CATEGORY_ICONS[category] ?? Lightbulb;
-                    const conf = CONFIDENCE_STYLES[ins.confidence] ?? CONFIDENCE_STYLES.medium;
-                    return (
-                      <motion.div
-                        key={ins.id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 + idx * 0.06 }}
-                      >
-                        <Card className="relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm h-full">
-                          <CardContent className="pt-5">
-                            <div className="flex items-start gap-3">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                                <Icon className="h-4 w-4 text-primary" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-medium text-sm flex-1">{ins.title}</h3>
-                                  {impactScore && (
-                                    <span className={`text-xs font-bold font-display ${
-                                      impactScore >= 8 ? "text-emerald-500" : impactScore >= 5 ? "text-amber-500" : "text-muted-foreground"
-                                    }`}>
-                                      {impactScore}/10
-                                    </span>
-                                  )}
+                {/* Executive Summary */}
+                {summary && (
+                  <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                    <Card className="relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm">
+                      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary/50" />
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Brain className="h-5 w-5 text-primary" />
+                          <h2 className="font-semibold font-display text-lg">Zusammenfassung</h2>
+                        </div>
+                        <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{summary.content}</p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* Tactical Grades */}
+                {tacticalGrades && <TacticalGradeMatrix grades={tacticalGrades} />}
+
+                {/* Momentum Timeline */}
+                {momentumData && <MomentumTimeline data={momentumData} />}
+
+                {/* Key Insights */}
+                {insights.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="h-5 w-5 text-primary" />
+                      <h2 className="font-semibold font-display">Coaching-Insights</h2>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {insights.map((ins, idx) => {
+                        const parsed = parseJson(ins.content);
+                        const description = parsed?.description ?? ins.content;
+                        const impactScore = parsed?.impact_score;
+                        const category = parsed?.category;
+                        const Icon = CATEGORY_ICONS[category] ?? Lightbulb;
+                        const conf = CONFIDENCE_STYLES[ins.confidence] ?? CONFIDENCE_STYLES.medium;
+                        return (
+                          <motion.div
+                            key={ins.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 + idx * 0.05 }}
+                          >
+                            <Card className="relative overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm h-full">
+                              <CardContent className="pt-5">
+                                <div className="flex items-start gap-3">
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                                    <Icon className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-medium text-sm flex-1">{ins.title}</h3>
+                                      {impactScore && (
+                                        <span className={`text-xs font-bold font-display ${
+                                          impactScore >= 8 ? "text-emerald-500" : impactScore >= 5 ? "text-amber-500" : "text-muted-foreground"
+                                        }`}>
+                                          {impactScore}/10
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
+                                    <Badge variant="outline" className={`mt-2 text-[10px] ${conf.bg} ${conf.text} border-0 cursor-help`} title={conf.reason}>
+                                      {conf.label}
+                                    </Badge>
+                                  </div>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
-                                <Badge 
-                                  variant="outline" 
-                                  className={`mt-2 text-[10px] ${conf.bg} ${conf.text} border-0 cursor-help`}
-                                  title={conf.reason}
-                                >
-                                  {conf.label}
-                                </Badge>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Risk Matrix */}
+                {riskMatrix && <RiskRadar risks={riskMatrix} />}
+
+                {/* Danger Zones + Chances */}
+                {(dangerZones || chances) && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {dangerZones && (
+                      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                        <CardContent className="pt-5">
+                          <div className="flex items-center gap-2 mb-3">
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            <h3 className="font-medium text-sm">Gefährdungszonen</h3>
+                          </div>
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Eigene Angriffe</p>
+                              <div className="flex gap-1.5 mt-1">
+                                {(dangerZones.data?.home_attack_zones ?? []).map((z: string) => (
+                                  <Badge key={z} variant="secondary" className="capitalize">{z === "left" ? "Links" : z === "right" ? "Rechts" : "Zentrum"}</Badge>
+                                ))}
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
+                            {dangerZones.data?.home_vulnerable_zones?.length > 0 && (
+                              <div>
+                                <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-2">Verwundbar</p>
+                                <div className="flex gap-1.5 mt-1">
+                                  {dangerZones.data.home_vulnerable_zones.map((z: string) => (
+                                    <Badge key={z} variant="outline" className="text-amber-500 border-amber-500/30">{z}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {chances && (
+                      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                        <CardContent className="pt-5">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Target className="h-4 w-4 text-primary" />
+                            <h3 className="font-medium text-sm">Chancen & Abschlüsse</h3>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-lg bg-muted/30 p-2.5 text-center">
+                              <p className="text-2xl font-bold font-display">{chances.data?.home_chances ?? "?"}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase">Heim</p>
+                            </div>
+                            <div className="rounded-lg bg-muted/30 p-2.5 text-center">
+                              <p className="text-2xl font-bold font-display">{chances.data?.away_chances ?? "?"}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase">Gast</p>
+                            </div>
+                          </div>
+                          {chances.data?.pattern_notes && (
+                            <p className="text-xs text-muted-foreground mt-3">{chances.data.pattern_notes}</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
 
-            {/* 6. RISK MATRIX */}
-            {riskMatrix && <RiskRadar risks={riskMatrix} />}
+                {/* Coaching Conclusions */}
+                {coaching && (
+                  <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <ClipboardList className="h-5 w-5 text-primary" />
+                        <h2 className="font-semibold font-display">Coaching-Schlussfolgerungen</h2>
+                      </div>
+                      <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{coaching.content}</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
 
-            {/* 7. PLAYER SPOTLIGHT */}
-            {playerSpotlight?.mvp && playerSpotlight?.concern && (
-              <PlayerSpotlight mvp={playerSpotlight.mvp} concern={playerSpotlight.concern} />
-            )}
-
-            {/* ═══ TACTICAL ANALYSIS SECTION ═══ */}
-            {(pressingData || transitions || passDirections || formationTimeline || framePositions) && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="space-y-4"
-              >
-                <div className="flex items-center gap-2 pt-2">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Taktische Detailanalyse</span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-
+              {/* ═══ TACTICS TAB ═══ */}
+              <TabsContent value="tactics" className="space-y-4">
                 {/* Tactical Replay */}
                 {framePositions?.data?.frames?.length > 0 && (
                   <Suspense fallback={<SkeletonCard count={1} />}>
-                    <TacticalReplay frames={framePositions.data.frames} intervalSec={framePositions.data.interval_sec ?? 30} />
+                    <TacticalReplay
+                      frames={framePositions.data.frames}
+                      intervalSec={framePositions.data.interval_sec ?? 30}
+                      teamSizeDetected={teamSizeDetected}
+                    />
                   </Suspense>
                 )}
 
@@ -433,154 +517,118 @@ export default function MatchReport() {
                   </Suspense>
                 )}
 
+                {!framePositions && !pressingData && !transitions && !passDirections && !formationTimeline && (
+                  <div className="py-12 text-center text-muted-foreground text-sm">
+                    Keine taktischen Daten verfügbar. Starte eine neue Analyse.
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* ═══ PLAYERS TAB ═══ */}
+              <TabsContent value="players" className="space-y-4">
+                {/* Player Spotlight */}
+                {playerSpotlight?.mvp && playerSpotlight?.concern && (
+                  <PlayerSpotlight mvp={playerSpotlight.mvp} concern={playerSpotlight.concern} />
+                )}
+
                 {/* Fatigue */}
                 {framePositions?.data?.frames?.length >= 4 && (
                   <Suspense fallback={<SkeletonCard count={1} />}>
                     <FatigueIndicator frames={framePositions.data.frames} intervalSec={framePositions.data.interval_sec ?? 30} />
                   </Suspense>
                 )}
-              </motion.div>
-            )}
 
-            {/* 8. OPPONENT DNA + DO/DON'T */}
-            {opponentDna && (
-              <OpponentDNA dna={opponentDna} actions={nextMatchActions ?? undefined} />
-            )}
+                {!playerSpotlight && !framePositions && (
+                  <div className="py-12 text-center text-muted-foreground text-sm">
+                    Keine Spieler-Daten verfügbar.
+                  </div>
+                )}
+              </TabsContent>
 
-            {/* Opponent Scouting (legacy) */}
-            {opponentScouting && (() => {
-              try {
-                const scoutData = JSON.parse(opponentScouting.content);
-                return (
+              {/* ═══ OPPONENT TAB ═══ */}
+              <TabsContent value="opponent" className="space-y-4">
+                {/* Opponent DNA */}
+                {opponentDna && (
+                  <OpponentDNA dna={opponentDna} actions={nextMatchActions ?? undefined} />
+                )}
+
+                {/* Opponent Scouting */}
+                {opponentScouting && (() => {
+                  try {
+                    const scoutData = JSON.parse(opponentScouting.content);
+                    return (
+                      <Suspense fallback={<SkeletonCard count={1} />}>
+                        <OpponentScoutReport data={scoutData} />
+                      </Suspense>
+                    );
+                  } catch { return null; }
+                })()}
+
+                {/* Opponent History */}
+                {opponentProfile && opponentProfile.matchCount >= 1 && (
                   <Suspense fallback={<SkeletonCard count={1} />}>
-                    <OpponentScoutReport data={scoutData} />
+                    <OpponentHistoryProfile profile={opponentProfile} />
                   </Suspense>
-                );
-              } catch { return null; }
-            })()}
-
-            {/* Opponent History */}
-            {opponentProfile && opponentProfile.matchCount >= 1 && (
-              <Suspense fallback={<SkeletonCard count={1} />}>
-                <OpponentHistoryProfile profile={opponentProfile} />
-              </Suspense>
-            )}
-
-            {/* Danger Zones + Chances */}
-            {(dangerZones || chances) && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {dangerZones && (
-                  <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-                    <CardContent className="pt-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                        <h3 className="font-medium text-sm">Gefährdungszonen</h3>
-                      </div>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Eigene Angriffe</p>
-                          <div className="flex gap-1.5 mt-1">
-                            {(dangerZones.data?.home_attack_zones ?? []).map((z: string) => (
-                              <Badge key={z} variant="secondary" className="capitalize">{z === "left" ? "Links" : z === "right" ? "Rechts" : "Zentrum"}</Badge>
-                            ))}
-                          </div>
-                        </div>
-                        {dangerZones.data?.home_vulnerable_zones?.length > 0 && (
-                          <div>
-                            <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-2">Verwundbar</p>
-                            <div className="flex gap-1.5 mt-1">
-                              {dangerZones.data.home_vulnerable_zones.map((z: string) => (
-                                <Badge key={z} variant="outline" className="text-amber-500 border-amber-500/30">{z}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
                 )}
-                {chances && (
-                  <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-                    <CardContent className="pt-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Target className="h-4 w-4 text-primary" />
-                        <h3 className="font-medium text-sm">Chancen & Abschlüsse</h3>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-                          <p className="text-2xl font-bold font-display">{chances.data?.home_chances ?? "?"}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase">Heim</p>
-                        </div>
-                        <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-                          <p className="text-2xl font-bold font-display">{chances.data?.away_chances ?? "?"}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase">Gast</p>
-                        </div>
-                      </div>
-                      {chances.data?.pattern_notes && (
-                        <p className="text-xs text-muted-foreground mt-3">{chances.data.pattern_notes}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
 
-            {/* 9. COACHING CONCLUSIONS */}
-            {coaching && (
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
-                <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <ClipboardList className="h-5 w-5 text-primary" />
-                      <h2 className="font-semibold font-display">Coaching-Schlussfolgerungen</h2>
+                {!opponentDna && !opponentScouting && !opponentProfile && (
+                  <div className="py-12 text-center text-muted-foreground text-sm">
+                    Keine Gegner-Daten verfügbar.
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* ═══ TRAINING TAB ═══ */}
+              <TabsContent value="training" className="space-y-4">
+                {/* Training Micro-Cycle */}
+                {trainingMicroCycle && <TrainingMicroCycle sessions={trainingMicroCycle} />}
+
+                {/* Legacy Training Recommendations */}
+                {training.length > 0 && !trainingMicroCycle && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-primary" />
+                      <h2 className="font-semibold font-display">Trainingsempfehlungen</h2>
                     </div>
-                    <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{coaching.content}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-
-            {/* 10. TRAINING MICRO-CYCLE */}
-            {trainingMicroCycle && <TrainingMicroCycle sessions={trainingMicroCycle} />}
-
-            {/* 11. LEGACY TRAINING RECOMMENDATIONS */}
-            {training.length > 0 && !trainingMicroCycle && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-primary" />
-                  <h2 className="font-semibold font-display">Trainingsempfehlungen</h2>
-                </div>
-                {training.map((rec) => {
-                  const Icon = CATEGORY_ICONS[rec.category] ?? Zap;
-                  return (
-                    <Card key={rec.id} className="border-border/50 bg-card/80 backdrop-blur-sm">
-                      <CardContent className="pt-5">
-                        <div className="flex items-start gap-3">
-                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${rec.priority === 1 ? "bg-primary/15" : "bg-muted"}`}>
-                            <Icon className={`h-4 w-4 ${rec.priority === 1 ? "text-primary" : "text-muted-foreground"}`} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-medium text-sm">{rec.title}</h3>
-                              {rec.priority === 1 && (
-                                <Badge className="bg-primary/10 text-primary border-0 text-[10px]">Priorität</Badge>
-                              )}
+                    {training.map((rec) => {
+                      const Icon = CATEGORY_ICONS[rec.category] ?? Zap;
+                      return (
+                        <Card key={rec.id} className="border-border/50 bg-card/80 backdrop-blur-sm">
+                          <CardContent className="pt-5">
+                            <div className="flex items-start gap-3">
+                              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${rec.priority === 1 ? "bg-primary/15" : "bg-muted"}`}>
+                                <Icon className={`h-4 w-4 ${rec.priority === 1 ? "text-primary" : "text-muted-foreground"}`} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-medium text-sm">{rec.title}</h3>
+                                  {rec.priority === 1 && (
+                                    <Badge className="bg-primary/10 text-primary border-0 text-[10px]">Priorität</Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{rec.description}</p>
+                                {rec.linked_pattern && (
+                                  <p className="text-[10px] text-muted-foreground/70 mt-2 flex items-center gap-1">
+                                    <ChevronRight className="h-3 w-3" />
+                                    Basiert auf: {rec.linked_pattern}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{rec.description}</p>
-                            {rec.linked_pattern && (
-                              <p className="text-[10px] text-muted-foreground/70 mt-2 flex items-center gap-1">
-                                <ChevronRight className="h-3 w-3" />
-                                Basiert auf: {rec.linked_pattern}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!trainingMicroCycle && training.length === 0 && (
+                  <div className="py-12 text-center text-muted-foreground text-sm">
+                    Keine Trainingsempfehlungen verfügbar.
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
 
             {/* Confidence disclaimer */}
             <div className="rounded-xl border border-border/50 bg-muted/20 p-4 text-center">
