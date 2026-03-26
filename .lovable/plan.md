@@ -1,72 +1,85 @@
 
 
-# Stabilisierung & Feature-Erweiterungen
+# Zeiterfassung, API-Integration & Fehlerprüfung
 
-## Probleme und Fixes
+## 1. Halbzeit-Zeiterfassung einbauen
 
-### 1. PWA-Installationshinweis trotz installierter App
-**Problem**: `Login.tsx` zeigt den Install-Screen basierend auf `isMobile && !isStandalone && !installSkipped`. Aber `isStandalone` wird nur einmal beim Mount gecheckt. Wenn der User die App bereits installiert hat und sie im Browser oeffnet, sieht er trotzdem den Screen. Zusaetzlich: `sessionStorage` wird bei jedem neuen Tab zurueckgesetzt.
+**Problem**: Die Aufnahmezeit (`duration_sec`) wird zwar kalkuliert und im JSON gespeichert, aber nirgends pro Halbzeit persistent in der DB gespeichert. Für Berechnungen (Laufleistung/min, Intensitätskurven) fehlen exakte Zeitstempel.
 
-**Fix**: 
-- `isStandalone` Check ist korrekt (prueft `display-mode: standalone`). Wenn die App installiert ist und der User sie OEffnet, ist `isStandalone = true` — das funktioniert.
-- Das eigentliche Problem: Wenn der User die App im Browser oeffnet (nicht ueber die installierte PWA), wird der Hinweis erneut gezeigt weil `sessionStorage` pro Session ist.
-- Fix: `localStorage` statt `sessionStorage` fuer `pwa-install-skipped`, mit 30-Tage-Ablauf. Plus: Wenn App bereits installiert ist (`isStandalone`), zeige stattdessen 3 grosse Buttons: **Kamera**, **Login**, **Registrierung**.
+**Fix** — DB-Migration:
+- Neue Spalten in `matches`:
+  - `h1_started_at timestamptz`
+  - `h1_ended_at timestamptz`
+  - `h2_started_at timestamptz`
+  - `h2_ended_at timestamptz`
+  - `recording_started_at timestamptz`
+  - `recording_ended_at timestamptz`
 
-**Datei**: `src/pages/Login.tsx`
+**Fix** — Frontend (`CameraTrackingPage.tsx`):
+- Bei `startRecording()`: Zeitstempel `recording_started_at` (und `h1_started_at` bei HZ1) in `matches` schreiben
+- Bei `triggerHalftime()`: `h1_ended_at` setzen
+- Bei `startSecondHalf()`: `h2_started_at` setzen
+- Bei `confirmStop()`: `h2_ended_at` bzw. `recording_ended_at` setzen
+- Für Helper: Zeitstempel über `camera-ops` Edge Function durchreichen
 
-### 2. Match Events werden in der Analyse ignoriert
-**Problem**: `generate-insights` fetcht KEINE `match_events`. Die manuell erfassten Tore, Karten, Ecken werden nirgendwo in die KI-Analyse eingespeist.
+**Fix** — Edge Functions:
+- `camera-ops/index.ts`: Neues Action `update-timing` oder Zeitstempel in `upload-frames` mitschicken, `matches` updaten
+- `generate-insights/index.ts`: Halbzeitdauern aus `matches` laden und im Prompt verwenden (z.B. "1. HZ: 47 Min, 2. HZ: 45 Min → Gesamtspielzeit: 92 Min")
+- `analyze-match/index.ts`: `duration_sec` pro Halbzeit präziser berechnen statt Schätzung
 
-**Fix**: In `generate-insights/index.ts` vor dem AI-Call die `match_events` aus der DB laden und als zusaetzlichen Kontext mitgeben. Die Events enthalten: Tore, Torschuesse, Karten, Ecken — mit Minute und Team.
+## 2. API-Football besser integrieren + Alternativen
 
-**Datei**: `supabase/functions/generate-insights/index.ts`
+**Aktueller Stand**: API-Football ist vollständig eingebaut (Suche, Config, Sync Fixtures, Sync Player Stats, Standings). Problem: API-Football deckt Regionalliga und darunter NICHT zuverlässig ab.
 
-### 3. Spielererkennung verbessern (flexible Teamgroessen)
-**Problem**: Der Prompt in `analyze-match` geht implizit von 11v11 aus. Bei 3v3, 5v5, 7v7 oder Trainingsspielen werden zu wenig oder zu viele Spieler erkannt. Schiedsrichter und Linienrichter werden mitgezaehlt.
+**Alternative**: **OpenLigaDB** (kostenlos, open-source, Deutschland-fokussiert):
+- Deckt 1.-3. Liga ab, aber NICHT Regionalliga oder tiefer
+- Kein API-Key nötig — einfache REST-Calls
+- Limitiert auf Ergebnisse/Tabellen — keine Spielerstatistiken
 
-**Fix**: Prompt in `analyze-match/index.ts` erweitern:
-- Explizit anweisen: "Zaehle KEINE Schiedsrichter, Linienrichter oder andere Offizielle (typisch: schwarze Kleidung, isolierte Position)."
-- "Das Spielformat ist unbekannt. Erkenne die tatsaechliche Anzahl Spieler pro Team (3v3 bis 11v11). Melde die erkannte Teamgroesse."
-- Neues Feld `team_size_detected` im Schema (z.B. `{ home: 7, away: 7 }`)
-- "Wenn weniger Spieler sichtbar sind als erwartet, schaetze aufgrund der Formation und des sichtbaren Feldausschnitts die wahrscheinliche Gesamtzahl."
+**Realistisches Fazit**: Für Regionalliga und tiefer existiert KEINE externe API mit detaillierten Statistiken. Die eigene Kamera-Analyse IST die einzige Datenquelle. Das ist ein USP.
 
-**Datei**: `supabase/functions/analyze-match/index.ts`
+**Was implementiert wird**:
+- OpenLigaDB als Fallback für 1.-3. Liga einbauen (kostenlos, kein Key nötig)
+  - Neue Edge Function `openligadb/index.ts` mit Endpunkten: Spielergebnisse, Tabelle
+  - In `AdminApiFootball.tsx`: Tab/Section für OpenLigaDB-Anbindung (Liga auswählen)
+  - Ergebnisse automatisch mit eigenen Matches abgleichen (Datum + Gegner → Score eintragen)
+- API-Football bleibt für höhere Ligen als Premium-Option
+- Im MatchReport: Wenn API-Daten vorhanden, merge mit eigenen Daten; sonst eigene Analyse als alleinige Quelle klar kennzeichnen
 
-### 4. Kamera-Orientierung erkennen
-**Problem**: Der Prompt fragt nicht nach der Kameraausrichtung (quer, laengs, schraeg). Das beeinflusst die Koordinaten-Interpretation massiv.
+## 3. Match Events tatsächlich in Analyse verwenden
 
-**Fix**: Prompt erweitern mit:
-- "Erkenne die Kamera-Perspektive: Ist die Kamera QUER (Seitenansicht, typisch Mittellinie), LAENGS (hinter dem Tor), SCHRAEG (Eckfahne), oder TEILAUSSCHNITT (nur ein Bereich)? Dies bestimmt wie x/y Koordinaten zu interpretieren sind."
-- Neues Schema-Feld `camera_perspective` mit `{ orientation: "landscape_side" | "landscape_behind_goal" | "diagonal" | "partial", coverage_description: "...", estimated_pitch_coverage_pct: number }`
-- Der Insights-Prompt muss die Perspektive bei Positionsberechnungen beruecksichtigen.
+**Problem geprüft**: `generate-insights` lädt jetzt `match_events`, ABER:
+- Die Events werden nur als Text-Kontext übergeben — sie beeinflussen nicht die strukturierten Felder (Momentum, Grades)
+- Die Event-Buttons speichern zwar korrekt in die DB, aber die `minute`-Berechnung basiert auf `recordingStartTime` (relativer Timer), nicht auf der tatsächlichen Spielminute
 
-**Datei**: `supabase/functions/analyze-match/index.ts`
+**Fix**:
+- `generate-insights`: Prompt explizit anweisen, dass die match_events FAKTISCH sind und Momentum-Scores, Match-Rating und Risk-Matrix darauf basieren MÜSSEN
+- `MatchEventQuickBar.tsx`: Minute-Berechnung verbessern — bei Halbzeit 2 die Offset-Minute (45+) addieren
+- Neue Event-Buttons hinzufügen: `foul`, `red_card`, `offside`, `free_kick` (mehr Daten = bessere Analyse)
 
-### 5. Kamera-Code als direkter Deep-Link
-**Problem**: Aktuell wird der Code per WhatsApp mit einem Link zu `/camera` geteilt. Der Helfer muss den Code manuell eintippen.
+## 4. Elapsed-Time-Display während Aufnahme
 
-**Fix**: 
-- Code-Share URL aendern zu: `https://ball-sense.lovable.app/camera?code=XXXXXX`
-- In `CameraCodeEntry.tsx`: URL-Parameter `code` auslesen und automatisch submitten
-- In `CameraCodeShare.tsx`: WhatsApp-Link und Kopier-Funktion aktualisieren
+**Problem**: Die Aufnahme zeigt nur Frame-Count, keine Uhrzeit/Timer.
 
-**Dateien**: `src/components/CameraCodeShare.tsx`, `src/components/CameraCodeEntry.tsx`
+**Fix** in `CameraTrackingPage.tsx`:
+- Live-Timer-Anzeige im Recording-Overlay: `MM:SS` seit Aufnahmestart
+- Bei 2. HZ: `45:00 + MM:SS`
+- Timer-Ref mit `setInterval(1000)` für Live-Update
 
-### 6. Fehlercheck: `training_recommendations` Tabelle
-**Problem**: `generate-insights` macht `DELETE` und `INSERT` auf `training_recommendations`, aber die RLS-Policies erlauben nur `SELECT` fuer Club-Members. Der Service-Role-Key umgeht RLS, also funktioniert es serverseitig — aber pruefen ob die Tabelle korrekt existiert.
+## Dateien
 
-**Status**: Tabelle existiert (Migration gefunden), Service-Role-Key wird verwendet — kein Problem.
-
-## Implementation (6 Dateien)
-
-| Datei | Aenderung |
+| Datei | Änderung |
 |---|---|
-| `src/pages/Login.tsx` | localStorage statt sessionStorage; installierte App: 3 Buttons statt Install-Screen |
-| `supabase/functions/generate-insights/index.ts` | match_events laden und als Kontext an AI uebergeben |
-| `supabase/functions/analyze-match/index.ts` | Prompt: flexible Teamgroesse, Schiri-Ausschluss, Kamera-Orientierung, neue Schema-Felder |
-| `src/components/CameraCodeShare.tsx` | Deep-Link mit Code in URL, WhatsApp-Text aktualisieren |
-| `src/components/CameraCodeEntry.tsx` | URL-Parameter `code` auslesen und auto-submit |
-| `src/components/MobileInstallFab.tsx` | Konsistenz mit neuem localStorage-Ansatz |
+| DB-Migration | 6 neue Spalten in `matches` für Timing |
+| `src/pages/CameraTrackingPage.tsx` | Zeitstempel bei Start/Stop/Halbzeit schreiben, Live-Timer-Anzeige |
+| `src/components/MatchEventQuickBar.tsx` | Mehr Event-Buttons, korrekte Minutenberechnung für 2. HZ |
+| `supabase/functions/camera-ops/index.ts` | Timing-Daten bei upload-frames in matches schreiben |
+| `supabase/functions/generate-insights/index.ts` | Spielzeit aus matches laden, match_events stärker gewichten |
+| `supabase/functions/openligadb/index.ts` | Neue Edge Function für OpenLigaDB (kostenlos, kein Key) |
+| `src/components/AdminApiFootball.tsx` | OpenLigaDB-Tab ergänzen |
 
-Keine DB-Migration noetig.
+## Nicht implementiert (mit Begründung)
+
+- **Automatische Tor/Foul-Erkennung per Kamera**: Bereits im `analyze-match`-Prompt angewiesen, visuelle Hinweise zu suchen (Jubel, Referee-Gesten). Mehr ist mit Standbild-Analyse (alle 30s) nicht zuverlässig möglich — das wäre Video-Analyse in Echtzeit, was die aktuelle Architektur nicht hergibt.
+- **Ballbesitz-Tracking**: Nicht aus 30s-Standbildern ableitbar. Wird geschätzt basierend auf Spielerpositionsverteilung (bereits im Prompt).
 
