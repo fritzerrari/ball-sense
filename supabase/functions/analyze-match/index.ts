@@ -166,7 +166,7 @@ Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Angriffsrichtungen und Raumbesetzung
 - Erkennbare Muster und Spielphasen
 - Ballpositionen und Druckzonen
-- Für JEDEN Frame: Schätze die ungefähren Positionen (x,y in 0-100% des Spielfelds) aller erkennbaren Spieler beider Teams und des Balls. x=0 ist die linke Torlinie, x=100 die rechte. y=0 oben, y=100 unten. Gib auch eine kurze Beschreibung der Szene pro Frame.
+- Für JEDEN Frame: Schätze die Positionen (x,y in 0-100% des Spielfelds) ALLER Spieler beider Teams und des Balls. x=0 ist die linke Torlinie, x=100 die rechte. y=0 oben, y=100 unten. WICHTIG: Du MUSST für JEDES Team die volle Spieleranzahl liefern (z.B. 11 pro Team bei 11v11, 7 bei 7v7). Wenn Spieler nicht direkt sichtbar sind, schätze ihre Position basierend auf der erkannten Formation und Spielsituation und markiere sie mit "estimated": true. Gib auch Trikotnummern an, wenn erkennbar.
 - Für JEDEN Frame: Schätze den sichtbaren Feldausschnitt (visible_area). Wenn die Kamera geschwenkt oder gezoomt wurde, zeigen verschiedene Frames unterschiedliche Bereiche.
 - Für JEDEN Frame: Schätze die Pressing-Linie beider Teams (y-Koordinate des höchsten Verteidigungsspielers, 0=oben, 100=unten) und die Kompaktheit (Abstand zwischen höchstem und tiefstem Feldspieler).
 - Erkenne Umschaltmomente: Wann gewinnt ein Team den Ball und kontert? Wann verliert ein Team den Ball und presst sofort nach?
@@ -312,13 +312,16 @@ KAMERA-PERSPEKTIVE ERKENNEN:
                         },
                         players: {
                           type: "array",
+                          description: "ALL players of BOTH teams. You MUST include estimated positions for players not directly visible. For a detected 11v11 match, provide exactly 11 home + 11 away players. Mark non-visible players with estimated=true.",
                           items: {
                             type: "object",
                             properties: {
                               team: { type: "string", enum: ["home", "away"] },
                               x: { type: "number" },
                               y: { type: "number" },
-                              role: { type: "string", description: "Optional: GK, DEF, MID, FWD if identifiable" },
+                              role: { type: "string", description: "GK, DEF, MID, or FWD" },
+                              number: { type: "integer", description: "Jersey number if identifiable" },
+                              estimated: { type: "boolean", description: "true if this player position is estimated (not directly visible). Default false." },
                             },
                             required: ["team", "x", "y"],
                           },
