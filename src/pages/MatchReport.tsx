@@ -5,11 +5,14 @@ import {
   ArrowLeft, Brain, Lightbulb, Target, Shield, Zap,
   ClipboardList, AlertTriangle, TrendingUp, Calendar,
   Loader2, RefreshCw, ChevronRight, Swords, Users, Dumbbell,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { usePdfExport, PdfReportType } from "@/hooks/use-pdf-export";
 import PostMatchEventEditor from "@/components/PostMatchEventEditor";
 import { useMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
@@ -97,6 +100,7 @@ export default function MatchReport() {
   const { data: match, isLoading } = useMatch(id);
   const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
   const { data: opponentProfile } = useOpponentHistory(match?.away_club_name);
+  const { exportPdf, exporting } = usePdfExport();
 
   const [sections, setSections] = useState<ReportSection[]>([]);
   const [training, setTraining] = useState<TrainingRec[]>([]);
@@ -205,6 +209,34 @@ export default function MatchReport() {
             <p className="text-xs text-muted-foreground">Match Report</p>
           </div>
           {id && <PostMatchEventEditor matchId={id} onEventsChanged={loadReportData} />}
+          {hasReport && id && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5" disabled={exporting}>
+                  {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  PDF
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="end">
+                <div className="space-y-1">
+                  {[
+                    { type: "full_report" as PdfReportType, label: "Kompletter Report" },
+                    { type: "training_plan" as PdfReportType, label: "Trainingsplan" },
+                    { type: "match_prep" as PdfReportType, label: "Gegner-Briefing" },
+                    { type: "halftime_tactics" as PdfReportType, label: "Halbzeit-Taktik" },
+                  ].map(({ type, label }) => (
+                    <button
+                      key={type}
+                      onClick={() => exportPdf(id, type, { clubName: clubName ?? undefined })}
+                      className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-muted transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           <Button variant="outline" size="sm" onClick={handleReprocess} disabled={reprocessing || !!isProcessing} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${reprocessing ? "animate-spin" : ""}`} />
             Neu analysieren
