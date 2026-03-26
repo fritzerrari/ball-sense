@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Search, Loader2, RefreshCw, Globe, Trophy, Users, Calendar,
-  CheckCircle2, AlertCircle, Zap, AlertTriangle, BarChart3,
+  CheckCircle2, AlertCircle, Zap, AlertTriangle, BarChart3, Database,
 } from "lucide-react";
 
 interface ApiConfig {
@@ -180,7 +181,17 @@ export default function AdminApiFootball() {
   const endDate = apiUsage?.subscription?.end ?? null;
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="api-football" className="space-y-6">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="api-football" className="gap-1.5">
+          <Zap className="h-3.5 w-3.5" /> API-Football
+        </TabsTrigger>
+        <TabsTrigger value="openligadb" className="gap-1.5">
+          <Database className="h-3.5 w-3.5" /> OpenLigaDB
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="api-football" className="space-y-6">
       {/* API Usage Card */}
       <div className={`glass-card p-5 space-y-4 ${isCritical ? "border-destructive/50" : isWarning ? "border-yellow-500/50" : ""}`}>
         <div className="flex items-center justify-between">
@@ -452,7 +463,12 @@ export default function AdminApiFootball() {
           </p>
         </div>
       </div>
-    </div>
+    </TabsContent>
+
+      <TabsContent value="openligadb">
+        <OpenLigaDBPanel />
+      </TabsContent>
+    </Tabs>
   );
 }
 
