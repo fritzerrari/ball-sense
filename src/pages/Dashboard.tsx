@@ -9,7 +9,7 @@ import { useFields } from "@/hooks/use-fields";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { PlanBadge } from "@/components/PlanBadge";
-import { SetupChecklist } from "@/components/SetupChecklist";
+
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import { MatchFlowGuide } from "@/components/MatchFlowGuide";
 import { useTranslation, useLocale } from "@/lib/i18n";
@@ -106,7 +106,7 @@ export default function Dashboard() {
         )}
 
         <MatchFlowGuide />
-        <SetupChecklist hasPlayers={!!hasPlayers} hasFields={!!hasFields} />
+        
 
         {/* Quick stats */}
         <div className="grid sm:grid-cols-3 gap-4">

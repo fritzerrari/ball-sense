@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Users, Map, Crosshair, Swords, Camera, BarChart3, ChevronRight, CheckCircle2, Rocket, BrainCircuit, ShieldAlert, Sparkles } from "lucide-react";
+import { Users, Map, Swords, Camera, BarChart3, ChevronRight, CheckCircle2, Rocket, BrainCircuit, ShieldAlert, Sparkles } from "lucide-react";
 import { usePlayers } from "@/hooks/use-players";
 import { useFields } from "@/hooks/use-fields";
 import { useMatches } from "@/hooks/use-matches";
