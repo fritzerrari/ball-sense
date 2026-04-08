@@ -704,21 +704,23 @@ export default function CameraTrackingPage() {
         )}
         {phase === "recording" && (
           <>
-            {/* Halftime button */}
-            <Button
-              onClick={triggerHalftime}
-              disabled={uploading || frameCount < 1}
-              size="lg"
-              variant="secondary"
-              className="w-full gap-2 h-12 text-base border border-primary/30 bg-primary/10 hover:bg-primary/20"
-            >
-              {uploading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Pause className="h-5 w-5 text-primary" />
-              )}
-              ⚽ Halbzeit — Hochladen & Pausieren
-            </Button>
+            {/* Halftime button — hidden for training sessions */}
+            {!isTraining && (
+              <Button
+                onClick={triggerHalftime}
+                disabled={uploading || frameCount < 1}
+                size="lg"
+                variant="secondary"
+                className="w-full gap-2 h-12 text-base border border-primary/30 bg-primary/10 hover:bg-primary/20"
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Pause className="h-5 w-5 text-primary" />
+                )}
+                ⚽ Halbzeit — Hochladen & Pausieren
+              </Button>
+            )}
 
             {/* Stop button */}
             <Button
