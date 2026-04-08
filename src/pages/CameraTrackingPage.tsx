@@ -15,7 +15,7 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 
-type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "analyzing" | "done";
+type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
 /** Check if user is authenticated */
 function useIsAuthenticated() {
