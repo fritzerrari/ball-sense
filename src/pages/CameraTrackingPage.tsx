@@ -43,6 +43,7 @@ export default function CameraTrackingPage() {
 
   const [phase, setPhase] = useState<Phase>(matchIdParam ? "setup" : "code");
   const [matchId, setMatchId] = useState<string | null>(matchIdParam ?? null);
+  const [matchType, setMatchType] = useState<string>("match");
   const [sessionToken, setSessionToken] = useState(searchParams.get("token") ?? "");
   const [sessionId, setSessionId] = useState<string | null>(null);
 
