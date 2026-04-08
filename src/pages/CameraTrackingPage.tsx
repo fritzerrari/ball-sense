@@ -732,6 +732,16 @@ export default function CameraTrackingPage() {
           </div>
         )}
 
+        {phase === "stopped" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 gap-4 px-6">
+            <Pause className="h-14 w-14 text-amber-400" />
+            <p className="text-lg font-semibold text-white">Aufnahme pausiert</p>
+            <p className="text-sm text-white/60 text-center">
+              {frameCount} Frames aufgenommen. Fortsetzen oder Analyse starten?
+            </p>
+          </div>
+        )}
+
         {phase === "done" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 gap-4">
             <CheckCircle2 className="h-16 w-16 text-primary" />
