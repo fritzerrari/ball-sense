@@ -43,6 +43,7 @@ export default function CameraTrackingPage() {
 
   const [phase, setPhase] = useState<Phase>(matchIdParam ? "setup" : "code");
   const [matchId, setMatchId] = useState<string | null>(matchIdParam ?? null);
+  const [matchType, setMatchType] = useState<string>("match");
   const [sessionToken, setSessionToken] = useState(searchParams.get("token") ?? "");
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -69,6 +70,15 @@ export default function CameraTrackingPage() {
 
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
+  const isTraining = matchType === "training";
+
+  // Fetch match_type when matchId is set
+  useEffect(() => {
+    if (!matchId) return;
+    supabase.from("matches").select("match_type").eq("id", matchId).maybeSingle().then(({ data }) => {
+      if (data?.match_type) setMatchType(data.match_type);
+    });
+  }, [matchId]);
 
   const handleCodeSuccess = useCallback((data: { matchId: string; cameraIndex: number; sessionToken: string }) => {
     setMatchId(data.matchId);
@@ -650,6 +660,7 @@ export default function CameraTrackingPage() {
                   sessionToken={isHelper ? sessionToken : undefined}
                   highlightsEnabled={hasHighlights && !isHelper}
                   halfNumber={halfNumber}
+                  isTraining={isTraining}
                 />
               </div>
             )}
@@ -694,21 +705,23 @@ export default function CameraTrackingPage() {
         )}
         {phase === "recording" && (
           <>
-            {/* Halftime button */}
-            <Button
-              onClick={triggerHalftime}
-              disabled={uploading || frameCount < 1}
-              size="lg"
-              variant="secondary"
-              className="w-full gap-2 h-12 text-base border border-primary/30 bg-primary/10 hover:bg-primary/20"
-            >
-              {uploading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Pause className="h-5 w-5 text-primary" />
-              )}
-              ⚽ Halbzeit — Hochladen & Pausieren
-            </Button>
+            {/* Halftime button — hidden for training sessions */}
+            {!isTraining && (
+              <Button
+                onClick={triggerHalftime}
+                disabled={uploading || frameCount < 1}
+                size="lg"
+                variant="secondary"
+                className="w-full gap-2 h-12 text-base border border-primary/30 bg-primary/10 hover:bg-primary/20"
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Pause className="h-5 w-5 text-primary" />
+                )}
+                ⚽ Halbzeit — Hochladen & Pausieren
+              </Button>
+            )}
 
             {/* Stop button */}
             <Button

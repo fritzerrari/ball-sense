@@ -12,6 +12,7 @@ interface Props {
   sessionToken?: string;
   highlightsEnabled?: boolean;
   halfNumber?: number;
+  isTraining?: boolean;
 }
 
 const EVENT_BUTTONS = [
@@ -34,8 +35,15 @@ export default function MatchEventQuickBar({
   sessionToken,
   highlightsEnabled = false,
   halfNumber = 1,
+  isTraining = false,
 }: Props) {
   const [saving, setSaving] = useState<string | null>(null);
+
+  // Filter out match-only events for training sessions
+  const TRAINING_EXCLUDED: EventType[] = ["substitution", "corner", "free_kick"];
+  const visibleButtons = isTraining
+    ? EVENT_BUTTONS.filter(b => !TRAINING_EXCLUDED.includes(b.type))
+    : EVENT_BUTTONS;
 
   const handleEvent = useCallback(async (eventType: EventType) => {
     if (saving) return;
@@ -128,8 +136,8 @@ export default function MatchEventQuickBar({
   }, [matchId, recorderRef, recordingStartTime, saving, sessionToken, highlightsEnabled, halfNumber]);
 
   return (
-    <div className="grid grid-cols-4 gap-1.5 w-full max-w-xs">
-      {EVENT_BUTTONS.map((btn) => (
+    <div className={`grid gap-1.5 w-full max-w-xs ${visibleButtons.length <= 5 ? "grid-cols-3" : "grid-cols-4"}`}>
+      {visibleButtons.map((btn) => (
         <Button
           key={btn.type}
           size="sm"
