@@ -54,6 +54,7 @@ export default function CameraTrackingPage() {
   const [transferAuthorized, setTransferAuthorized] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const stoppedCaptureRef = useRef<{ frames: string[]; durationSec: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
