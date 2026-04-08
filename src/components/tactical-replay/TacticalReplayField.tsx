@@ -49,20 +49,32 @@ export default function TacticalReplayField({
         <rect x="0" y="0" width="105" height="68" fill="url(#trGrass)" />
         <rect x="0" y="0" width="105" height="68" fill="url(#trStripes)" />
 
-        {/* Field lines */}
+        {/* Field lines — adapted for team size */}
         <g stroke="hsl(var(--pitch-line))" strokeOpacity="0.4" fill="none">
           <rect x="1" y="1" width="103" height="66" strokeWidth="0.35" rx="0.5" />
           <line x1="52.5" y1="1" x2="52.5" y2="67" strokeWidth="0.3" />
-          <circle cx="52.5" cy="34" r="9.15" strokeWidth="0.3" />
+          <circle cx="52.5" cy="34" r={isSmallFormat ? 6 : 9.15} strokeWidth="0.3" />
           <circle cx="52.5" cy="34" r="0.6" fill="hsl(var(--pitch-line))" fillOpacity="0.4" stroke="none" />
-          <rect x="1" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
-          <rect x="87.5" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
-          <rect x="1" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
-          <rect x="98.5" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
-          <circle cx="12" cy="34" r="0.4" fill="hsl(var(--pitch-line))" fillOpacity="0.35" stroke="none" />
-          <circle cx="93" cy="34" r="0.4" fill="hsl(var(--pitch-line))" fillOpacity="0.35" stroke="none" />
-          <path d="M 17.5 27.5 A 9.15 9.15 0 0 1 17.5 40.5" strokeWidth="0.25" />
-          <path d="M 87.5 27.5 A 9.15 9.15 0 0 0 87.5 40.5" strokeWidth="0.25" />
+          {/* Penalty areas — only for 9v9+ */}
+          {!isSmallFormat && (
+            <>
+              <rect x="1" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
+              <rect x="87.5" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
+              <rect x="1" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
+              <rect x="98.5" y="24.84" width="5.5" height="18.32" strokeWidth="0.2" />
+              <circle cx="12" cy="34" r="0.4" fill="hsl(var(--pitch-line))" fillOpacity="0.35" stroke="none" />
+              <circle cx="93" cy="34" r="0.4" fill="hsl(var(--pitch-line))" fillOpacity="0.35" stroke="none" />
+              <path d="M 17.5 27.5 A 9.15 9.15 0 0 1 17.5 40.5" strokeWidth="0.25" />
+              <path d="M 87.5 27.5 A 9.15 9.15 0 0 0 87.5 40.5" strokeWidth="0.25" />
+            </>
+          )}
+          {/* Simplified goal areas for small formats */}
+          {isSmallFormat && (
+            <>
+              <rect x="1" y="20" width="8" height="28" strokeWidth="0.25" />
+              <rect x="96" y="20" width="8" height="28" strokeWidth="0.25" />
+            </>
+          )}
         </g>
 
         {/* Player trails */}
