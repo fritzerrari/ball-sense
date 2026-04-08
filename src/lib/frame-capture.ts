@@ -116,8 +116,8 @@ export async function captureFramesFromFile(
  * Call startLiveCapture with the video element showing the camera stream.
  * Call stop() on the returned object when recording ends.
  */
-export function startLiveCapture(videoEl: HTMLVideoElement) {
-  const frames: string[] = [];
+export function startLiveCapture(videoEl: HTMLVideoElement, initialFrames?: string[]) {
+  const frames: string[] = initialFrames ? [...initialFrames] : [];
   let skippedFrames = 0;
   const canvas = document.createElement("canvas");
   let interval: ReturnType<typeof setInterval> | null = null;

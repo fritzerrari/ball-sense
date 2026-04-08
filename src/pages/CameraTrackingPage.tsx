@@ -15,7 +15,7 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 
-type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "analyzing" | "done";
+type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
 /** Check if user is authenticated */
 function useIsAuthenticated() {
@@ -54,6 +54,7 @@ export default function CameraTrackingPage() {
   const [transferAuthorized, setTransferAuthorized] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const stoppedCaptureRef = useRef<{ frames: string[]; durationSec: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
@@ -491,21 +492,76 @@ export default function CameraTrackingPage() {
     setShowStopConfirm(true);
   }, [frameCount]);
 
+  // Pause capture but keep camera stream alive for possible resume
   const confirmStop = useCallback(async () => {
     if (!matchId) return;
     setShowStopConfirm(false);
 
+    // Stop frame capture but DON'T kill the camera stream yet
     const captureResult = liveCaptureRef.current?.stop();
     liveCaptureRef.current = null;
-    videoRecorderRef.current?.stop();
-    videoRecorderRef.current = null;
 
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    if (videoRef.current) videoRef.current.srcObject = null;
     if ((streamRef as any)._countInterval) clearInterval((streamRef as any)._countInterval);
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     if (deltaUploadRef.current) clearInterval(deltaUploadRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
+
+    if (!captureResult || captureResult.frames.length === 0) {
+      toast.error("Keine Frames aufgenommen");
+      setPhase("setup");
+      return;
+    }
+
+    // Store captured frames for later finalize or resume
+    stoppedCaptureRef.current = { frames: captureResult.frames, durationSec: captureResult.durationSec };
+    setPhase("stopped");
+    if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
+  }, [matchId]);
+
+  // Resume recording after accidental stop — re-start capture with existing stream
+  const resumeRecording = useCallback(() => {
+    if (videoRef.current) {
+      liveCaptureRef.current = startLiveCapture(videoRef.current, stoppedCaptureRef.current?.frames);
+    }
+
+    if (hasHighlights && !isHelper && streamRef.current) {
+      videoRecorderRef.current = startVideoRecorder(streamRef.current);
+    }
+
+    stoppedCaptureRef.current = null;
+    setPhase("recording");
+    setRecordingStartTime(Date.now());
+    setElapsedSeconds(0);
+    lastUploadedIndexRef.current = 0;
+    chunkIndexRef.current = 0;
+    if (navigator.vibrate) navigator.vibrate(50);
+
+    const countInterval = setInterval(() => {
+      setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
+    }, 5000);
+    (streamRef as any)._countInterval = countInterval;
+
+    if (isHelper) {
+      deltaUploadRef.current = setInterval(() => {
+        if (deltaRetryCountRef.current < 3) uploadDelta();
+      }, 45000);
+    }
+
+    toast.success("Aufnahme fortgesetzt!");
+  }, [hasHighlights, isHelper, uploadDelta]);
+
+  // Finalize: destroy stream, upload, start analysis
+  const finalizeStop = useCallback(async () => {
+    if (!matchId || !stoppedCaptureRef.current) return;
+
+    const captureResult = stoppedCaptureRef.current;
+    stoppedCaptureRef.current = null;
+
+    // Now kill everything
+    videoRecorderRef.current?.stop();
+    videoRecorderRef.current = null;
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    if (videoRef.current) videoRef.current.srcObject = null;
 
     // Persist end timing
     const now = new Date().toISOString();
@@ -516,12 +572,6 @@ export default function CameraTrackingPage() {
       timingFields.h1_ended_at = now;
     }
     updateMatchTiming(timingFields);
-
-    if (!captureResult || captureResult.frames.length === 0) {
-      toast.error("Keine Frames aufgenommen");
-      setPhase("setup");
-      return;
-    }
 
     setPhase("analyzing");
     setProgress(20);
@@ -682,6 +732,16 @@ export default function CameraTrackingPage() {
           </div>
         )}
 
+        {phase === "stopped" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 gap-4 px-6">
+            <Pause className="h-14 w-14 text-amber-400" />
+            <p className="text-lg font-semibold text-white">Aufnahme pausiert</p>
+            <p className="text-sm text-white/60 text-center">
+              {frameCount} Frames aufgenommen. Fortsetzen oder Analyse starten?
+            </p>
+          </div>
+        )}
+
         {phase === "done" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 gap-4">
             <CheckCircle2 className="h-16 w-16 text-primary" />
@@ -741,6 +801,25 @@ export default function CameraTrackingPage() {
           </>
         )}
 
+        {phase === "stopped" && (
+          <div className="space-y-2">
+            <Button
+              onClick={resumeRecording}
+              size="lg"
+              className="w-full gap-2 h-14 text-base"
+            >
+              <Play className="h-5 w-5" /> Aufnahme fortsetzen
+            </Button>
+            <Button
+              onClick={finalizeStop}
+              size="lg"
+              variant="destructive"
+              className="w-full gap-2 h-12 text-base"
+            >
+              <Square className="h-4 w-4" /> Endgültig stoppen & Analyse starten
+            </Button>
+          </div>
+        )}
         {phase === "halftime_pause" && (
           <div className="space-y-2">
             <Button
