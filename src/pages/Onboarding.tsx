@@ -173,7 +173,7 @@ export default function Onboarding() {
     }
 
     if (Object.keys(updates).length > 0 && currentClubId) {
-      await supabase.from("clubs").update(updates).eq("id", currentClubId);
+      await supabase.from("clubs").update(updates as any).eq("id", currentClubId);
     }
 
     // Refresh again to pick up name/logo changes
