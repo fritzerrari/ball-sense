@@ -24,6 +24,7 @@ export default function TacticalReplayField({
   expectedAway,
 }: TacticalReplayFieldProps) {
   const history = posHistoryRef.current;
+  const isSmallFormat = expectedHome <= 7 || expectedAway <= 7;
 
   return (
     <div className="rounded-2xl border border-border/50 relative overflow-hidden shadow-inner" style={{ aspectRatio: "105/68" }}>
