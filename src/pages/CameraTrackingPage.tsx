@@ -660,6 +660,7 @@ export default function CameraTrackingPage() {
                   sessionToken={isHelper ? sessionToken : undefined}
                   highlightsEnabled={hasHighlights && !isHelper}
                   halfNumber={halfNumber}
+                  isTraining={isTraining}
                 />
               </div>
             )}
