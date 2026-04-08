@@ -134,7 +134,7 @@ export default function TacticalReplayField({
                 fontWeight="bold"
                 fontFamily="var(--font-display)"
               >
-                {p.number ?? (p.role ? p.role.charAt(0) : "")}
+                {p.number != null ? p.number : (p.role ? p.role.charAt(0) : "")}
               </text>
             </g>
           );

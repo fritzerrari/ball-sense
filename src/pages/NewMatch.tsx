@@ -103,11 +103,11 @@ export default function NewMatch() {
       await supabase.from("matches").update({ status: "processing" }).eq("id", matchId);
       setUploadProgress(90);
 
+      // Invoke analyze-match WITHOUT inline frames — it loads from storage
       const { error: fnError } = await supabase.functions.invoke("analyze-match", {
         body: {
           match_id: matchId,
           job_id: job.id,
-          frames: captureResult.frames,
           duration_sec: captureResult.durationSec,
         },
       });
