@@ -801,6 +801,25 @@ export default function CameraTrackingPage() {
           </>
         )}
 
+        {phase === "stopped" && (
+          <div className="space-y-2">
+            <Button
+              onClick={resumeRecording}
+              size="lg"
+              className="w-full gap-2 h-14 text-base"
+            >
+              <Play className="h-5 w-5" /> Aufnahme fortsetzen
+            </Button>
+            <Button
+              onClick={finalizeStop}
+              size="lg"
+              variant="destructive"
+              className="w-full gap-2 h-12 text-base"
+            >
+              <Square className="h-4 w-4" /> Endgültig stoppen & Analyse starten
+            </Button>
+          </div>
+        )}
         {phase === "halftime_pause" && (
           <div className="space-y-2">
             <Button
