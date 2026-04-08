@@ -70,6 +70,15 @@ export default function CameraTrackingPage() {
 
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
+  const isTraining = matchType === "training";
+
+  // Fetch match_type when matchId is set
+  useEffect(() => {
+    if (!matchId) return;
+    supabase.from("matches").select("match_type").eq("id", matchId).maybeSingle().then(({ data }) => {
+      if (data?.match_type) setMatchType(data.match_type);
+    });
+  }, [matchId]);
 
   const handleCodeSuccess = useCallback((data: { matchId: string; cameraIndex: number; sessionToken: string }) => {
     setMatchId(data.matchId);
