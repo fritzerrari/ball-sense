@@ -356,10 +356,10 @@ WICHTIG: Gib NUR das HTML zurück, kein Markdown, keine Erklärung. NUTZE die CS
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Erstelle den Report. Hier sind alle verfügbaren Daten:\n\n${JSON.stringify(dataContext, null, 2)}` },
+          { role: "user", content: `Erstelle den Report. Daten:\n${JSON.stringify(dataContext)}` },
         ],
       }),
     });
