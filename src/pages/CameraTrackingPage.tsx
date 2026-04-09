@@ -693,15 +693,27 @@ export default function CameraTrackingPage() {
         {phase === "recording" && (
           <>
             {/* Recording indicator with pulsing ring and live timer */}
-            <div className="absolute top-4 left-4 flex items-center gap-2 bg-destructive/90 rounded-full px-3 py-2 shadow-lg shadow-destructive/20">
-              <div className="relative">
-                <div className="h-3 w-3 rounded-full bg-white animate-pulse" />
-                <div className="absolute inset-0 h-3 w-3 rounded-full bg-white/30 animate-ping" />
+            <div className="absolute top-4 left-4 flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-destructive/90 rounded-full px-3 py-2 shadow-lg shadow-destructive/20">
+                <div className="relative">
+                  <div className="h-3 w-3 rounded-full bg-white animate-pulse" />
+                  <div className="absolute inset-0 h-3 w-3 rounded-full bg-white/30 animate-ping" />
+                </div>
+                <span className="text-xs text-white font-semibold">
+                  {halfNumber === 2 ? "2. HZ" : "REC"}
+                </span>
+                <span className="text-xs text-white/80 font-mono">{timerDisplay}</span>
               </div>
-              <span className="text-xs text-white font-semibold">
-                {halfNumber === 2 ? "2. HZ" : "REC"}
-              </span>
-              <span className="text-xs text-white/80 font-mono">{timerDisplay}</span>
+              {/* Live score badge */}
+              {!isTraining && (
+                <div className="bg-black/70 rounded-full px-3 py-2 flex items-center gap-1.5 shadow-lg">
+                  <span className="text-xs text-white font-bold">{homeTeamName.slice(0, 8)}</span>
+                  <span className="text-sm text-white font-mono font-bold">{liveHomeGoals}</span>
+                  <span className="text-xs text-white/60">:</span>
+                  <span className="text-sm text-white font-mono font-bold">{liveAwayGoals}</span>
+                  <span className="text-xs text-white font-bold">{awayTeamName.slice(0, 8)}</span>
+                </div>
+              )}
             </div>
 
             {/* Frame counter + sync status */}
@@ -741,6 +753,18 @@ export default function CameraTrackingPage() {
                   highlightsEnabled={hasHighlights && !isHelper}
                   halfNumber={halfNumber}
                   isTraining={isTraining}
+                  homeTeamName={homeTeamName}
+                  awayTeamName={awayTeamName}
+                  onGoalEvent={(team) => {
+                    if (team === "home") setLiveHomeGoals(p => p + 1);
+                    else setLiveAwayGoals(p => p + 1);
+                  }}
+                  onEventDeleted={(type, team) => {
+                    if (type === "goal") {
+                      if (team === "home") setLiveHomeGoals(p => Math.max(0, p - 1));
+                      else setLiveAwayGoals(p => Math.max(0, p - 1));
+                    }
+                  }}
                 />
               </div>
             )}
