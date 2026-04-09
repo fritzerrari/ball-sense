@@ -1,64 +1,86 @@
 
-# Plan: Chance-Button Fix + Multi-Kamera-Harmonisierung
 
-## Analyse
+# Analyse & Gamechanger-Vorschläge für FieldIQ
 
-### 1. "Chance"-Button (shot_on_target)
-Der Button funktioniert **technisch korrekt** — `shot_on_target` ist ein gültiger Enum-Wert in der DB. Das Problem liegt wahrscheinlich daran, dass der Nutzer den Button klickt, aber kein visuelles Feedback bekommt, weil:
-- Der Toast zeigt "Chance (Heim) ✓" — das funktioniert
-- **Mögliches Problem**: Wenn `saving` noch auf einen vorherigen Event-Typ gesetzt ist (Race Condition bei schnellem Klicken), wird der Klick ignoriert (`if (saving) return;`)
-- **Bestätigung nötig**: Wir prüfen die DB auf tatsächlich gespeicherte `shot_on_target`-Events
+## Aktuelle Datenanalyse
 
-### 2. Multi-Kamera-Harmonisierung — **Kritisches Problem**
-Mehrere Kameras überschreiben sich gegenseitig:
-- Jede Kamera speichert Frames unter `{match_id}.json` (canonical), `{match_id}_chunk_X.json` etc.
-- Kamera 2 überschreibt die Frames von Kamera 1 mit `upsert: true`
-- `updateCanonicalFrameFile` in `camera-ops` merged zwar, aber die Chunks überschreiben sich trotzdem
-- `analyze-match` lädt nur `{match_id}.json` — sieht nur die Frames der letzten Kamera
+Das letzte Spiel (08.04.) zeigt die Probleme klar:
+- **9 Events**, davon **7x `shot_on_target`**, **2x `goal`** — alle mit `team: "home"`
+- Der Team-Toggle wurde zwar eingebaut, aber die `homeTeamName`/`awayTeamName`-Props werden im `CameraTrackingPage` **nicht an den QuickBar übergeben** — der Nutzer sieht nur "Heim" und "Gegner" als Standardwerte
+- Kein Live-Spielstand auf dem Tracking-Screen sichtbar
 
-Die Storage-Pfade müssen den `camera_index` enthalten, und die Analyse muss Frames aller Kameras zusammenführen.
+## Was verbessert werden kann
+
+### 1. Live-Spielstand auf dem Tracking-Screen (Quick Win)
+Während der Aufnahme wird kein laufender Spielstand angezeigt. Der Coach sieht nicht, wie viele Tore er für welches Team geloggt hat.
+
+**Änderung:** Kleines Score-Badge oben auf dem Kamera-Screen: `Heim 2 : 0 Gegner` — live aktualisiert bei jedem Goal-Event.
+
+**Datei:** `src/pages/CameraTrackingPage.tsx` — Score-State tracken aus Events, im Recording-Overlay anzeigen.
+
+### 2. Team-Namen an QuickBar durchreichen (Bug-Fix)
+Aktuell bekommt `MatchEventQuickBar` keine `homeTeamName`/`awayTeamName`-Props im CameraTrackingPage. Der Coach sieht nur "Heim"/"Gegner" statt z.B. "FC Muster"/"SV Gegner".
+
+**Änderung:** Match-Daten (`away_club_name`, Club-Name) laden und als Props übergeben.
+
+**Datei:** `src/pages/CameraTrackingPage.tsx`
+
+### 3. Event-Korrektur während der Aufnahme (Gamechanger)
+Aktuell kann man Events nicht löschen — wenn man versehentlich "Tor" drückt, bleibt es für immer. Das verfälscht die gesamte Analyse.
+
+**Änderung:** 
+- Mini-Event-Log unterhalb der Buttons (letzte 3 Events als Chips)
+- Jeder Chip hat ein X zum Löschen
+- Bestätigungsdialog: "Tor (Heim, Min. 7) wirklich entfernen?"
+
+**Dateien:** `src/components/MatchEventQuickBar.tsx` — Event-History als State + Lösch-Funktion
+
+### 4. Post-Match Ergebnis-Korrektur (Gamechanger)
+Nach dem Spiel sollte der Coach das Endergebnis manuell korrigieren können, falls Events falsch geloggt wurden. Das korrigierte Ergebnis wird dann in der Analyse verwendet.
+
+**Änderung:**
+- Im `PostMatchEventEditor` (bereits vorhanden): Editable Score-Felder hinzufügen
+- Score in `matches`-Tabelle speichern (neue Spalten `home_score`, `away_score`)
+- `generate-insights` nutzt diese als höchste Priorität ("Ground Truth") statt Events zu zählen
+
+**Dateien:** 
+- Migration: `home_score` und `away_score` Spalten auf `matches`
+- `src/components/PostMatchEventEditor.tsx`
+- `supabase/functions/generate-insights/index.ts`
+
+### 5. Intelligente Event-Duplikat-Erkennung
+7x `shot_on_target` in 8 Minuten deutet auf versehentliche Doppelklicks hin (trotz Debounce). 
+
+**Änderung:** Nach dem Speichern eines Events kurz den Button deaktivieren (visuell mit Countdown-Ring, 3 Sekunden), damit der Coach bewusst erneut klicken muss.
+
+**Datei:** `src/components/MatchEventQuickBar.tsx`
 
 ---
 
-## Änderungen
+## Empfohlene Priorität
 
-### A. Chance-Button absichern
-**Datei: `src/components/MatchEventQuickBar.tsx`**
-- `saving`-State von `string | null` auf Set-basierte Logik umstellen, damit schnelles Klicken verschiedener Buttons parallel funktioniert
-- Visuelles Feedback verbessern: Button kurz grün aufleuchten lassen nach erfolgreichem Speichern
+| # | Feature | Impact | Aufwand |
+|---|---------|--------|---------|
+| 1 | **Event-Korrektur (Undo/Delete)** | Gamechanger — verhindert falsche Analysen | Mittel |
+| 2 | **Post-Match Score-Korrektur** | Gamechanger — letzte Sicherheit für korrekte Ergebnisse | Mittel |
+| 3 | **Live-Spielstand im Tracking** | Hoch — Coach hat Überblick | Klein |
+| 4 | **Team-Namen durchreichen** | Bug-Fix — bessere UX | Klein |
+| 5 | **Cooldown nach Event-Klick** | Mittel — weniger Fehlklicks | Klein |
 
-### B. Multi-Kamera Frame-Storage (Kern-Fix)
-**Datei: `supabase/functions/camera-ops/index.ts`**
-- `camera_index` aus der `camera_access_sessions`-Tabelle im `validateSession` mitlesen
-- Storage-Pfade um `camera_index` erweitern:
-  - Chunks: `{match_id}_cam{camera_index}_chunk_{i}.json`
-  - Canonical pro Kamera: `{match_id}_cam{camera_index}.json`
-- `updateCanonicalFrameFile` anpassen: schreibt kamera-spezifische canonical files
-- Neuer Merge-Schritt bei `upload-frames`: alle Kamera-Canonical-Files zu einem globalen `{match_id}.json` zusammenführen
+## Technische Umsetzung
 
-### C. Analyse-Pipeline für Multi-Kamera
-**Datei: `supabase/functions/analyze-match/index.ts`**
-- `loadFramesFromStorage` erweitern: zusätzlich `{match_id}_cam{0-3}.json` Dateien suchen und mergen
-- Frames nach Zeitstempel sortieren (interleave statt concatenate), damit die Analyse ein kohärentes Bild bekommt
-- Cleanup-Pfade um kamera-spezifische Dateien erweitern
+### Neue DB-Spalten (Migration)
+```sql
+ALTER TABLE matches ADD COLUMN home_score integer DEFAULT NULL;
+ALTER TABLE matches ADD COLUMN away_score integer DEFAULT NULL;
+```
 
-### D. Event-Feedback & Parallel-Klick (MatchEventQuickBar)
-**Datei: `src/components/MatchEventQuickBar.tsx`**
-- Statt `saving: string | null` → `savingSet: Set<string>` — mehrere Events können parallel gespeichert werden
-- Nach erfolgreichem Speichern: kurzer Erfolgs-Indikator (grüner Checkmark-Flash) auf dem Button
-- Debounce pro Event-Typ (500ms), um Doppelklicks auf denselben Button zu verhindern
-
-### E. Cleanup erweitern
-**Datei: `supabase/functions/generate-insights/index.ts`**
-- Cleanup-Pfade um `_cam{0-3}` Varianten erweitern
-
----
-
-## Dateien-Übersicht
-
+### Dateien-Übersicht
 | Datei | Änderung |
 |---|---|
-| `src/components/MatchEventQuickBar.tsx` | Parallel-Klick-Schutz, Debounce, visuelles Feedback |
-| `supabase/functions/camera-ops/index.ts` | camera_index in Storage-Pfade, kamera-spezifische Canonicals |
-| `supabase/functions/analyze-match/index.ts` | Multi-Kamera Frame-Merge in loadFramesFromStorage |
-| `supabase/functions/generate-insights/index.ts` | Cleanup-Pfade erweitern |
+| `src/components/MatchEventQuickBar.tsx` | Event-Log mit Undo, Cooldown-Timer, Live-Score-Callback |
+| `src/pages/CameraTrackingPage.tsx` | Live-Score-Anzeige, Team-Namen laden & übergeben |
+| `src/components/PostMatchEventEditor.tsx` | Score-Korrektur-Felder |
+| `supabase/functions/generate-insights/index.ts` | `home_score`/`away_score` aus matches als Ground Truth nutzen |
+| Migration | `home_score`, `away_score` auf `matches` |
+
