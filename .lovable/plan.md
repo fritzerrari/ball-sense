@@ -1,86 +1,113 @@
 
 
-# Analyse & Gamechanger-Vorschläge für FieldIQ
+# Plan: Tutorial-Seite + Umfassender PDF-Report
 
-## Aktuelle Datenanalyse
+## Teil 1: Tutorial-Seite mit Features & Workflow
 
-Das letzte Spiel (08.04.) zeigt die Probleme klar:
-- **9 Events**, davon **7x `shot_on_target`**, **2x `goal`** — alle mit `team: "home"`
-- Der Team-Toggle wurde zwar eingebaut, aber die `homeTeamName`/`awayTeamName`-Props werden im `CameraTrackingPage` **nicht an den QuickBar übergeben** — der Nutzer sieht nur "Heim" und "Gegner" als Standardwerte
-- Kein Live-Spielstand auf dem Tracking-Screen sichtbar
+Die bestehende `/guide`-Seite (FullGuide.tsx) wird zu einer visuellen Tutorial-Seite umgebaut mit zwei Hauptbereichen:
 
-## Was verbessert werden kann
+### A. Neues Tutorial-Layout
+**Datei: `src/pages/TutorialPage.tsx`** (neue Seite)
 
-### 1. Live-Spielstand auf dem Tracking-Screen (Quick Win)
-Während der Aufnahme wird kein laufender Spielstand angezeigt. Der Coach sieht nicht, wie viele Tore er für welches Team geloggt hat.
+Aufbau:
+1. **Hero-Bereich**: "So funktioniert FieldIQ" mit animiertem Workflow-Diagramm
+2. **Vor dem Spiel** (Schritt-für-Schritt mit visuellen Karten):
+   - Verein & Kader anlegen (mit illustriertem Mockup)
+   - Spielfeld einrichten
+   - Spiel anlegen & Aufstellung wählen
+   - Kamera positionieren (Tipps mit Diagramm: Höhe, Winkel, Sonne)
+3. **Während des Spiels**:
+   - Events loggen (Team-Toggle erklärt, Undo erklärt)
+   - Live-Score sichtbar
+   - Halbzeit-Upload optional
+4. **Nach dem Spiel**:
+   - Analyse wird gestartet
+   - Report lesen & verstehen
+   - PDF exportieren
+   - Ergebnis korrigieren
+5. **Feature-Highlights** (visuell als Cards mit Icons):
+   - KI-Coaching-Report (Match-Rating, Taktische Noten, Momentum)
+   - Spielzug-Replay (animierte Taktik-Grafik)
+   - Gegner-DNA & Scouting
+   - Trainings-Mikrozyklus
+   - PDF-Export (4 Report-Typen)
+   - Multi-Kamera-Support
+   - Spielvorbereitung
+   - KI-Assistent
 
-**Änderung:** Kleines Score-Badge oben auf dem Kamera-Screen: `Heim 2 : 0 Gegner` — live aktualisiert bei jedem Goal-Event.
+Jeder Schritt enthält ein visuelles Mockup-Element (CSS-basiert, keine externen Bilder) das den jeweiligen Screen simuliert.
 
-**Datei:** `src/pages/CameraTrackingPage.tsx` — Score-State tracken aus Events, im Recording-Overlay anzeigen.
+### B. Navigation verlinken
+- **Landing Footer**: Link "Tutorial" in der Help-Spalte
+- **AppLayout**: Link "Tutorial" im Mehr-Menü
+- **App.tsx**: Route `/tutorial` hinzufügen
 
-### 2. Team-Namen an QuickBar durchreichen (Bug-Fix)
-Aktuell bekommt `MatchEventQuickBar` keine `homeTeamName`/`awayTeamName`-Props im CameraTrackingPage. Der Coach sieht nur "Heim"/"Gegner" statt z.B. "FC Muster"/"SV Gegner".
-
-**Änderung:** Match-Daten (`away_club_name`, Club-Name) laden und als Props übergeben.
-
-**Datei:** `src/pages/CameraTrackingPage.tsx`
-
-### 3. Event-Korrektur während der Aufnahme (Gamechanger)
-Aktuell kann man Events nicht löschen — wenn man versehentlich "Tor" drückt, bleibt es für immer. Das verfälscht die gesamte Analyse.
-
-**Änderung:** 
-- Mini-Event-Log unterhalb der Buttons (letzte 3 Events als Chips)
-- Jeder Chip hat ein X zum Löschen
-- Bestätigungsdialog: "Tor (Heim, Min. 7) wirklich entfernen?"
-
-**Dateien:** `src/components/MatchEventQuickBar.tsx` — Event-History als State + Lösch-Funktion
-
-### 4. Post-Match Ergebnis-Korrektur (Gamechanger)
-Nach dem Spiel sollte der Coach das Endergebnis manuell korrigieren können, falls Events falsch geloggt wurden. Das korrigierte Ergebnis wird dann in der Analyse verwendet.
-
-**Änderung:**
-- Im `PostMatchEventEditor` (bereits vorhanden): Editable Score-Felder hinzufügen
-- Score in `matches`-Tabelle speichern (neue Spalten `home_score`, `away_score`)
-- `generate-insights` nutzt diese als höchste Priorität ("Ground Truth") statt Events zu zählen
-
-**Dateien:** 
-- Migration: `home_score` und `away_score` Spalten auf `matches`
-- `src/components/PostMatchEventEditor.tsx`
-- `supabase/functions/generate-insights/index.ts`
-
-### 5. Intelligente Event-Duplikat-Erkennung
-7x `shot_on_target` in 8 Minuten deutet auf versehentliche Doppelklicks hin (trotz Debounce). 
-
-**Änderung:** Nach dem Speichern eines Events kurz den Button deaktivieren (visuell mit Countdown-Ring, 3 Sekunden), damit der Coach bewusst erneut klicken muss.
-
-**Datei:** `src/components/MatchEventQuickBar.tsx`
+**Dateien:**
+| Datei | Änderung |
+|---|---|
+| `src/pages/TutorialPage.tsx` | Neue Seite |
+| `src/App.tsx` | Route `/tutorial` |
+| `src/components/AppLayout.tsx` | Link im Mehr-Menü |
+| `src/components/landing/Footer.tsx` | Link in Help-Spalte |
 
 ---
 
-## Empfohlene Priorität
+## Teil 2: Umfassender PDF-Report
 
-| # | Feature | Impact | Aufwand |
-|---|---------|--------|---------|
-| 1 | **Event-Korrektur (Undo/Delete)** | Gamechanger — verhindert falsche Analysen | Mittel |
-| 2 | **Post-Match Score-Korrektur** | Gamechanger — letzte Sicherheit für korrekte Ergebnisse | Mittel |
-| 3 | **Live-Spielstand im Tracking** | Hoch — Coach hat Überblick | Klein |
-| 4 | **Team-Namen durchreichen** | Bug-Fix — bessere UX | Klein |
-| 5 | **Cooldown nach Event-Klick** | Mittel — weniger Fehlklicks | Klein |
+Der aktuelle `generate-pdf-report` Edge Function wird massiv erweitert:
 
-## Technische Umsetzung
+### A. Mehr Daten laden
+- **Match-Lineups** laden (Aufstellung Heim + Gegner)
+- **Away-Spieler-Stats** laden (nicht nur Home)
+- **Match-Score** aus `matches.home_score`/`away_score` laden (Ground Truth)
+- Alle report_sections werden bereits geladen
 
-### Neue DB-Spalten (Migration)
-```sql
-ALTER TABLE matches ADD COLUMN home_score integer DEFAULT NULL;
-ALTER TABLE matches ADD COLUMN away_score integer DEFAULT NULL;
-```
+### B. Deutlich erweiterter AI-Prompt (nur `full_report`)
+Der Prompt wird auf ~25 Sektionen erweitert:
 
-### Dateien-Übersicht
+1. **Deckblatt** (Verein, Gegner, Datum, Ergebnis groß)
+2. **Inhaltsverzeichnis**
+3. **Management Summary** (1 Seite: Ergebnis, 3 Key-Takeaways, Gesamtnote, Empfehlung)
+4. **Mannschaftsaufstellung** (Formation als CSS-Feld-Grafik mit Spielernamen/Nummern, Start-11 + Bank)
+5. **Spielergebnis & Match-Rating** (Gesamtnote + Sub-Scores als horizontale Balken)
+6. **Taktische Bewertung** (A-F Grades als farbige Badges, 6 Dimensionen)
+7. **Momentum-Timeline** (CSS-basierter Verlauf mit Event-Markern)
+8. **Event-Chronik** (Alle Events als Timeline: Tore, Karten, Chancen, Fouls mit Minute und Team-Farbe)
+9. **Chancen-Analyse** (Schüsse aufs Tor pro Team als Balken-Vergleich)
+10. **Stärken & Schwächen Heim** (Tabelle mit Grün/Rot-Indikatoren)
+11. **Stärken & Schwächen Gegner** (Gegner-DNA als Radar-ähnliche CSS-Grafik)
+12. **Coaching-Insights** (nummeriert, priorisiert, mit Impact-Score)
+13. **Risiko-Matrix** (Severity + Dringlichkeit als farbcodierte Tabelle)
+14. **Spieler-Spotlight** (MVP + Sorgenspieler mit Metriken-Vergleich)
+15. **Spieler-Bewertungen** (Komplette Tabelle ALLER Spieler: Rating, Distanz, Tore, Assists, Pässe, Zweikämpfe, Sprints)
+16. **Gegner-Analyse** (Do/Don't, Spielstil-Fingerabdruck)
+17. **Trainingsempfehlungen** (priorisiert)
+18. **Trainings-Mikrozyklus** (3 Sessions als Karten mit Übungen, Dauer, Intensität)
+19. **Fazit & Ausblick** (Zusammenfassung + 3 Prioritäten fürs nächste Spiel)
+20. **Notizseiten** (2 Seiten liniert)
+
+### C. CSS-Charts im Prompt anfordern
+Der Prompt wird explizit anweisen:
+- **Formations-Grafik**: CSS-Grid mit 4 Linien (TW, Abwehr, Mittelfeld, Sturm), Spieler als farbige Kreise mit Nummer
+- **Balkendiagramme**: Horizontale CSS-Balken für alle Vergleichswerte (Ballbesitz, Pässe, Zweikämpfe)
+- **Event-Timeline**: Vertikale Timeline mit farbigen Dots (grün=Heim, rot=Gegner) und Minuten-Labels
+- **Radar-Chart als CSS**: Pentagon/Hexagon mit Werten als gestapelte Flächen (vereinfacht als Balkengruppe)
+- **Heatmap-Tabelle**: 3x3 Grid mit Farbintensität für Zonen-Aktivität
+
+### D. Stärkeres AI-Modell
+Wechsel von `gemini-3-flash-preview` auf `google/gemini-2.5-pro` für höhere Qualität bei dem komplexen HTML-Output.
+
+**Datei:** `supabase/functions/generate-pdf-report/index.ts`
+
+---
+
+## Dateien-Übersicht
+
 | Datei | Änderung |
 |---|---|
-| `src/components/MatchEventQuickBar.tsx` | Event-Log mit Undo, Cooldown-Timer, Live-Score-Callback |
-| `src/pages/CameraTrackingPage.tsx` | Live-Score-Anzeige, Team-Namen laden & übergeben |
-| `src/components/PostMatchEventEditor.tsx` | Score-Korrektur-Felder |
-| `supabase/functions/generate-insights/index.ts` | `home_score`/`away_score` aus matches als Ground Truth nutzen |
-| Migration | `home_score`, `away_score` auf `matches` |
+| `src/pages/TutorialPage.tsx` | Neue visuell-reichhaltige Tutorial-Seite |
+| `src/App.tsx` | Route `/tutorial` |
+| `src/components/AppLayout.tsx` | Tutorial-Link im Menü |
+| `src/components/landing/Footer.tsx` | Tutorial-Link im Footer |
+| `supabase/functions/generate-pdf-report/index.ts` | Lineups laden, Away-Stats, erweiterter Prompt mit Charts, Management Summary, stärkeres Modell |
 
