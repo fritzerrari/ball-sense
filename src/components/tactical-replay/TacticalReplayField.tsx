@@ -15,6 +15,9 @@ interface TacticalReplayFieldProps {
   expectedAway: number;
 }
 
+const HOME_COLOR = "hsl(160, 84%, 39%)";
+const AWAY_COLOR = "hsl(15, 85%, 55%)";
+
 export default function TacticalReplayField({
   displayState,
   posHistoryRef,
@@ -50,13 +53,12 @@ export default function TacticalReplayField({
         <rect x="0" y="0" width="105" height="68" fill="url(#trGrass)" />
         <rect x="0" y="0" width="105" height="68" fill="url(#trStripes)" />
 
-        {/* Field lines — adapted for team size */}
+        {/* Field lines */}
         <g stroke="hsl(var(--pitch-line))" strokeOpacity="0.4" fill="none">
           <rect x="1" y="1" width="103" height="66" strokeWidth="0.35" rx="0.5" />
           <line x1="52.5" y1="1" x2="52.5" y2="67" strokeWidth="0.3" />
           <circle cx="52.5" cy="34" r={isSmallFormat ? 6 : 9.15} strokeWidth="0.3" />
           <circle cx="52.5" cy="34" r="0.6" fill="hsl(var(--pitch-line))" fillOpacity="0.4" stroke="none" />
-          {/* Penalty areas — only for 9v9+ */}
           {!isSmallFormat && (
             <>
               <rect x="1" y="13.84" width="16.5" height="40.32" strokeWidth="0.25" />
@@ -69,7 +71,6 @@ export default function TacticalReplayField({
               <path d="M 87.5 27.5 A 9.15 9.15 0 0 0 87.5 40.5" strokeWidth="0.25" />
             </>
           )}
-          {/* Simplified goal areas for small formats */}
           {isSmallFormat && (
             <>
               <rect x="1" y="20" width="8" height="28" strokeWidth="0.25" />
@@ -88,7 +89,7 @@ export default function TacticalReplayField({
               key={`trail-${key}`}
               points={trail.map(pt => `${(pt.x / 100) * 105},${(pt.y / 100) * 68}`).join(" ")}
               fill="none"
-              stroke={p.team === "home" ? "hsl(210, 90%, 55%)" : "hsl(0, 80%, 55%)"}
+              stroke={p.team === "home" ? HOME_COLOR : AWAY_COLOR}
               strokeWidth="0.5"
               strokeOpacity="0.3"
               strokeLinecap="round"
@@ -120,10 +121,9 @@ export default function TacticalReplayField({
           const cy = (p.y / 100) * 68;
           const isHome = p.team === "home";
           const isGhost = p.estimated;
-          const fillColor = isHome ? "hsl(210, 90%, 55%)" : "hsl(0, 80%, 55%)";
+          const fillColor = isHome ? HOME_COLOR : AWAY_COLOR;
           return (
             <g key={i} filter={isGhost ? undefined : "url(#playerShadow)"}>
-              {/* Player circle */}
               <circle
                 cx={cx}
                 cy={cy}
@@ -135,7 +135,6 @@ export default function TacticalReplayField({
                 strokeDasharray={isGhost ? "0.8,0.4" : "none"}
                 filter={isGhost ? undefined : "url(#glow)"}
               />
-              {/* Jersey number or role */}
               <text
                 x={cx}
                 y={cy + 0.7}
@@ -177,11 +176,21 @@ export default function TacticalReplayField({
         )}
       </div>
 
-      {/* Team size indicator */}
-      <div className="absolute bottom-2 left-2 pointer-events-none">
+      {/* Legend + team size */}
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none">
         <span className="text-[9px] text-white/60 bg-black/30 backdrop-blur-sm rounded px-1.5 py-0.5">
           {expectedHome}v{expectedAway}
         </span>
+        <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded px-2 py-0.5">
+          <span className="flex items-center gap-1 text-[9px] text-white/80">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: HOME_COLOR }} />
+            Heim
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-white/80">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: AWAY_COLOR }} />
+            Gegner
+          </span>
+        </div>
       </div>
     </div>
   );

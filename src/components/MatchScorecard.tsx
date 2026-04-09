@@ -87,7 +87,8 @@ export default function MatchScorecard({ rating, homeTeam, awayTeam, date, kicko
             {hasScore ? (
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="flex-1 text-right min-w-0">
-                  <p className="font-bold font-display text-sm sm:text-base truncate">{homeTeam}</p>
+                  <p className="font-bold font-display text-sm sm:text-base truncate text-primary">{homeTeam}</p>
+                  <p className="text-[9px] text-primary/60 uppercase tracking-wider">Heim</p>
                 </div>
                 <motion.div
                   initial={{ scale: 0 }}
@@ -100,11 +101,18 @@ export default function MatchScorecard({ rating, homeTeam, awayTeam, date, kicko
                   <span className="text-2xl sm:text-3xl font-black font-display">{rating.away_goals}</span>
                 </motion.div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold font-display text-sm sm:text-base truncate">{awayTeam}</p>
+                  <p className="font-bold font-display text-sm sm:text-base truncate text-destructive">{awayTeam}</p>
+                  <p className="text-[9px] text-destructive/60 uppercase tracking-wider">Gegner</p>
                 </div>
               </div>
             ) : (
-              <h2 className="text-base sm:text-lg font-bold font-display">{homeTeam} vs {awayTeam}</h2>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold font-display">
+                  <span className="text-primary">{homeTeam}</span>
+                  <span className="text-muted-foreground mx-2">vs</span>
+                  <span className="text-destructive">{awayTeam}</span>
+                </h2>
+              </div>
             )}
             <p className="text-[11px] text-muted-foreground mt-1 text-center">
               {new Date(date).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}

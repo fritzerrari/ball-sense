@@ -102,7 +102,11 @@ serve(async (req) => {
       const eventLines = matchEvents.map((e: any) =>
         `Min ${e.minute}: ${e.event_type} (${e.team})${e.player_name ? ` — ${e.player_name}` : ""}${e.notes ? ` [${e.notes}]` : ""}`
       );
-      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nWICHTIG: Diese Events sind GROUND TRUTH. Tore MÜSSEN im Momentum-Score als Spitzen erscheinen. Karten MÜSSEN in der Discipline-Bewertung berücksichtigt werden. Das Match-Rating MUSS die tatsächlichen Ereignisse widerspiegeln.`;
+      // Count goals per team from events
+      const homeGoals = matchEvents.filter((e: any) => e.event_type === "goal" && e.team === "home").length;
+      const awayGoals = matchEvents.filter((e: any) => e.event_type === "goal" && e.team === "away").length;
+
+      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nENDERGEBNIS (berechnet aus Events): Heim ${homeGoals} : ${awayGoals} Gegner\n\nWICHTIG: Diese Events sind GROUND TRUTH. Das Endergebnis MUSS home_goals=${homeGoals} und away_goals=${awayGoals} sein. Die team-Angabe bei jedem Event ist entscheidend (home=Heimteam, away=Gegner). Tore MÜSSEN im Momentum-Score als Spitzen erscheinen. Karten MÜSSEN in der Discipline-Bewertung berücksichtigt werden.`;
     }
     await supabase.from("analysis_jobs").update({ progress: 90 }).eq("id", job_id);
 
@@ -166,15 +170,17 @@ REGELN:
                 properties: {
                   match_rating: {
                     type: "object",
-                    description: "Overall match rating with sub-scores",
+                    description: "Overall match rating with sub-scores and final score",
                     properties: {
                       overall: { type: "number", description: "Overall match rating 1-10" },
                       offense: { type: "number", description: "Offense sub-score 1-10" },
                       defense: { type: "number", description: "Defense sub-score 1-10" },
                       transitions: { type: "number", description: "Transitions sub-score 1-10" },
                       discipline: { type: "number", description: "Discipline sub-score 1-10" },
+                      home_goals: { type: "number", description: "Total goals scored by home team" },
+                      away_goals: { type: "number", description: "Total goals scored by away team" },
                     },
-                    required: ["overall", "offense", "defense", "transitions", "discipline"],
+                    required: ["overall", "offense", "defense", "transitions", "discipline", "home_goals", "away_goals"],
                   },
                   tactical_grades: {
                     type: "array",

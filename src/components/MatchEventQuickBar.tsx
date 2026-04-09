@@ -13,6 +13,8 @@ interface Props {
   highlightsEnabled?: boolean;
   halfNumber?: number;
   isTraining?: boolean;
+  homeTeamName?: string;
+  awayTeamName?: string;
 }
 
 const EVENT_BUTTONS = [
@@ -27,6 +29,7 @@ const EVENT_BUTTONS = [
 ] as const;
 
 type EventType = typeof EVENT_BUTTONS[number]["type"];
+type ActiveTeam = "home" | "away";
 
 export default function MatchEventQuickBar({
   matchId,
@@ -36,14 +39,27 @@ export default function MatchEventQuickBar({
   highlightsEnabled = false,
   halfNumber = 1,
   isTraining = false,
+  homeTeamName = "Heim",
+  awayTeamName = "Gegner",
 }: Props) {
   const [saving, setSaving] = useState<string | null>(null);
+  const [activeTeam, setActiveTeam] = useState<ActiveTeam>("home");
+
+  const isHome = activeTeam === "home";
 
   // Filter out match-only events for training sessions
   const TRAINING_EXCLUDED: EventType[] = ["substitution", "corner", "free_kick"];
   const visibleButtons = isTraining
     ? EVENT_BUTTONS.filter(b => !TRAINING_EXCLUDED.includes(b.type))
     : EVENT_BUTTONS;
+
+  const toggleTeam = useCallback(() => {
+    setActiveTeam(prev => {
+      const next = prev === "home" ? "away" : "home";
+      if (navigator.vibrate) navigator.vibrate([15, 30, 15]);
+      return next;
+    });
+  }, []);
 
   const handleEvent = useCallback(async (eventType: EventType) => {
     if (saving) return;
@@ -54,6 +70,7 @@ export default function MatchEventQuickBar({
 
     const elapsedMin = Math.max(1, Math.round((Date.now() - recordingStartTime) / 60000));
     const minute = halfNumber === 2 ? 45 + elapsedMin : elapsedMin;
+    const teamLabel = isHome ? homeTeamName : awayTeamName;
 
     try {
       let clip: HighlightClip | null = null;
@@ -76,7 +93,7 @@ export default function MatchEventQuickBar({
               match_id: matchId,
               event_type: eventType,
               minute,
-              team: "home",
+              team: activeTeam,
             }),
           },
         );
@@ -89,7 +106,7 @@ export default function MatchEventQuickBar({
           match_id: matchId,
           event_type: eventType,
           minute,
-          team: "home",
+          team: activeTeam,
           notes: clip ? "Highlight-Clip gespeichert" : undefined,
         });
         if (eventError) throw eventError;
@@ -127,33 +144,57 @@ export default function MatchEventQuickBar({
       }
 
       if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-      toast.success("Event gespeichert ✓");
+      const eventLabel = EVENT_BUTTONS.find(b => b.type === eventType)?.label ?? eventType;
+      toast.success(`${eventLabel} (${teamLabel}) ✓`);
     } catch (err: any) {
       toast.error(err.message ?? "Event konnte nicht gespeichert werden");
     } finally {
       setSaving(null);
     }
-  }, [matchId, recorderRef, recordingStartTime, saving, sessionToken, highlightsEnabled, halfNumber]);
+  }, [matchId, recorderRef, recordingStartTime, saving, sessionToken, highlightsEnabled, halfNumber, activeTeam, isHome, homeTeamName, awayTeamName]);
 
   return (
-    <div className={`grid gap-1.5 w-full max-w-xs ${visibleButtons.length <= 5 ? "grid-cols-3" : "grid-cols-4"}`}>
-      {visibleButtons.map((btn) => (
-        <Button
-          key={btn.type}
-          size="sm"
-          variant="secondary"
-          className="gap-0.5 text-[10px] md:text-xs h-10 md:h-9 min-w-0 bg-background/80 backdrop-blur border border-border/50 active:scale-95 transition-transform flex-col md:flex-row p-1 md:p-2"
-          disabled={saving !== null}
-          onClick={() => handleEvent(btn.type)}
+    <div className="w-full max-w-xs space-y-2">
+      {/* Team toggle */}
+      {!isTraining && (
+        <button
+          onClick={toggleTeam}
+          className={`w-full flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-bold font-display transition-all active:scale-[0.97] border ${
+            isHome
+              ? "bg-primary/15 border-primary/40 text-primary"
+              : "bg-destructive/15 border-destructive/40 text-destructive"
+          }`}
         >
-          {saving === btn.type ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <span className="text-base md:text-sm leading-none">{btn.icon}</span>
-          )}
-          <span className="leading-none">{btn.label}</span>
-        </Button>
-      ))}
+          <span className={`inline-block w-2.5 h-2.5 rounded-full ${isHome ? "bg-primary" : "bg-destructive"}`} />
+          {isHome ? `🏠 ${homeTeamName}` : `📣 ${awayTeamName}`}
+          <span className="text-[10px] font-normal opacity-60 ml-1">Tippe zum Wechseln</span>
+        </button>
+      )}
+
+      {/* Event buttons */}
+      <div className={`grid gap-1.5 w-full ${visibleButtons.length <= 5 ? "grid-cols-3" : "grid-cols-4"}`}>
+        {visibleButtons.map((btn) => (
+          <Button
+            key={btn.type}
+            size="sm"
+            variant="secondary"
+            className={`gap-0.5 text-[10px] md:text-xs h-10 md:h-9 min-w-0 backdrop-blur border active:scale-95 transition-transform flex-col md:flex-row p-1 md:p-2 ${
+              isHome
+                ? "bg-background/80 border-border/50"
+                : "bg-destructive/5 border-destructive/20"
+            }`}
+            disabled={saving !== null}
+            onClick={() => handleEvent(btn.type)}
+          >
+            {saving === btn.type ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <span className="text-base md:text-sm leading-none">{btn.icon}</span>
+            )}
+            <span className="leading-none">{btn.label}</span>
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }
