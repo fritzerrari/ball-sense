@@ -69,16 +69,46 @@ export default function CameraTrackingPage() {
   const chunkIndexRef = useRef(0);
   const deltaRetryCountRef = useRef(0);
 
+  const [homeTeamName, setHomeTeamName] = useState("Heim");
+  const [awayTeamName, setAwayTeamName] = useState("Gegner");
+  const [liveHomeGoals, setLiveHomeGoals] = useState(0);
+  const [liveAwayGoals, setLiveAwayGoals] = useState(0);
+
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
   const isTraining = matchType === "training";
 
-  // Fetch match_type when matchId is set
+  // Fetch match_type and team names when matchId is set
   useEffect(() => {
     if (!matchId) return;
-    supabase.from("matches").select("match_type").eq("id", matchId).maybeSingle().then(({ data }) => {
-      if (data?.match_type) setMatchType(data.match_type);
-    });
+    (async () => {
+      const { data: matchData } = await supabase
+        .from("matches")
+        .select("match_type, away_club_name, home_club_id")
+        .eq("id", matchId)
+        .maybeSingle();
+      if (matchData?.match_type) setMatchType(matchData.match_type);
+      if (matchData?.away_club_name) setAwayTeamName(matchData.away_club_name);
+      if (matchData?.home_club_id) {
+        const { data: club } = await supabase
+          .from("clubs")
+          .select("name")
+          .eq("id", matchData.home_club_id)
+          .maybeSingle();
+        if (club?.name) setHomeTeamName(club.name);
+      }
+
+      // Load existing goal events to init live score
+      const { data: events } = await supabase
+        .from("match_events")
+        .select("event_type, team")
+        .eq("match_id", matchId)
+        .eq("event_type", "goal");
+      if (events) {
+        setLiveHomeGoals(events.filter(e => e.team === "home").length);
+        setLiveAwayGoals(events.filter(e => e.team === "away").length);
+      }
+    })();
   }, [matchId]);
 
   const handleCodeSuccess = useCallback((data: { matchId: string; cameraIndex: number; sessionToken: string }) => {
