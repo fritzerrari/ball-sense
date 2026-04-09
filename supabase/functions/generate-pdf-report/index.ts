@@ -624,10 +624,17 @@ Nutze die tatsächlichen Spieldaten. SPRACHE: Deutsch. NUR JSON.`;
             </div>
             <p style="font-size:11px;color:#334155">${t.description ?? ""}</p>
           </div>`).join("")}
-          ${trainingMicro && Array.isArray(trainingMicro) ? `<h3 style="margin-top:12px">Mikrozyklus</h3>${trainingMicro.map((s: any, i: number) => `<div class="training-card">
-            <div class="tc-header"><span class="tc-title">Session ${i + 1}: ${s.theme ?? s.title ?? ""}</span><span class="tc-meta">${s.duration ?? ""} • ${s.intensity ?? ""}</span></div>
-            ${Array.isArray(s.exercises) ? s.exercises.map((ex: any) => `<p style="font-size:10px;margin:2px 0">• ${typeof ex === "string" ? ex : ex.name ?? ex.title ?? ""}</p>`).join("") : ""}
-          </div>`).join("") : ""}
+          ${(() => {
+            if (!trainingMicro || !Array.isArray(trainingMicro)) return "";
+            const microHtml = trainingMicro.map((s: any, i: number) => {
+              const exHtml = Array.isArray(s.exercises) ? s.exercises.map((ex: any) => {
+                const exName = typeof ex === "string" ? ex : (ex.name ?? ex.title ?? "");
+                return '<p style="font-size:10px;margin:2px 0">• ' + exName + "</p>";
+              }).join("") : "";
+              return '<div class="training-card"><div class="tc-header"><span class="tc-title">Session ' + (i+1) + ": " + (s.theme ?? s.title ?? "") + '</span><span class="tc-meta">' + (s.duration ?? "") + " • " + (s.intensity ?? "") + "</span></div>" + exHtml + "</div>";
+            }).join("");
+            return '<h3 style="margin-top:12px">Mikrozyklus</h3>' + microHtml;
+          })()}
           <div class="notes-area"><div class="notes-label">📝 Eigene Notizen</div>${"<div class='note-line'></div>".repeat(5)}</div>
           <div class="page-footer">Generiert mit FieldIQ • ${matchDate}</div>
         </div>`);
