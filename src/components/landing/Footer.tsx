@@ -30,6 +30,7 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold mb-4">{t("landing.help")}</h4>
             <ul className="space-y-2.5 text-xs text-muted-foreground">
+              <li><Link to="/tutorial" className="hover:text-foreground transition-colors">Tutorial</Link></li>
               <li><Link to="/install" className="hover:text-foreground transition-colors">{t("landing.installation")}</Link></li>
               <li><Link to="/login" className="hover:text-foreground transition-colors">{t("landing.signIn")}</Link></li>
             </ul>
