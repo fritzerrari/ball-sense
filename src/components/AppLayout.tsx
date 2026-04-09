@@ -2,6 +2,7 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Brain,
+  BookOpen,
   BrainCircuit,
   Download,
   Home,
@@ -60,6 +61,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.fields"), icon: Map, href: "/fields" },
     { label: t("nav.settings"), icon: Settings, href: "/settings" },
     { label: t("nav.install"), icon: Download, href: "/install" },
+    { label: "Tutorial", icon: BookOpen, href: "/tutorial" },
   ];
 
   const adminItems = isAdmin ? [{ label: t("nav.admin"), icon: Shield, href: "/admin" }] : [];
