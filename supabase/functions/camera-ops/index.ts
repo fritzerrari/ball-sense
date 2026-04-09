@@ -23,7 +23,7 @@ async function validateSession(supabaseAdmin: any, sessionToken: string, matchId
   const tokenHash = await hashToken(sessionToken);
   const { data: session, error } = await supabaseAdmin
     .from("camera_access_sessions")
-    .select("id, match_id, club_id, expires_at, transfer_authorized")
+    .select("id, match_id, club_id, expires_at, transfer_authorized, camera_index")
     .eq("session_token_hash", tokenHash)
     .eq("match_id", matchId)
     .maybeSingle();
@@ -39,27 +39,76 @@ async function validateSession(supabaseAdmin: any, sessionToken: string, matchId
   return session;
 }
 
-async function updateCanonicalFrameFile(supabaseAdmin: any, matchId: string, newFrames: string[]) {
+async function updateCanonicalFrameFile(supabaseAdmin: any, matchId: string, newFrames: string[], cameraIndex: number | null) {
   try {
+    // Write camera-specific canonical file
+    const camSuffix = cameraIndex != null ? `_cam${cameraIndex}` : "";
+    const camPath = `${matchId}${camSuffix}.json`;
+
     const { data: existing } = await supabaseAdmin.storage
       .from("match-frames")
-      .download(`${matchId}.json`);
+      .download(camPath);
 
-    let allFrames: string[] = [];
-    let totalDuration = 0;
+    let camFrames: string[] = [];
+    let camDuration = 0;
 
     if (existing) {
       try {
         const parsed = JSON.parse(await existing.text());
-        allFrames = parsed.frames ?? [];
-        totalDuration = parsed.duration_sec ?? 0;
+        camFrames = parsed.frames ?? [];
+        camDuration = parsed.duration_sec ?? 0;
       } catch { /* start fresh */ }
     }
 
-    allFrames.push(...newFrames);
-    totalDuration += newFrames.length * 30;
+    camFrames.push(...newFrames);
+    camDuration += newFrames.length * 30;
 
-    const canonicalJson = JSON.stringify({
+    const camJson = JSON.stringify({
+      frames: camFrames,
+      duration_sec: camDuration,
+      phase: "full",
+      camera_index: cameraIndex ?? 0,
+      captured_at: new Date().toISOString(),
+    });
+
+    await supabaseAdmin.storage
+      .from("match-frames")
+      .upload(camPath, new Blob([camJson], { type: "application/json" }), { upsert: true });
+
+    // Now merge all camera canonicals into global {matchId}.json
+    await mergeAllCameraCanonicals(supabaseAdmin, matchId);
+  } catch (err) {
+    console.error("canonical frame file update error:", err);
+  }
+}
+
+async function mergeAllCameraCanonicals(supabaseAdmin: any, matchId: string) {
+  try {
+    const allFrames: string[] = [];
+    let totalDuration = 0;
+
+    // Try camera-specific files (cam0-3)
+    let foundAnyCam = false;
+    for (let cam = 0; cam < 4; cam++) {
+      const { data: camFile } = await supabaseAdmin.storage
+        .from("match-frames")
+        .download(`${matchId}_cam${cam}.json`);
+      if (camFile) {
+        foundAnyCam = true;
+        try {
+          const parsed = JSON.parse(await camFile.text());
+          if (parsed.frames?.length) {
+            allFrames.push(...parsed.frames);
+            totalDuration += parsed.duration_sec ?? 0;
+          }
+        } catch { /* skip corrupt */ }
+      }
+    }
+
+    // If no camera-specific files found, the global file is already the source of truth
+    if (!foundAnyCam) return;
+
+    const globalJson = JSON.stringify({
       frames: allFrames,
       duration_sec: totalDuration,
       phase: "full",
@@ -68,9 +117,9 @@ async function updateCanonicalFrameFile(supabaseAdmin: any, matchId: string, new
 
     await supabaseAdmin.storage
       .from("match-frames")
-      .upload(`${matchId}.json`, new Blob([canonicalJson], { type: "application/json" }), { upsert: true });
+      .upload(`${matchId}.json`, new Blob([globalJson], { type: "application/json" }), { upsert: true });
   } catch (err) {
-    console.error("canonical frame file update error:", err);
+    console.error("merge camera canonicals error:", err);
   }
 }
 
@@ -313,7 +362,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      const suffix = phase && phase !== "full" ? `_${phase}` : "";
+      const camIdx = session.camera_index ?? 0;
+      const camSuffix = `_cam${camIdx}`;
+      const suffix = phase && phase !== "full" ? `${camSuffix}_${phase}` : camSuffix;
       const filePath = `${match_id}${suffix}.json`;
 
       const framesJson = JSON.stringify({
@@ -339,7 +390,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames);
+      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames, session.camera_index);
 
       const { data: job, error: jobError } = await supabaseAdmin
         .from("analysis_jobs")
@@ -426,7 +477,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      const filePath = `${match_id}_chunk_${chunk_index ?? 0}.json`;
+      const camIdx = session.camera_index ?? 0;
+      const filePath = `${match_id}_cam${camIdx}_chunk_${chunk_index ?? 0}.json`;
       const framesJson = JSON.stringify({
         frames,
         chunk_index: chunk_index ?? 0,
@@ -449,7 +501,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames);
+      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames, session.camera_index);
 
       const { data: currentSession } = await supabaseAdmin
         .from("camera_access_sessions")
@@ -474,7 +526,7 @@ Deno.serve(async (req) => {
 
         const allFrames: string[] = [];
         for (let i = 0; i <= (chunk_index ?? 0); i++) {
-          const chunkPath = `${match_id}_chunk_${i}.json`;
+          const chunkPath = `${match_id}_cam${camIdx}_chunk_${i}.json`;
           const { data: chunkData } = await supabaseAdmin.storage
             .from("match-frames")
             .download(chunkPath);

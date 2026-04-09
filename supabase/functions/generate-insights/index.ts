@@ -491,6 +491,14 @@ REGELN:
         cleanupPaths.push(`${match_id}_chunk_${i}.json`);
       }
       cleanupPaths.push(`${match_id}_h1.json`, `${match_id}_h2.json`);
+      // Multi-camera cleanup
+      for (let cam = 0; cam < 4; cam++) {
+        cleanupPaths.push(`${match_id}_cam${cam}.json`);
+        for (let i = 0; i < 50; i++) {
+          cleanupPaths.push(`${match_id}_cam${cam}_chunk_${i}.json`);
+        }
+        cleanupPaths.push(`${match_id}_cam${cam}_h1.json`, `${match_id}_cam${cam}_h2.json`);
+      }
       await supabase.storage.from("match-frames").remove(cleanupPaths);
       console.log(`Final cleanup: removed frames for match ${match_id}`);
 

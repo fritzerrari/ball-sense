@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { VideoRecorderHandle, HighlightClip } from "@/lib/video-recorder";
@@ -42,8 +42,10 @@ export default function MatchEventQuickBar({
   homeTeamName = "Heim",
   awayTeamName = "Gegner",
 }: Props) {
-  const [saving, setSaving] = useState<string | null>(null);
+  const [savingSet, setSavingSet] = useState<Set<string>>(new Set());
+  const [successSet, setSuccessSet] = useState<Set<string>>(new Set());
   const [activeTeam, setActiveTeam] = useState<ActiveTeam>("home");
+  const debounceRef = useRef<Record<string, number>>({});
 
   const isHome = activeTeam === "home";
 
@@ -62,8 +64,15 @@ export default function MatchEventQuickBar({
   }, []);
 
   const handleEvent = useCallback(async (eventType: EventType) => {
-    if (saving) return;
-    setSaving(eventType);
+    // Debounce: prevent double-tap on same button within 500ms
+    const now = Date.now();
+    if (debounceRef.current[eventType] && now - debounceRef.current[eventType] < 500) return;
+    debounceRef.current[eventType] = now;
+
+    // Allow parallel saves for different event types
+    if (savingSet.has(eventType)) return;
+
+    setSavingSet(prev => new Set(prev).add(eventType));
 
     // Haptic feedback
     if (navigator.vibrate) navigator.vibrate(30);
@@ -143,15 +152,29 @@ export default function MatchEventQuickBar({
         }
       }
 
+      // Show success flash on button
+      setSuccessSet(prev => new Set(prev).add(eventType));
+      setTimeout(() => {
+        setSuccessSet(prev => {
+          const next = new Set(prev);
+          next.delete(eventType);
+          return next;
+        });
+      }, 800);
+
       if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
       const eventLabel = EVENT_BUTTONS.find(b => b.type === eventType)?.label ?? eventType;
       toast.success(`${eventLabel} (${teamLabel}) ✓`);
     } catch (err: any) {
       toast.error(err.message ?? "Event konnte nicht gespeichert werden");
     } finally {
-      setSaving(null);
+      setSavingSet(prev => {
+        const next = new Set(prev);
+        next.delete(eventType);
+        return next;
+      });
     }
-  }, [matchId, recorderRef, recordingStartTime, saving, sessionToken, highlightsEnabled, halfNumber, activeTeam, isHome, homeTeamName, awayTeamName]);
+  }, [matchId, recorderRef, recordingStartTime, savingSet, sessionToken, highlightsEnabled, halfNumber, activeTeam, isHome, homeTeamName, awayTeamName]);
 
   return (
     <div className="w-full max-w-xs space-y-2">
@@ -173,27 +196,36 @@ export default function MatchEventQuickBar({
 
       {/* Event buttons */}
       <div className={`grid gap-1.5 w-full ${visibleButtons.length <= 5 ? "grid-cols-3" : "grid-cols-4"}`}>
-        {visibleButtons.map((btn) => (
-          <Button
-            key={btn.type}
-            size="sm"
-            variant="secondary"
-            className={`gap-0.5 text-[10px] md:text-xs h-10 md:h-9 min-w-0 backdrop-blur border active:scale-95 transition-transform flex-col md:flex-row p-1 md:p-2 ${
-              isHome
-                ? "bg-background/80 border-border/50"
-                : "bg-destructive/5 border-destructive/20"
-            }`}
-            disabled={saving !== null}
-            onClick={() => handleEvent(btn.type)}
-          >
-            {saving === btn.type ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <span className="text-base md:text-sm leading-none">{btn.icon}</span>
-            )}
-            <span className="leading-none">{btn.label}</span>
-          </Button>
-        ))}
+        {visibleButtons.map((btn) => {
+          const isSaving = savingSet.has(btn.type);
+          const isSuccess = successSet.has(btn.type);
+
+          return (
+            <Button
+              key={btn.type}
+              size="sm"
+              variant="secondary"
+              className={`gap-0.5 text-[10px] md:text-xs h-10 md:h-9 min-w-0 backdrop-blur border active:scale-95 transition-all flex-col md:flex-row p-1 md:p-2 ${
+                isSuccess
+                  ? "bg-primary/20 border-primary/50 text-primary"
+                  : isHome
+                    ? "bg-background/80 border-border/50"
+                    : "bg-destructive/5 border-destructive/20"
+              }`}
+              disabled={isSaving}
+              onClick={() => handleEvent(btn.type)}
+            >
+              {isSaving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : isSuccess ? (
+                <Check className="h-3.5 w-3.5 text-primary" />
+              ) : (
+                <span className="text-base md:text-sm leading-none">{btn.icon}</span>
+              )}
+              <span className="leading-none">{btn.label}</span>
+            </Button>
+          );
+        })}
       </div>
     </div>
   );
