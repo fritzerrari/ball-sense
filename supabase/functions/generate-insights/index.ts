@@ -102,11 +102,24 @@ serve(async (req) => {
       const eventLines = matchEvents.map((e: any) =>
         `Min ${e.minute}: ${e.event_type} (${e.team})${e.player_name ? ` — ${e.player_name}` : ""}${e.notes ? ` [${e.notes}]` : ""}`
       );
-      // Count goals per team from events
-      const homeGoals = matchEvents.filter((e: any) => e.event_type === "goal" && e.team === "home").length;
-      const awayGoals = matchEvents.filter((e: any) => e.event_type === "goal" && e.team === "away").length;
 
-      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nENDERGEBNIS (berechnet aus Events): Heim ${homeGoals} : ${awayGoals} Gegner\n\nWICHTIG: Diese Events sind GROUND TRUTH. Das Endergebnis MUSS home_goals=${homeGoals} und away_goals=${awayGoals} sein. Die team-Angabe bei jedem Event ist entscheidend (home=Heimteam, away=Gegner). Tore MÜSSEN im Momentum-Score als Spitzen erscheinen. Karten MÜSSEN in der Discipline-Bewertung berücksichtigt werden.`;
+      // Use manually corrected score (Ground Truth) if available, else count from events
+      const hasGroundTruth = match?.home_score != null && match?.away_score != null;
+      let homeGoals: number;
+      let awayGoals: number;
+      let scoreSource: string;
+
+      if (hasGroundTruth) {
+        homeGoals = match.home_score;
+        awayGoals = match.away_score;
+        scoreSource = "manuell korrigiertes Endergebnis (Ground Truth vom Trainer)";
+      } else {
+        homeGoals = matchEvents.filter((e: any) => e.event_type === "goal" && e.team === "home").length;
+        awayGoals = matchEvents.filter((e: any) => e.event_type === "goal" && e.team === "away").length;
+        scoreSource = "berechnet aus erfassten Tor-Events";
+      }
+
+      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nENDERGEBNIS (${scoreSource}): Heim ${homeGoals} : ${awayGoals} Gegner\n\nWICHTIG: Diese Events sind GROUND TRUTH. Das Endergebnis MUSS home_goals=${homeGoals} und away_goals=${awayGoals} sein. Die team-Angabe bei jedem Event ist entscheidend (home=Heimteam, away=Gegner). Tore MÜSSEN im Momentum-Score als Spitzen erscheinen. Karten MÜSSEN in der Discipline-Bewertung berücksichtigt werden.`;
     }
     await supabase.from("analysis_jobs").update({ progress: 90 }).eq("id", job_id);
 
