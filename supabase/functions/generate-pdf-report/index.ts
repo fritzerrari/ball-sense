@@ -419,13 +419,11 @@ Nutze die tatsächlichen Spieldaten. SPRACHE: Deutsch. NUR JSON.`;
                 ${playerDots}
               </div>
             </div>
-            ${subs.length ? `<h3 style="margin-top:8px">Ersatzbank</h3><div style="font-size:10px;color:#64748b">${subs.map((s: any) => `${s.shirt_number ?? "?"} ${s.player_name}`).join(" • ")}</div>` : ""}
+            ${subs.length ? '<h3 style="margin-top:8px">Ersatzbank</h3><div style="font-size:10px;color:#64748b">' + subs.map((s: any) => (s.shirt_number ?? "?") + " " + s.player_name).join(" • ") + "</div>" : ""}
           </div>
           <div>
-            <h3>${awayTeam} ${match?.away_formation ? `(${match.away_formation})` : ""}</h3>
-            ${awayLU.length ? `<div style="font-size:11px">${awayLU.map((p: any) => `<div style="margin:3px 0">
-              <span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:#dc2626;color:#fff;text-align:center;line-height:28px;font-size:10px;font-weight:700;margin-right:6px">${p.shirt_number ?? ""}</span>${p.player_name}
-            </div>`).join("")}</div>` : `<p style="color:#94a3b8;font-size:11px">Keine Daten</p>`}
+            <h3>${awayTeam} ${match?.away_formation ? "(" + match.away_formation + ")" : ""}</h3>
+            ${awayLU.length ? '<div style="font-size:11px">' + awayLU.map((p: any) => '<div style="margin:3px 0"><span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:#dc2626;color:#fff;text-align:center;line-height:28px;font-size:10px;font-weight:700;margin-right:6px">' + (p.shirt_number ?? "") + "</span>" + p.player_name + "</div>").join("") + "</div>" : '<p style="color:#94a3b8;font-size:11px">Keine Daten</p>'}
           </div>
         </div>
         <div class="page-footer">Generiert mit FieldIQ • ${matchDate}</div>
