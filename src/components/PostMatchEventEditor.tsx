@@ -71,6 +71,12 @@ export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props
   const [suggestions, setSuggestions] = useState<SuggestedEvent[]>([]);
   const [importingIdx, setImportingIdx] = useState<number | null>(null);
 
+  // Score correction
+  const [homeScore, setHomeScore] = useState<string>("");
+  const [awayScore, setAwayScore] = useState<string>("");
+  const [scoreSaving, setScoreSaving] = useState(false);
+  const [scoreLoaded, setScoreLoaded] = useState(false);
+
   const loadEvents = async () => {
     setLoading(true);
     const { data } = await supabase
@@ -83,7 +89,19 @@ export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props
   };
 
   useEffect(() => {
-    if (open) loadEvents();
+    if (open) {
+      loadEvents();
+      // Load existing score
+      if (!scoreLoaded) {
+        supabase.from("matches").select("home_score, away_score").eq("id", matchId).maybeSingle().then(({ data }) => {
+          if (data) {
+            setHomeScore(data.home_score != null ? String(data.home_score) : "");
+            setAwayScore(data.away_score != null ? String(data.away_score) : "");
+          }
+          setScoreLoaded(true);
+        });
+      }
+    }
   }, [open, matchId]);
 
   const handleAdd = async () => {
