@@ -362,7 +362,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      const suffix = phase && phase !== "full" ? `_${phase}` : "";
+      const camIdx = session.camera_index ?? 0;
+      const camSuffix = `_cam${camIdx}`;
+      const suffix = phase && phase !== "full" ? `${camSuffix}_${phase}` : camSuffix;
       const filePath = `${match_id}${suffix}.json`;
 
       const framesJson = JSON.stringify({
@@ -388,7 +390,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames);
+      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames, session.camera_index);
 
       const { data: job, error: jobError } = await supabaseAdmin
         .from("analysis_jobs")
@@ -475,7 +477,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      const filePath = `${match_id}_chunk_${chunk_index ?? 0}.json`;
+      const camIdx = session.camera_index ?? 0;
+      const filePath = `${match_id}_cam${camIdx}_chunk_${chunk_index ?? 0}.json`;
       const framesJson = JSON.stringify({
         frames,
         chunk_index: chunk_index ?? 0,
@@ -498,7 +501,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames);
+      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames, session.camera_index);
 
       const { data: currentSession } = await supabaseAdmin
         .from("camera_access_sessions")
@@ -523,7 +526,7 @@ Deno.serve(async (req) => {
 
         const allFrames: string[] = [];
         for (let i = 0; i <= (chunk_index ?? 0); i++) {
-          const chunkPath = `${match_id}_chunk_${i}.json`;
+          const chunkPath = `${match_id}_cam${camIdx}_chunk_${i}.json`;
           const { data: chunkData } = await supabaseAdmin.storage
             .from("match-frames")
             .download(chunkPath);
