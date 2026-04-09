@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -71,6 +71,12 @@ export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props
   const [suggestions, setSuggestions] = useState<SuggestedEvent[]>([]);
   const [importingIdx, setImportingIdx] = useState<number | null>(null);
 
+  // Score correction
+  const [homeScore, setHomeScore] = useState<string>("");
+  const [awayScore, setAwayScore] = useState<string>("");
+  const [scoreSaving, setScoreSaving] = useState(false);
+  const [scoreLoaded, setScoreLoaded] = useState(false);
+
   const loadEvents = async () => {
     setLoading(true);
     const { data } = await supabase
@@ -83,7 +89,19 @@ export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props
   };
 
   useEffect(() => {
-    if (open) loadEvents();
+    if (open) {
+      loadEvents();
+      // Load existing score
+      if (!scoreLoaded) {
+        supabase.from("matches").select("home_score, away_score").eq("id", matchId).maybeSingle().then(({ data }) => {
+          if (data) {
+            setHomeScore(data.home_score != null ? String(data.home_score) : "");
+            setAwayScore(data.away_score != null ? String(data.away_score) : "");
+          }
+          setScoreLoaded(true);
+        });
+      }
+    }
   }, [open, matchId]);
 
   const handleAdd = async () => {
@@ -370,6 +388,68 @@ export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props
               </CardContent>
             </Card>
           )}
+
+          {/* Score correction */}
+          <Card className="border-primary/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-display">Endergebnis korrigieren</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs text-muted-foreground">Heim</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={homeScore}
+                    onChange={(e) => setHomeScore(e.target.value)}
+                    placeholder="–"
+                    className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-center text-lg font-bold text-foreground"
+                  />
+                </div>
+                <span className="text-lg font-bold text-muted-foreground mt-5">:</span>
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs text-muted-foreground">Gast</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={awayScore}
+                    onChange={(e) => setAwayScore(e.target.value)}
+                    placeholder="–"
+                    className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-center text-lg font-bold text-foreground"
+                  />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="w-full gap-1.5"
+                disabled={scoreSaving}
+                onClick={async () => {
+                  setScoreSaving(true);
+                  try {
+                    const { error } = await supabase.from("matches").update({
+                      home_score: homeScore ? parseInt(homeScore) : null,
+                      away_score: awayScore ? parseInt(awayScore) : null,
+                    } as any).eq("id", matchId);
+                    if (error) throw error;
+                    toast.success("Ergebnis gespeichert");
+                    onEventsChanged?.();
+                  } catch (err: any) {
+                    toast.error(err.message ?? "Fehler beim Speichern");
+                  } finally {
+                    setScoreSaving(false);
+                  }
+                }}
+              >
+                {scoreSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                Ergebnis speichern
+              </Button>
+              <p className="text-[10px] text-muted-foreground">
+                Das korrigierte Ergebnis wird in der Analyse als „Ground Truth" verwendet.
+              </p>
+            </CardContent>
+          </Card>
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">

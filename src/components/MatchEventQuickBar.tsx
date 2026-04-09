@@ -1,8 +1,10 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Check, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Check, Loader2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { VideoRecorderHandle, HighlightClip } from "@/lib/video-recorder";
 
 interface Props {
@@ -15,6 +17,8 @@ interface Props {
   isTraining?: boolean;
   homeTeamName?: string;
   awayTeamName?: string;
+  onGoalEvent?: (team: "home" | "away") => void;
+  onEventDeleted?: (eventType: string, team: string) => void;
 }
 
 const EVENT_BUTTONS = [
@@ -31,6 +35,16 @@ const EVENT_BUTTONS = [
 type EventType = typeof EVENT_BUTTONS[number]["type"];
 type ActiveTeam = "home" | "away";
 
+interface RecentEvent {
+  id: string;
+  type: EventType;
+  team: ActiveTeam;
+  minute: number;
+  label: string;
+}
+
+const COOLDOWN_MS = 3000;
+
 export default function MatchEventQuickBar({
   matchId,
   recorderRef,
@@ -41,19 +55,30 @@ export default function MatchEventQuickBar({
   isTraining = false,
   homeTeamName = "Heim",
   awayTeamName = "Gegner",
+  onGoalEvent,
+  onEventDeleted,
 }: Props) {
   const [savingSet, setSavingSet] = useState<Set<string>>(new Set());
   const [successSet, setSuccessSet] = useState<Set<string>>(new Set());
+  const [cooldownSet, setCooldownSet] = useState<Set<string>>(new Set());
   const [activeTeam, setActiveTeam] = useState<ActiveTeam>("home");
+  const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<RecentEvent | null>(null);
   const debounceRef = useRef<Record<string, number>>({});
 
   const isHome = activeTeam === "home";
 
-  // Filter out match-only events for training sessions
   const TRAINING_EXCLUDED: EventType[] = ["substitution", "corner", "free_kick"];
   const visibleButtons = isTraining
     ? EVENT_BUTTONS.filter(b => !TRAINING_EXCLUDED.includes(b.type))
     : EVENT_BUTTONS;
+
+  // Cooldown timer cleanup
+  useEffect(() => {
+    if (cooldownSet.size === 0) return;
+    const timer = setTimeout(() => setCooldownSet(new Set()), COOLDOWN_MS);
+    return () => clearTimeout(timer);
+  }, [cooldownSet]);
 
   const toggleTeam = useCallback(() => {
     setActiveTeam(prev => {
@@ -64,17 +89,14 @@ export default function MatchEventQuickBar({
   }, []);
 
   const handleEvent = useCallback(async (eventType: EventType) => {
-    // Debounce: prevent double-tap on same button within 500ms
     const now = Date.now();
     if (debounceRef.current[eventType] && now - debounceRef.current[eventType] < 500) return;
     debounceRef.current[eventType] = now;
 
-    // Allow parallel saves for different event types
-    if (savingSet.has(eventType)) return;
+    if (savingSet.has(eventType) || cooldownSet.has(eventType)) return;
 
     setSavingSet(prev => new Set(prev).add(eventType));
 
-    // Haptic feedback
     if (navigator.vibrate) navigator.vibrate(30);
 
     const elapsedMin = Math.max(1, Math.round((Date.now() - recordingStartTime) / 60000));
@@ -86,6 +108,8 @@ export default function MatchEventQuickBar({
       if (highlightsEnabled && recorderRef.current) {
         clip = recorderRef.current.extractHighlight(eventType, minute);
       }
+
+      let insertedId: string | undefined;
 
       if (sessionToken) {
         const res = await fetch(
@@ -110,15 +134,18 @@ export default function MatchEventQuickBar({
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error ?? "Event konnte nicht gespeichert werden");
         }
+        const resData = await res.json();
+        insertedId = resData?.id;
       } else {
-        const { error: eventError } = await supabase.from("match_events").insert({
+        const { data: inserted, error: eventError } = await supabase.from("match_events").insert({
           match_id: matchId,
           event_type: eventType,
           minute,
           team: activeTeam,
           notes: clip ? "Highlight-Clip gespeichert" : undefined,
-        });
+        }).select("id").single();
         if (eventError) throw eventError;
+        insertedId = inserted?.id;
 
         if (clip) {
           const ext = clip.mimeType.includes("mp4") ? "mp4" : "webm";
@@ -152,7 +179,7 @@ export default function MatchEventQuickBar({
         }
       }
 
-      // Show success flash on button
+      // Success flash
       setSuccessSet(prev => new Set(prev).add(eventType));
       setTimeout(() => {
         setSuccessSet(prev => {
@@ -162,8 +189,31 @@ export default function MatchEventQuickBar({
         });
       }, 800);
 
-      if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+      // Cooldown
+      setCooldownSet(prev => new Set(prev).add(eventType));
+      setTimeout(() => {
+        setCooldownSet(prev => {
+          const next = new Set(prev);
+          next.delete(eventType);
+          return next;
+        });
+      }, COOLDOWN_MS);
+
+      // Add to recent events
       const eventLabel = EVENT_BUTTONS.find(b => b.type === eventType)?.label ?? eventType;
+      if (insertedId) {
+        setRecentEvents(prev => [
+          { id: insertedId!, type: eventType, team: activeTeam, minute, label: eventLabel },
+          ...prev,
+        ].slice(0, 3));
+      }
+
+      // Notify parent about goals
+      if (eventType === "goal" && onGoalEvent) {
+        onGoalEvent(activeTeam);
+      }
+
+      if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
       toast.success(`${eventLabel} (${teamLabel}) ✓`);
     } catch (err: any) {
       toast.error(err.message ?? "Event konnte nicht gespeichert werden");
@@ -174,10 +224,60 @@ export default function MatchEventQuickBar({
         return next;
       });
     }
-  }, [matchId, recorderRef, recordingStartTime, savingSet, sessionToken, highlightsEnabled, halfNumber, activeTeam, isHome, homeTeamName, awayTeamName]);
+  }, [matchId, recorderRef, recordingStartTime, savingSet, cooldownSet, sessionToken, highlightsEnabled, halfNumber, activeTeam, isHome, homeTeamName, awayTeamName, onGoalEvent]);
+
+  const handleDeleteEvent = useCallback(async (event: RecentEvent) => {
+    try {
+      if (sessionToken) {
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({
+              action: "delete-event",
+              session_token: sessionToken,
+              match_id: matchId,
+              event_id: event.id,
+            }),
+          },
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? "Löschen fehlgeschlagen");
+        }
+      } else {
+        const { error } = await supabase.from("match_events").delete().eq("id", event.id);
+        if (error) throw error;
+      }
+
+      setRecentEvents(prev => prev.filter(e => e.id !== event.id));
+      if (event.type === "goal" && onEventDeleted) {
+        onEventDeleted(event.type, event.team);
+      }
+      toast.success(`${event.label} (Min. ${event.minute}) gelöscht`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Löschen fehlgeschlagen");
+    }
+    setDeleteTarget(null);
+  }, [matchId, sessionToken, onEventDeleted]);
 
   return (
     <div className="w-full max-w-xs space-y-2">
+      {/* Delete confirm dialog */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Event löschen?"
+        description={deleteTarget ? `${deleteTarget.label} (${deleteTarget.team === "home" ? homeTeamName : awayTeamName}, Min. ${deleteTarget.minute}) wirklich entfernen?` : ""}
+        confirmLabel="Löschen"
+        onConfirm={() => deleteTarget && handleDeleteEvent(deleteTarget)}
+        destructive
+      />
+
       {/* Team toggle */}
       {!isTraining && (
         <button
@@ -199,6 +299,7 @@ export default function MatchEventQuickBar({
         {visibleButtons.map((btn) => {
           const isSaving = savingSet.has(btn.type);
           const isSuccess = successSet.has(btn.type);
+          const isCooldown = cooldownSet.has(btn.type);
 
           return (
             <Button
@@ -208,11 +309,13 @@ export default function MatchEventQuickBar({
               className={`gap-0.5 text-[10px] md:text-xs h-10 md:h-9 min-w-0 backdrop-blur border active:scale-95 transition-all flex-col md:flex-row p-1 md:p-2 ${
                 isSuccess
                   ? "bg-primary/20 border-primary/50 text-primary"
-                  : isHome
-                    ? "bg-background/80 border-border/50"
-                    : "bg-destructive/5 border-destructive/20"
+                  : isCooldown
+                    ? "bg-muted/60 border-border/30 opacity-60"
+                    : isHome
+                      ? "bg-background/80 border-border/50"
+                      : "bg-destructive/5 border-destructive/20"
               }`}
-              disabled={isSaving}
+              disabled={isSaving || isCooldown}
               onClick={() => handleEvent(btn.type)}
             >
               {isSaving ? (
@@ -227,6 +330,23 @@ export default function MatchEventQuickBar({
           );
         })}
       </div>
+
+      {/* Recent events (undo chips) */}
+      {recentEvents.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {recentEvents.map((ev) => (
+            <Badge
+              key={ev.id}
+              variant="secondary"
+              className="gap-1 text-[10px] py-0.5 px-2 cursor-pointer hover:bg-destructive/10 hover:border-destructive/30 transition-colors"
+              onClick={() => setDeleteTarget(ev)}
+            >
+              {ev.minute}' {ev.label}
+              <X className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
+            </Badge>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

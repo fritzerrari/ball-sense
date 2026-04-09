@@ -1156,6 +1156,7 @@ export type Database = {
           away_club_id: string | null
           away_club_name: string | null
           away_formation: string | null
+          away_score: number | null
           consent_minors_confirmed: boolean
           consent_players_confirmed: boolean
           created_at: string
@@ -1167,6 +1168,7 @@ export type Database = {
           h2_started_at: string | null
           home_club_id: string
           home_formation: string | null
+          home_score: number | null
           id: string
           kickoff: string | null
           match_type: string
@@ -1181,6 +1183,7 @@ export type Database = {
           away_club_id?: string | null
           away_club_name?: string | null
           away_formation?: string | null
+          away_score?: number | null
           consent_minors_confirmed?: boolean
           consent_players_confirmed?: boolean
           created_at?: string
@@ -1192,6 +1195,7 @@ export type Database = {
           h2_started_at?: string | null
           home_club_id: string
           home_formation?: string | null
+          home_score?: number | null
           id?: string
           kickoff?: string | null
           match_type?: string
@@ -1206,6 +1210,7 @@ export type Database = {
           away_club_id?: string | null
           away_club_name?: string | null
           away_formation?: string | null
+          away_score?: number | null
           consent_minors_confirmed?: boolean
           consent_players_confirmed?: boolean
           created_at?: string
@@ -1217,6 +1222,7 @@ export type Database = {
           h2_started_at?: string | null
           home_club_id?: string
           home_formation?: string | null
+          home_score?: number | null
           id?: string
           kickoff?: string | null
           match_type?: string
