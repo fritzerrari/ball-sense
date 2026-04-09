@@ -389,6 +389,68 @@ export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props
             </Card>
           )}
 
+          {/* Score correction */}
+          <Card className="border-primary/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-display">Endergebnis korrigieren</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs text-muted-foreground">Heim</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={homeScore}
+                    onChange={(e) => setHomeScore(e.target.value)}
+                    placeholder="–"
+                    className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-center text-lg font-bold text-foreground"
+                  />
+                </div>
+                <span className="text-lg font-bold text-muted-foreground mt-5">:</span>
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs text-muted-foreground">Gast</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={awayScore}
+                    onChange={(e) => setAwayScore(e.target.value)}
+                    placeholder="–"
+                    className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-center text-lg font-bold text-foreground"
+                  />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="w-full gap-1.5"
+                disabled={scoreSaving}
+                onClick={async () => {
+                  setScoreSaving(true);
+                  try {
+                    const { error } = await supabase.from("matches").update({
+                      home_score: homeScore ? parseInt(homeScore) : null,
+                      away_score: awayScore ? parseInt(awayScore) : null,
+                    } as any).eq("id", matchId);
+                    if (error) throw error;
+                    toast.success("Ergebnis gespeichert");
+                    onEventsChanged?.();
+                  } catch (err: any) {
+                    toast.error(err.message ?? "Fehler beim Speichern");
+                  } finally {
+                    setScoreSaving(false);
+                  }
+                }}
+              >
+                {scoreSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                Ergebnis speichern
+              </Button>
+              <p className="text-[10px] text-muted-foreground">
+                Das korrigierte Ergebnis wird in der Analyse als „Ground Truth" verwendet.
+              </p>
+            </CardContent>
+          </Card>
+
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Erfasste Events ({events.length})
