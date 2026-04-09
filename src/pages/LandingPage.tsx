@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, Play, ArrowDown, Smartphone, Zap, Shield, Trophy, Menu, X } from "lucide-react";
+import { ChevronRight, Play, ArrowDown, Smartphone, Zap, Shield, Trophy, Menu, X, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -33,6 +33,8 @@ export default function LandingPage() {
     { href: "#pricing", label: t("landing.pricing") },
   ];
 
+  const tutorialLabel = de ? "Tutorial" : "Tutorial";
+
   const scrollTo = (href: string) => {
     setMobileNavOpen(false);
     const el = document.querySelector(href);
@@ -59,6 +61,12 @@ export default function LandingPage() {
                 {link.label}
               </button>
             ))}
+            <Link
+              to="/tutorial"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {tutorialLabel}
+            </Link>
           </div>
           <div className="flex items-center gap-2">
             <LanguageToggle />
@@ -94,6 +102,14 @@ export default function LandingPage() {
                 {link.label}
               </button>
             ))}
+            <Link
+              to="/tutorial"
+              onClick={() => setMobileNavOpen(false)}
+              className="text-left text-base font-medium text-foreground hover:text-primary transition-colors flex items-center gap-2"
+            >
+              <BookOpen className="h-4 w-4" />
+              {tutorialLabel}
+            </Link>
             <hr className="border-border" />
             <Button variant="ghost" asChild className="justify-start">
               <Link to="/login" onClick={() => setMobileNavOpen(false)}>{t("landing.signIn")}</Link>
