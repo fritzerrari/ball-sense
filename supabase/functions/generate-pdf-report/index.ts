@@ -24,8 +24,8 @@ const ratingBg = (r: number | null) => {
 
 // ── Helper: horizontal comparison bar ──
 const compBar = (label: string, homeVal: number | string, awayVal: number | string, homeNum?: number, awayNum?: number) => {
-  const hN = homeNum ?? parseFloat(String(homeVal)) || 0;
-  const aN = awayNum ?? parseFloat(String(awayVal)) || 0;
+  const hN = homeNum ?? (parseFloat(String(homeVal)) || 0);
+  const aN = awayNum ?? (parseFloat(String(awayVal)) || 0);
   const total = hN + aN || 1;
   const hPct = Math.round((hN / total) * 100);
   const aPct = 100 - hPct;
