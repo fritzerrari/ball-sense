@@ -8,7 +8,7 @@ const corsHeaders = {
 
 /** Try to load frames from storage with fallback: main.json -> _h1+_h2 -> _chunk_* */
 async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number } | null> {
-  // 1. Try canonical file
+  // 1. Try canonical file (merged from all cameras)
   const { data: mainFile } = await supabase.storage.from("match-frames").download(`${matchId}.json`);
   if (mainFile) {
     try {
@@ -17,7 +17,24 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
     } catch { /* corrupt */ }
   }
 
-  // 2. Try half files (_h1 + _h2)
+  // 2. Try camera-specific canonical files (cam0-3)
+  const allCamFrames: string[] = [];
+  let camDuration = 0;
+  for (let cam = 0; cam < 4; cam++) {
+    const { data: camFile } = await supabase.storage.from("match-frames").download(`${matchId}_cam${cam}.json`);
+    if (camFile) {
+      try {
+        const parsed = JSON.parse(await camFile.text());
+        if (parsed.frames?.length) {
+          allCamFrames.push(...parsed.frames);
+          camDuration += parsed.duration_sec ?? 0;
+        }
+      } catch { /* skip */ }
+    }
+  }
+  if (allCamFrames.length > 0) return { frames: allCamFrames, duration_sec: camDuration };
+
+  // 3. Try half files (_h1 + _h2)
   const allHalfFrames: string[] = [];
   let totalDuration = 0;
   for (const suffix of ["_h1", "_h2"]) {
@@ -34,11 +51,23 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
   }
   if (allHalfFrames.length > 0) return { frames: allHalfFrames, duration_sec: totalDuration };
 
-  // 3. Try chunk files (_chunk_0, _chunk_1, ...)
+  // 4. Try chunk files (including camera-specific chunks)
   const allChunkFrames: string[] = [];
+  // First try camera-specific chunks
+  for (let cam = 0; cam < 4; cam++) {
+    for (let i = 0; i < 100; i++) {
+      const { data: chunkFile } = await supabase.storage.from("match-frames").download(`${matchId}_cam${cam}_chunk_${i}.json`);
+      if (!chunkFile) break;
+      try {
+        const parsed = JSON.parse(await chunkFile.text());
+        if (parsed.frames?.length) allChunkFrames.push(...parsed.frames);
+      } catch { /* skip corrupt */ }
+    }
+  }
+  // Then try legacy non-camera chunks
   for (let i = 0; i < 100; i++) {
     const { data: chunkFile } = await supabase.storage.from("match-frames").download(`${matchId}_chunk_${i}.json`);
-    if (!chunkFile) break; // No more chunks
+    if (!chunkFile) break;
     try {
       const parsed = JSON.parse(await chunkFile.text());
       if (parsed.frames?.length) allChunkFrames.push(...parsed.frames);
