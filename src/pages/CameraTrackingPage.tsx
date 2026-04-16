@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye, Pause, Play, CloudUpload, Wifi } from "lucide-react";
+import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye, Pause, Play, CloudUpload, Wifi, Maximize2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
