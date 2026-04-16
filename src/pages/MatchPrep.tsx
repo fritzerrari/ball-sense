@@ -109,6 +109,7 @@ export default function MatchPrep() {
   };
 
   return (
+    <>
     <AppLayout>
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-center gap-3">
@@ -393,5 +394,6 @@ export default function MatchPrep() {
       onConfirm={handleDelete}
       destructive
     />
+    </>
   );
 }
