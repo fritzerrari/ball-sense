@@ -266,7 +266,7 @@ export default function MatchEventQuickBar({
   }, [matchId, sessionToken, onEventDeleted]);
 
   return (
-    <div className="w-full max-w-xs space-y-2">
+    <div className="w-full max-w-sm space-y-1.5">
       {/* Delete confirm dialog */}
       <ConfirmDialog
         open={!!deleteTarget}
@@ -278,24 +278,24 @@ export default function MatchEventQuickBar({
         destructive
       />
 
-      {/* Team toggle */}
+      {/* Team toggle — compact */}
       {!isTraining && (
         <button
           onClick={toggleTeam}
-          className={`w-full flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-bold font-display transition-all active:scale-[0.97] border ${
+          className={`w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 px-3 text-[11px] font-bold font-display transition-all active:scale-[0.97] border ${
             isHome
               ? "bg-primary/15 border-primary/40 text-primary"
               : "bg-destructive/15 border-destructive/40 text-destructive"
           }`}
         >
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${isHome ? "bg-primary" : "bg-destructive"}`} />
+          <span className={`inline-block w-2 h-2 rounded-full ${isHome ? "bg-primary" : "bg-destructive"}`} />
           {isHome ? `🏠 ${homeTeamName}` : `📣 ${awayTeamName}`}
-          <span className="text-[10px] font-normal opacity-60 ml-1">Tippe zum Wechseln</span>
+          <span className="text-[9px] font-normal opacity-60 ml-1">Wechseln</span>
         </button>
       )}
 
-      {/* Event buttons */}
-      <div className={`grid gap-1.5 w-full ${visibleButtons.length <= 5 ? "grid-cols-3" : "grid-cols-4"}`}>
+      {/* Event buttons — horizontal scrollable row */}
+      <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide">
         {visibleButtons.map((btn) => {
           const isSaving = savingSet.has(btn.type);
           const isSuccess = successSet.has(btn.type);
@@ -306,7 +306,7 @@ export default function MatchEventQuickBar({
               key={btn.type}
               size="sm"
               variant="secondary"
-              className={`gap-0.5 text-[10px] md:text-xs h-10 md:h-9 min-w-0 backdrop-blur border active:scale-95 transition-all flex-col md:flex-row p-1 md:p-2 ${
+              className={`flex-shrink-0 gap-0.5 text-[10px] h-8 min-w-0 backdrop-blur border active:scale-95 transition-all flex-col p-1 px-2 ${
                 isSuccess
                   ? "bg-primary/20 border-primary/50 text-primary"
                   : isCooldown
@@ -319,13 +319,13 @@ export default function MatchEventQuickBar({
               onClick={() => handleEvent(btn.type)}
             >
               {isSaving ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3 w-3 animate-spin" />
               ) : isSuccess ? (
-                <Check className="h-3.5 w-3.5 text-primary" />
+                <Check className="h-3 w-3 text-primary" />
               ) : (
-                <span className="text-base md:text-sm leading-none">{btn.icon}</span>
+                <span className="text-sm leading-none">{btn.icon}</span>
               )}
-              <span className="leading-none">{btn.label}</span>
+              <span className="leading-none text-[9px]">{btn.label}</span>
             </Button>
           );
         })}
