@@ -276,20 +276,28 @@ export default function CameraTrackingPage() {
 
   const initCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      const preferUW = getUltraWidePreference();
+      const stream = await ultraWide.initStream(preferUW);
+      if (stream) {
+        streamRef.current = stream;
+        setPhase("ready");
+      } else {
+        // Fallback: try standard getUserMedia
+        const fallback = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+        streamRef.current = fallback;
+        if (videoRef.current) {
+          videoRef.current.srcObject = fallback;
+          videoRef.current.play();
+        }
+        setPhase("ready");
       }
-      setPhase("ready");
     } catch {
       toast.error("Kamera konnte nicht gestartet werden");
     }
-  }, []);
+  }, [ultraWide]);
 
   const startRecording = useCallback(() => {
     if (videoRef.current) {
