@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, Play, ArrowDown, Smartphone, Zap, Shield, Trophy, Menu, X, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -6,20 +6,38 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useTranslation } from "@/lib/i18n";
-import { HeroSlider } from "@/components/landing/HeroSlider";
-import { DemoSection } from "@/components/landing/DemoSection";
-import { HowItWorks } from "@/components/landing/HowItWorks";
-import { AnalyticsShowcase } from "@/components/landing/AnalyticsShowcase";
-import { FeatureCards } from "@/components/landing/FeatureCards";
-import { KeyNumbers } from "@/components/landing/KeyNumbers";
-import { TrustSection } from "@/components/landing/TrustSection";
-import { PricingSection } from "@/components/landing/PricingSection";
-import { FAQSection } from "@/components/landing/FAQSection";
-import { WhyFieldIQ } from "@/components/landing/WhyFieldIQ";
-import { TransparencySection } from "@/components/landing/TransparencySection";
-import { CompareInline } from "@/components/landing/CompareInline";
-import { Footer } from "@/components/landing/Footer";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+
+const HeroSlider = lazy(() => import("@/components/landing/HeroSlider").then((module) => ({ default: module.HeroSlider })));
+const DemoSection = lazy(() => import("@/components/landing/DemoSection").then((module) => ({ default: module.DemoSection })));
+const HowItWorks = lazy(() => import("@/components/landing/HowItWorks").then((module) => ({ default: module.HowItWorks })));
+const AnalyticsShowcase = lazy(() => import("@/components/landing/AnalyticsShowcase").then((module) => ({ default: module.AnalyticsShowcase })));
+const FeatureCards = lazy(() => import("@/components/landing/FeatureCards").then((module) => ({ default: module.FeatureCards })));
+const KeyNumbers = lazy(() => import("@/components/landing/KeyNumbers").then((module) => ({ default: module.KeyNumbers })));
+const TrustSection = lazy(() => import("@/components/landing/TrustSection").then((module) => ({ default: module.TrustSection })));
+const PricingSection = lazy(() => import("@/components/landing/PricingSection").then((module) => ({ default: module.PricingSection })));
+const FAQSection = lazy(() => import("@/components/landing/FAQSection").then((module) => ({ default: module.FAQSection })));
+const WhyFieldIQ = lazy(() => import("@/components/landing/WhyFieldIQ").then((module) => ({ default: module.WhyFieldIQ })));
+const TransparencySection = lazy(() => import("@/components/landing/TransparencySection").then((module) => ({ default: module.TransparencySection })));
+const CompareInline = lazy(() => import("@/components/landing/CompareInline").then((module) => ({ default: module.CompareInline })));
+const Footer = lazy(() => import("@/components/landing/Footer").then((module) => ({ default: module.Footer })));
+
+function LandingSectionSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <div className={`container mx-auto px-4 py-12 md:py-20 ${className}`}>
+      <div className="rounded-3xl border border-border/40 bg-card/30 p-6 md:p-10 animate-pulse">
+        <div className="h-5 w-32 rounded bg-muted mb-4" />
+        <div className="h-10 w-3/4 rounded bg-muted mb-3" />
+        <div className="h-4 w-full rounded bg-muted/80 mb-2" />
+        <div className="h-4 w-5/6 rounded bg-muted/80 mb-8" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="h-48 rounded-2xl bg-muted/70" />
+          <div className="h-48 rounded-2xl bg-muted/70" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage() {
   const { t, language } = useTranslation();
@@ -219,7 +237,9 @@ export default function LandingPage() {
 
             {/* Right — Product Mockup */}
             <div className="lg:pl-4 hidden md:block">
-              <HeroSlider />
+              <Suspense fallback={<div className="h-[520px] rounded-[2rem] border border-border/40 bg-card/30 animate-pulse" />}>
+                <HeroSlider />
+              </Suspense>
             </div>
           </div>
 
@@ -241,17 +261,19 @@ export default function LandingPage() {
       </section>
 
       {/* Optimized section order for conversion */}
-      <KeyNumbers />
-      <WhyFieldIQ />
-      <HowItWorks />
-      <FeatureCards />
-      <TransparencySection />
-      <CompareInline />
-      <AnalyticsShowcase />
-      <DemoSection />
-      <TrustSection />
-      <PricingSection />
-      <FAQSection />
+      <Suspense fallback={<LandingSectionSkeleton className="pt-0" />}>
+        <KeyNumbers />
+        <WhyFieldIQ />
+        <HowItWorks />
+        <FeatureCards />
+        <TransparencySection />
+        <CompareInline />
+        <AnalyticsShowcase />
+        <DemoSection />
+        <TrustSection />
+        <PricingSection />
+        <FAQSection />
+      </Suspense>
 
       {/* Final CTA */}
       <section className="py-16 md:py-36 relative overflow-hidden">
@@ -294,7 +316,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <Footer />
+      <Suspense fallback={<div className="h-32" />}>
+        <Footer />
+      </Suspense>
     </div>
   );
 }
