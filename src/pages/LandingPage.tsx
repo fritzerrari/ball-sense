@@ -54,8 +54,8 @@ export default function LandingPage() {
       return () => window.cancelIdleCallback(idleId);
     }
 
-    const timeoutId = window.setTimeout(() => setDeferredSectionsReady(true), 300);
-    return () => window.clearTimeout(timeoutId);
+    const timeoutId = setTimeout(() => setDeferredSectionsReady(true), 300);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const navLinks = [
