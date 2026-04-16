@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      devOptions: {
+        enabled: false,
+      },
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: false, // use public/manifest.json
       workbox: {
