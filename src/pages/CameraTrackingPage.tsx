@@ -70,6 +70,10 @@ export default function CameraTrackingPage() {
   const chunkIndexRef = useRef(0);
   const deltaRetryCountRef = useRef(0);
 
+  const ultraWide = useUltraWideCamera(videoRef);
+  const chunkIndexRef = useRef(0);
+  const deltaRetryCountRef = useRef(0);
+
   const [homeTeamName, setHomeTeamName] = useState("Heim");
   const [awayTeamName, setAwayTeamName] = useState("Gegner");
   const [liveHomeGoals, setLiveHomeGoals] = useState(0);
