@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Building2, CreditCard, Save, Loader2, Check, KeyRound, Copy, ShieldCheck, Trash2, Power, BarChart3 } from "lucide-react";
+import { Building2, CreditCard, Save, Loader2, Check, KeyRound, Copy, ShieldCheck, Trash2, Power, BarChart3, Camera } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
@@ -13,6 +13,7 @@ import { ClubLogoUpload } from "@/components/ClubLogoUpload";
 import { useTranslation } from "@/lib/i18n";
 import { Switch } from "@/components/ui/switch";
 import { useBenchmarkOptIn } from "@/hooks/use-benchmark";
+import { getUltraWidePreference, setUltraWidePreference } from "@/hooks/use-ultra-wide-camera";
 
 async function hashCode(code: string) {
   const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
@@ -253,6 +254,9 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Camera Settings */}
+        <CameraSettingsSection />
+
         {/* Benchmark Opt-in — Pro only */}
         <BenchmarkOptInSection />
 
@@ -309,6 +313,44 @@ export default function SettingsPage() {
 
       <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} currentPlan={plan} />
     </AppLayout>
+  );
+}
+
+function CameraSettingsSection() {
+  const { language } = useTranslation();
+  const [preferUltraWide, setPreferUltraWide] = useState(getUltraWidePreference);
+
+  const handleToggle = (val: boolean) => {
+    setPreferUltraWide(val);
+    setUltraWidePreference(val);
+    toast.success(language === "de" ? "Einstellung gespeichert" : "Setting saved");
+  };
+
+  return (
+    <div className="glass-card space-y-4 p-6">
+      <h2 className="text-lg font-semibold font-display flex items-center gap-2">
+        <Camera className="h-5 w-5 text-primary" />
+        {language === "de" ? "Kamera-Einstellungen" : "Camera Settings"}
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        {language === "de"
+          ? "Steuere die Standard-Kameraeinstellungen für das Tracking."
+          : "Control default camera settings for tracking."}
+      </p>
+      <div className="flex items-center gap-3">
+        <Switch checked={preferUltraWide} onCheckedChange={handleToggle} />
+        <div>
+          <span className="text-sm text-foreground font-medium">
+            {language === "de" ? "Weitwinkel als Standard" : "Use wide-angle by default"}
+          </span>
+          <p className="text-xs text-muted-foreground">
+            {language === "de"
+              ? "Aktiviert automatisch die 0.5x Ultra-Weitwinkel-Kamera beim Start der Aufnahme (falls verfügbar)."
+              : "Automatically activates the 0.5x ultra-wide camera when starting a recording (if available)."}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 

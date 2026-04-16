@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye, Pause, Play, CloudUpload, Wifi } from "lucide-react";
+import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye, Pause, Play, CloudUpload, Wifi, Maximize2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
@@ -14,6 +14,7 @@ import MatchEventQuickBar from "@/components/MatchEventQuickBar";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
+import { useUltraWideCamera, getUltraWidePreference } from "@/hooks/use-ultra-wide-camera";
 
 type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
@@ -68,6 +69,8 @@ export default function CameraTrackingPage() {
   const lastUploadedIndexRef = useRef(0);
   const chunkIndexRef = useRef(0);
   const deltaRetryCountRef = useRef(0);
+
+  const ultraWide = useUltraWideCamera(videoRef);
 
   const [homeTeamName, setHomeTeamName] = useState("Heim");
   const [awayTeamName, setAwayTeamName] = useState("Gegner");
@@ -273,20 +276,28 @@ export default function CameraTrackingPage() {
 
   const initCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      const preferUW = getUltraWidePreference();
+      const stream = await ultraWide.initStream(preferUW);
+      if (stream) {
+        streamRef.current = stream;
+        setPhase("ready");
+      } else {
+        // Fallback: try standard getUserMedia
+        const fallback = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+        streamRef.current = fallback;
+        if (videoRef.current) {
+          videoRef.current.srcObject = fallback;
+          videoRef.current.play();
+        }
+        setPhase("ready");
       }
-      setPhase("ready");
     } catch {
       toast.error("Kamera konnte nicht gestartet werden");
     }
-  }, []);
+  }, [ultraWide]);
 
   const startRecording = useCallback(() => {
     if (videoRef.current) {
@@ -675,6 +686,22 @@ export default function CameraTrackingPage() {
               <span className="text-lg">📱↔️</span>
               <span className="text-xs text-white/60">Querformat empfohlen</span>
             </div>
+            {/* Ultra-wide toggle */}
+            {ultraWide.hasUltraWide && (
+              <button
+                onClick={async () => {
+                  await ultraWide.toggle();
+                  streamRef.current = ultraWide.getStream();
+                }}
+                disabled={ultraWide.switching}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 rounded-full px-4 py-2 border border-white/20 transition-colors"
+              >
+                <Maximize2 className="h-4 w-4 text-white/70" />
+                <span className="text-xs text-white/70 font-medium">
+                  {ultraWide.useUltraWide ? "0.5x Weitwinkel aktiv" : "1x Standard — auf 0.5x wechseln"}
+                </span>
+              </button>
+            )}
             {isHelper && !transferAuthorized && (
               <div className="flex items-center gap-1.5 bg-destructive/20 rounded-full px-4 py-2 border border-destructive/30">
                 <Loader2 className="h-3.5 w-3.5 text-destructive animate-spin" />
@@ -716,8 +743,24 @@ export default function CameraTrackingPage() {
               )}
             </div>
 
-            {/* Frame counter + sync status */}
+            {/* Frame counter + ultra-wide toggle + sync status */}
             <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
+              {ultraWide.hasUltraWide && (
+                <button
+                  onClick={async () => {
+                    await ultraWide.toggle();
+                    streamRef.current = ultraWide.getStream();
+                    toast.success(ultraWide.useUltraWide ? "1x Standard" : "0.5x Weitwinkel");
+                  }}
+                  disabled={ultraWide.switching}
+                  className="bg-black/70 hover:bg-black/80 rounded-full px-3 py-1.5 flex items-center gap-1.5 transition-colors"
+                >
+                  <Maximize2 className="h-3 w-3 text-white" />
+                  <span className="text-xs text-white font-bold font-mono">
+                    {ultraWide.useUltraWide ? "0.5x" : "1x"}
+                  </span>
+                </button>
+              )}
               <div className="bg-black/60 rounded-full px-3 py-1.5">
                 <span className="text-xs text-white font-medium">{frameCount} Frames</span>
               </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Mountain, Smartphone, CheckCircle2, X } from "lucide-react";
+import { Camera, Mountain, Smartphone, CheckCircle2, X, Maximize2 } from "lucide-react";
 
 interface CameraSetupOverlayProps {
   onDismiss: () => void;
@@ -24,6 +24,11 @@ const tips = [
     desc: "Handy quer halten oder anlehnen. Nicht schwenken oder zoomen.",
   },
   {
+    icon: Maximize2,
+    title: "Weitwinkel nutzen",
+    desc: "Zu nah am Feld? Aktiviere den 0.5x-Modus oben rechts für mehr Übersicht.",
+  },
+  {
     icon: CheckCircle2,
     title: "Auto-Kalibrierung",
     desc: "Die KI erkennt das Spielfeld automatisch — du musst nichts kalibrieren.",
@@ -31,7 +36,7 @@ const tips = [
 ];
 
 export default function CameraSetupOverlay({ onDismiss, onStart }: CameraSetupOverlayProps) {
-  const [checked, setChecked] = useState<boolean[]>([false, false, false, false]);
+  const [checked, setChecked] = useState<boolean[]>([false, false, false, false, false]);
 
   const allChecked = checked.every(Boolean);
 
