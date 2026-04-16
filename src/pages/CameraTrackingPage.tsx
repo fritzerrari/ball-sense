@@ -16,7 +16,38 @@ import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
 
-type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
+type Phase = "code" | "restoring" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
+
+const SESSION_STORAGE_KEY = "fieldiq_camera_session";
+
+interface StoredSession {
+  matchId: string;
+  sessionToken: string;
+  cameraIndex: number;
+  createdAt: string;
+}
+
+function saveSession(data: StoredSession) {
+  try { localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data)); } catch {}
+}
+
+function loadSession(): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredSession;
+    // Expire after 14h client-side
+    if (Date.now() - new Date(parsed.createdAt).getTime() > 14 * 60 * 60 * 1000) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch { return null; }
+}
+
+function clearSession() {
+  try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch {}
+}
 
 /** Check if user is authenticated */
 function useIsAuthenticated() {
