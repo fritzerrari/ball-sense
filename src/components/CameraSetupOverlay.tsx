@@ -36,7 +36,7 @@ const tips = [
 ];
 
 export default function CameraSetupOverlay({ onDismiss, onStart }: CameraSetupOverlayProps) {
-  const [checked, setChecked] = useState<boolean[]>([false, false, false, false]);
+  const [checked, setChecked] = useState<boolean[]>([false, false, false, false, false]);
 
   const allChecked = checked.every(Boolean);
 

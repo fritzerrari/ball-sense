@@ -254,6 +254,9 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Camera Settings */}
+        <CameraSettingsSection />
+
         {/* Benchmark Opt-in — Pro only */}
         <BenchmarkOptInSection />
 
