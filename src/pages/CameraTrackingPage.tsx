@@ -705,6 +705,7 @@ export default function CameraTrackingPage() {
 
       setProgress(100);
       setPhase("done");
+      clearSession();
       if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
       toast.success("Endanalyse gestartet!");
     } catch (err: any) {
@@ -713,9 +714,18 @@ export default function CameraTrackingPage() {
     }
   }, [matchId, halfNumber, isHelper, uploadViaEdgeFunction, uploadDirect, updateMatchTiming]);
 
-  // Code entry phase
-  if (phase === "code") {
-    return <CameraCodeEntry onSuccess={handleCodeSuccess} />;
+  // Code entry or restoring phase
+  if (phase === "code" || phase === "restoring") {
+    return phase === "restoring" ? (
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Session wird wiederhergestellt…</p>
+        </div>
+      </div>
+    ) : (
+      <CameraCodeEntry onSuccess={handleCodeSuccess} />
+    );
   }
 
   const progressPct = Math.min(100, Math.round((frameCount / RECOMMENDED_FRAMES) * 100));
