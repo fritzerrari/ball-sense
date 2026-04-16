@@ -276,6 +276,10 @@ export default function CameraTrackingPage() {
 
   const initCamera = useCallback(async () => {
     try {
+      // Ensure camera detection completes before starting stream
+      const detectedCams = await ultraWide.detectCameras();
+      toast.info(`${detectedCams.length} Kamera(s) erkannt`, { duration: 3000 });
+
       const stream = await ultraWide.initStream();
       if (stream) {
         streamRef.current = stream;
@@ -685,22 +689,28 @@ export default function CameraTrackingPage() {
               <span className="text-lg">📱↔️</span>
               <span className="text-xs text-white/60">Querformat empfohlen</span>
             </div>
-            {/* Ultra-wide toggle */}
-            {ultraWide.hasMultipleCameras && (
-              <button
-                onClick={async () => {
+            {/* Camera lens toggle — always show for feedback */}
+            <button
+              onClick={async () => {
+                if (ultraWide.hasMultipleCameras) {
                   await ultraWide.cycleCamera();
                   streamRef.current = ultraWide.getStream();
-                }}
-                disabled={ultraWide.switching}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 rounded-full px-4 py-2 border border-white/20 transition-colors"
-              >
-                <Maximize2 className="h-4 w-4 text-white/70" />
-                <span className="text-xs text-white/70 font-medium">
-                  {ultraWide.currentCameraLabel()} — tippen zum Wechseln
-                </span>
-              </button>
-            )}
+                }
+              }}
+              disabled={ultraWide.switching || !ultraWide.hasMultipleCameras}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 border transition-colors ${
+                ultraWide.hasMultipleCameras
+                  ? "bg-white/10 hover:bg-white/20 border-white/20"
+                  : "bg-white/5 border-white/10 opacity-50"
+              }`}
+            >
+              <Maximize2 className="h-4 w-4 text-white/70" />
+              <span className="text-xs text-white/70 font-medium">
+                {ultraWide.hasMultipleCameras
+                  ? `${ultraWide.currentCameraLabel()} — tippen zum Wechseln`
+                  : `${ultraWide.cameraCount} Kamera erkannt`}
+              </span>
+            </button>
             {isHelper && !transferAuthorized && (
               <div className="flex items-center gap-1.5 bg-destructive/20 rounded-full px-4 py-2 border border-destructive/30">
                 <Loader2 className="h-3.5 w-3.5 text-destructive animate-spin" />
@@ -847,12 +857,12 @@ export default function CameraTrackingPage() {
         )}
       </div>
 
-      <div className="safe-area-pad border-t border-border bg-background p-4 space-y-2">
+      <div className="safe-area-pad border-t border-border bg-background p-3 space-y-1.5">
         {phase === "ready" && (
           <Button
             onClick={() => { if (navigator.vibrate) navigator.vibrate(50); handleReadyStart(); }}
             size="lg"
-            className="w-full gap-2 h-14 text-base active:scale-[0.97] transition-transform"
+            className="w-full gap-2 h-12 text-base active:scale-[0.97] transition-transform"
             disabled={isHelper && !transferAuthorized}
           >
             <Video className="h-5 w-5" />
@@ -860,41 +870,37 @@ export default function CameraTrackingPage() {
           </Button>
         )}
         {phase === "recording" && (
-          <>
+          <div className="flex gap-1.5">
             {/* Halftime button — hidden for training sessions */}
             {!isTraining && (
               <Button
                 onClick={triggerHalftime}
                 disabled={uploading || frameCount < 1}
-                size="lg"
                 variant="secondary"
-                className="w-full gap-2 h-12 text-base border border-primary/30 bg-primary/10 hover:bg-primary/20"
+                className="flex-1 gap-1.5 h-10 text-sm border border-primary/30 bg-primary/10 hover:bg-primary/20"
               >
                 {uploading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Pause className="h-5 w-5 text-primary" />
+                  <Pause className="h-4 w-4 text-primary" />
                 )}
-                ⚽ Halbzeit — Hochladen & Pausieren
+                Halbzeit
               </Button>
             )}
 
             {/* Stop button */}
             <Button
               onClick={requestStop}
-              size="lg"
               variant="destructive"
-              className="w-full gap-2 h-14 text-base"
+              className={`gap-1.5 h-10 text-sm ${isTraining ? "flex-1" : "flex-1"}`}
               disabled={!canStopRecording(frameCount)}
             >
-              <Square className="h-5 w-5" />
-              {frameCount < 5
-                ? `Stoppen (${frameCount} Frames)`
-                : frameCount < RECOMMENDED_FRAMES
-                  ? `Stoppen (${frameCount} Frames)`
-                  : "Stoppen & Endanalyse"}
+              <Square className="h-4 w-4" />
+              {frameCount < RECOMMENDED_FRAMES
+                ? `Stopp (${frameCount})`
+                : "Stopp & Analyse"}
             </Button>
-          </>
+          </div>
         )}
 
         {phase === "stopped" && (
