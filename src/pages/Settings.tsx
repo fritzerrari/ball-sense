@@ -316,6 +316,44 @@ export default function SettingsPage() {
   );
 }
 
+function CameraSettingsSection() {
+  const { language } = useTranslation();
+  const [preferUltraWide, setPreferUltraWide] = useState(getUltraWidePreference);
+
+  const handleToggle = (val: boolean) => {
+    setPreferUltraWide(val);
+    setUltraWidePreference(val);
+    toast.success(language === "de" ? "Einstellung gespeichert" : "Setting saved");
+  };
+
+  return (
+    <div className="glass-card space-y-4 p-6">
+      <h2 className="text-lg font-semibold font-display flex items-center gap-2">
+        <Camera className="h-5 w-5 text-primary" />
+        {language === "de" ? "Kamera-Einstellungen" : "Camera Settings"}
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        {language === "de"
+          ? "Steuere die Standard-Kameraeinstellungen für das Tracking."
+          : "Control default camera settings for tracking."}
+      </p>
+      <div className="flex items-center gap-3">
+        <Switch checked={preferUltraWide} onCheckedChange={handleToggle} />
+        <div>
+          <span className="text-sm text-foreground font-medium">
+            {language === "de" ? "Weitwinkel als Standard" : "Use wide-angle by default"}
+          </span>
+          <p className="text-xs text-muted-foreground">
+            {language === "de"
+              ? "Aktiviert automatisch die 0.5x Ultra-Weitwinkel-Kamera beim Start der Aufnahme (falls verfügbar)."
+              : "Automatically activates the 0.5x ultra-wide camera when starting a recording (if available)."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BenchmarkOptInSection() {
   const { optedIn, loading, isPro, toggle, toggling } = useBenchmarkOptIn();
   const { t, language } = useTranslation();
