@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Mountain, Smartphone, CheckCircle2, X } from "lucide-react";
+import { Camera, Mountain, Smartphone, CheckCircle2, X, Maximize2 } from "lucide-react";
 
 interface CameraSetupOverlayProps {
   onDismiss: () => void;
