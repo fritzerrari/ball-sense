@@ -12,8 +12,10 @@ import {
   Brain, Shield, Swords, Target, AlertTriangle, Users,
   Loader2, ArrowLeft, Zap, ChevronRight, ClipboardList, Download,
 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface Preparation {
   id: string;
@@ -30,6 +32,20 @@ export default function MatchPrep() {
   const [generating, setGenerating] = useState(false);
   const [activePrep, setActivePrep] = useState<Preparation | null>(null);
   const { exportPdf, exporting } = usePdfExport();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    const { error } = await supabase.from("match_preparations").delete().eq("id", deleteId);
+    if (error) {
+      toast.error("Fehler beim Löschen");
+    } else {
+      toast.success("Vorbereitung gelöscht");
+      if (activePrep?.id === deleteId) setActivePrep(null);
+      refetch();
+    }
+    setDeleteId(null);
+  };
 
   // Fetch past preparations
   const { data: pastPreps, refetch } = useQuery({
@@ -93,6 +109,7 @@ export default function MatchPrep() {
   };
 
   return (
+    <>
     <AppLayout>
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-center gap-3">
@@ -326,7 +343,15 @@ export default function MatchPrep() {
                         {new Date(p.created_at).toLocaleDateString("de-DE")} · Formation: {p.preparation_data?.recommended_formation ?? "?"}
                       </p>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteId(p.id); }}
+                        className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive/70" />
+                      </button>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </button>
                 ))}
               </div>
@@ -359,5 +384,16 @@ export default function MatchPrep() {
         )}
       </div>
     </AppLayout>
+
+    <ConfirmDialog
+      open={!!deleteId}
+      onOpenChange={(open) => !open && setDeleteId(null)}
+      title="Vorbereitung löschen"
+      description="Möchtest du diese Spielvorbereitung wirklich löschen? Dies kann nicht rückgängig gemacht werden."
+      confirmLabel="Löschen"
+      onConfirm={handleDelete}
+      destructive
+    />
+    </>
   );
 }
