@@ -686,10 +686,10 @@ export default function CameraTrackingPage() {
               <span className="text-xs text-white/60">Querformat empfohlen</span>
             </div>
             {/* Ultra-wide toggle */}
-            {ultraWide.hasUltraWide && (
+            {ultraWide.hasMultipleCameras && (
               <button
                 onClick={async () => {
-                  await ultraWide.toggle();
+                  await ultraWide.cycleCamera();
                   streamRef.current = ultraWide.getStream();
                 }}
                 disabled={ultraWide.switching}
@@ -697,7 +697,7 @@ export default function CameraTrackingPage() {
               >
                 <Maximize2 className="h-4 w-4 text-white/70" />
                 <span className="text-xs text-white/70 font-medium">
-                  {ultraWide.useUltraWide ? "0.5x Weitwinkel aktiv" : "1x Standard — auf 0.5x wechseln"}
+                  {ultraWide.currentCameraLabel()} — tippen zum Wechseln
                 </span>
               </button>
             )}
