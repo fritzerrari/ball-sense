@@ -276,8 +276,7 @@ export default function CameraTrackingPage() {
 
   const initCamera = useCallback(async () => {
     try {
-      const preferUW = getUltraWidePreference();
-      const stream = await ultraWide.initStream(preferUW);
+      const stream = await ultraWide.initStream();
       if (stream) {
         streamRef.current = stream;
         setPhase("ready");
