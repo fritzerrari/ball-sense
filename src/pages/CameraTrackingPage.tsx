@@ -148,8 +148,49 @@ export default function CameraTrackingPage() {
   const handleCodeSuccess = useCallback((data: { matchId: string; cameraIndex: number; sessionToken: string }) => {
     setMatchId(data.matchId);
     setSessionToken(data.sessionToken);
+    saveSession({
+      matchId: data.matchId,
+      sessionToken: data.sessionToken,
+      cameraIndex: data.cameraIndex,
+      createdAt: new Date().toISOString(),
+    });
     setPhase("setup");
   }, []);
+
+  // ── Session recovery on mount (handles page refresh) ──
+  useEffect(() => {
+    if (matchIdParam) return; // authenticated user with route param — no recovery needed
+    const stored = loadSession();
+    if (!stored) return;
+
+    setPhase("restoring");
+    const CAMERA_ACCESS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-access`;
+    fetch(CAMERA_ACCESS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "validate",
+        session_token: stored.sessionToken,
+        match_id: stored.matchId,
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.valid) {
+          setMatchId(stored.matchId);
+          setSessionToken(stored.sessionToken);
+          setPhase("setup");
+          toast.info("Session wiederhergestellt");
+        } else {
+          clearSession();
+          setPhase("code");
+        }
+      })
+      .catch(() => {
+        clearSession();
+        setPhase("code");
+      });
+  }, [matchIdParam]);
 
   // ── Persist timing to DB ──
   const updateMatchTiming = useCallback(async (fields: Record<string, string>) => {
