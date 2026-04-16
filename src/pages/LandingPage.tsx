@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, Play, ArrowDown, Smartphone, Zap, Shield, Trophy, Menu, X, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -43,6 +43,20 @@ export default function LandingPage() {
   const { t, language } = useTranslation();
   const de = language === "de";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [deferredSectionsReady, setDeferredSectionsReady] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(() => setDeferredSectionsReady(true), { timeout: 1200 });
+
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = window.setTimeout(() => setDeferredSectionsReady(true), 300);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   const navLinks = [
     { href: "#how-it-works", label: t("landing.howItWorks") },
@@ -261,19 +275,23 @@ export default function LandingPage() {
       </section>
 
       {/* Optimized section order for conversion */}
-      <Suspense fallback={<LandingSectionSkeleton className="pt-0" />}>
-        <KeyNumbers />
-        <WhyFieldIQ />
-        <HowItWorks />
-        <FeatureCards />
-        <TransparencySection />
-        <CompareInline />
-        <AnalyticsShowcase />
-        <DemoSection />
-        <TrustSection />
-        <PricingSection />
-        <FAQSection />
-      </Suspense>
+      {deferredSectionsReady ? (
+        <Suspense fallback={<LandingSectionSkeleton className="pt-0" />}>
+          <KeyNumbers />
+          <WhyFieldIQ />
+          <HowItWorks />
+          <FeatureCards />
+          <TransparencySection />
+          <CompareInline />
+          <AnalyticsShowcase />
+          <DemoSection />
+          <TrustSection />
+          <PricingSection />
+          <FAQSection />
+        </Suspense>
+      ) : (
+        <LandingSectionSkeleton className="pt-0" />
+      )}
 
       {/* Final CTA */}
       <section className="py-16 md:py-36 relative overflow-hidden">
@@ -316,9 +334,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <Suspense fallback={<div className="h-32" />}>
-        <Footer />
-      </Suspense>
+      {deferredSectionsReady ? (
+        <Suspense fallback={<div className="h-32" />}>
+          <Footer />
+        </Suspense>
+      ) : (
+        <div className="h-32" />
+      )}
     </div>
   );
 }

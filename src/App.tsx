@@ -3,17 +3,17 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./components/AuthProvider";
 import { ThemeProvider } from "./components/ThemeProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { lazy, Suspense } from "react";
 
 // Eagerly loaded (landing + auth)
 import LandingPage from "./pages/LandingPage";
-import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 // Lazy loaded pages
+const AuthAppShell = lazy(() => import("./components/AuthAppShell"));
+const Login = lazy(() => import("./pages/Login"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Matches = lazy(() => import("./pages/Matches"));
 const NewMatch = lazy(() => import("./pages/NewMatch"));
@@ -62,18 +62,24 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AuthProvider>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
+          <Suspense fallback={<PageLoader />}> 
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/camera/:id/track" element={<CameraTrackingPage />} />
+              <Route path="/camera" element={<CameraTrackingPage />} />
+              <Route path="/install" element={<InstallGuide />} />
+              <Route path="/guide" element={<FullGuide />} />
+              <Route path="/legal/:slug" element={<LegalPage />} />
+              <Route path="/compare" element={<ComparePage />} />
+              <Route path="/tutorial" element={<TutorialPage />} />
+
+              <Route element={<AuthAppShell />}>
                 <Route path="/login" element={<Login />} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/matches" element={<ProtectedRoute><Matches /></ProtectedRoute>} />
                 <Route path="/matches/new" element={<ProtectedRoute><NewMatch /></ProtectedRoute>} />
                 <Route path="/matches/:id" element={<ProtectedRoute><MatchReport /></ProtectedRoute>} />
                 <Route path="/matches/:id/processing" element={<ProtectedRoute><ProcessingPage /></ProtectedRoute>} />
-                <Route path="/camera/:id/track" element={<CameraTrackingPage />} />
-                <Route path="/camera" element={<CameraTrackingPage />} />
                 <Route path="/players" element={<ProtectedRoute><Players /></ProtectedRoute>} />
                 <Route path="/fields" element={<ProtectedRoute><Fields /></ProtectedRoute>} />
                 <Route path="/fields/:id/calibrate" element={<ProtectedRoute><FieldCalibration /></ProtectedRoute>} />
@@ -83,16 +89,12 @@ const App = () => (
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/trends" element={<ProtectedRoute><TrendDashboard /></ProtectedRoute>} />
                 <Route path="/players/compare" element={<ProtectedRoute><PlayerCompare /></ProtectedRoute>} />
-                <Route path="/install" element={<InstallGuide />} />
-                <Route path="/guide" element={<FullGuide />} />
-                <Route path="/legal/:slug" element={<LegalPage />} />
-                <Route path="/compare" element={<ComparePage />} />
-                <Route path="/tutorial" element={<TutorialPage />} />
                 <Route path="/match-prep" element={<ProtectedRoute><MatchPrep /></ProtectedRoute>} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </AuthProvider>
+              </Route>
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
