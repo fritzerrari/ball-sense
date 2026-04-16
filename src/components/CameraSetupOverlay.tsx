@@ -24,6 +24,11 @@ const tips = [
     desc: "Handy quer halten oder anlehnen. Nicht schwenken oder zoomen.",
   },
   {
+    icon: Maximize2,
+    title: "Weitwinkel nutzen",
+    desc: "Zu nah am Feld? Aktiviere den 0.5x-Modus oben rechts für mehr Übersicht.",
+  },
+  {
     icon: CheckCircle2,
     title: "Auto-Kalibrierung",
     desc: "Die KI erkennt das Spielfeld automatisch — du musst nichts kalibrieren.",

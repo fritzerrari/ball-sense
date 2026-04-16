@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Building2, CreditCard, Save, Loader2, Check, KeyRound, Copy, ShieldCheck, Trash2, Power, BarChart3 } from "lucide-react";
+import { Building2, CreditCard, Save, Loader2, Check, KeyRound, Copy, ShieldCheck, Trash2, Power, BarChart3, Camera } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
@@ -13,6 +13,7 @@ import { ClubLogoUpload } from "@/components/ClubLogoUpload";
 import { useTranslation } from "@/lib/i18n";
 import { Switch } from "@/components/ui/switch";
 import { useBenchmarkOptIn } from "@/hooks/use-benchmark";
+import { getUltraWidePreference, setUltraWidePreference } from "@/hooks/use-ultra-wide-camera";
 
 async function hashCode(code: string) {
   const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
