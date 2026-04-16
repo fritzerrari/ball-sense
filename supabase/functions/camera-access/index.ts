@@ -75,37 +75,70 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Determine camera index (count existing sessions for this match)
-      const { count } = await supabase
+      // Check for existing active session for this code + match (reuse on refresh)
+      const { data: existingSession } = await supabase
         .from("camera_access_sessions")
-        .select("*", { count: "exact", head: true })
+        .select("id, camera_index")
+        .eq("code_id", accessCode.id)
         .eq("match_id", latestMatch.id)
-        .gt("expires_at", new Date().toISOString());
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      const cameraIndex = (count ?? 0);
-
-      // Create session
       const sessionToken = generateSessionToken();
       const sessionHash = await sha256Hex(sessionToken);
       const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(); // 12h
 
-      const { error: sessionError } = await supabase
-        .from("camera_access_sessions")
-        .insert({
-          club_id: accessCode.club_id,
-          code_id: accessCode.id,
-          match_id: latestMatch.id,
-          camera_index: cameraIndex,
-          session_token_hash: sessionHash,
-          expires_at: expiresAt,
-        });
+      let cameraIndex: number;
 
-      if (sessionError) {
-        console.error("Session creation error:", sessionError);
-        return new Response(
-          JSON.stringify({ error: "Session konnte nicht erstellt werden." }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (existingSession) {
+        // Reuse existing session — update token but keep camera_index
+        cameraIndex = existingSession.camera_index ?? 0;
+        const { error: updateError } = await supabase
+          .from("camera_access_sessions")
+          .update({
+            session_token_hash: sessionHash,
+            expires_at: expiresAt,
+            last_used_at: new Date().toISOString(),
+          })
+          .eq("id", existingSession.id);
+
+        if (updateError) {
+          console.error("Session update error:", updateError);
+          return new Response(
+            JSON.stringify({ error: "Session konnte nicht aktualisiert werden." }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else {
+        // Create new session with next camera_index
+        const { count } = await supabase
+          .from("camera_access_sessions")
+          .select("*", { count: "exact", head: true })
+          .eq("match_id", latestMatch.id)
+          .gt("expires_at", new Date().toISOString());
+
+        cameraIndex = count ?? 0;
+
+        const { error: sessionError } = await supabase
+          .from("camera_access_sessions")
+          .insert({
+            club_id: accessCode.club_id,
+            code_id: accessCode.id,
+            match_id: latestMatch.id,
+            camera_index: cameraIndex,
+            session_token_hash: sessionHash,
+            expires_at: expiresAt,
+          });
+
+        if (sessionError) {
+          console.error("Session creation error:", sessionError);
+          return new Response(
+            JSON.stringify({ error: "Session konnte nicht erstellt werden." }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
 
       // Update last_used_at on the access code

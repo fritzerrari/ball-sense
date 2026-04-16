@@ -16,7 +16,38 @@ import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
 
-type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
+type Phase = "code" | "restoring" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
+
+const SESSION_STORAGE_KEY = "fieldiq_camera_session";
+
+interface StoredSession {
+  matchId: string;
+  sessionToken: string;
+  cameraIndex: number;
+  createdAt: string;
+}
+
+function saveSession(data: StoredSession) {
+  try { localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data)); } catch {}
+}
+
+function loadSession(): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredSession;
+    // Expire after 14h client-side
+    if (Date.now() - new Date(parsed.createdAt).getTime() > 14 * 60 * 60 * 1000) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch { return null; }
+}
+
+function clearSession() {
+  try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch {}
+}
 
 /** Check if user is authenticated */
 function useIsAuthenticated() {
@@ -117,8 +148,49 @@ export default function CameraTrackingPage() {
   const handleCodeSuccess = useCallback((data: { matchId: string; cameraIndex: number; sessionToken: string }) => {
     setMatchId(data.matchId);
     setSessionToken(data.sessionToken);
+    saveSession({
+      matchId: data.matchId,
+      sessionToken: data.sessionToken,
+      cameraIndex: data.cameraIndex,
+      createdAt: new Date().toISOString(),
+    });
     setPhase("setup");
   }, []);
+
+  // ── Session recovery on mount (handles page refresh) ──
+  useEffect(() => {
+    if (matchIdParam) return; // authenticated user with route param — no recovery needed
+    const stored = loadSession();
+    if (!stored) return;
+
+    setPhase("restoring");
+    const CAMERA_ACCESS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-access`;
+    fetch(CAMERA_ACCESS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "validate",
+        session_token: stored.sessionToken,
+        match_id: stored.matchId,
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.valid) {
+          setMatchId(stored.matchId);
+          setSessionToken(stored.sessionToken);
+          setPhase("setup");
+          toast.info("Session wiederhergestellt");
+        } else {
+          clearSession();
+          setPhase("code");
+        }
+      })
+      .catch(() => {
+        clearSession();
+        setPhase("code");
+      });
+  }, [matchIdParam]);
 
   // ── Persist timing to DB ──
   const updateMatchTiming = useCallback(async (fields: Record<string, string>) => {
@@ -633,6 +705,7 @@ export default function CameraTrackingPage() {
 
       setProgress(100);
       setPhase("done");
+      clearSession();
       if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
       toast.success("Endanalyse gestartet!");
     } catch (err: any) {
@@ -641,9 +714,18 @@ export default function CameraTrackingPage() {
     }
   }, [matchId, halfNumber, isHelper, uploadViaEdgeFunction, uploadDirect, updateMatchTiming]);
 
-  // Code entry phase
-  if (phase === "code") {
-    return <CameraCodeEntry onSuccess={handleCodeSuccess} />;
+  // Code entry or restoring phase
+  if (phase === "code" || phase === "restoring") {
+    return phase === "restoring" ? (
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Session wird wiederhergestellt…</p>
+        </div>
+      </div>
+    ) : (
+      <CameraCodeEntry onSuccess={handleCodeSuccess} />
+    );
   }
 
   const progressPct = Math.min(100, Math.round((frameCount / RECOMMENDED_FRAMES) * 100));
