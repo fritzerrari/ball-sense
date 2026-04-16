@@ -686,6 +686,22 @@ export default function CameraTrackingPage() {
               <span className="text-lg">📱↔️</span>
               <span className="text-xs text-white/60">Querformat empfohlen</span>
             </div>
+            {/* Ultra-wide toggle */}
+            {ultraWide.hasUltraWide && (
+              <button
+                onClick={async () => {
+                  await ultraWide.toggle();
+                  streamRef.current = ultraWide.getStream();
+                }}
+                disabled={ultraWide.switching}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 rounded-full px-4 py-2 border border-white/20 transition-colors"
+              >
+                <Maximize2 className="h-4 w-4 text-white/70" />
+                <span className="text-xs text-white/70 font-medium">
+                  {ultraWide.useUltraWide ? "0.5x Weitwinkel aktiv" : "1x Standard — auf 0.5x wechseln"}
+                </span>
+              </button>
+            )}
             {isHelper && !transferAuthorized && (
               <div className="flex items-center gap-1.5 bg-destructive/20 rounded-full px-4 py-2 border border-destructive/30">
                 <Loader2 className="h-3.5 w-3.5 text-destructive animate-spin" />
