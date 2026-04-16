@@ -744,19 +744,19 @@ export default function CameraTrackingPage() {
 
             {/* Frame counter + ultra-wide toggle + sync status */}
             <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
-              {ultraWide.hasUltraWide && (
+              {ultraWide.hasMultipleCameras && (
                 <button
                   onClick={async () => {
-                    await ultraWide.toggle();
+                    await ultraWide.cycleCamera();
                     streamRef.current = ultraWide.getStream();
-                    toast.success(ultraWide.useUltraWide ? "1x Standard" : "0.5x Weitwinkel");
+                    toast.success(ultraWide.currentCameraLabel());
                   }}
                   disabled={ultraWide.switching}
                   className="bg-black/70 hover:bg-black/80 rounded-full px-3 py-1.5 flex items-center gap-1.5 transition-colors"
                 >
                   <Maximize2 className="h-3 w-3 text-white" />
                   <span className="text-xs text-white font-bold font-mono">
-                    {ultraWide.useUltraWide ? "0.5x" : "1x"}
+                    {ultraWide.currentCameraLabel()}
                   </span>
                 </button>
               )}
