@@ -14,7 +14,7 @@ import MatchEventQuickBar from "@/components/MatchEventQuickBar";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
-import { useUltraWideCamera, getUltraWidePreference } from "@/hooks/use-ultra-wide-camera";
+import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
 
 type Phase = "code" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
@@ -276,8 +276,7 @@ export default function CameraTrackingPage() {
 
   const initCamera = useCallback(async () => {
     try {
-      const preferUW = getUltraWidePreference();
-      const stream = await ultraWide.initStream(preferUW);
+      const stream = await ultraWide.initStream();
       if (stream) {
         streamRef.current = stream;
         setPhase("ready");
@@ -687,10 +686,10 @@ export default function CameraTrackingPage() {
               <span className="text-xs text-white/60">Querformat empfohlen</span>
             </div>
             {/* Ultra-wide toggle */}
-            {ultraWide.hasUltraWide && (
+            {ultraWide.hasMultipleCameras && (
               <button
                 onClick={async () => {
-                  await ultraWide.toggle();
+                  await ultraWide.cycleCamera();
                   streamRef.current = ultraWide.getStream();
                 }}
                 disabled={ultraWide.switching}
@@ -698,7 +697,7 @@ export default function CameraTrackingPage() {
               >
                 <Maximize2 className="h-4 w-4 text-white/70" />
                 <span className="text-xs text-white/70 font-medium">
-                  {ultraWide.useUltraWide ? "0.5x Weitwinkel aktiv" : "1x Standard — auf 0.5x wechseln"}
+                  {ultraWide.currentCameraLabel()} — tippen zum Wechseln
                 </span>
               </button>
             )}
@@ -745,19 +744,19 @@ export default function CameraTrackingPage() {
 
             {/* Frame counter + ultra-wide toggle + sync status */}
             <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
-              {ultraWide.hasUltraWide && (
+              {ultraWide.hasMultipleCameras && (
                 <button
                   onClick={async () => {
-                    await ultraWide.toggle();
+                    await ultraWide.cycleCamera();
                     streamRef.current = ultraWide.getStream();
-                    toast.success(ultraWide.useUltraWide ? "1x Standard" : "0.5x Weitwinkel");
+                    toast.success(ultraWide.currentCameraLabel());
                   }}
                   disabled={ultraWide.switching}
                   className="bg-black/70 hover:bg-black/80 rounded-full px-3 py-1.5 flex items-center gap-1.5 transition-colors"
                 >
                   <Maximize2 className="h-3 w-3 text-white" />
                   <span className="text-xs text-white font-bold font-mono">
-                    {ultraWide.useUltraWide ? "0.5x" : "1x"}
+                    {ultraWide.currentCameraLabel()}
                   </span>
                 </button>
               )}
