@@ -1,44 +1,53 @@
 
 
-# Weitwinkel-Fix & Layout-Optimierung für Kamera-Tracking
+# Robuste Kamera-Session-Persistenz
 
-## Problem 1: Kein Weitwinkel-Button auf Pixel 8a
+## Problem
+Wenn ein Helfer-Handy die Seite refresht, geht der `sessionToken` verloren (nur in React State). Bei erneutem Code-Eingeben wird ein **neuer** `camera_access_sessions`-Eintrag mit höherem `camera_index` erstellt → das System glaubt, eine neue Kamera sei dazugekommen.
 
-Das Pixel 8a hat 2 Rückkameras (64MP Haupt + 13MP Ultrawide). Die aktuelle Erkennung scheitert wahrscheinlich daran, dass:
-- Android Chrome Labels wie `"camera2 0, facing back"` zurückgibt — ohne "wide"/"ultra" im Text
-- Die Filterlogik `label.includes("front")` matched auf `"facing front"`, was korrekt filtert — aber möglicherweise gibt es Timing-Probleme: `detectCameras()` läuft asynchron beim Mount, `initStream()` wird aber evtl. aufgerufen bevor die Erkennung fertig ist (leeres `cameras`-Array → Fallback auf `facingMode: environment`)
-
-**Fix:** 
-- `detectCameras()` muss **vor** `initStream()` abgeschlossen sein (await-Kette)
-- Zusätzlich: Debug-Toast einbauen, der beim Laden die Anzahl erkannter Kameras anzeigt (nur temporär, um das Problem auf dem Gerät zu verifizieren)
-- Robustere Erkennung: Alle `videoinput`-Geräte nehmen, dann nur explizit "facing front" ausfiltern (statt auf "front" allgemein zu prüfen)
-
-## Problem 2: Layout nicht optimal
-
-Aus dem Screenshot: Die Event-Buttons (Tor, Chance, Gelb, etc.) nehmen ca. 40% des sichtbaren Kamerabildes ein. Die Buttons unten (Halbzeit, Stoppen) sind sehr groß.
-
-**Optimierungen:**
-- Event-QuickBar kompakter: Buttons kleiner, in einer scrollbaren Zeile statt 2x4-Grid
-- Bottom-Controls kompakter: Halbzeit-Button schmaler (h-10 statt h-12), Stoppen-Button h-12 statt h-14
-- Kamerabild bekommt mehr Raum
+## Lösung
+Zwei Ebenen: **Client-seitig** den Session-Token in `localStorage` persistieren und bei Reload automatisch wiederherstellen. **Server-seitig** bei `lookup` prüfen, ob bereits eine aktive Session für denselben Code + Match existiert, und diese wiederverwenden statt eine neue zu erstellen.
 
 ## Änderungen
 
-### 1. `src/hooks/use-ultra-wide-camera.ts`
-- `detectCameras` als Promise returnen, in `initStream` zuerst `await detectCameras()` aufrufen falls noch nicht fertig
-- Filter anpassen: nur `"facing front"` explizit ausschließen (nicht generisches "front")
-- Console-Log der erkannten Kameras für Debugging
+### 1. `src/pages/CameraTrackingPage.tsx` — Session-Recovery bei Reload
+- Nach erfolgreichem `handleCodeSuccess`: `sessionToken`, `matchId` und `cameraIndex` in `localStorage` speichern (Key: `fieldiq_camera_session`)
+- Beim Mount: Prüfen ob eine gespeicherte Session existiert → `validate`-Action aufrufen → bei Erfolg direkt Phase `"setup"` setzen (Code-Eingabe überspringen)
+- Bei `release`/Session-Ende: localStorage-Eintrag löschen
 
-### 2. `src/pages/CameraTrackingPage.tsx`  
-- `initCamera` wartet auf Kameraerkennung bevor Stream gestartet wird
-- Bottom-Controls: Padding und Button-Höhen reduzieren (`p-3` statt `p-4`, `h-11`/`h-12` statt `h-12`/`h-14`)
-- Kamera-Wechsel-Button immer anzeigen (auch bei 1 Kamera, dann als Info "1 Kamera erkannt"), damit User sieht, dass das Feature existiert
+### 2. `supabase/functions/camera-access/index.ts` — Lookup mit Reuse
+- Bei `action: "lookup"`: Vor dem Erstellen einer neuen Session prüfen, ob bereits eine **aktive, nicht abgelaufene** Session für denselben `code_id` + `match_id` existiert
+- Falls ja: Neuen `session_token_hash` setzen (Update statt Insert), bestehenden `camera_index` beibehalten, alten Token ersetzen
+- Falls nein: Wie bisher neue Session erstellen
+- Dadurch bleibt der `camera_index` stabil, auch bei mehrfachem Code-Eingeben
 
-### 3. `src/components/MatchEventQuickBar.tsx`
-- Event-Buttons in horizontaler Scroll-Zeile statt 4-Spalten-Grid
-- Kompaktere Höhe (h-8 statt h-10) für Mobile
-- Team-Toggle schmaler
+### 3. `src/components/CameraCodeEntry.tsx` — Minimale Anpassung
+- Keine strukturelle Änderung nötig, aber beim Auto-Fill aus URL-Parameter ebenfalls localStorage-Recovery bevorzugen
 
-### 4. `src/components/CameraSetupOverlay.tsx`  
-- Keine Änderung nötig (Weitwinkel-Tipp bereits vorhanden)
+## Technische Details
+
+**localStorage-Schema:**
+```json
+{
+  "matchId": "uuid",
+  "sessionToken": "hex-string",
+  "cameraIndex": 0,
+  "code": "123456",
+  "createdAt": "2025-01-01T..."
+}
+```
+
+**Edge Function Reuse-Logik (Pseudocode):**
+```sql
+-- Prüfe existierende Session für code_id + match_id
+SELECT id, camera_index FROM camera_access_sessions
+WHERE code_id = :code_id AND match_id = :match_id
+AND expires_at > now()
+LIMIT 1;
+
+-- Falls gefunden: Update session_token_hash + last_used_at
+-- Falls nicht: Insert wie bisher
+```
+
+Dies stellt sicher, dass selbst bei Refresh oder erneutem Code-Eingeben die gleiche Kamera-Position beibehalten wird.
 
