@@ -94,7 +94,7 @@ export function useDisplayCapture(opts: UseDisplayCaptureOptions = {}) {
         // This also fires when iframe permission policy blocks display-capture
         msg = isInIframe()
           ? "Bildschirm-Freigabe wurde abgelehnt oder ist im Editor-Vorschau blockiert. Bitte öffne FieldIQ über die Live-URL (demo6.time2rise.de)."
-          : "Bildschirm-Freigabe abgelehnt. Bitte erneut versuchen und „Gesamten Bildschirm" wählen.";
+          : 'Bildschirm-Freigabe abgelehnt. Bitte erneut versuchen und „Gesamten Bildschirm" wählen.';
       } else if (name === "NotFoundError" || name === "NotSupportedError") {
         msg = "Kein freigebbarer Bildschirm gefunden. Bitte Browser auf neueste Version aktualisieren.";
       } else if (name === "AbortError") {
