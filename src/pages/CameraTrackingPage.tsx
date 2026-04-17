@@ -368,12 +368,6 @@ export default function CameraTrackingPage() {
   }, [isHelper, phase, frameCount]);
 
   const initCamera = useCallback(async () => {
-    // External mode: open setup dialog → screen capture
-    if (isExternalMode) {
-      setShowExternalSetup(true);
-      return;
-    }
-
     try {
       // Ensure camera detection completes before starting stream
       const detectedCams = await ultraWide.detectCameras();
@@ -396,56 +390,17 @@ export default function CameraTrackingPage() {
         }
         setPhase("ready");
       }
+
+      // After init: hint if neither zoom nor multi-cam available
+      setTimeout(() => {
+        if (!ultraWide.wideAngleSupported) {
+          toast.info("Diese Kamera unterstützt keinen Weitwinkel-Wechsel.", { duration: 4000 });
+        }
+      }, 1500);
     } catch {
       toast.error("Kamera konnte nicht gestartet werden");
     }
-  }, [ultraWide, isExternalMode]);
-
-  // Start external (display) capture after user confirms in setup dialog.
-  // CRITICAL: getDisplayMedia() must run synchronously from the user gesture
-  // (no awaits before it) — otherwise Android Chrome/Edge lose transient
-  // activation and the call fails as if the browser didn't support it.
-  const startExternalCapture = useCallback(async () => {
-    // 1) Fire capture IMMEDIATELY — preserves the user gesture chain
-    const result = await displayCapture.start();
-
-    if (result.status !== "success" || !result.stream) {
-      if (result.message) toast.error(result.message);
-      return;
-    }
-
-    // 2) Stream is live — close dialog and bind video
-    setShowExternalSetup(false);
-    streamRef.current = result.stream;
-    if (videoRef.current) {
-      videoRef.current.srcObject = result.stream;
-      videoRef.current.play().catch(() => {});
-    }
-    setPhase("ready");
-    toast.success("Externe Kamera verbunden — wechsle jetzt zur Kamera-App!");
-
-    // 3) AFTER capture: connectivity hint (non-blocking)
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      toast.warning(
-        "Kein Internet erkannt. Aktiviere mobile Daten — die WiFi-Kamera liefert kein Internet."
-      );
-      return;
-    }
-    try {
-      const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), 4000);
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`, {
-        method: "GET",
-        signal: ctrl.signal,
-        cache: "no-store",
-      });
-      clearTimeout(timeout);
-    } catch {
-      toast.warning(
-        "FieldIQ-Server nicht erreichbar. Prüfe Mobilfunk-Empfang — WiFi-Kamera liefert kein Internet."
-      );
-    }
-  }, [displayCapture]);
+  }, [ultraWide]);
 
   const startRecording = useCallback(() => {
     if (videoRef.current) {
