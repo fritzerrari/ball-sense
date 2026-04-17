@@ -865,6 +865,8 @@ export default function CameraTrackingPage() {
         onConfirm={startExternalCapture}
         isIOS={displayCapture.isIOS}
       />
+
+      <div className="relative flex-1 bg-black">
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
 
         {phase === "setup" && (
