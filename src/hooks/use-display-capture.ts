@@ -7,6 +7,28 @@ export function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && "ontouchend" in document);
 }
 
+/** Detect Android */
+export function isAndroid(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent || "");
+}
+
+/**
+ * Detect mobile browser (Android phone/tablet or iOS).
+ * Mobile browsers do NOT reliably support getDisplayMedia for capturing
+ * other apps — even Chrome/Edge on Android cannot record another app's screen
+ * without OS-level permissions only available to native apps.
+ */
+export function isMobileBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (isIOS()) return true;
+  if (/Android/i.test(ua) && /Mobile/i.test(ua)) return true;
+  // Android tablets (no "Mobile" token) — still mobile browser
+  if (/Android/i.test(ua)) return true;
+  return false;
+}
+
 /** Detect if app runs inside an iframe (e.g. Lovable preview editor) */
 export function isInIframe(): boolean {
   if (typeof window === "undefined") return false;
@@ -17,13 +39,18 @@ export function isInIframe(): boolean {
   }
 }
 
-/** Whether the browser exposes `getDisplayMedia()` at all */
+/**
+ * Display-Capture is only realistically usable on **desktop browsers**
+ * (Chrome, Edge, Firefox, Safari ≥ 13).
+ * Mobile browsers (Android Chrome/Edge, iOS Safari) cannot capture
+ * other apps' screens via the Web Platform.
+ */
 export function isDisplayCaptureSupported(): boolean {
   return (
     typeof navigator !== "undefined" &&
     !!navigator.mediaDevices &&
     typeof navigator.mediaDevices.getDisplayMedia === "function" &&
-    !isIOS()
+    !isMobileBrowser()
   );
 }
 
@@ -40,6 +67,7 @@ export type DisplayCaptureStatus =
   | "success"
   | "iframe_blocked"
   | "ios_unsupported"
+  | "android_mobile_unsupported"
   | "api_missing"
   | "permission_denied"
   | "selection_cancelled"
@@ -54,11 +82,13 @@ export interface DisplayCaptureResult {
 
 const STATUS_MESSAGES: Record<Exclude<DisplayCaptureStatus, "success">, string> = {
   iframe_blocked:
-    "Bildschirm-Capture ist im Editor-Vorschau-Fenster blockiert. Bitte öffne FieldIQ über die Live-URL (z.B. demo6.time2rise.de) in Chrome/Edge/Firefox.",
+    "Bildschirm-Capture ist im Editor-Vorschau-Fenster blockiert. Bitte öffne FieldIQ über die Live-URL in einem eigenen Browser-Tab.",
   ios_unsupported:
-    "iOS unterstützt Bildschirm-Capture im Browser nicht. Bitte nutze ein Android-Gerät oder einen Desktop-Browser.",
+    "iOS unterstützt Bildschirm-Capture im Browser nicht. Bitte filme direkt mit der Handy-Kamera, nutze den Helfer-Flow oder lade ein Video hoch.",
+  android_mobile_unsupported:
+    "Mobile Browser auf Android können das Bild einer anderen App nicht per Screen-Capture übernehmen. Bitte filme direkt mit der Handy-Kamera, nutze den Helfer-Flow oder lade ein Video hoch.",
   api_missing:
-    "Dein Browser unterstützt Bildschirm-Capture nicht. Nutze Chrome, Edge oder Firefox (Desktop oder Android).",
+    "Dein Browser unterstützt Bildschirm-Capture nicht. Nutze einen aktuellen Desktop-Browser (Chrome, Edge oder Firefox).",
   permission_denied:
     'Bildschirm-Freigabe abgelehnt. Bitte direkt erneut aus diesem Dialog starten und „Gesamten Bildschirm" wählen.',
   selection_cancelled: "Bildschirm-Auswahl abgebrochen. Bitte erneut starten.",
@@ -72,13 +102,11 @@ interface UseDisplayCaptureOptions {
 
 /**
  * Wrapper around `navigator.mediaDevices.getDisplayMedia()`.
- * Used to capture the phone's screen so an external WiFi-camera app
- * (e.g. SafetyCam, V380) can act as the video source for FieldIQ.
  *
- * IMPORTANT: `start()` MUST be called synchronously from a user gesture
- * (click/touch handler). Any `await` before this call will lose the
- * transient activation on Android Chrome/Edge and cause failures that
- * masquerade as "browser not supported".
+ * NOTE: This API is only realistically usable on **desktop browsers**.
+ * Mobile browsers (Android/iOS) cannot capture other apps. The hook
+ * returns explicit `android_mobile_unsupported` / `ios_unsupported`
+ * statuses so the UI can guide users to alternative recording flows.
  */
 export function useDisplayCapture(opts: UseDisplayCaptureOptions = {}) {
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -97,11 +125,17 @@ export function useDisplayCapture(opts: UseDisplayCaptureOptions = {}) {
   const start = useCallback(async (): Promise<DisplayCaptureResult> => {
     setError(null);
 
-    // Pre-flight checks — return classified status without invoking API
+    // Pre-flight: classify mobile/unsupported environments BEFORE invoking the API
     if (isIOS()) {
       const message = STATUS_MESSAGES.ios_unsupported;
       setError(message);
       return { status: "ios_unsupported", stream: null, message };
+    }
+
+    if (isAndroid() || isMobileBrowser()) {
+      const message = STATUS_MESSAGES.android_mobile_unsupported;
+      setError(message);
+      return { status: "android_mobile_unsupported", stream: null, message };
     }
 
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
@@ -134,7 +168,6 @@ export function useDisplayCapture(opts: UseDisplayCaptureOptions = {}) {
       const name = err?.name;
       let status: DisplayCaptureStatus;
       if (name === "NotAllowedError") {
-        // Iframe permission policy denials also surface as NotAllowedError
         status = isInIframe() ? "iframe_blocked" : "permission_denied";
       } else if (name === "NotFoundError" || name === "NotSupportedError") {
         status = "no_source";
@@ -160,6 +193,8 @@ export function useDisplayCapture(opts: UseDisplayCaptureOptions = {}) {
     getStream: () => streamRef.current,
     supported: isDisplayCaptureSupported(),
     isIOS: isIOS(),
+    isAndroid: isAndroid(),
+    isMobileBrowser: isMobileBrowser(),
     isInIframe: isInIframe(),
   };
 }

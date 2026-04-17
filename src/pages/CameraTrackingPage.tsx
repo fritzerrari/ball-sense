@@ -16,7 +16,7 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
-import { useDisplayCapture } from "@/hooks/use-display-capture";
+import { useDisplayCapture, isMobileBrowser } from "@/hooks/use-display-capture";
 import ExternalCameraSetup from "@/components/ExternalCameraSetup";
 
 type Phase = "code" | "restoring" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
@@ -74,7 +74,7 @@ function formatTimer(totalSeconds: number, isSecondHalf: boolean): string {
 
 export default function CameraTrackingPage() {
   const { id: matchIdParam } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [phase, setPhase] = useState<Phase>(matchIdParam ? "setup" : "code");
   const [matchId, setMatchId] = useState<string | null>(matchIdParam ?? null);
@@ -108,7 +108,9 @@ export default function CameraTrackingPage() {
 
   const ultraWide = useUltraWideCamera(videoRef);
 
-  // External camera (screen-capture of WiFi cam app, e.g. SafetyCam) — Android-only
+  // External camera (screen-capture of WiFi cam app) — DESKTOP-ONLY.
+  // Mobile browsers (Android/iOS) cannot capture another app's screen via the
+  // Web Platform — see use-display-capture.ts for capability detection.
   const isExternalMode = searchParams.get("mode") === "external";
   const [showExternalSetup, setShowExternalSetup] = useState(false);
   const displayCapture = useDisplayCapture({
@@ -915,6 +917,22 @@ export default function CameraTrackingPage() {
         onOpenChange={setShowExternalSetup}
         onConfirm={startExternalCapture}
         isIOS={displayCapture.isIOS}
+        onPickAlternative={(mode) => {
+          setShowExternalSetup(false);
+          // Switch URL away from external mode and let the user pick again.
+          const next = new URLSearchParams(searchParams);
+          next.set("mode", mode);
+          setSearchParams(next, { replace: true });
+          // Trigger a soft reload of the camera init flow
+          if (mode === "self") {
+            // Re-run init for direct camera capture
+            setTimeout(() => initCamera(), 50);
+          } else if (mode === "helper") {
+            toast.info("Wechsle zum Helfer-Flow: Code aus dem Match-Setup teilen.");
+          } else if (mode === "upload") {
+            toast.info("Wechsle in den Upload-Flow im Match-Setup.");
+          }
+        }}
       />
 
       <div className="relative flex-1 bg-black">
