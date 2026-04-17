@@ -108,6 +108,20 @@ export default function CameraTrackingPage() {
 
   const ultraWide = useUltraWideCamera(videoRef);
 
+  // External camera (screen-capture of WiFi cam app, e.g. SafetyCam) — Android-only
+  const isExternalMode = searchParams.get("mode") === "external";
+  const [showExternalSetup, setShowExternalSetup] = useState(false);
+  const displayCapture = useDisplayCapture({
+    onTrackEnded: () => {
+      toast.warning("Bildschirm-Freigabe beendet. Aufnahme stoppt.");
+      if (liveCaptureRef.current) {
+        setShowStopConfirm(true);
+      } else {
+        setPhase("setup");
+      }
+    },
+  });
+
   const [homeTeamName, setHomeTeamName] = useState("Heim");
   const [awayTeamName, setAwayTeamName] = useState("Gegner");
   const [liveHomeGoals, setLiveHomeGoals] = useState(0);
