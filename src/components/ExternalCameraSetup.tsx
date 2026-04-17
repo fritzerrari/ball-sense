@@ -7,7 +7,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { MonitorSmartphone, Wifi, AlertTriangle, Battery, Clock } from "lucide-react";
+import {
+  MonitorSmartphone,
+  Wifi,
+  AlertTriangle,
+  Battery,
+  Clock,
+  Signal,
+  Smartphone,
+  ArrowRight,
+  Database,
+} from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -43,20 +53,65 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
           </div>
         ) : (
           <>
-            <ol className="space-y-3 text-sm">
-              {[
-                "Öffne die Kamera-App (z.B. SafetyCam) und starte die Live-Vorschau.",
-                "Tippe gleich auf 'Bildschirm teilen' und wähle 'Gesamten Bildschirm'.",
-                "Wechsle zurück zur Kamera-App und stelle sie auf Vollbild.",
-              ].map((step, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
-                    {i + 1}
-                  </span>
-                  <span className="pt-0.5">{step}</span>
-                </li>
-              ))}
-            </ol>
+            {/* Schritt 0: Netzwerk-Setup */}
+            <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 space-y-3">
+              <p className="font-semibold text-sm flex items-center gap-2">
+                <Signal className="h-4 w-4 text-primary" />
+                Schritt 0: Netzwerk vorbereiten
+              </p>
+
+              {/* Visuelles Diagramm */}
+              <div className="flex items-center justify-between gap-1 rounded-md bg-background/60 p-2.5 text-[10px] font-medium">
+                <div className="flex flex-col items-center gap-0.5 text-center">
+                  <MonitorSmartphone className="h-5 w-5 text-primary" />
+                  <span>Kamera</span>
+                </div>
+                <div className="flex flex-col items-center text-primary">
+                  <Wifi className="h-3.5 w-3.5" />
+                  <span className="text-[9px]">WiFi</span>
+                </div>
+                <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                <div className="flex flex-col items-center gap-0.5 text-center">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                  <span>Phone</span>
+                </div>
+                <div className="flex flex-col items-center text-primary">
+                  <Signal className="h-3.5 w-3.5" />
+                  <span className="text-[9px]">4G/5G</span>
+                </div>
+                <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                <div className="flex flex-col items-center gap-0.5 text-center">
+                  <Database className="h-5 w-5 text-primary" />
+                  <span>FieldIQ</span>
+                </div>
+              </div>
+
+              <ol className="space-y-1.5 text-xs text-muted-foreground">
+                <li>✅ <span className="text-foreground">Mobile Daten</span> einschalten (Einstellungen → Mobilfunk)</li>
+                <li>✅ WiFi mit Kamera verbinden (z.B. „SafetyCam_XXXX")</li>
+                <li>✅ Falls Android warnt „Kein Internet": <span className="text-foreground">„Trotzdem verbinden"</span></li>
+                <li>⚠️ Android-Setting prüfen: <span className="text-foreground">„Mobile Daten bei WiFi-ohne-Internet erlauben"</span></li>
+              </ol>
+            </div>
+
+            {/* Bisherige 3 Schritte */}
+            <div className="space-y-2">
+              <p className="font-semibold text-sm">Dann in der App:</p>
+              <ol className="space-y-3 text-sm">
+                {[
+                  "Öffne die Kamera-App (z.B. SafetyCam) und starte die Live-Vorschau.",
+                  'Tippe gleich auf "Bildschirm teilen" und wähle "Gesamten Bildschirm".',
+                  "Wechsle zurück zur Kamera-App und stelle sie auf Vollbild.",
+                ].map((step, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                      {i + 1}
+                    </span>
+                    <span className="pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
 
             <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs">
               <p className="font-semibold text-foreground flex items-center gap-1.5">
@@ -64,9 +119,11 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
                 Wichtig zu wissen
               </p>
               <ul className="space-y-1.5 text-muted-foreground">
-                <li className="flex gap-2"><Clock className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Ca. 1–3s Latenz je nach WiFi-Kamera.</li>
-                <li className="flex gap-2"><Wifi className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Lass die Kamera-App im Vordergrund — nicht zum Browser zurückwechseln.</li>
+                <li className="flex gap-2"><Database className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Datenverbrauch: ca. <span className="text-foreground">8–15 MB pro 90-Min-Spiel</span> (nur Frames + Events, kein Video).</li>
+                <li className="flex gap-2"><Clock className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Ca. 1–3 s Latenz je nach WiFi-Kamera.</li>
+                <li className="flex gap-2"><Wifi className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Kamera-App im Vordergrund halten — nicht zum Browser zurück.</li>
                 <li className="flex gap-2"><Battery className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Höherer Akku- &amp; Hitze-Verbrauch als normale Aufnahme.</li>
+                <li className="flex gap-2"><Signal className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Bei schlechtem Empfang puffern Frames automatisch und werden später synchronisiert.</li>
               </ul>
             </div>
 
