@@ -421,11 +421,32 @@ export default function CameraTrackingPage() {
     }
   }, [ultraWide, isExternalMode]);
 
-  // Start external (display) capture after user confirms in setup dialog
+  // Start external (display) capture after user confirms in setup dialog.
+  // CRITICAL: getDisplayMedia() must run synchronously from the user gesture
+  // (no awaits before it) — otherwise Android Chrome/Edge lose transient
+  // activation and the call fails as if the browser didn't support it.
   const startExternalCapture = useCallback(async () => {
-    // Connectivity check: WiFi-cam often has no internet, mobile data must be active
+    // 1) Fire capture IMMEDIATELY — preserves the user gesture chain
+    const result = await displayCapture.start();
+
+    if (result.status !== "success" || !result.stream) {
+      if (result.message) toast.error(result.message);
+      return;
+    }
+
+    // 2) Stream is live — close dialog and bind video
+    setShowExternalSetup(false);
+    streamRef.current = result.stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = result.stream;
+      videoRef.current.play().catch(() => {});
+    }
+    setPhase("ready");
+    toast.success("Externe Kamera verbunden — wechsle jetzt zur Kamera-App!");
+
+    // 3) AFTER capture: connectivity hint (non-blocking)
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      toast.error(
+      toast.warning(
         "Kein Internet erkannt. Aktiviere mobile Daten — die WiFi-Kamera liefert kein Internet."
       );
       return;
@@ -440,25 +461,10 @@ export default function CameraTrackingPage() {
       });
       clearTimeout(timeout);
     } catch {
-      toast.error(
+      toast.warning(
         "FieldIQ-Server nicht erreichbar. Prüfe Mobilfunk-Empfang — WiFi-Kamera liefert kein Internet."
       );
-      return;
     }
-
-    setShowExternalSetup(false);
-    const stream = await displayCapture.start();
-    if (!stream) {
-      if (displayCapture.error) toast.error(displayCapture.error);
-      return;
-    }
-    streamRef.current = stream;
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(() => {});
-    }
-    setPhase("ready");
-    toast.success("Externe Kamera verbunden — wechsle jetzt zur Kamera-App!");
   }, [displayCapture]);
 
   const startRecording = useCallback(() => {
