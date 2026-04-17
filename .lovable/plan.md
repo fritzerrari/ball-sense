@@ -1,53 +1,56 @@
 
 
-# Robuste Kamera-Session-Persistenz
+## Ziel
+Externe WiFi-Kamera (z.B. SafetyCam-Rückfahrkamera) als **zusätzliche Aufnahme-Option** neben der Handy-Kamera anbieten. User entscheidet pro Match frei: Handy-Linse ODER externe Cam via Bildschirm-Capture.
 
-## Problem
-Wenn ein Helfer-Handy die Seite refresht, geht der `sessionToken` verloren (nur in React State). Bei erneutem Code-Eingeben wird ein **neuer** `camera_access_sessions`-Eintrag mit höherem `camera_index` erstellt → das System glaubt, eine neue Kamera sei dazugekommen.
+## Umsetzung
 
-## Lösung
-Zwei Ebenen: **Client-seitig** den Session-Token in `localStorage` persistieren und bei Reload automatisch wiederherstellen. **Server-seitig** bei `lookup` prüfen, ob bereits eine aktive Session für denselben Code + Match existiert, und diese wiederverwenden statt eine neue zu erstellen.
+### 1. `MatchRecordingChoice.tsx` — Neue 4. Option
+Zusätzliche Karte **"Externe Kamera (Beta)"** mit `MonitorSmartphone`-Icon. Untertitel: "WiFi-/Rückfahrkamera via App-Bild · Nur Android". Mode-Type erweitern auf `"self" | "helper" | "upload" | "external"`.
 
-## Änderungen
+### 2. Neuer Hook `src/hooks/use-display-capture.ts`
+- Wrapper um `navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })`
+- iOS-Detection mit klarer Fehlermeldung
+- Lifecycle: `start()`, `stop()`, `stream`, `error`-States
+- Listener auf Track-`ended`-Event (User stoppt Bildschirm-Freigabe)
 
-### 1. `src/pages/CameraTrackingPage.tsx` — Session-Recovery bei Reload
-- Nach erfolgreichem `handleCodeSuccess`: `sessionToken`, `matchId` und `cameraIndex` in `localStorage` speichern (Key: `fieldiq_camera_session`)
-- Beim Mount: Prüfen ob eine gespeicherte Session existiert → `validate`-Action aufrufen → bei Erfolg direkt Phase `"setup"` setzen (Code-Eingabe überspringen)
-- Bei `release`/Session-Ende: localStorage-Eintrag löschen
+### 3. Neuer Setup-Dialog `src/components/ExternalCameraSetup.tsx`
+3-Schritt-Onboarding bevor `getDisplayMedia` aufgerufen wird:
+1. "Öffne die Kamera-App (z.B. SafetyCam) und starte die Live-Vorschau"
+2. "Tippe gleich auf 'Bildschirm teilen' → 'Gesamten Bildschirm'"
+3. "Wechsle zurück zur Kamera-App im Vollbild"
 
-### 2. `supabase/functions/camera-access/index.ts` — Lookup mit Reuse
-- Bei `action: "lookup"`: Vor dem Erstellen einer neuen Session prüfen, ob bereits eine **aktive, nicht abgelaufene** Session für denselben `code_id` + `match_id` existiert
-- Falls ja: Neuen `session_token_hash` setzen (Update statt Insert), bestehenden `camera_index` beibehalten, alten Token ersetzen
-- Falls nein: Wie bisher neue Session erstellen
-- Dadurch bleibt der `camera_index` stabil, auch bei mehrfachem Code-Eingeben
+Plus Hinweise: ~1-3s Latenz, Akku/Hitze, App im Vordergrund halten, iOS nicht unterstützt.
 
-### 3. `src/components/CameraCodeEntry.tsx` — Minimale Anpassung
-- Keine strukturelle Änderung nötig, aber beim Auto-Fill aus URL-Parameter ebenfalls localStorage-Recovery bevorzugen
+### 4. `CameraTrackingPage.tsx` — Mode-Integration
+- Neuer Recording-Mode `"external"` neben den bestehenden
+- Bei Auswahl: Setup-Dialog → `useDisplayCapture().start()` statt `useUltraWideCamera().initStream()`
+- Stream wird genauso ans `<video>`-Element gebunden
+- **Frame-Capture, Event-Tracking, Halbzeit-Logik, Side-Swap, RecordingGuard bleiben unverändert** — Stream ist transparent austauschbar
+- Track-`ended` → sauberes Stop + Toast "Bildschirm-Freigabe beendet"
 
-## Technische Details
+### 5. `NewMatch.tsx` — Routing
+`handleRecordingChoice` erweitern: `mode === "external"` → navigate mit Query-Param `?mode=external`, der in `CameraTrackingPage` ausgewertet wird.
 
-**localStorage-Schema:**
-```json
-{
-  "matchId": "uuid",
-  "sessionToken": "hex-string",
-  "cameraIndex": 0,
-  "code": "123456",
-  "createdAt": "2025-01-01T..."
-}
-```
+### 6. Memory-Update
+Neue Datei `mem://features/external-camera-mode.md`: Beta, Android-only, Bildschirm-Capture-Ansatz, Kompatibilität mit allen WiFi-Cams (SafetyCam, V380, etc.) deren App ein Live-Bild zeigt.
 
-**Edge Function Reuse-Logik (Pseudocode):**
-```sql
--- Prüfe existierende Session für code_id + match_id
-SELECT id, camera_index FROM camera_access_sessions
-WHERE code_id = :code_id AND match_id = :match_id
-AND expires_at > now()
-LIMIT 1;
+## Was unverändert bleibt
+- ✅ Komplette KI-Pipeline, Edge Functions, DB-Schema
+- ✅ Halbzeit-Side-Swap, Highlights, Notifications
+- ✅ Helfer-Code-Flow, Upload-Flow, Self-Recording-Flow
 
--- Falls gefunden: Update session_token_hash + last_used_at
--- Falls nicht: Insert wie bisher
-```
+## Klare Einschränkungen (transparent kommuniziert in UI)
+- ⚠️ Nur Android Chrome (iOS Safari unterstützt `getDisplayMedia` nicht)
+- ⚠️ Latenz ~1-3s je nach WiFi-Cam
+- ⚠️ Bildqualität abhängig von Cam-Modell
+- ⚠️ Smartphone muss Kamera-App im Vordergrund halten
 
-Dies stellt sicher, dass selbst bei Refresh oder erneutem Code-Eingeben die gleiche Kamera-Position beibehalten wird.
+## Was bewusst NICHT gebaut wird
+- ❌ iOS-Workaround (technisch unmöglich ohne Native-App)
+- ❌ Direkte RTSP-Anbindung (proprietäre Hersteller-Protokolle)
+- ❌ Auto-Start des Capture (Browser-Sicherheit erfordert User-Bestätigung)
+
+## Antwort auf deine Frage
+**Ja, exakt so wird es gebaut:** Du wählst pro Match in der Aufnahme-Auswahl frei zwischen "Ich filme selbst (Handy)", "Helfer filmt", "Video hochladen" oder neu "Externe Kamera". Die externe Cam ist eine **zusätzliche Option**, kein Ersatz — der bisherige Handy-Workflow bleibt 1:1 erhalten.
 
