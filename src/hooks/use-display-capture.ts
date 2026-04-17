@@ -27,6 +27,15 @@ export function isDisplayCaptureSupported(): boolean {
   );
 }
 
+/**
+ * Display-Capture is effectively blocked when the app runs inside an iframe
+ * without `allow="display-capture"` permission policy (e.g. Lovable editor preview).
+ * In that case the user must open the live URL in a standalone tab.
+ */
+export function isDisplayCaptureBlockedByFrame(): boolean {
+  return isInIframe();
+}
+
 interface UseDisplayCaptureOptions {
   onTrackEnded?: () => void;
 }
