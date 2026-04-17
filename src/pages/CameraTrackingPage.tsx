@@ -917,6 +917,22 @@ export default function CameraTrackingPage() {
         onOpenChange={setShowExternalSetup}
         onConfirm={startExternalCapture}
         isIOS={displayCapture.isIOS}
+        onPickAlternative={(mode) => {
+          setShowExternalSetup(false);
+          // Switch URL away from external mode and let the user pick again.
+          const next = new URLSearchParams(searchParams);
+          next.set("mode", mode);
+          setSearchParams(next, { replace: true });
+          // Trigger a soft reload of the camera init flow
+          if (mode === "self") {
+            // Re-run init for direct camera capture
+            setTimeout(() => initCamera(), 50);
+          } else if (mode === "helper") {
+            toast.info("Wechsle zum Helfer-Flow: Code aus dem Match-Setup teilen.");
+          } else if (mode === "upload") {
+            toast.info("Wechsle in den Upload-Flow im Match-Setup.");
+          }
+        }}
       />
 
       <div className="relative flex-1 bg-black">
