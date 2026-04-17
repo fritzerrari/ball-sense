@@ -574,8 +574,45 @@ export default function CameraTrackingPage() {
     }
   }, [matchId, isHelper, uploadViaEdgeFunction, uploadDirect, uploading, updateMatchTiming]);
 
-  // ── Start second half ──
-  const startSecondHalf = useCallback(() => {
+  // ── Auto-detect side swap by comparing average player x-positions ──
+  // Heuristic: query latest frame_positions before pause; if home avg-x is now in opposite half, suggest swap.
+  const detectSideSwap = useCallback(async (): Promise<boolean | null> => {
+    if (!matchId) return null;
+    try {
+      const { data: results } = await supabase
+        .from("analysis_results")
+        .select("data")
+        .eq("match_id", matchId)
+        .eq("result_type", "frame_positions")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const frames = (results?.[0]?.data as any)?.frames;
+      if (!Array.isArray(frames) || frames.length === 0) return null;
+      // Take the LAST analyzed frame (closest to halftime)
+      const lastFrame = frames[frames.length - 1];
+      const players = lastFrame?.players ?? [];
+      const homePlayers = players.filter((p: any) => p.team === "home");
+      if (homePlayers.length < 3) return null;
+      const homeAvgX = homePlayers.reduce((sum: number, p: any) => sum + (p.x ?? 50), 0) / homePlayers.length;
+      // Convention: home defends left half (x<50) in H1. If avg-x > 60 in H1's last frame → already on right → swap likely true for H2
+      // Standard football: teams swap, so if H1 had home on left (avg<50), H2 expects home on right.
+      // We can't measure H2 yet, so fall back to standard rule (swap=true) unless evidence of H1 home-on-right.
+      // Return null = unknown — let UI default to "swap = true"
+      return homeAvgX < 50 ? true : false;
+    } catch {
+      return null;
+    }
+  }, [matchId]);
+
+  // ── Open the side-swap confirmation dialog before actually starting H2 ──
+  const requestStartSecondHalf = useCallback(async () => {
+    const detected = await detectSideSwap();
+    setAutoDetectedSwap(detected);
+    setShowSideSwapDialog(true);
+  }, [detectSideSwap]);
+
+  // ── Start second half (called after side-swap dialog confirms) ──
+  const startSecondHalf = useCallback(async (sidesSwapped: boolean) => {
     if (videoRef.current) {
       liveCaptureRef.current = startLiveCapture(videoRef.current);
     }
@@ -594,14 +631,39 @@ export default function CameraTrackingPage() {
     chunkIndexRef.current = 0;
     if (navigator.vibrate) navigator.vibrate(50);
 
-    // Persist h2_started_at
+    // Persist h2_started_at AND swap flag
     updateMatchTiming({ h2_started_at: now });
+    if (matchId && !isHelper) {
+      await supabase.from("matches").update({ h2_sides_swapped: sidesSwapped } as any).eq("id", matchId);
+    } else if (matchId && isHelper && sessionToken) {
+      // Route through edge function so anonymous helpers can persist this flag too
+      try {
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({
+              action: "update-timing",
+              session_token: sessionToken,
+              match_id: matchId,
+              timing: { h2_sides_swapped: sidesSwapped },
+            }),
+          },
+        );
+      } catch { /* non-critical */ }
+    }
+
+    toast.success(sidesSwapped ? "2. Halbzeit gestartet — Seiten getauscht ↔" : "2. Halbzeit gestartet — gleiche Seiten");
 
     const countInterval = setInterval(() => {
       setFrameCount(liveCaptureRef.current?.getFrameCount() ?? 0);
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
-  }, [hasHighlights, isHelper, updateMatchTiming]);
+  }, [hasHighlights, isHelper, updateMatchTiming, matchId, sessionToken]);
 
   const requestStop = useCallback(() => {
     if (!canStopRecording(frameCount)) {
