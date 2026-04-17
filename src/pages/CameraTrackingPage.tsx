@@ -74,7 +74,7 @@ function formatTimer(totalSeconds: number, isSecondHalf: boolean): string {
 
 export default function CameraTrackingPage() {
   const { id: matchIdParam } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [phase, setPhase] = useState<Phase>(matchIdParam ? "setup" : "code");
   const [matchId, setMatchId] = useState<string | null>(matchIdParam ?? null);
