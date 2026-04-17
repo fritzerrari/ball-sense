@@ -401,6 +401,29 @@ export default function CameraTrackingPage() {
 
   // Start external (display) capture after user confirms in setup dialog
   const startExternalCapture = useCallback(async () => {
+    // Connectivity check: WiFi-cam often has no internet, mobile data must be active
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      toast.error(
+        "Kein Internet erkannt. Aktiviere mobile Daten — die WiFi-Kamera liefert kein Internet."
+      );
+      return;
+    }
+    try {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 4000);
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`, {
+        method: "GET",
+        signal: ctrl.signal,
+        cache: "no-store",
+      });
+      clearTimeout(timeout);
+    } catch {
+      toast.error(
+        "FieldIQ-Server nicht erreichbar. Prüfe Mobilfunk-Empfang — WiFi-Kamera liefert kein Internet."
+      );
+      return;
+    }
+
     setShowExternalSetup(false);
     const stream = await displayCapture.start();
     if (!stream) {

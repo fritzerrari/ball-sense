@@ -100,7 +100,7 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
               <ol className="space-y-3 text-sm">
                 {[
                   "Öffne die Kamera-App (z.B. SafetyCam) und starte die Live-Vorschau.",
-                  "Tippe gleich auf „Bildschirm teilen" und wähle „Gesamten Bildschirm".",
+                  'Tippe gleich auf "Bildschirm teilen" und wähle "Gesamten Bildschirm".',
                   "Wechsle zurück zur Kamera-App und stelle sie auf Vollbild.",
                 ].map((step, i) => (
                   <li key={i} className="flex gap-3">
