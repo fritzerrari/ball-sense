@@ -60,7 +60,7 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
 
             <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs">
               <p className="font-semibold text-foreground flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                <AlertTriangle className="h-3.5 w-3.5 text-primary" />
                 Wichtig zu wissen
               </p>
               <ul className="space-y-1.5 text-muted-foreground">
