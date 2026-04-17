@@ -1,112 +1,76 @@
 
-## Diagnose
 
-Die frühere Gesture-/iframe-Analyse war nur ein Teil des Problems. Nach Code- und API-Abgleich ist der eigentliche Hauptpunkt:
+## Aufgabe
 
-- `getDisplayMedia()` ist in `use-display-capture.ts` die technische Basis der ganzen „Externe Kamera“-Idee.
-- Diese Basis ist auf **Chrome/Edge Android im mobilen Browser nicht verlässlich bzw. laut aktueller Kompatibilität nicht unterstützt**.
-- Deshalb ist die Meldung „Browser unterstützt Capture nicht“ auf Android am Ende **inhaltlich korrekt** – auch wenn Chrome selbst genutzt wird.
-- Der aktuelle Workflow ist also nicht nur UX-seitig, sondern **plattformseitig falsch zugeschnitten**.
+Zwei Dinge:
+1. **„Externe Kamera"-Feature komplett ausbauen** — Bildschirm-Capture funktioniert mobil nicht und liefert auch am Desktop keinen Mehrwert für dich am Spielfeld.
+2. **Weitwinkel-Erkennung auf Pixel 8a fixen** — `useUltraWideCamera` erkennt die 0.5x-Kamera dort nicht.
 
-Kurz: Die Web-App kann die Android-Kamera-App per Bildschirmfreigabe nicht robust als Quelle verwenden. Das ist kein kleiner Bug mehr, sondern ein **falscher technischer Ansatz für Mobile Web**.
+## Teil 1: Externe Kamera ausbauen
 
-## Lösung
+### Was entfernt wird
+- `src/components/ExternalCameraSetup.tsx` — Datei löschen
+- `src/components/CameraRemotePanel.tsx` — falls nur für External genutzt: prüfen, sonst behalten
+- `src/hooks/use-display-capture.ts` — Datei löschen
+- `src/components/MatchRecordingChoice.tsx` — Eintrag `"external"` aus `choices` entfernen, Type `RecordingMode` reduzieren auf `"self" | "helper" | "upload"`
+- `src/pages/CameraTrackingPage.tsx` — alle `mode === "external"` Pfade, `startExternalCapture`, Display-Capture-Imports, Setup-Dialog-Branch entfernen
+- `mem://features/external-camera-mode.md` — Memory-Datei löschen
+- `mem://index.md` — Eintrag „External Camera Mode" aus Memories entfernen
 
-### 1. Feature neu zuschneiden: kein Android-Browser-Screen-Capture mehr
-Ich würde die „Externe Kamera“-Funktion im Web **nicht mehr als Android-Lösung** anbieten.
+### Was bleibt
+Self-Recording, Helfer-Flow, Upload-Flow — alle drei laufen unverändert weiter.
 
-Stattdessen:
-- Android mobile browser: **klar als nicht unterstützt blocken**
-- Desktop browser: optional weiter erlauben als Beta
-- iOS: weiter blocken
+## Teil 2: Weitwinkel auf Pixel 8a fixen
 
-Damit verschwindet die falsche Erwartung „Chrome auf Android müsste doch gehen“.
+### Diagnose
+Pixel 8a hat physisch **eine** Hauptkamera (64 MP) + **eine** Ultraweit (13 MP). Aktuell scheitert die Erkennung wahrscheinlich an einem von zwei Punkten:
 
-### 2. Capability Detection korrekt machen
-`src/hooks/use-display-capture.ts`
-- Neue Erkennung für:
-  - `android_mobile_unsupported`
-  - `iframe_blocked`
-  - `ios_unsupported`
-  - `api_missing`
-  - `permission_denied`
-  - `selection_cancelled`
-  - `no_source`
-- `supported` darf nicht mehr nur `getDisplayMedia` + `!isIOS` sein.
-- Android-Mobile-Browser müssen explizit als **nicht unterstützt** behandelt werden.
+1. **Android Chrome listet auf Pixel-Geräten oft nur die „logische" Kamera** statt aller physischen Sensoren — `enumerateDevices()` zeigt dann nur ein Rear-Device.
+2. **Selbst wenn beide gelistet werden**, hat Chrome auf Pixel 8a Labels wie `"camera2 0, facing back"` und `"camera2 2, facing back"` — das aktuelle Filter-Heuristik in `use-ultra-wide-camera.ts` lässt beide durch (gut), aber das **Cycling per `deviceId`** schlägt fehl, weil Chrome auf Pixel die zweite Rear-Kamera nicht als separaten `getUserMedia`-Stream öffnen will.
 
-### 3. UX im Auswahl-Screen korrigieren
-`src/components/MatchRecordingChoice.tsx`
-- „Externe Kamera“ nicht mehr mit „Nur Android“ bewerben.
-- Stattdessen z. B.:
-  - „Desktop Beta“
-  - auf Android: Badge „Im mobilen Browser nicht möglich“
-- Optional disabled state auf Android statt normal auswählbar.
+### Lösung: zoom-basierter Weitwinkel statt Device-Switching
+Statt zwischen physischen Devices zu wechseln, nutzen wir die **MediaStreamTrack `zoom` Capability** (Pixel 8a unterstützt `zoom: { min: 1, max: 7 }`). Für „Weitwinkel" setzen wir `zoom = min`, was auf Pixel automatisch auf den Ultra-Wide-Sensor umschaltet.
 
-### 4. Setup-Dialog in echte Richtungen aufteilen
-`src/components/ExternalCameraSetup.tsx`
-- Android:
-  - deutliche Blocker-Meldung
-  - Erklärung: mobile Browser können das Kamera-App-Bild nicht per Screen Capture übernehmen
-  - direkte Alternativen anzeigen:
-    - „Ich filme selbst“
-    - „Helfer filmt“
-    - „Video hochladen“
-- Preview-iframe:
-  - separater Hinweis „nur Live-URL“
-- Desktop:
-  - Beta-Hinweis + normaler Start-CTA
+**Geänderte Datei: `src/hooks/use-ultra-wide-camera.ts`**
 
-### 5. Route-Level Guard einbauen
-`src/pages/CameraTrackingPage.tsx`
-- Wenn `?mode=external` auf Android mobile geöffnet wird:
-  - gar nicht erst in den bisherigen External-Capture-Flow gehen
-  - stattdessen sofort erklärende Meldung + Rückweg/Fallback anbieten
-- So landet niemand mehr in einem technisch unmöglichen Flow.
+Neuer Ablauf:
+1. Beim ersten `initStream` Standard-Stream mit `facingMode: "environment"` öffnen.
+2. `track.getCapabilities()` prüfen auf `zoom`-Support.
+3. Falls `zoom` verfügbar → „Weitwinkel" = `applyConstraints({ advanced: [{ zoom: capabilities.zoom.min }] })`. Kein Device-Switch, kein Stream-Restart.
+4. Falls `zoom` nicht verfügbar → Fallback auf bestehendes Device-Cycling.
+5. UI-Label anpassen: bei `zoom == min` → „0.5x Weitwinkel", bei `zoom == 1` → „1x", bei höher → „Xx Zoom".
 
-### 6. Copy und Erwartungsmanagement bereinigen
-Auch die Memory/Copy ist aktuell widersprüchlich („Android-only“ vs. „Desktop auch“).
-Ich würde alle Texte angleichen auf:
-- **Desktop-Browser: Beta**
-- **Android/iPhone mobile browser: nicht unterstützt**
-- Für Android als Alternative: normales Filmen, Helfer-Flow oder Upload-Flow
+Vorteile:
+- Funktioniert auf Pixel 8a (und allen anderen Pixel/Samsung-Geräten mit `zoom`-Capability).
+- Kein Stream-Restart → kein Flackern, schneller Wechsel.
+- Behält Fallback für Geräte ohne `zoom`-API.
 
-## Was bewusst nicht gebaut wird
+**Geänderte Datei: Aufrufer (z. B. `src/pages/CameraTrackingPage.tsx`)**
+Der Toggle-Button bleibt, ruft aber statt `cycleCamera()` jetzt `toggleWideAngle()` auf. Bei Geräten ohne Zoom-Support fällt es transparent auf Cycling zurück.
 
-Ich würde **keinen weiteren Workaround auf Android-Web** versuchen, weil:
-- Browser-Screen-Capture dort die falsche Grundlage ist
-- PWA das Problem nicht zuverlässig löst
-- dafür realistisch eine **native Android-App / Companion-App** oder eine **kamera-spezifische Direktintegration** nötig wäre
+### Zusätzlich: Debug-Hinweis im UI
+Ein dezentes Info-Toast beim ersten Start: „Weitwinkel nicht verfügbar — diese Kamera unterstützt keinen optischen Zoom-Wechsel" wenn weder `zoom` noch zweite Rear-Cam erkannt wird. So weißt du sofort, woran es liegt, statt im Dunkeln zu rätseln.
 
-Beides ist eine eigene Produktentscheidung, nicht ein kleiner Frontend-Fix.
+## Betroffene Dateien (Übersicht)
 
-## Ergebnis
-
-Nach Umsetzung:
-- keine falsche Android-Erwartung mehr
-- keine irreführende „Chrome müsste gehen“-Situation mehr
-- sauberer, ehrlicher Workflow mit klaren Alternativen
-- Desktop-Beta bleibt möglich, mobiler Browser wird korrekt abgefangen
-
-## Betroffene Dateien
-
-- `src/hooks/use-display-capture.ts`
-- `src/components/MatchRecordingChoice.tsx`
+**Löschen:**
 - `src/components/ExternalCameraSetup.tsx`
-- `src/pages/CameraTrackingPage.tsx`
+- `src/hooks/use-display-capture.ts`
+- `mem://features/external-camera-mode.md`
 
-## Technische Details
+**Ändern:**
+- `src/components/MatchRecordingChoice.tsx` — External-Option entfernen
+- `src/pages/CameraTrackingPage.tsx` — External-Branches entfernen, Weitwinkel-Toggle anpassen
+- `src/hooks/use-ultra-wide-camera.ts` — Zoom-Capability-API ergänzen, Cycling als Fallback
+- `mem://index.md` — External-Eintrag entfernen
 
-```text
-Neuer Entscheidungsbaum
+**Unverändert:**
+- Self/Helfer/Upload-Flows, Frame-Pipeline, Storage, Analyse
 
-external mode gewählt
-→ iOS? blocken
-→ Android mobile browser? blocken + Alternativen
-→ iframe? Live-URL-Hinweis
-→ Desktop + getDisplayMedia vorhanden?
-   → Beta-Flow erlauben
-   → sonst API-Meldung
-```
+## Validierung nach Umsetzung
 
-Wenn du das freigibst, setze ich den Flow auf eine ehrliche, funktionierende Variante um statt weiter Android-Chrome-Workarounds hinterherzulaufen.
+1. „Externe Kamera"-Karte erscheint nicht mehr in `MatchRecordingChoice`.
+2. Direktaufruf `?mode=external` führt sauber auf Self-Flow oder zeigt 404, kein toter Code.
+3. Auf Pixel 8a: Weitwinkel-Button schaltet hörbar/sichtbar in Ultraweit-Bildausschnitt (~0.5x). Zurückschalten auf 1x funktioniert.
+4. Auf Geräten ohne Zoom-Capability (älteres Android): Fallback-Cycling funktioniert wie bisher.
+
