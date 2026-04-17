@@ -17,7 +17,9 @@ import {
   Smartphone,
   ArrowRight,
   Database,
+  ExternalLink,
 } from "lucide-react";
+import { isInIframe } from "@/hooks/use-display-capture";
 
 interface Props {
   open: boolean;
@@ -26,7 +28,15 @@ interface Props {
   isIOS: boolean;
 }
 
+const LIVE_URL = "https://demo6.time2rise.de";
+
 export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isIOS }: Props) {
+  const inFrame = isInIframe();
+
+  const openLiveUrl = () => {
+    window.open(LIVE_URL, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
@@ -53,6 +63,27 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
           </div>
         ) : (
           <>
+            {inFrame && (
+              <div className="rounded-lg border-2 border-destructive/50 bg-destructive/10 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+                  <p className="font-semibold text-sm">Editor-Vorschau blockiert Bildschirm-Capture</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Der Lovable-Editor lädt FieldIQ in einem iframe ohne Display-Capture-Berechtigung.
+                  Chrome, Edge und Firefox unterstützen Bildschirm-Capture grundsätzlich — aber nur
+                  in einem eigenen Tab. Öffne die Live-URL und versuche es dort erneut.
+                </p>
+                <Button onClick={openLiveUrl} className="w-full gap-2" size="sm">
+                  <ExternalLink className="h-4 w-4" />
+                  FieldIQ in neuem Tab öffnen
+                </Button>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Öffnet <span className="font-medium text-foreground">demo6.time2rise.de</span> in neuem Tab
+                </p>
+              </div>
+            )}
+
             {/* Schritt 0: Netzwerk-Setup */}
             <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 space-y-3">
               <p className="font-semibold text-sm flex items-center gap-2">
@@ -127,18 +158,6 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
               </ul>
             </div>
 
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs space-y-1">
-              <p className="font-semibold text-foreground flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-primary" />
-                Hinweis zum Editor-Vorschau
-              </p>
-              <p className="text-muted-foreground">
-                Im Lovable-Editor-Vorschau ist Bildschirm-Capture blockiert. Bitte öffne FieldIQ über die
-                Live-URL (z.B. <span className="text-foreground font-medium">demo6.time2rise.de</span>) in
-                Chrome, Edge oder Firefox.
-              </p>
-            </div>
-
             <p className="text-[11px] text-muted-foreground italic">
               Beta-Funktion. Funktioniert auf Android Chrome sowie Desktop Chrome/Edge/Firefox.
               Bildqualität abhängig von deiner Kamera.
@@ -151,9 +170,9 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
             Abbrechen
           </Button>
           {!isIOS && (
-            <Button onClick={onConfirm} className="gap-2">
+            <Button onClick={onConfirm} className="gap-2" variant={inFrame ? "outline" : "default"}>
               <MonitorSmartphone className="h-4 w-4" />
-              Bildschirm freigeben
+              {inFrame ? "Trotzdem versuchen" : "Bildschirm freigeben"}
             </Button>
           )}
         </DialogFooter>
