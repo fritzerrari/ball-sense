@@ -16,6 +16,8 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
+import { useDisplayCapture } from "@/hooks/use-display-capture";
+import ExternalCameraSetup from "@/components/ExternalCameraSetup";
 
 type Phase = "code" | "restoring" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
@@ -105,6 +107,20 @@ export default function CameraTrackingPage() {
   const deltaRetryCountRef = useRef(0);
 
   const ultraWide = useUltraWideCamera(videoRef);
+
+  // External camera (screen-capture of WiFi cam app, e.g. SafetyCam) — Android-only
+  const isExternalMode = searchParams.get("mode") === "external";
+  const [showExternalSetup, setShowExternalSetup] = useState(false);
+  const displayCapture = useDisplayCapture({
+    onTrackEnded: () => {
+      toast.warning("Bildschirm-Freigabe beendet. Aufnahme stoppt.");
+      if (liveCaptureRef.current) {
+        setShowStopConfirm(true);
+      } else {
+        setPhase("setup");
+      }
+    },
+  });
 
   const [homeTeamName, setHomeTeamName] = useState("Heim");
   const [awayTeamName, setAwayTeamName] = useState("Gegner");
@@ -350,6 +366,12 @@ export default function CameraTrackingPage() {
   }, [isHelper, phase, frameCount]);
 
   const initCamera = useCallback(async () => {
+    // External mode: open setup dialog → screen capture
+    if (isExternalMode) {
+      setShowExternalSetup(true);
+      return;
+    }
+
     try {
       // Ensure camera detection completes before starting stream
       const detectedCams = await ultraWide.detectCameras();
@@ -375,7 +397,24 @@ export default function CameraTrackingPage() {
     } catch {
       toast.error("Kamera konnte nicht gestartet werden");
     }
-  }, [ultraWide]);
+  }, [ultraWide, isExternalMode]);
+
+  // Start external (display) capture after user confirms in setup dialog
+  const startExternalCapture = useCallback(async () => {
+    setShowExternalSetup(false);
+    const stream = await displayCapture.start();
+    if (!stream) {
+      if (displayCapture.error) toast.error(displayCapture.error);
+      return;
+    }
+    streamRef.current = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {});
+    }
+    setPhase("ready");
+    toast.success("Externe Kamera verbunden — wechsle jetzt zur Kamera-App!");
+  }, [displayCapture]);
 
   const startRecording = useCallback(() => {
     if (videoRef.current) {
@@ -819,6 +858,12 @@ export default function CameraTrackingPage() {
         homeTeamName={homeTeamName}
         awayTeamName={awayTeamName}
         onConfirm={(swapped) => startSecondHalf(swapped)}
+      />
+      <ExternalCameraSetup
+        open={showExternalSetup}
+        onOpenChange={setShowExternalSetup}
+        onConfirm={startExternalCapture}
+        isIOS={displayCapture.isIOS}
       />
 
       <div className="relative flex-1 bg-black">
