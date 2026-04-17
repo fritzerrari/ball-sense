@@ -1,4 +1,5 @@
 import { Video, KeyRound, Upload, MonitorSmartphone } from "lucide-react";
+import { isInIframe } from "@/hooks/use-display-capture";
 
 type RecordingMode = "self" | "helper" | "upload" | "external";
 
