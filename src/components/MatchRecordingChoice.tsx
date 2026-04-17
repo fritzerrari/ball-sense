@@ -37,6 +37,8 @@ const choices: { mode: RecordingMode; icon: typeof Video; title: string; desc: s
 ];
 
 export default function MatchRecordingChoice({ onSelect }: MatchRecordingChoiceProps) {
+  const inFrame = isInIframe();
+
   return (
     <div className="space-y-4">
       <div className="text-center mb-2">
@@ -45,36 +47,42 @@ export default function MatchRecordingChoice({ onSelect }: MatchRecordingChoiceP
       </div>
 
       <div className="space-y-3">
-        {choices.map(({ mode, icon: Icon, title, desc, recommended, beta }) => (
-          <button
-            key={mode}
-            onClick={() => {
-              if (navigator.vibrate) navigator.vibrate(20);
-              onSelect(mode);
-            }}
-            className={`w-full flex items-center gap-4 rounded-xl border-2 bg-card p-5 text-left
-              transition-all hover:border-primary/40 hover:bg-primary/5 active:scale-[0.97]
-              focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                recommended ? "border-primary/30 ring-1 ring-primary/10" : "border-border"
-              }`}
-          >
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-              <Icon className="h-7 w-7 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-base font-semibold font-display">{title}</p>
-                {recommended && (
-                  <span className="text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">Empfohlen</span>
-                )}
-                {beta && (
-                  <span className="text-[10px] font-semibold bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Beta</span>
-                )}
+        {choices.map(({ mode, icon: Icon, title, desc, recommended, beta }) => {
+          const liveOnly = mode === "external" && inFrame;
+          return (
+            <button
+              key={mode}
+              onClick={() => {
+                if (navigator.vibrate) navigator.vibrate(20);
+                onSelect(mode);
+              }}
+              className={`w-full flex items-center gap-4 rounded-xl border-2 bg-card p-5 text-left
+                transition-all hover:border-primary/40 hover:bg-primary/5 active:scale-[0.97]
+                focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                  recommended ? "border-primary/30 ring-1 ring-primary/10" : "border-border"
+                }`}
+            >
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Icon className="h-7 w-7 text-primary" />
               </div>
-              <p className="text-sm text-muted-foreground mt-0.5">{desc}</p>
-            </div>
-          </button>
-        ))}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-base font-semibold font-display">{title}</p>
+                  {recommended && (
+                    <span className="text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">Empfohlen</span>
+                  )}
+                  {beta && (
+                    <span className="text-[10px] font-semibold bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Beta</span>
+                  )}
+                  {liveOnly && (
+                    <span className="text-[10px] font-semibold bg-destructive/15 text-destructive px-2 py-0.5 rounded-full">Nur Live-URL</span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">{desc}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
