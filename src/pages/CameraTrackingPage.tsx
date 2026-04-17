@@ -845,28 +845,6 @@ export default function CameraTrackingPage() {
         awayTeamName={awayTeamName}
         onConfirm={(swapped) => startSecondHalf(swapped)}
       />
-      <ExternalCameraSetup
-        open={showExternalSetup}
-        onOpenChange={setShowExternalSetup}
-        onConfirm={startExternalCapture}
-        isIOS={displayCapture.isIOS}
-        onPickAlternative={(mode) => {
-          setShowExternalSetup(false);
-          // Switch URL away from external mode and let the user pick again.
-          const next = new URLSearchParams(searchParams);
-          next.set("mode", mode);
-          setSearchParams(next, { replace: true });
-          // Trigger a soft reload of the camera init flow
-          if (mode === "self") {
-            // Re-run init for direct camera capture
-            setTimeout(() => initCamera(), 50);
-          } else if (mode === "helper") {
-            toast.info("Wechsle zum Helfer-Flow: Code aus dem Match-Setup teilen.");
-          } else if (mode === "upload") {
-            toast.info("Wechsle in den Upload-Flow im Match-Setup.");
-          }
-        }}
-      />
 
       <div className="relative flex-1 bg-black">
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
@@ -891,26 +869,29 @@ export default function CameraTrackingPage() {
               <span className="text-lg">📱↔️</span>
               <span className="text-xs text-white/60">Querformat empfohlen</span>
             </div>
-            {/* Camera lens toggle — always show for feedback */}
+            {/* Wide-angle toggle — uses zoom-API or device cycling */}
             <button
               onClick={async () => {
-                if (ultraWide.hasMultipleCameras) {
-                  await ultraWide.cycleCamera();
+                const ok = await ultraWide.toggleWideAngle();
+                if (ok) {
                   streamRef.current = ultraWide.getStream();
+                  toast.success(ultraWide.currentCameraLabel());
+                } else {
+                  toast.info("Weitwinkel auf diesem Gerät nicht verfügbar");
                 }
               }}
-              disabled={ultraWide.switching || !ultraWide.hasMultipleCameras}
+              disabled={ultraWide.switching || !ultraWide.wideAngleSupported}
               className={`flex items-center gap-2 rounded-full px-4 py-2 border transition-colors ${
-                ultraWide.hasMultipleCameras
+                ultraWide.wideAngleSupported
                   ? "bg-white/10 hover:bg-white/20 border-white/20"
                   : "bg-white/5 border-white/10 opacity-50"
               }`}
             >
               <Maximize2 className="h-4 w-4 text-white/70" />
               <span className="text-xs text-white/70 font-medium">
-                {ultraWide.hasMultipleCameras
+                {ultraWide.wideAngleSupported
                   ? `${ultraWide.currentCameraLabel()} — tippen zum Wechseln`
-                  : `${ultraWide.cameraCount} Kamera erkannt`}
+                  : "Kein Weitwinkel verfügbar"}
               </span>
             </button>
             {isHelper && !transferAuthorized && (
