@@ -859,8 +859,12 @@ export default function CameraTrackingPage() {
         awayTeamName={awayTeamName}
         onConfirm={(swapped) => startSecondHalf(swapped)}
       />
-
-      <div className="relative flex-1 bg-black">
+      <ExternalCameraSetup
+        open={showExternalSetup}
+        onOpenChange={setShowExternalSetup}
+        onConfirm={startExternalCapture}
+        isIOS={displayCapture.isIOS}
+      />
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
 
         {phase === "setup" && (
