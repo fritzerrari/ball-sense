@@ -170,10 +170,15 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
             Abbrechen
           </Button>
           {!isIOS && (
-            <Button onClick={onConfirm} className="gap-2" variant={inFrame ? "outline" : "default"}>
-              <MonitorSmartphone className="h-4 w-4" />
-              {inFrame ? "Trotzdem versuchen" : "Bildschirm freigeben"}
-            </Button>
+            <div className="flex flex-col gap-1.5 sm:items-end">
+              <Button onClick={onConfirm} className="gap-2" variant={inFrame ? "outline" : "default"}>
+                <MonitorSmartphone className="h-4 w-4" />
+                {inFrame ? "Trotzdem versuchen" : "Jetzt Bildschirmfreigabe starten"}
+              </Button>
+              <p className="text-[10px] text-muted-foreground sm:text-right">
+                Der Systemdialog erscheint direkt nach dem Tippen.
+              </p>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>
