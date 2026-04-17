@@ -352,6 +352,12 @@ export default function CameraTrackingPage() {
   }, [isHelper, phase, frameCount]);
 
   const initCamera = useCallback(async () => {
+    // External mode: open setup dialog → screen capture
+    if (isExternalMode) {
+      setShowExternalSetup(true);
+      return;
+    }
+
     try {
       // Ensure camera detection completes before starting stream
       const detectedCams = await ultraWide.detectCameras();
@@ -377,7 +383,24 @@ export default function CameraTrackingPage() {
     } catch {
       toast.error("Kamera konnte nicht gestartet werden");
     }
-  }, [ultraWide]);
+  }, [ultraWide, isExternalMode]);
+
+  // Start external (display) capture after user confirms in setup dialog
+  const startExternalCapture = useCallback(async () => {
+    setShowExternalSetup(false);
+    const stream = await displayCapture.start();
+    if (!stream) {
+      if (displayCapture.error) toast.error(displayCapture.error);
+      return;
+    }
+    streamRef.current = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {});
+    }
+    setPhase("ready");
+    toast.success("Externe Kamera verbunden — wechsle jetzt zur Kamera-App!");
+  }, [displayCapture]);
 
   const startRecording = useCallback(() => {
     if (videoRef.current) {
