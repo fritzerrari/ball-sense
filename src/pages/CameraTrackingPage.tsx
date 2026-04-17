@@ -341,7 +341,7 @@ export default function CameraTrackingPage() {
         triggerHalftime();
       } else if (cmd === "start" && (phase === "ready" || phase === "halftime_pause")) {
         if (phase === "ready") startRecording();
-        else startSecondHalf();
+        else requestStartSecondHalf();
       }
     }, 10000);
 
