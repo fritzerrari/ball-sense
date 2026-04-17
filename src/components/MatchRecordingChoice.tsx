@@ -1,12 +1,12 @@
-import { Video, KeyRound, Upload } from "lucide-react";
+import { Video, KeyRound, Upload, MonitorSmartphone } from "lucide-react";
 
-type RecordingMode = "self" | "helper" | "upload";
+type RecordingMode = "self" | "helper" | "upload" | "external";
 
 interface MatchRecordingChoiceProps {
   onSelect: (mode: RecordingMode) => void;
 }
 
-const choices: { mode: RecordingMode; icon: typeof Video; title: string; desc: string; recommended?: boolean }[] = [
+const choices: { mode: RecordingMode; icon: typeof Video; title: string; desc: string; recommended?: boolean; beta?: boolean }[] = [
   {
     mode: "self",
     icon: Video,
@@ -26,6 +26,13 @@ const choices: { mode: RecordingMode; icon: typeof Video; title: string; desc: s
     title: "Video hochladen",
     desc: "Bestehendes Video nachträglich analysieren",
   },
+  {
+    mode: "external",
+    icon: MonitorSmartphone,
+    title: "Externe Kamera",
+    desc: "WiFi-/Rückfahrkamera via App-Bild · Nur Android",
+    beta: true,
+  },
 ];
 
 export default function MatchRecordingChoice({ onSelect }: MatchRecordingChoiceProps) {
@@ -37,7 +44,7 @@ export default function MatchRecordingChoice({ onSelect }: MatchRecordingChoiceP
       </div>
 
       <div className="space-y-3">
-        {choices.map(({ mode, icon: Icon, title, desc, recommended }) => (
+        {choices.map(({ mode, icon: Icon, title, desc, recommended, beta }) => (
           <button
             key={mode}
             onClick={() => {
@@ -54,10 +61,13 @@ export default function MatchRecordingChoice({ onSelect }: MatchRecordingChoiceP
               <Icon className="h-7 w-7 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-base font-semibold font-display">{title}</p>
                 {recommended && (
                   <span className="text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">Empfohlen</span>
+                )}
+                {beta && (
+                  <span className="text-[10px] font-semibold bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Beta</span>
                 )}
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">{desc}</p>

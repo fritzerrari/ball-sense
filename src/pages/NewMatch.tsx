@@ -147,9 +147,11 @@ export default function NewMatch() {
     }
   };
 
-  const handleRecordingChoice = (mode: "self" | "helper" | "upload") => {
+  const handleRecordingChoice = (mode: "self" | "helper" | "upload" | "external") => {
     if (mode === "self" && matchId) {
       navigate(`/camera/${matchId}/track`);
+    } else if (mode === "external" && matchId) {
+      navigate(`/camera/${matchId}/track?mode=external`);
     } else if (mode === "helper") {
       setStep("code");
     } else {
