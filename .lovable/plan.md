@@ -1,105 +1,112 @@
 
+## Diagnose
 
-## Tiefenanalyse
+Die frühere Gesture-/iframe-Analyse war nur ein Teil des Problems. Nach Code- und API-Abgleich ist der eigentliche Hauptpunkt:
 
-Die wahrscheinlichste Hauptursache ist **nicht fehlender Browser-Support**, sondern der aktuelle Ablauf in `CameraTrackingPage.tsx`:
+- `getDisplayMedia()` ist in `use-display-capture.ts` die technische Basis der ganzen „Externe Kamera“-Idee.
+- Diese Basis ist auf **Chrome/Edge Android im mobilen Browser nicht verlässlich bzw. laut aktueller Kompatibilität nicht unterstützt**.
+- Deshalb ist die Meldung „Browser unterstützt Capture nicht“ auf Android am Ende **inhaltlich korrekt** – auch wenn Chrome selbst genutzt wird.
+- Der aktuelle Workflow ist also nicht nur UX-seitig, sondern **plattformseitig falsch zugeschnitten**.
 
-- Der Button im Dialog ruft `startExternalCapture()` auf.
-- Dort läuft **zuerst** ein async Connectivity-Check (`fetch` auf `/auth/v1/health`).
-- **Erst danach** wird `displayCapture.start()` und damit `navigator.mediaDevices.getDisplayMedia()` aufgerufen.
-
-Auf Android Chrome/Edge geht dabei oft die nötige **User-Gesture / transient activation** verloren. Dann verhält sich `getDisplayMedia()` so, als wäre es nicht unterstützt oder abgelehnt, obwohl der Browser es grundsätzlich kann.
-
-Zusätzlich gibt es noch den zweiten bekannten Sonderfall:
-- Im **Lovable-Preview-iframe** ist Display-Capture separat blockiert.
-
-Damit gibt es aktuell zwei verschiedene Ursachen, die in der UX zu ähnlich aussehen:
-1. **Gesture-Kette verloren** auf echter Live-URL
-2. **Iframe-Permission blockiert** im Editor-Preview
+Kurz: Die Web-App kann die Android-Kamera-App per Bildschirmfreigabe nicht robust als Quelle verwenden. Das ist kein kleiner Bug mehr, sondern ein **falscher technischer Ansatz für Mobile Web**.
 
 ## Lösung
 
-### 1. `CameraTrackingPage.tsx` – Capture direkt im Klick starten
-Ich würde den Flow so umbauen, dass beim Klick auf **„Bildschirm freigeben“** `getDisplayMedia()` **sofort und direkt** gestartet wird.
+### 1. Feature neu zuschneiden: kein Android-Browser-Screen-Capture mehr
+Ich würde die „Externe Kamera“-Funktion im Web **nicht mehr als Android-Lösung** anbieten.
 
-Geplante Änderung:
-- `startExternalCapture()` beginnt direkt mit `displayCapture.start()`
-- **keine `await fetch(...)` mehr vor dem Capture**
-- Netzwerk-/Health-Checks erst **nach erfolgreichem Stream-Start**
+Stattdessen:
+- Android mobile browser: **klar als nicht unterstützt blocken**
+- Desktop browser: optional weiter erlauben als Beta
+- iOS: weiter blocken
 
-Das ist der wichtigste Fix.
+Damit verschwindet die falsche Erwartung „Chrome auf Android müsste doch gehen“.
 
-### 2. `use-display-capture.ts` – Fehler sauber klassifizieren
-Der Hook sollte nicht nur `error` in React-State setzen, sondern einen **klaren Rückgabestatus** liefern, z. B.:
+### 2. Capability Detection korrekt machen
+`src/hooks/use-display-capture.ts`
+- Neue Erkennung für:
+  - `android_mobile_unsupported`
+  - `iframe_blocked`
+  - `ios_unsupported`
+  - `api_missing`
+  - `permission_denied`
+  - `selection_cancelled`
+  - `no_source`
+- `supported` darf nicht mehr nur `getDisplayMedia` + `!isIOS` sein.
+- Android-Mobile-Browser müssen explizit als **nicht unterstützt** behandelt werden.
 
-```text
-success
-iframe_blocked
-ios_unsupported
-api_missing
-permission_denied
-selection_cancelled
-unknown_error
-```
+### 3. UX im Auswahl-Screen korrigieren
+`src/components/MatchRecordingChoice.tsx`
+- „Externe Kamera“ nicht mehr mit „Nur Android“ bewerben.
+- Stattdessen z. B.:
+  - „Desktop Beta“
+  - auf Android: Badge „Im mobilen Browser nicht möglich“
+- Optional disabled state auf Android statt normal auswählbar.
 
-So kann die Seite präzise reagieren, statt generisch „Browser unterstützt nicht“ anzuzeigen.
+### 4. Setup-Dialog in echte Richtungen aufteilen
+`src/components/ExternalCameraSetup.tsx`
+- Android:
+  - deutliche Blocker-Meldung
+  - Erklärung: mobile Browser können das Kamera-App-Bild nicht per Screen Capture übernehmen
+  - direkte Alternativen anzeigen:
+    - „Ich filme selbst“
+    - „Helfer filmt“
+    - „Video hochladen“
+- Preview-iframe:
+  - separater Hinweis „nur Live-URL“
+- Desktop:
+  - Beta-Hinweis + normaler Start-CTA
 
-### 3. `CameraTrackingPage.tsx` – Connectivity-Check nachgelagert
-Den bestehenden Internet-/Health-Check behalten, aber erst **nachdem** der Screen-Share-Dialog erfolgreich war.
+### 5. Route-Level Guard einbauen
+`src/pages/CameraTrackingPage.tsx`
+- Wenn `?mode=external` auf Android mobile geöffnet wird:
+  - gar nicht erst in den bisherigen External-Capture-Flow gehen
+  - stattdessen sofort erklärende Meldung + Rückweg/Fallback anbieten
+- So landet niemand mehr in einem technisch unmöglichen Flow.
 
-Neuer Ablauf:
-```text
-Button-Klick
-→ getDisplayMedia() sofort
-→ Stream erfolgreich?
-  → ja: Video binden, Phase = ready
-  → danach: Connectivity prüfen
-      → bei fehlendem Internet: klarer Toast „Kamera-WLAN aktiv, aber mobile Daten fehlen“
-```
+### 6. Copy und Erwartungsmanagement bereinigen
+Auch die Memory/Copy ist aktuell widersprüchlich („Android-only“ vs. „Desktop auch“).
+Ich würde alle Texte angleichen auf:
+- **Desktop-Browser: Beta**
+- **Android/iPhone mobile browser: nicht unterstützt**
+- Für Android als Alternative: normales Filmen, Helfer-Flow oder Upload-Flow
 
-So bleibt der Browser-Dialog zuverlässig, und der Nutzer bekommt trotzdem den Hinweis zum Mobilfunk.
+## Was bewusst nicht gebaut wird
 
-### 4. `ExternalCameraSetup.tsx` – Copy an echten Ursachen ausrichten
-Dialogtext anpassen:
-- nicht mehr primär „Browser unterstützt nicht“
-- stattdessen:
-  - im Preview: „Editor blockiert Bildschirmfreigabe, bitte Live-URL öffnen“
-  - auf Android Live-URL: „Tippe hier und wähle Gesamten Bildschirm“
-  - bei Fehlschlag: „Bitte direkt erneut aus diesem Dialog starten“
+Ich würde **keinen weiteren Workaround auf Android-Web** versuchen, weil:
+- Browser-Screen-Capture dort die falsche Grundlage ist
+- PWA das Problem nicht zuverlässig löst
+- dafür realistisch eine **native Android-App / Companion-App** oder eine **kamera-spezifische Direktintegration** nötig wäre
 
-Optional würde ich den CTA klarer machen:
-- „Jetzt Bildschirmfreigabe starten“
-- darunter kleiner Hinweis: „Der Systemdialog muss direkt nach dem Tippen erscheinen“
+Beides ist eine eigene Produktentscheidung, nicht ein kleiner Frontend-Fix.
 
-### 5. Fehleranzeige robuster machen
-Aktuell wird nach `await displayCapture.start()` direkt `displayCapture.error` gelesen. Das kann wegen asynchronem State veraltet sein.
+## Ergebnis
 
-Ich würde die Fehler-Info **direkt aus `start()` zurückgeben** statt mich auf nachträglich gesetzten State zu verlassen.
-
-### 6. Keine Backend-Änderungen
-Für diesen Fix sind **keine Datenbank- oder Backend-Anpassungen** nötig. Es ist ein reines Frontend-/Browser-Flow-Problem.
-
-## Ergebnis nach Umsetzung
-
-Auf der **Live-URL** sollte die externe Kamera wieder korrekt funktionieren, weil:
-- Android Chrome/Edge den Screen-Share-Dialog direkt nach dem Klick öffnen
-- das Kamera-WLAN/Mobilfunk-Thema weiterhin geprüft wird, aber erst **nach** dem Capture
-- der Nutzer präzisere Fehler statt „nicht unterstützt“ bekommt
-
-Im **Lovable-Preview** bleibt es weiterhin blockiert, aber dann mit klarer, richtiger Erklärung.
+Nach Umsetzung:
+- keine falsche Android-Erwartung mehr
+- keine irreführende „Chrome müsste gehen“-Situation mehr
+- sauberer, ehrlicher Workflow mit klaren Alternativen
+- Desktop-Beta bleibt möglich, mobiler Browser wird korrekt abgefangen
 
 ## Betroffene Dateien
 
-- `src/pages/CameraTrackingPage.tsx`
 - `src/hooks/use-display-capture.ts`
+- `src/components/MatchRecordingChoice.tsx`
 - `src/components/ExternalCameraSetup.tsx`
+- `src/pages/CameraTrackingPage.tsx`
 
-## Validierung nach Implementierung
+## Technische Details
 
-Ich würde danach gezielt prüfen:
-1. Klick auf „Externe Kamera“ auf der **Live-URL**
-2. Klick auf „Bildschirm freigeben“
-3. Öffnet sich **sofort** der native Screen-Share-Dialog auf Android Chrome/Edge?
-4. Wird nach erfolgreicher Freigabe erst danach der Connectivity-Hinweis angezeigt?
-5. Zeigt der Preview-iframe weiterhin korrekt „nur Live-URL“ statt „Browser nicht unterstützt“?
+```text
+Neuer Entscheidungsbaum
 
+external mode gewählt
+→ iOS? blocken
+→ Android mobile browser? blocken + Alternativen
+→ iframe? Live-URL-Hinweis
+→ Desktop + getDisplayMedia vorhanden?
+   → Beta-Flow erlauben
+   → sonst API-Meldung
+```
+
+Wenn du das freigibst, setze ich den Flow auf eine ehrliche, funktionierende Variante um statt weiter Android-Chrome-Workarounds hinterherzulaufen.
