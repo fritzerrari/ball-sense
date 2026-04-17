@@ -1072,7 +1072,7 @@ export default function CameraTrackingPage() {
         {phase === "halftime_pause" && (
           <div className="space-y-2">
             <Button
-              onClick={startSecondHalf}
+              onClick={requestStartSecondHalf}
               size="lg"
               className="w-full gap-2 h-14 text-base"
             >
