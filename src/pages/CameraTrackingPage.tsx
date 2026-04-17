@@ -937,12 +937,14 @@ export default function CameraTrackingPage() {
 
             {/* Frame counter + ultra-wide toggle + sync status */}
             <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
-              {ultraWide.hasMultipleCameras && (
+              {ultraWide.wideAngleSupported && (
                 <button
                   onClick={async () => {
-                    await ultraWide.cycleCamera();
-                    streamRef.current = ultraWide.getStream();
-                    toast.success(ultraWide.currentCameraLabel());
+                    const ok = await ultraWide.toggleWideAngle();
+                    if (ok) {
+                      streamRef.current = ultraWide.getStream();
+                      toast.success(ultraWide.currentCameraLabel());
+                    }
                   }}
                   disabled={ultraWide.switching}
                   className="bg-black/70 hover:bg-black/80 rounded-full px-3 py-1.5 flex items-center gap-1.5 transition-colors"
