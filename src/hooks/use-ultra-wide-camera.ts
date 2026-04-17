@@ -1,38 +1,42 @@
 import { useState, useCallback, useRef } from "react";
 
-const STORAGE_KEY = "fieldiq_prefer_ultrawide";
-
 interface CameraDevice {
   deviceId: string;
   label: string;
   index: number;
 }
 
+type ZoomCapability = { min: number; max: number; step?: number };
+
 /**
- * Detects available rear cameras and provides cycling between them.
- * On most phones, camera 0 = standard, camera 1 = ultra-wide, camera 2 = telephoto.
- * Since labels are unreliable (especially on Android), we enumerate all rear cameras
- * and let the user cycle through them.
+ * Provides wide-angle (0.5x) switching for mobile cameras.
+ *
+ * Strategy:
+ * 1. Primary: Use `MediaStreamTrack.applyConstraints({ advanced: [{ zoom }] })`
+ *    to switch zoom level — works on Pixel/Samsung where Chrome exposes a
+ *    single logical camera with optical zoom range that automatically
+ *    routes to the ultra-wide sensor at min zoom.
+ * 2. Fallback: Cycle through enumerated rear devices (older Android, some
+ *    custom ROMs) when the active track has no `zoom` capability.
  */
 export function useUltraWideCamera(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [activeCameraIndex, setActiveCameraIndex] = useState(0);
   const [switching, setSwitching] = useState(false);
+  const [zoomCapability, setZoomCapability] = useState<ZoomCapability | null>(null);
+  const [currentZoom, setCurrentZoom] = useState<number | null>(null);
+  const [wideAngleActive, setWideAngleActive] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const detectDone = useRef(false);
   const detectPromise = useRef<Promise<CameraDevice[]> | null>(null);
 
-  /**
-   * Detect rear cameras. Returns a promise that resolves to the detected devices.
-   * Safe to call multiple times — only runs once.
-   */
+  /** Detect rear cameras (used as fallback when zoom-API not available). */
   const detectCameras = useCallback((): Promise<CameraDevice[]> => {
     if (detectDone.current) return Promise.resolve(cameras);
     if (detectPromise.current) return detectPromise.current;
 
     detectPromise.current = (async () => {
       try {
-        // Need a temporary stream to get labeled devices
         const tempStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment" },
           audio: false,
@@ -42,21 +46,10 @@ export function useUltraWideCamera(videoRef: React.RefObject<HTMLVideoElement | 
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter((d) => d.kind === "videoinput");
 
-        // Debug: log all cameras found
-        console.log("[UltraWide] All video devices:", videoDevices.map(d => ({
-          id: d.deviceId.slice(0, 8),
-          label: d.label,
-        })));
-
-        // Filter out front-facing cameras using robust heuristics for Android
-        // Android Chrome often labels cameras as "camera2 X, facing back/front"
         const rearCandidates = videoDevices.filter((d) => {
           const label = d.label.toLowerCase();
-          // Explicitly exclude "facing front" (Android Chrome format)
           if (label.includes("facing front")) return false;
-          // Exclude "facetime" (macOS)
           if (label.includes("facetime")) return false;
-          // Exclude generic "front" only when NOT also containing back/rear/environment
           if (
             label.includes("front") &&
             !label.includes("back") &&
@@ -68,22 +61,17 @@ export function useUltraWideCamera(videoRef: React.RefObject<HTMLVideoElement | 
           return true;
         });
 
-        // Use all video devices if filtering left us with none
         const finalList = rearCandidates.length > 0 ? rearCandidates : videoDevices;
-
         const mapped: CameraDevice[] = finalList.map((d, i) => ({
           deviceId: d.deviceId,
           label: d.label || `Kamera ${i + 1}`,
           index: i,
         }));
 
-        console.log(`[UltraWide] Detected ${mapped.length} rear camera(s):`, mapped.map(c => c.label));
-
         setCameras(mapped);
         detectDone.current = true;
         return mapped;
-      } catch (err) {
-        console.warn("[UltraWide] Camera detection failed:", err);
+      } catch {
         detectDone.current = true;
         return [];
       }
@@ -92,33 +80,30 @@ export function useUltraWideCamera(videoRef: React.RefObject<HTMLVideoElement | 
     return detectPromise.current;
   }, [cameras]);
 
-  /** Get a readable label for the current camera */
-  const currentCameraLabel = useCallback((): string => {
-    if (cameras.length === 0) return "Kamera";
-    const cam = cameras[activeCameraIndex];
-    if (!cam) return "Kamera";
-    const label = cam.label.toLowerCase();
-    if (label.includes("ultra") || label.includes("wide") || label.includes("weitwinkel") || label.includes("0.5")) {
-      return "0.5x Weitwinkel";
+  /** Inspect current track for zoom capability. */
+  const inspectZoom = useCallback((stream: MediaStream) => {
+    const track = stream.getVideoTracks()[0];
+    if (!track || typeof track.getCapabilities !== "function") {
+      setZoomCapability(null);
+      setCurrentZoom(null);
+      return;
     }
-    if (label.includes("tele") || label.includes("zoom") || label.includes("2x") || label.includes("3x")) {
-      return `${activeCameraIndex + 1}x Tele`;
+    const caps = track.getCapabilities() as MediaTrackCapabilities & { zoom?: ZoomCapability };
+    if (caps.zoom && typeof caps.zoom.min === "number" && typeof caps.zoom.max === "number" && caps.zoom.max > caps.zoom.min) {
+      setZoomCapability({ min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step });
+      const settings = track.getSettings() as MediaTrackSettings & { zoom?: number };
+      setCurrentZoom(settings.zoom ?? caps.zoom.min);
+    } else {
+      setZoomCapability(null);
+      setCurrentZoom(null);
     }
-    // Default: show index-based label
-    if (cameras.length <= 1) return "1x";
-    return `Kamera ${activeCameraIndex + 1}/${cameras.length}`;
-  }, [cameras, activeCameraIndex]);
+  }, []);
 
-  /**
-   * Initialize or switch the camera stream.
-   * Ensures camera detection has completed before selecting a device.
-   */
+  /** Initialize camera stream. */
   const initStream = useCallback(
     async (cameraIdx?: number): Promise<MediaStream | null> => {
-      // Ensure detection is done before using cameras list
       const detectedCameras = await detectCameras();
 
-      // Stop existing stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -145,6 +130,8 @@ export function useUltraWideCamera(videoRef: React.RefObject<HTMLVideoElement | 
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         streamRef.current = stream;
+        inspectZoom(stream);
+        setWideAngleActive(false);
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -156,67 +143,95 @@ export function useUltraWideCamera(videoRef: React.RefObject<HTMLVideoElement | 
         return null;
       }
     },
-    [detectCameras, activeCameraIndex, videoRef],
+    [detectCameras, activeCameraIndex, videoRef, inspectZoom],
   );
 
-  /** Cycle to the next camera */
-  const cycleCamera = useCallback(async () => {
-    const detectedCameras = await detectCameras();
-    if (detectedCameras.length <= 1 || switching) return;
+  /**
+   * Toggle wide-angle mode. Prefers in-stream zoom (no flicker).
+   * Falls back to device cycling for cameras without zoom capability.
+   * Returns true if toggle succeeded, false if neither path is available.
+   */
+  const toggleWideAngle = useCallback(async (): Promise<boolean> => {
+    if (switching) return false;
 
-    setSwitching(true);
-    const nextIdx = (activeCameraIndex + 1) % detectedCameras.length;
-    const stream = await initStream(nextIdx);
-
-    if (stream) {
-      setActiveCameraIndex(nextIdx);
+    // Path A: Zoom API (Pixel 8a, modern Samsung, etc.)
+    if (zoomCapability && streamRef.current) {
+      const track = streamRef.current.getVideoTracks()[0];
+      if (track) {
+        setSwitching(true);
+        try {
+          const targetZoom = wideAngleActive ? 1 : zoomCapability.min;
+          // Clamp to capability range
+          const clamped = Math.max(zoomCapability.min, Math.min(zoomCapability.max, targetZoom));
+          await track.applyConstraints({ advanced: [{ zoom: clamped }] as any });
+          setCurrentZoom(clamped);
+          setWideAngleActive(!wideAngleActive);
+          setSwitching(false);
+          return true;
+        } catch {
+          setSwitching(false);
+          // fall through to device cycling
+        }
+      }
     }
-    setSwitching(false);
-  }, [detectCameras, switching, activeCameraIndex, initStream]);
 
-  /** Get the current stream ref */
+    // Path B: Device cycling fallback
+    const detectedCameras = await detectCameras();
+    if (detectedCameras.length > 1) {
+      setSwitching(true);
+      const nextIdx = (activeCameraIndex + 1) % detectedCameras.length;
+      const stream = await initStream(nextIdx);
+      if (stream) {
+        setActiveCameraIndex(nextIdx);
+        setWideAngleActive(nextIdx !== 0);
+      }
+      setSwitching(false);
+      return !!stream;
+    }
+
+    return false;
+  }, [zoomCapability, wideAngleActive, switching, detectCameras, activeCameraIndex, initStream]);
+
+  /** Whether wide-angle switching is available at all. */
+  const wideAngleSupported =
+    !!zoomCapability || cameras.length > 1;
+
+  /** Human-readable label for current zoom/lens state. */
+  const currentCameraLabel = useCallback((): string => {
+    if (zoomCapability && currentZoom !== null) {
+      if (currentZoom <= zoomCapability.min + 0.01) return "0.5x Weitwinkel";
+      if (Math.abs(currentZoom - 1) < 0.01) return "1x";
+      return `${currentZoom.toFixed(1)}x Zoom`;
+    }
+    if (cameras.length === 0) return "1x";
+    if (cameras.length === 1) return "1x";
+    return wideAngleActive ? "Weitwinkel" : "1x";
+  }, [zoomCapability, currentZoom, cameras.length, wideAngleActive]);
+
   const getStream = useCallback(() => streamRef.current, []);
 
-  const hasMultipleCameras = cameras.length > 1;
-
   return {
-    /** Whether multiple rear cameras were detected */
-    hasMultipleCameras,
-    /** Number of detected cameras (useful for debug display) */
+    /** True if wide-angle toggling is available (zoom-API or multiple devices). */
+    wideAngleSupported,
+    /** True if currently in wide-angle mode. */
+    wideAngleActive,
+    /** Number of detected rear cameras (debug). */
     cameraCount: cameras.length,
-    /** Index of the currently active camera */
-    activeCameraIndex,
-    /** True while switching cameras */
+    /** Whether the active stream exposes a zoom range (debug). */
+    hasZoomCapability: !!zoomCapability,
+    /** True while switching. */
     switching,
-    /** Cycle to the next available camera */
-    cycleCamera,
-    /** Initialize camera stream (call instead of raw getUserMedia) */
+    /** Toggle between standard and wide-angle. */
+    toggleWideAngle,
+    /** Initialize camera stream. */
     initStream,
-    /** Get current MediaStream */
+    /** Get current MediaStream. */
     getStream,
-    /** Detected camera devices */
+    /** Detected camera devices. */
     cameras,
-    /** Human-readable label for the active camera */
+    /** Human-readable label. */
     currentCameraLabel,
-    /** Force re-detection of cameras */
+    /** Force re-detection. */
     detectCameras,
   };
-}
-
-/** Read the stored preference for camera index */
-export function getUltraWidePreference(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-/** Save the stored preference */
-export function setUltraWidePreference(value: boolean) {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(value));
-  } catch {
-    // localStorage not available
-  }
 }
