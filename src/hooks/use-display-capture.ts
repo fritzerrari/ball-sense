@@ -4,11 +4,20 @@ import { useCallback, useRef, useState } from "react";
 export function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
-  // iPhone, iPad, iPod, plus iPadOS that masquerades as Mac with touch
   return /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && "ontouchend" in document);
 }
 
-/** Whether the browser supports `getDisplayMedia()` */
+/** Detect if app runs inside an iframe (e.g. Lovable preview editor) */
+export function isInIframe(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
+/** Whether the browser exposes `getDisplayMedia()` at all */
 export function isDisplayCaptureSupported(): boolean {
   return (
     typeof navigator !== "undefined" &&
@@ -19,7 +28,6 @@ export function isDisplayCaptureSupported(): boolean {
 }
 
 interface UseDisplayCaptureOptions {
-  /** Called when the user (or the OS) ends the screen share. */
   onTrackEnded?: () => void;
 }
 
@@ -46,24 +54,28 @@ export function useDisplayCapture(opts: UseDisplayCaptureOptions = {}) {
     setError(null);
 
     if (isIOS()) {
-      const msg = "iOS unterstützt Bildschirm-Capture im Browser nicht. Bitte nutze ein Android-Gerät.";
+      const msg =
+        "iOS unterstützt Bildschirm-Capture im Browser nicht. Bitte nutze ein Android-Gerät oder einen Desktop-Browser.";
       setError(msg);
       return null;
     }
-    if (!isDisplayCaptureSupported()) {
-      const msg = "Dein Browser unterstützt Bildschirm-Capture nicht. Nutze Chrome auf Android.";
+
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      const msg = isInIframe()
+        ? "Bildschirm-Capture ist im Editor-Vorschau-Fenster blockiert. Bitte öffne FieldIQ über die Live-URL (z.B. demo6.time2rise.de) in Chrome/Edge/Firefox."
+        : "Dein Browser unterstützt Bildschirm-Capture nicht. Nutze Chrome, Edge oder Firefox (Desktop oder Android).";
       setError(msg);
       return null;
     }
 
     setStarting(true);
     try {
+      // Triggered directly from the user gesture — no awaits before this call.
       const ds = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: { ideal: 30 } } as MediaTrackConstraints,
         audio: false,
       });
 
-      // Listen for user-initiated stop (system "Stop sharing" button)
       ds.getVideoTracks().forEach((track) => {
         track.addEventListener("ended", () => {
           streamRef.current = null;
@@ -76,10 +88,20 @@ export function useDisplayCapture(opts: UseDisplayCaptureOptions = {}) {
       setStream(ds);
       return ds;
     } catch (err: any) {
-      const msg =
-        err?.name === "NotAllowedError"
-          ? "Bildschirm-Freigabe abgelehnt."
-          : err?.message ?? "Bildschirm-Capture fehlgeschlagen.";
+      let msg: string;
+      const name = err?.name;
+      if (name === "NotAllowedError") {
+        // This also fires when iframe permission policy blocks display-capture
+        msg = isInIframe()
+          ? "Bildschirm-Freigabe wurde abgelehnt oder ist im Editor-Vorschau blockiert. Bitte öffne FieldIQ über die Live-URL (demo6.time2rise.de)."
+          : 'Bildschirm-Freigabe abgelehnt. Bitte erneut versuchen und „Gesamten Bildschirm" wählen.';
+      } else if (name === "NotFoundError" || name === "NotSupportedError") {
+        msg = "Kein freigebbarer Bildschirm gefunden. Bitte Browser auf neueste Version aktualisieren.";
+      } else if (name === "AbortError") {
+        msg = "Bildschirm-Auswahl abgebrochen.";
+      } else {
+        msg = err?.message ?? "Bildschirm-Capture fehlgeschlagen.";
+      }
       setError(msg);
       return null;
     } finally {
@@ -96,5 +118,6 @@ export function useDisplayCapture(opts: UseDisplayCaptureOptions = {}) {
     getStream: () => streamRef.current,
     supported: isDisplayCaptureSupported(),
     isIOS: isIOS(),
+    isInIframe: isInIframe(),
   };
 }
