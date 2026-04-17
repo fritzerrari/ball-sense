@@ -10,6 +10,7 @@ import { startVideoRecorder, type VideoRecorderHandle } from "@/lib/video-record
 import RecordingGuard, { canStopRecording, MIN_FRAMES_FOR_ANALYSIS, RECOMMENDED_FRAMES } from "@/components/RecordingGuard";
 import CameraSetupOverlay from "@/components/CameraSetupOverlay";
 import StopConfirmDialog from "@/components/StopConfirmDialog";
+import SideSwapDialog from "@/components/SideSwapDialog";
 import MatchEventQuickBar from "@/components/MatchEventQuickBar";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
@@ -85,6 +86,8 @@ export default function CameraTrackingPage() {
   const [halfNumber, setHalfNumber] = useState(1);
   const [transferAuthorized, setTransferAuthorized] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [showSideSwapDialog, setShowSideSwapDialog] = useState(false);
+  const [autoDetectedSwap, setAutoDetectedSwap] = useState<boolean | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const stoppedCaptureRef = useRef<{ frames: string[]; durationSec: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
