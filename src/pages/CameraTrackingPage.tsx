@@ -812,6 +812,14 @@ export default function CameraTrackingPage() {
         onConfirm={confirmStop}
         frameCount={frameCount}
       />
+      <SideSwapDialog
+        open={showSideSwapDialog}
+        onOpenChange={setShowSideSwapDialog}
+        autoDetected={autoDetectedSwap}
+        homeTeamName={homeTeamName}
+        awayTeamName={awayTeamName}
+        onConfirm={(swapped) => startSecondHalf(swapped)}
+      />
 
       <div className="relative flex-1 bg-black">
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
