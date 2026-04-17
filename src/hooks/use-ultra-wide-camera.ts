@@ -1,5 +1,25 @@
 import { useState, useCallback, useRef } from "react";
 
+const STORAGE_KEY = "fieldiq_prefer_ultrawide";
+
+/** Read the stored wide-angle default preference. */
+export function getUltraWidePreference(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Save the stored wide-angle default preference. */
+export function setUltraWidePreference(value: boolean) {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(value));
+  } catch {
+    // localStorage not available
+  }
+}
+
 interface CameraDevice {
   deviceId: string;
   label: string;

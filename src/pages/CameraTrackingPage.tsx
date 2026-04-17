@@ -16,8 +16,6 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
-import { useDisplayCapture, isMobileBrowser } from "@/hooks/use-display-capture";
-import ExternalCameraSetup from "@/components/ExternalCameraSetup";
 
 type Phase = "code" | "restoring" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
@@ -107,22 +105,6 @@ export default function CameraTrackingPage() {
   const deltaRetryCountRef = useRef(0);
 
   const ultraWide = useUltraWideCamera(videoRef);
-
-  // External camera (screen-capture of WiFi cam app) — DESKTOP-ONLY.
-  // Mobile browsers (Android/iOS) cannot capture another app's screen via the
-  // Web Platform — see use-display-capture.ts for capability detection.
-  const isExternalMode = searchParams.get("mode") === "external";
-  const [showExternalSetup, setShowExternalSetup] = useState(false);
-  const displayCapture = useDisplayCapture({
-    onTrackEnded: () => {
-      toast.warning("Bildschirm-Freigabe beendet. Aufnahme stoppt.");
-      if (liveCaptureRef.current) {
-        setShowStopConfirm(true);
-      } else {
-        setPhase("setup");
-      }
-    },
-  });
 
   const [homeTeamName, setHomeTeamName] = useState("Heim");
   const [awayTeamName, setAwayTeamName] = useState("Gegner");
@@ -253,15 +235,11 @@ export default function CameraTrackingPage() {
     }
   }, [phase, recordingStartTime]);
 
-  // ── Connectivity watcher (esp. for external camera mode where WiFi is on the cam) ──
+  // ── Connectivity watcher ──
   useEffect(() => {
     if (phase !== "recording") return;
     const handleOffline = () => {
-      toast.warning(
-        isExternalMode
-          ? "Mobile Daten unterbrochen — Frames werden gepuffert. Aufnahme läuft weiter."
-          : "Internet unterbrochen — Frames werden gepuffert."
-      );
+      toast.warning("Internet unterbrochen — Frames werden gepuffert.");
     };
     const handleOnline = () => {
       toast.success("Verbindung wiederhergestellt — Frames werden synchronisiert.");
@@ -272,7 +250,7 @@ export default function CameraTrackingPage() {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
     };
-  }, [phase, isExternalMode]);
+  }, [phase]);
 
 
   // ── Capture a small thumbnail for heartbeat ──
