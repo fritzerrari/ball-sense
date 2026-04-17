@@ -1,48 +1,32 @@
 
 
 ## Problem
-User bekommt "Browser unterstützt nicht" trotz Chrome auf Android. Ursache liegt im `isDisplayCaptureSupported()`-Check in `use-display-capture.ts`.
+User testet im Lovable-Editor-Vorschau (1567x879, läuft im iframe). Edge & Chrome unterstützen `getDisplayMedia` grundsätzlich, aber:
 
-## Analyse
+**Hauptursache: iframe-Permission-Policy fehlt.** Der Lovable-Editor lädt die App in einem iframe ohne `allow="display-capture"`. Dadurch ist `navigator.mediaDevices.getDisplayMedia` zwar als Funktion verfügbar, schlägt aber beim Aufruf mit `NotAllowedError` fehl — oder wird je nach Browser-Version komplett blockiert.
 
-Der aktuelle Code:
-```ts
-export function isIOS(): boolean {
-  return /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && "ontouchend" in document);
-}
-export function isDisplayCaptureSupported(): boolean {
-  return !!navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function" && !isIOS();
-}
-```
-
-Wahrscheinliche Ursachen:
-1. **User testet im Desktop-Browser** (Viewport ist 1567x879 → das ist ein Desktop, kein Phone!) — auf Desktop-Chrome funktioniert getDisplayMedia eigentlich, aber evtl. nicht im Lovable-Preview-Iframe ohne `allow="display-capture"` Permission-Policy.
-2. **Iframe-Permission fehlt**: Lovable-Preview läuft in iframe. `getDisplayMedia` benötigt explizit `allow="display-capture"` auf dem iframe — sonst ist `getDisplayMedia` zwar definiert, schlägt aber fehl ODER ist gar nicht verfügbar.
-3. **HTTPS-Kontext**: Preview ist HTTPS — sollte OK sein.
-
-Der User sieht den Fehler im Desktop-Preview (1567px), nicht auf seinem Android-Phone. Auf der published URL (`ball-sense.lovable.app` oder `demo6.time2rise.de`) auf Android sollte es prinzipiell laufen.
+Das ist eine **Plattform-Limitierung des Lovable-Editors**, die wir nicht im Code umgehen können. ABER: auf der **Live-URL** (`demo6.time2rise.de` oder `ball-sense.lovable.app`) läuft die App nicht im iframe und Display-Capture funktioniert.
 
 ## Lösung
 
-### 1. `use-display-capture.ts` — Bessere Diagnose
-- Differenziertere Fehlermeldungen je nach realer Ursache
-- Statt nur `isIOS()` zu blocken: tatsächlich `getDisplayMedia` aufrufen und den echten Browser-Error zeigen
-- Erkennen: läuft die App in einem iframe? Falls ja → Hinweis "Öffne FieldIQ direkt unter demo6.time2rise.de, nicht im Editor-Vorschau"
-- Desktop-Chrome erlauben (nicht nur Android) — `getDisplayMedia` läuft auch auf Desktop-Chrome/Edge/Firefox
+### 1. `use-display-capture.ts` — Iframe-Erkennung verschärfen
+Aktuell prüft der Hook nur `getDisplayMedia` Funktions-Existenz. Wenn die App im iframe läuft, soll der Hook den User **aktiv vor dem Start warnen**, nicht erst beim Fehlschlag. Neue Logik:
+- Wenn `isInIframe()` → `supported = false` zurückgeben mit klarer Meldung "Editor-Vorschau blockiert Bildschirm-Capture — bitte Live-URL öffnen"
+- Auf der Live-URL (kein iframe) → normal versuchen
 
-### 2. `ExternalCameraSetup.tsx` — Klarere Hinweise
-- Hinweis ergänzen: "Funktioniert nicht im Lovable-Preview-Iframe — bitte Live-URL nutzen"
-- Browser-Liste erweitern: Android Chrome, Desktop Chrome/Edge/Firefox
+### 2. `ExternalCameraSetup.tsx` — Prominenter Live-URL-Button
+Wenn iframe erkannt: **Großer Call-to-Action-Button "FieldIQ in neuem Tab öffnen"** der direkt zu `https://demo6.time2rise.de` (oder published URL) springt. So kann der User mit einem Klick zur funktionierenden Umgebung wechseln, statt URL manuell einzutippen.
 
-### 3. Iframe-Permission prüfen
-- Falls Lovable-Preview kein `allow="display-capture"` setzt, ist das eine Plattform-Limitierung — in dem Fall klare Meldung "Öffne die Live-URL"
+### 3. `MatchRecordingChoice.tsx` — Karte im Editor markieren
+Wenn iframe erkannt, "Externe Kamera"-Karte mit Hinweis-Badge "Nur Live-URL" versehen, damit klar ist warum's im Editor nicht geht.
+
+### 4. Fallback-Versuch trotzdem erlauben
+Manche Browser-Versionen erlauben Display-Capture inzwischen auch im iframe. Daher: **"Trotzdem versuchen"-Option** anbieten, falls der User es probieren möchte. Schlägt es fehl → klare Erklärung + Live-URL-Button.
 
 ## Was unverändert bleibt
-- ✅ Capture-Logik selbst
-- ✅ Setup-Flow
+- ✅ Setup-Flow, Capture-Logik, Frame-Pipeline
+- ✅ Funktionalität auf Live-URL (Desktop Edge/Chrome/Firefox & Android Chrome)
 
-## Ergebnis
-- Im Lovable-Preview-Iframe: klare Meldung "Bitte Live-URL öffnen" statt "Browser nicht unterstützt"
-- Auf Live-URL (Desktop oder Android Chrome): funktioniert
-- Auf iOS Safari: weiterhin geblockt mit klarer Erklärung
+## Klare Antwort
+Edge unterstützt Display-Capture sehr wohl — aber **nicht in einem iframe ohne Permission-Policy**, was beim Lovable-Editor der Fall ist. Lösung: Die App muss in einem eigenen Tab (Live-URL) laufen. Das bauen wir mit einem One-Click-Button direkt im Setup-Dialog ein.
 
