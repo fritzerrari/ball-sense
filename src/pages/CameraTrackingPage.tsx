@@ -16,8 +16,6 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
-import { useDisplayCapture, isMobileBrowser } from "@/hooks/use-display-capture";
-import ExternalCameraSetup from "@/components/ExternalCameraSetup";
 
 type Phase = "code" | "restoring" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
@@ -107,22 +105,6 @@ export default function CameraTrackingPage() {
   const deltaRetryCountRef = useRef(0);
 
   const ultraWide = useUltraWideCamera(videoRef);
-
-  // External camera (screen-capture of WiFi cam app) — DESKTOP-ONLY.
-  // Mobile browsers (Android/iOS) cannot capture another app's screen via the
-  // Web Platform — see use-display-capture.ts for capability detection.
-  const isExternalMode = searchParams.get("mode") === "external";
-  const [showExternalSetup, setShowExternalSetup] = useState(false);
-  const displayCapture = useDisplayCapture({
-    onTrackEnded: () => {
-      toast.warning("Bildschirm-Freigabe beendet. Aufnahme stoppt.");
-      if (liveCaptureRef.current) {
-        setShowStopConfirm(true);
-      } else {
-        setPhase("setup");
-      }
-    },
-  });
 
   const [homeTeamName, setHomeTeamName] = useState("Heim");
   const [awayTeamName, setAwayTeamName] = useState("Gegner");
@@ -253,15 +235,11 @@ export default function CameraTrackingPage() {
     }
   }, [phase, recordingStartTime]);
 
-  // ── Connectivity watcher (esp. for external camera mode where WiFi is on the cam) ──
+  // ── Connectivity watcher ──
   useEffect(() => {
     if (phase !== "recording") return;
     const handleOffline = () => {
-      toast.warning(
-        isExternalMode
-          ? "Mobile Daten unterbrochen — Frames werden gepuffert. Aufnahme läuft weiter."
-          : "Internet unterbrochen — Frames werden gepuffert."
-      );
+      toast.warning("Internet unterbrochen — Frames werden gepuffert.");
     };
     const handleOnline = () => {
       toast.success("Verbindung wiederhergestellt — Frames werden synchronisiert.");
@@ -272,7 +250,7 @@ export default function CameraTrackingPage() {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
     };
-  }, [phase, isExternalMode]);
+  }, [phase]);
 
 
   // ── Capture a small thumbnail for heartbeat ──
@@ -390,12 +368,6 @@ export default function CameraTrackingPage() {
   }, [isHelper, phase, frameCount]);
 
   const initCamera = useCallback(async () => {
-    // External mode: open setup dialog → screen capture
-    if (isExternalMode) {
-      setShowExternalSetup(true);
-      return;
-    }
-
     try {
       // Ensure camera detection completes before starting stream
       const detectedCams = await ultraWide.detectCameras();
@@ -418,56 +390,17 @@ export default function CameraTrackingPage() {
         }
         setPhase("ready");
       }
+
+      // After init: hint if neither zoom nor multi-cam available
+      setTimeout(() => {
+        if (!ultraWide.wideAngleSupported) {
+          toast.info("Diese Kamera unterstützt keinen Weitwinkel-Wechsel.", { duration: 4000 });
+        }
+      }, 1500);
     } catch {
       toast.error("Kamera konnte nicht gestartet werden");
     }
-  }, [ultraWide, isExternalMode]);
-
-  // Start external (display) capture after user confirms in setup dialog.
-  // CRITICAL: getDisplayMedia() must run synchronously from the user gesture
-  // (no awaits before it) — otherwise Android Chrome/Edge lose transient
-  // activation and the call fails as if the browser didn't support it.
-  const startExternalCapture = useCallback(async () => {
-    // 1) Fire capture IMMEDIATELY — preserves the user gesture chain
-    const result = await displayCapture.start();
-
-    if (result.status !== "success" || !result.stream) {
-      if (result.message) toast.error(result.message);
-      return;
-    }
-
-    // 2) Stream is live — close dialog and bind video
-    setShowExternalSetup(false);
-    streamRef.current = result.stream;
-    if (videoRef.current) {
-      videoRef.current.srcObject = result.stream;
-      videoRef.current.play().catch(() => {});
-    }
-    setPhase("ready");
-    toast.success("Externe Kamera verbunden — wechsle jetzt zur Kamera-App!");
-
-    // 3) AFTER capture: connectivity hint (non-blocking)
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      toast.warning(
-        "Kein Internet erkannt. Aktiviere mobile Daten — die WiFi-Kamera liefert kein Internet."
-      );
-      return;
-    }
-    try {
-      const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), 4000);
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`, {
-        method: "GET",
-        signal: ctrl.signal,
-        cache: "no-store",
-      });
-      clearTimeout(timeout);
-    } catch {
-      toast.warning(
-        "FieldIQ-Server nicht erreichbar. Prüfe Mobilfunk-Empfang — WiFi-Kamera liefert kein Internet."
-      );
-    }
-  }, [displayCapture]);
+  }, [ultraWide]);
 
   const startRecording = useCallback(() => {
     if (videoRef.current) {
@@ -912,28 +845,6 @@ export default function CameraTrackingPage() {
         awayTeamName={awayTeamName}
         onConfirm={(swapped) => startSecondHalf(swapped)}
       />
-      <ExternalCameraSetup
-        open={showExternalSetup}
-        onOpenChange={setShowExternalSetup}
-        onConfirm={startExternalCapture}
-        isIOS={displayCapture.isIOS}
-        onPickAlternative={(mode) => {
-          setShowExternalSetup(false);
-          // Switch URL away from external mode and let the user pick again.
-          const next = new URLSearchParams(searchParams);
-          next.set("mode", mode);
-          setSearchParams(next, { replace: true });
-          // Trigger a soft reload of the camera init flow
-          if (mode === "self") {
-            // Re-run init for direct camera capture
-            setTimeout(() => initCamera(), 50);
-          } else if (mode === "helper") {
-            toast.info("Wechsle zum Helfer-Flow: Code aus dem Match-Setup teilen.");
-          } else if (mode === "upload") {
-            toast.info("Wechsle in den Upload-Flow im Match-Setup.");
-          }
-        }}
-      />
 
       <div className="relative flex-1 bg-black">
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
@@ -958,26 +869,29 @@ export default function CameraTrackingPage() {
               <span className="text-lg">📱↔️</span>
               <span className="text-xs text-white/60">Querformat empfohlen</span>
             </div>
-            {/* Camera lens toggle — always show for feedback */}
+            {/* Wide-angle toggle — uses zoom-API or device cycling */}
             <button
               onClick={async () => {
-                if (ultraWide.hasMultipleCameras) {
-                  await ultraWide.cycleCamera();
+                const ok = await ultraWide.toggleWideAngle();
+                if (ok) {
                   streamRef.current = ultraWide.getStream();
+                  toast.success(ultraWide.currentCameraLabel());
+                } else {
+                  toast.info("Weitwinkel auf diesem Gerät nicht verfügbar");
                 }
               }}
-              disabled={ultraWide.switching || !ultraWide.hasMultipleCameras}
+              disabled={ultraWide.switching || !ultraWide.wideAngleSupported}
               className={`flex items-center gap-2 rounded-full px-4 py-2 border transition-colors ${
-                ultraWide.hasMultipleCameras
+                ultraWide.wideAngleSupported
                   ? "bg-white/10 hover:bg-white/20 border-white/20"
                   : "bg-white/5 border-white/10 opacity-50"
               }`}
             >
               <Maximize2 className="h-4 w-4 text-white/70" />
               <span className="text-xs text-white/70 font-medium">
-                {ultraWide.hasMultipleCameras
+                {ultraWide.wideAngleSupported
                   ? `${ultraWide.currentCameraLabel()} — tippen zum Wechseln`
-                  : `${ultraWide.cameraCount} Kamera erkannt`}
+                  : "Kein Weitwinkel verfügbar"}
               </span>
             </button>
             {isHelper && !transferAuthorized && (
@@ -1023,12 +937,14 @@ export default function CameraTrackingPage() {
 
             {/* Frame counter + ultra-wide toggle + sync status */}
             <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
-              {ultraWide.hasMultipleCameras && (
+              {ultraWide.wideAngleSupported && (
                 <button
                   onClick={async () => {
-                    await ultraWide.cycleCamera();
-                    streamRef.current = ultraWide.getStream();
-                    toast.success(ultraWide.currentCameraLabel());
+                    const ok = await ultraWide.toggleWideAngle();
+                    if (ok) {
+                      streamRef.current = ultraWide.getStream();
+                      toast.success(ultraWide.currentCameraLabel());
+                    }
                   }}
                   disabled={ultraWide.switching}
                   className="bg-black/70 hover:bg-black/80 rounded-full px-3 py-1.5 flex items-center gap-1.5 transition-colors"
