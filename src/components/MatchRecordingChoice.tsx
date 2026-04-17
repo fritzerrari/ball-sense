@@ -1,5 +1,5 @@
 import { Video, KeyRound, Upload, MonitorSmartphone } from "lucide-react";
-import { isInIframe } from "@/hooks/use-display-capture";
+import { isInIframe, isMobileBrowser } from "@/hooks/use-display-capture";
 
 type RecordingMode = "self" | "helper" | "upload" | "external";
 
@@ -31,13 +31,14 @@ const choices: { mode: RecordingMode; icon: typeof Video; title: string; desc: s
     mode: "external",
     icon: MonitorSmartphone,
     title: "Externe Kamera",
-    desc: "WiFi-/Rückfahrkamera via App-Bild · Nur Android",
+    desc: "WiFi-/Rückfahrkamera via Bildschirm-Freigabe · Nur Desktop-Browser",
     beta: true,
   },
 ];
 
 export default function MatchRecordingChoice({ onSelect }: MatchRecordingChoiceProps) {
   const inFrame = isInIframe();
+  const mobile = isMobileBrowser();
 
   return (
     <div className="space-y-4">
@@ -48,19 +49,25 @@ export default function MatchRecordingChoice({ onSelect }: MatchRecordingChoiceP
 
       <div className="space-y-3">
         {choices.map(({ mode, icon: Icon, title, desc, recommended, beta }) => {
-          const liveOnly = mode === "external" && inFrame;
+          const liveOnly = mode === "external" && inFrame && !mobile;
+          const mobileBlocked = mode === "external" && mobile;
+          const disabled = mobileBlocked;
           return (
             <button
               key={mode}
               onClick={() => {
+                if (disabled) return;
                 if (navigator.vibrate) navigator.vibrate(20);
                 onSelect(mode);
               }}
+              disabled={disabled}
+              aria-disabled={disabled}
               className={`w-full flex items-center gap-4 rounded-xl border-2 bg-card p-5 text-left
-                transition-all hover:border-primary/40 hover:bg-primary/5 active:scale-[0.97]
-                focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                  recommended ? "border-primary/30 ring-1 ring-primary/10" : "border-border"
-                }`}
+                transition-all focus:outline-none focus:ring-2 focus:ring-primary/50
+                ${disabled
+                  ? "opacity-60 cursor-not-allowed border-border"
+                  : "hover:border-primary/40 hover:bg-primary/5 active:scale-[0.97]"}
+                ${recommended ? "border-primary/30 ring-1 ring-primary/10" : "border-border"}`}
             >
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                 <Icon className="h-7 w-7 text-primary" />
@@ -71,14 +78,21 @@ export default function MatchRecordingChoice({ onSelect }: MatchRecordingChoiceP
                   {recommended && (
                     <span className="text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">Empfohlen</span>
                   )}
-                  {beta && (
-                    <span className="text-[10px] font-semibold bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Beta</span>
+                  {beta && !mobileBlocked && (
+                    <span className="text-[10px] font-semibold bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Desktop Beta</span>
                   )}
                   {liveOnly && (
                     <span className="text-[10px] font-semibold bg-destructive/15 text-destructive px-2 py-0.5 rounded-full">Nur Live-URL</span>
                   )}
+                  {mobileBlocked && (
+                    <span className="text-[10px] font-semibold bg-destructive/15 text-destructive px-2 py-0.5 rounded-full">Im mobilen Browser nicht möglich</span>
+                  )}
                 </div>
-                <p className="text-sm text-muted-foreground mt-0.5">{desc}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {mobileBlocked
+                    ? "Bitte am Desktop nutzen — oder hier eine der anderen Optionen wählen."
+                    : desc}
+                </p>
               </div>
             </button>
           );
