@@ -127,8 +127,21 @@ export default function ExternalCameraSetup({ open, onOpenChange, onConfirm, isI
               </ul>
             </div>
 
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs space-y-1">
+              <p className="font-semibold text-foreground flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                Hinweis zum Editor-Vorschau
+              </p>
+              <p className="text-muted-foreground">
+                Im Lovable-Editor-Vorschau ist Bildschirm-Capture blockiert. Bitte öffne FieldIQ über die
+                Live-URL (z.B. <span className="text-foreground font-medium">demo6.time2rise.de</span>) in
+                Chrome, Edge oder Firefox.
+              </p>
+            </div>
+
             <p className="text-[11px] text-muted-foreground italic">
-              Beta-Funktion. Funktioniert nur auf Android Chrome. Bildqualität abhängig von deiner Kamera.
+              Beta-Funktion. Funktioniert auf Android Chrome sowie Desktop Chrome/Edge/Firefox.
+              Bildqualität abhängig von deiner Kamera.
             </p>
           </>
         )}
