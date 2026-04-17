@@ -251,6 +251,28 @@ export default function CameraTrackingPage() {
     }
   }, [phase, recordingStartTime]);
 
+  // ── Connectivity watcher (esp. for external camera mode where WiFi is on the cam) ──
+  useEffect(() => {
+    if (phase !== "recording") return;
+    const handleOffline = () => {
+      toast.warning(
+        isExternalMode
+          ? "Mobile Daten unterbrochen — Frames werden gepuffert. Aufnahme läuft weiter."
+          : "Internet unterbrochen — Frames werden gepuffert."
+      );
+    };
+    const handleOnline = () => {
+      toast.success("Verbindung wiederhergestellt — Frames werden synchronisiert.");
+    };
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [phase, isExternalMode]);
+
+
   // ── Capture a small thumbnail for heartbeat ──
   const captureThumbnail = useCallback((): string | null => {
     if (!videoRef.current || videoRef.current.videoWidth === 0) return null;
