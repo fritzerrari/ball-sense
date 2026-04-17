@@ -285,11 +285,15 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Only allow known timing fields
+      // Only allow known timing fields (timestamps + the side-swap boolean for halftime)
       const allowed = ["h1_started_at", "h1_ended_at", "h2_started_at", "h2_ended_at", "recording_started_at", "recording_ended_at"];
-      const safe: Record<string, string> = {};
+      const safe: Record<string, unknown> = {};
       for (const key of allowed) {
         if (timing[key]) safe[key] = timing[key];
+      }
+      // Boolean: h2_sides_swapped — accept explicit booleans only
+      if (typeof timing.h2_sides_swapped === "boolean") {
+        safe.h2_sides_swapped = timing.h2_sides_swapped;
       }
 
       if (Object.keys(safe).length > 0) {

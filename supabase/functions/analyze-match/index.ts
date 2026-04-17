@@ -509,6 +509,29 @@ KAMERA-PERSPEKTIVE ERKENNEN:
     const analysis = JSON.parse(toolCall.function.arguments);
     await supabase.from("analysis_jobs").update({ progress: 70 }).eq("id", job_id);
 
+    // ── H2 side-swap normalization ──
+    // If this is the second-half analysis and teams swapped sides at halftime,
+    // mirror x-coordinates so all positions stay consistent with H1's perspective.
+    const isH2 = phase === "h2";
+    const sidesSwapped = isH2 && match?.h2_sides_swapped === true;
+    if (sidesSwapped && Array.isArray(analysis.frame_positions)) {
+      console.log(`[H2-SWAP] Mirroring x-coordinates for ${analysis.frame_positions.length} frames`);
+      for (const fr of analysis.frame_positions) {
+        if (Array.isArray(fr.players)) {
+          for (const p of fr.players) {
+            if (typeof p.x === "number") p.x = 100 - p.x;
+          }
+        }
+        if (fr.ball && typeof fr.ball.x === "number") fr.ball.x = 100 - fr.ball.x;
+      }
+      // Mirror danger_zones x if present
+      if (Array.isArray(analysis.danger_zones)) {
+        for (const z of analysis.danger_zones) {
+          if (typeof z.x === "number") z.x = 100 - z.x;
+        }
+      }
+    }
+
     // For live_partial: don't delete old results, just add new ones
     if (!isLivePartial) {
       await supabase.from("analysis_results").delete().eq("match_id", match_id);

@@ -1165,6 +1165,7 @@ export type Database = {
           h1_ended_at: string | null
           h1_started_at: string | null
           h2_ended_at: string | null
+          h2_sides_swapped: boolean
           h2_started_at: string | null
           home_club_id: string
           home_formation: string | null
@@ -1192,6 +1193,7 @@ export type Database = {
           h1_ended_at?: string | null
           h1_started_at?: string | null
           h2_ended_at?: string | null
+          h2_sides_swapped?: boolean
           h2_started_at?: string | null
           home_club_id: string
           home_formation?: string | null
@@ -1219,6 +1221,7 @@ export type Database = {
           h1_ended_at?: string | null
           h1_started_at?: string | null
           h2_ended_at?: string | null
+          h2_sides_swapped?: boolean
           h2_started_at?: string | null
           home_club_id?: string
           home_formation?: string | null
