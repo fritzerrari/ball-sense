@@ -201,13 +201,24 @@ export default function MatchReport() {
     <AppLayout>
       <div className="mx-auto max-w-5xl space-y-5">
         {/* Compact Nav */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Link to="/matches" className="rounded-lg p-2 transition-colors hover:bg-muted">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="flex-1 min-w-0">
             <p className="text-xs text-muted-foreground">Match Report</p>
           </div>
+          {(() => {
+            const cov = (match as any)?.fields?.calibration?.coverage as string | undefined;
+            if (!cov || cov === "full") return null;
+            const label = cov === "left_half" ? "Linke Hälfte" : cov === "right_half" ? "Rechte Hälfte" : "Teilfeld";
+            return (
+              <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Halbfeld-Analyse · {label}
+              </Badge>
+            );
+          })()}
           {id && <PostMatchEventEditor matchId={id} onEventsChanged={loadReportData} />}
           {hasReport && id && (
             <Popover>
