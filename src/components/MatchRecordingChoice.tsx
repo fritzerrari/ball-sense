@@ -11,7 +11,7 @@ const choices: { mode: RecordingMode; icon: typeof Video; title: string; desc: s
     mode: "self",
     icon: Video,
     title: "Ich filme selbst",
-    desc: "Handy aufstellen und direkt aufnehmen",
+    desc: "Handy aufstellen — auch nur eine Hälfte möglich",
     recommended: true,
   },
   {
