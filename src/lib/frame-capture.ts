@@ -16,6 +16,8 @@ const MIN_VARIANCE = 200;
 
 export interface FrameCaptureResult {
   frames: string[]; // base64 JPEG strings
+  /** Wall-clock timestamp (ms since epoch) for each frame. Same length as `frames`. */
+  timestamps: number[];
   durationSec: number;
   skippedFrames?: number; // number of frames skipped due to quality
 }
