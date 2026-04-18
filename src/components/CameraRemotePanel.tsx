@@ -185,7 +185,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
 
           return (
             <div key={s.id} className="rounded-lg border border-border p-3 space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   {isOnline ? (
                     <Wifi className="h-3.5 w-3.5 text-primary" />
@@ -201,6 +201,10 @@ export default function CameraRemotePanel({ matchId }: Props) {
                   >
                     {PHASE_LABELS[currentPhase] ?? currentPhase}
                   </Badge>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground tabular-nums">
+                  <span>Beigetreten: {formatJoinTime(s.created_at)}</span>
+                  <span>· {syncedFrames} Frames</span>
                 </div>
               </div>
 
