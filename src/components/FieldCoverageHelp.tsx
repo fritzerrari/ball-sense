@@ -36,12 +36,12 @@ export default function FieldCoverageHelp() {
           <Option
             icon={Smartphone}
             title="2. Nur eine Hälfte filmen"
-            desc="Wähle unten „Linke Hälfte" oder „Rechte Hälfte". Du bekommst dann ehrliche Kennzahlen für die sichtbare Hälfte — keine geschätzten Werte fürs ganze Feld."
+            desc='Wähle unten "Linke Hälfte" oder "Rechte Hälfte". Du bekommst dann ehrliche Kennzahlen für die sichtbare Hälfte — keine geschätzten Werte fürs ganze Feld.'
           />
           <Option
             icon={Users}
             title="3. Helfer mit zweitem Handy"
-            desc="Brich ab, geh zurück und wähle „Helfer filmt". Beide Handys hinter beide Tore (45°-Winkel zur Mittellinie) — so deckt ihr das ganze Feld ab."
+            desc='Brich ab, geh zurück und wähle "Helfer filmt". Beide Handys hinter beide Tore (45°-Winkel zur Mittellinie) — so deckt ihr das ganze Feld ab.'
           />
         </div>
       )}

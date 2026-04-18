@@ -114,7 +114,7 @@ export default function CameraSetupOverlay({ onDismiss, onStart }: CameraSetupOv
           </div>
 
           {coverage !== "full" && (
-            <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+            <div className="mt-3 rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs text-warning leading-relaxed">
               <strong>Tipp:</strong> Mit einem Helfer + zweitem Handy bekommst du das ganze Feld. Brich ab und wähle stattdessen „Helfer filmt".
             </div>
           )}
