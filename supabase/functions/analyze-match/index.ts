@@ -6,9 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/** Try to load frames from storage with fallback: main.json -> _h1+_h2 -> _chunk_* */
+/** Try to load frames from storage with fallback chain. Camera-files are time-merged. */
 async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number } | null> {
-  // 1. Try canonical file (merged from all cameras)
+  // 1. Try canonical file (already time-merged across all cameras by camera-ops)
   const { data: mainFile } = await supabase.storage.from("match-frames").download(`${matchId}.json`);
   if (mainFile) {
     try {
@@ -17,24 +17,30 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
     } catch { /* corrupt */ }
   }
 
-  // 2. Try camera-specific canonical files (cam0-3)
-  const allCamFrames: string[] = [];
+  // 2. Re-merge camera-specific canonical files (cam0-3) by timestamp.
+  type Tagged = { frame: string; ts: number };
+  const taggedCam: Tagged[] = [];
   let camDuration = 0;
   for (let cam = 0; cam < 4; cam++) {
     const { data: camFile } = await supabase.storage.from("match-frames").download(`${matchId}_cam${cam}.json`);
-    if (camFile) {
-      try {
-        const parsed = JSON.parse(await camFile.text());
-        if (parsed.frames?.length) {
-          allCamFrames.push(...parsed.frames);
-          camDuration += parsed.duration_sec ?? 0;
-        }
-      } catch { /* skip */ }
-    }
+    if (!camFile) continue;
+    try {
+      const parsed = JSON.parse(await camFile.text());
+      const fr: string[] = parsed.frames ?? [];
+      const ts: number[] = parsed.timestamps ?? [];
+      camDuration += parsed.duration_sec ?? 0;
+      for (let i = 0; i < fr.length; i++) {
+        // Stable synthetic ts if missing: order frames per cam, slightly offset by cam id.
+        taggedCam.push({ frame: fr[i], ts: ts[i] ?? i * 30_000 + cam * 1_000 });
+      }
+    } catch { /* skip */ }
   }
-  if (allCamFrames.length > 0) return { frames: allCamFrames, duration_sec: camDuration };
+  if (taggedCam.length > 0) {
+    taggedCam.sort((a, b) => a.ts - b.ts);
+    return { frames: taggedCam.map((t) => t.frame), duration_sec: camDuration };
+  }
 
-  // 3. Try half files (_h1 + _h2)
+  // 3. Try half files (_h1 + _h2) — these are trainer self-recording snapshots.
   const allHalfFrames: string[] = [];
   let totalDuration = 0;
   for (const suffix of ["_h1", "_h2"]) {
@@ -51,16 +57,19 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
   }
   if (allHalfFrames.length > 0) return { frames: allHalfFrames, duration_sec: totalDuration };
 
-  // 4. Try chunk files (including camera-specific chunks)
-  const allChunkFrames: string[] = [];
-  // First try camera-specific chunks
+  // 4. Try chunk files (camera-specific first, then legacy) — also time-merge if timestamps present.
+  const taggedChunks: Tagged[] = [];
   for (let cam = 0; cam < 4; cam++) {
     for (let i = 0; i < 100; i++) {
       const { data: chunkFile } = await supabase.storage.from("match-frames").download(`${matchId}_cam${cam}_chunk_${i}.json`);
       if (!chunkFile) break;
       try {
         const parsed = JSON.parse(await chunkFile.text());
-        if (parsed.frames?.length) allChunkFrames.push(...parsed.frames);
+        const fr: string[] = parsed.frames ?? [];
+        const ts: number[] = parsed.timestamps ?? [];
+        for (let j = 0; j < fr.length; j++) {
+          taggedChunks.push({ frame: fr[j], ts: ts[j] ?? (i * 100 + j) * 30_000 + cam * 1_000 });
+        }
       } catch { /* skip corrupt */ }
     }
   }
@@ -70,10 +79,16 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
     if (!chunkFile) break;
     try {
       const parsed = JSON.parse(await chunkFile.text());
-      if (parsed.frames?.length) allChunkFrames.push(...parsed.frames);
+      const fr: string[] = parsed.frames ?? [];
+      for (let j = 0; j < fr.length; j++) {
+        taggedChunks.push({ frame: fr[j], ts: (i * 100 + j) * 30_000 });
+      }
     } catch { /* skip corrupt */ }
   }
-  if (allChunkFrames.length > 0) return { frames: allChunkFrames, duration_sec: allChunkFrames.length * 30 };
+  if (taggedChunks.length > 0) {
+    taggedChunks.sort((a, b) => a.ts - b.ts);
+    return { frames: taggedChunks.map((t) => t.frame), duration_sec: taggedChunks.length * 30 };
+  }
 
   return null;
 }
