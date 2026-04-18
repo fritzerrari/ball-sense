@@ -89,7 +89,7 @@ export default function CameraTrackingPage() {
   const [showSideSwapDialog, setShowSideSwapDialog] = useState(false);
   const [autoDetectedSwap, setAutoDetectedSwap] = useState<boolean | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const stoppedCaptureRef = useRef<{ frames: string[]; durationSec: number } | null>(null);
+  const stoppedCaptureRef = useRef<{ frames: string[]; timestamps: number[]; durationSec: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
@@ -310,6 +310,7 @@ export default function CameraTrackingPage() {
   const uploadDelta = useCallback(async () => {
     if (!liveCaptureRef.current || !matchId || !isHelper || !sessionToken) return;
     const newFrames = liveCaptureRef.current.getNewFramesSince(lastUploadedIndexRef.current);
+    const newTimestamps = liveCaptureRef.current.getNewTimestampsSince(lastUploadedIndexRef.current);
     if (newFrames.length === 0) return;
 
     try {
@@ -326,6 +327,7 @@ export default function CameraTrackingPage() {
             session_token: sessionToken,
             match_id: matchId,
             frames: newFrames,
+            timestamps: newTimestamps,
             chunk_index: chunkIndexRef.current,
           }),
         },
@@ -483,6 +485,7 @@ export default function CameraTrackingPage() {
   // ── Upload frames via edge function (anonymous helper) ──
   const uploadViaEdgeFunction = useCallback(async (
     frames: string[],
+    timestamps: number[] | undefined,
     durationSec: number,
     phaseStr: string,
   ) => {
@@ -499,6 +502,7 @@ export default function CameraTrackingPage() {
           session_token: sessionToken,
           match_id: matchId,
           frames,
+          timestamps,
           duration_sec: durationSec,
           phase: phaseStr,
         }),
@@ -511,53 +515,102 @@ export default function CameraTrackingPage() {
     return res.json();
   }, [sessionToken, matchId]);
 
-  // ── Upload frames directly (authenticated user) ──
+  // ── Upload frames directly (authenticated trainer = camera 0) ──
+  // Writes into _cam0.json (consistent with helper flow) so multi-camera
+  // time-merging in analyze-match works regardless of who uploaded.
   const uploadDirect = useCallback(async (
     frames: string[],
+    timestamps: number[] | undefined,
     durationSec: number,
     phaseStr: string,
   ) => {
-    // 1. Upload phase-specific file (_h1, _h2, or canonical for full)
-    const suffix = phaseStr !== "full" ? `_${phaseStr}` : "";
-    const filePath = `${matchId}${suffix}.json`;
-
-    const framesJson = JSON.stringify({
+    const TRAINER_CAM_INDEX = 0;
+    // 1. Phase-specific snapshot (kept for audit/halftime debugging).
+    const phaseSuffix = phaseStr !== "full" ? `_${phaseStr}` : "";
+    const phasePath = `${matchId}_cam${TRAINER_CAM_INDEX}${phaseSuffix}.json`;
+    const phaseJson = JSON.stringify({
       frames,
+      timestamps,
       duration_sec: durationSec,
       phase: phaseStr,
+      camera_index: TRAINER_CAM_INDEX,
       captured_at: new Date().toISOString(),
     });
     await supabase.storage
       .from("match-frames")
-      .upload(filePath, new Blob([framesJson], { type: "application/json" }), { upsert: true });
+      .upload(phasePath, new Blob([phaseJson], { type: "application/json" }), { upsert: true });
 
-    // 2. Update canonical file (merge H1+H2 or write full)
-    const canonicalPath = `${matchId}.json`;
-    if (phaseStr !== "full") {
-      // Merge: load existing canonical frames (if any) and append new ones
-      let existingFrames: string[] = [];
+    // 2. Append to camera-canonical _cam0.json (load existing, merge, write back).
+    const camPath = `${matchId}_cam${TRAINER_CAM_INDEX}.json`;
+    let camFrames: string[] = [];
+    let camTimestamps: number[] = [];
+    let camDuration = 0;
+    try {
+      const { data: existing } = await supabase.storage.from("match-frames").download(camPath);
+      if (existing) {
+        const parsed = JSON.parse(await existing.text());
+        camFrames = parsed.frames ?? [];
+        camTimestamps = parsed.timestamps ?? [];
+        camDuration = parsed.duration_sec ?? 0;
+      }
+    } catch { /* first half */ }
+
+    const baseTs = camTimestamps.length > 0
+      ? camTimestamps[camTimestamps.length - 1] + 30_000
+      : Date.now() - frames.length * 30_000;
+    const tsToAppend = (timestamps && timestamps.length === frames.length)
+      ? timestamps
+      : frames.map((_, i) => baseTs + i * 30_000);
+
+    camFrames = [...camFrames, ...frames];
+    camTimestamps = [...camTimestamps, ...tsToAppend];
+    camDuration += durationSec;
+
+    const camJson = JSON.stringify({
+      frames: camFrames,
+      timestamps: camTimestamps,
+      duration_sec: camDuration,
+      phase: "full",
+      camera_index: TRAINER_CAM_INDEX,
+      captured_at: new Date().toISOString(),
+    });
+    await supabase.storage
+      .from("match-frames")
+      .upload(camPath, new Blob([camJson], { type: "application/json" }), { upsert: true });
+
+    // 3. Time-merge ALL _cam*.json into the global {matchId}.json so analyze-match
+    //    sees a chronologically interleaved feed across trainer + helpers.
+    type Tagged = { frame: string; ts: number };
+    const all: Tagged[] = [];
+    let totalDuration = 0;
+    for (let cam = 0; cam < 4; cam++) {
       try {
-        const { data: existing } = await supabase.storage
-          .from("match-frames")
-          .download(canonicalPath);
-        if (existing) {
-          const parsed = JSON.parse(await existing.text());
-          existingFrames = parsed.frames ?? [];
+        const { data: f } = await supabase.storage.from("match-frames").download(`${matchId}_cam${cam}.json`);
+        if (!f) continue;
+        const parsed = JSON.parse(await f.text());
+        const fr: string[] = parsed.frames ?? [];
+        const ts: number[] = parsed.timestamps ?? [];
+        totalDuration += parsed.duration_sec ?? 0;
+        for (let i = 0; i < fr.length; i++) {
+          all.push({ frame: fr[i], ts: ts[i] ?? i * 30_000 + cam * 1_000 });
         }
-      } catch { /* no existing canonical — first half */ }
-
+      } catch { /* skip */ }
+    }
+    if (all.length > 0) {
+      all.sort((a, b) => a.ts - b.ts);
       const mergedJson = JSON.stringify({
-        frames: [...existingFrames, ...frames],
-        duration_sec: durationSec,
-        phase: "merged",
+        frames: all.map((x) => x.frame),
+        timestamps: all.map((x) => x.ts),
+        duration_sec: totalDuration,
+        phase: "full",
         captured_at: new Date().toISOString(),
       });
       await supabase.storage
         .from("match-frames")
-        .upload(canonicalPath, new Blob([mergedJson], { type: "application/json" }), { upsert: true });
+        .upload(`${matchId}.json`, new Blob([mergedJson], { type: "application/json" }), { upsert: true });
     }
 
-    // 3. Determine job_kind: intermediate for H1, final for H2/full
+    // 4. Determine job_kind: intermediate for H1, final for H2/full
     const jobKind = phaseStr === "h1" ? "h1_intermediate" : "final";
 
     const { data: job, error: jobError } = await supabase.from("analysis_jobs").insert({
@@ -570,7 +623,7 @@ export default function CameraTrackingPage() {
 
     await supabase.from("matches").update({ status: "processing" }).eq("id", matchId!);
 
-    // 4. Invoke analyze-match WITHOUT inline frames — it loads from storage
+    // 5. Invoke analyze-match WITHOUT inline frames — it loads time-merged canonical from storage.
     const { error: fnError } = await supabase.functions.invoke("analyze-match", {
       body: {
         match_id: matchId,
@@ -603,9 +656,9 @@ export default function CameraTrackingPage() {
     setUploading(true);
     try {
       if (isHelper) {
-        await uploadViaEdgeFunction(captureResult.frames, captureResult.durationSec, "h1");
+        await uploadViaEdgeFunction(captureResult.frames, captureResult.timestamps, captureResult.durationSec, "h1");
       } else {
-        await uploadDirect(captureResult.frames, captureResult.durationSec, "h1");
+        await uploadDirect(captureResult.frames, captureResult.timestamps, captureResult.durationSec, "h1");
       }
 
       setPhase("halftime_pause");
@@ -744,7 +797,7 @@ export default function CameraTrackingPage() {
     }
 
     // Store captured frames for later finalize or resume
-    stoppedCaptureRef.current = { frames: captureResult.frames, durationSec: captureResult.durationSec };
+    stoppedCaptureRef.current = { frames: captureResult.frames, timestamps: captureResult.timestamps, durationSec: captureResult.durationSec };
     setPhase("stopped");
     if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
   }, [matchId]);
@@ -752,7 +805,7 @@ export default function CameraTrackingPage() {
   // Resume recording after accidental stop — re-start capture with existing stream
   const resumeRecording = useCallback(() => {
     if (videoRef.current) {
-      liveCaptureRef.current = startLiveCapture(videoRef.current, stoppedCaptureRef.current?.frames);
+      liveCaptureRef.current = startLiveCapture(videoRef.current, stoppedCaptureRef.current?.frames, stoppedCaptureRef.current?.timestamps);
     }
 
     if (hasHighlights && !isHelper && streamRef.current) {
@@ -813,9 +866,9 @@ export default function CameraTrackingPage() {
       setProgress(40);
 
       if (isHelper) {
-        await uploadViaEdgeFunction(captureResult.frames, captureResult.durationSec, phaseStr);
+        await uploadViaEdgeFunction(captureResult.frames, captureResult.timestamps, captureResult.durationSec, phaseStr);
       } else {
-        await uploadDirect(captureResult.frames, captureResult.durationSec, phaseStr);
+        await uploadDirect(captureResult.frames, captureResult.timestamps, captureResult.durationSec, phaseStr);
       }
 
       setProgress(100);
