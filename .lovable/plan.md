@@ -1,76 +1,77 @@
 
 
-## Aufgabe
+## Analyse der Frage
 
-Zwei Dinge:
-1. **„Externe Kamera"-Feature komplett ausbauen** — Bildschirm-Capture funktioniert mobil nicht und liefert auch am Desktop keinen Mehrwert für dich am Spielfeld.
-2. **Weitwinkel-Erkennung auf Pixel 8a fixen** — `useUltraWideCamera` erkennt die 0.5x-Kamera dort nicht.
+Der Nutzer steht real am Spielfeld und kommt mit seinem Handy nicht so weit zurück / so hoch, dass das **ganze Feld** ins Bild passt. Das ist ein häufiges Problem bei Amateurplätzen ohne Tribüne.
 
-## Teil 1: Externe Kamera ausbauen
+## Was die App heute schon kann (recherchiert)
 
-### Was entfernt wird
-- `src/components/ExternalCameraSetup.tsx` — Datei löschen
-- `src/components/CameraRemotePanel.tsx` — falls nur für External genutzt: prüfen, sonst behalten
-- `src/hooks/use-display-capture.ts` — Datei löschen
-- `src/components/MatchRecordingChoice.tsx` — Eintrag `"external"` aus `choices` entfernen, Type `RecordingMode` reduzieren auf `"self" | "helper" | "upload"`
-- `src/pages/CameraTrackingPage.tsx` — alle `mode === "external"` Pfade, `startExternalCapture`, Display-Capture-Imports, Setup-Dialog-Branch entfernen
-- `mem://features/external-camera-mode.md` — Memory-Datei löschen
-- `mem://index.md` — Eintrag „External Camera Mode" aus Memories entfernen
+Beim Blick in die bestehende Architektur (`mem://features/camera-setup-logic`, `mem://features/field-calibration`, `src/lib/types.ts` mit `FieldCoverage`) sehe ich:
 
-### Was bleibt
-Self-Recording, Helfer-Flow, Upload-Flow — alle drei laufen unverändert weiter.
+- Es gibt bereits den Datentyp **`FieldCoverage`** mit den Werten `"full" | "left_half" | "right_half" | "custom"`.
+- Es gibt bereits **`field_rect`** und **`zoom_level`** im `CalibrationData`-Interface.
+- Die Auto-Kalibrierung über `detect-field-corners` läuft beim Aufnahmestart automatisch.
+- Es werden offiziell **1–3 Smartphones** unterstützt (Mittellinie, plus optional zwei Hälften).
 
-## Teil 2: Weitwinkel auf Pixel 8a fixen
+Das heißt: Die **Datengrundlage** für Teilfeld-Aufnahmen ist da, sie wird aber im UI heute nicht aktiv als Lösung angeboten und der Nutzer wird nicht erklärend geführt.
 
-### Diagnose
-Pixel 8a hat physisch **eine** Hauptkamera (64 MP) + **eine** Ultraweit (13 MP). Aktuell scheitert die Erkennung wahrscheinlich an einem von zwei Punkten:
+## Empfohlene Lösung — drei Antwort-Wege im UI
 
-1. **Android Chrome listet auf Pixel-Geräten oft nur die „logische" Kamera** statt aller physischen Sensoren — `enumerateDevices()` zeigt dann nur ein Rear-Device.
-2. **Selbst wenn beide gelistet werden**, hat Chrome auf Pixel 8a Labels wie `"camera2 0, facing back"` und `"camera2 2, facing back"` — das aktuelle Filter-Heuristik in `use-ultra-wide-camera.ts` lässt beide durch (gut), aber das **Cycling per `deviceId`** schlägt fehl, weil Chrome auf Pixel die zweite Rear-Kamera nicht als separaten `getUserMedia`-Stream öffnen will.
+Statt nur eine Antwort zu geben, schlage ich vor, dem Nutzer **drei konkrete Wege** direkt im Recording-Setup anzubieten:
 
-### Lösung: zoom-basierter Weitwinkel statt Device-Switching
-Statt zwischen physischen Devices zu wechseln, nutzen wir die **MediaStreamTrack `zoom` Capability** (Pixel 8a unterstützt `zoom: { min: 1, max: 7 }`). Für „Weitwinkel" setzen wir `zoom = min`, was auf Pixel automatisch auf den Ultra-Wide-Sensor umschaltet.
+### Weg 1: Halbfeld-Modus (1 Handy, halbe Coverage)
+- Nutzer wählt aktiv **„Linke Hälfte"** oder **„Rechte Hälfte"**.
+- Auto-Kalibrierung erkennt nur die sichtbare Hälfte, `coverage = "left_half"` / `"right_half"` wird gespeichert.
+- Analyse läuft normal, aber Kennzahlen werden mit **Halbfeld-Hinweis** versehen (z. B. „Nur Heim-Defensive analysiert").
+- Pässe/Events außerhalb des Bildes werden klar als „nicht erfasst" markiert statt geraten.
 
-**Geänderte Datei: `src/hooks/use-ultra-wide-camera.ts`**
+### Weg 2: Zwei-Handy-Setup (volle Coverage)
+- Erstes Handy filmt eine Hälfte selbst, zweites Handy via **Helfer-Code** die andere.
+- Bestehender Helfer-Flow + bestehende Frame-Merging-Logik (`_cam0`, `_cam1`) macht das technisch schon möglich.
+- Im UI klare Anleitung: „Stell beide Handys hinter beide Tore, je 45°-Winkel zur Mittellinie."
 
-Neuer Ablauf:
-1. Beim ersten `initStream` Standard-Stream mit `facingMode: "environment"` öffnen.
-2. `track.getCapabilities()` prüfen auf `zoom`-Support.
-3. Falls `zoom` verfügbar → „Weitwinkel" = `applyConstraints({ advanced: [{ zoom: capabilities.zoom.min }] })`. Kein Device-Switch, kein Stream-Restart.
-4. Falls `zoom` nicht verfügbar → Fallback auf bestehendes Device-Cycling.
-5. UI-Label anpassen: bei `zoom == min` → „0.5x Weitwinkel", bei `zoom == 1` → „1x", bei höher → „Xx Zoom".
+### Weg 3: Weitwinkel + bessere Position (kein Hardware-Wechsel)
+- Hinweis auf den **0.5x-Weitwinkel-Toggle** (gerade gefixt für Pixel 8a).
+- Tipps zur Position: höher stehen (Auto/Bank/Zaun), weiter weg, quer halten.
+- `CameraSetupOverlay` zeigt diese Tipps schon — wir verstärken den Punkt „nicht das ganze Feld? → Weitwinkel + erhöhen".
 
-Vorteile:
-- Funktioniert auf Pixel 8a (und allen anderen Pixel/Samsung-Geräten mit `zoom`-Capability).
-- Kein Stream-Restart → kein Flackern, schneller Wechsel.
-- Behält Fallback für Geräte ohne `zoom`-API.
+## Was ich konkret bauen würde
 
-**Geänderte Datei: Aufrufer (z. B. `src/pages/CameraTrackingPage.tsx`)**
-Der Toggle-Button bleibt, ruft aber statt `cycleCamera()` jetzt `toggleWideAngle()` auf. Bei Geräten ohne Zoom-Support fällt es transparent auf Cycling zurück.
+**Phase A — Sofort sichtbare UX (klein, hoher Nutzen):**
 
-### Zusätzlich: Debug-Hinweis im UI
-Ein dezentes Info-Toast beim ersten Start: „Weitwinkel nicht verfügbar — diese Kamera unterstützt keinen optischen Zoom-Wechsel" wenn weder `zoom` noch zweite Rear-Cam erkannt wird. So weißt du sofort, woran es liegt, statt im Dunkeln zu rätseln.
+1. **Neue Komponente `FieldCoverageHelp.tsx`** als ausklappbarer „Mein Feld passt nicht ins Bild?"-Hinweis im `CameraSetupOverlay`.
+2. **`MatchRecordingChoice.tsx`** ergänzen: Unter „Ich filme selbst" eine kleine Zusatzzeile „Auch nur eine Hälfte möglich".
+3. **`CameraSetupOverlay.tsx`** ergänzen um einen sichtbaren Mode-Selector: **Ganzes Feld / Linke Hälfte / Rechte Hälfte**, gespeichert in `coverage`.
 
-## Betroffene Dateien (Übersicht)
+**Phase B — Coverage in Analyse durchziehen:**
 
-**Löschen:**
-- `src/components/ExternalCameraSetup.tsx`
-- `src/hooks/use-display-capture.ts`
-- `mem://features/external-camera-mode.md`
+4. **`CameraTrackingPage.tsx`** speichert die gewählte `coverage` in `match.calibration` (Feld existiert bereits in `CalibrationData`).
+5. **`MatchReport.tsx` / `DataQualityPanel.tsx`** zeigen ein Badge „Halbfeld-Analyse" wenn `coverage !== "full"`, damit Kennzahlen korrekt eingeordnet werden.
+6. **`use-match-stats.ts`**: Bei Halbfeld-Coverage werden gegnerische Kennzahlen, die ohne sichtbares Feld nicht ableitbar sind (z. B. Pressing-Höhe gegnerische Hälfte), auf `null` gesetzt statt geschätzt — passt zum bestehenden „Truth Mode" aus `mem://features/tracking-ux-transparency`.
+
+**Phase C — Helfer-Empfehlung verstärken (optional):**
+
+7. Im `CameraSetupOverlay` bei Auswahl „Halbfeld" zusätzlich Hinweis-Card: „Tipp: Mit einem Helfer + zweitem Handy bekommst du das ganze Feld → [Helfer-Code teilen]" → führt direkt in den bestehenden Helfer-Flow.
+
+## Betroffene Dateien
+
+**Neu:**
+- `src/components/FieldCoverageHelp.tsx`
 
 **Ändern:**
-- `src/components/MatchRecordingChoice.tsx` — External-Option entfernen
-- `src/pages/CameraTrackingPage.tsx` — External-Branches entfernen, Weitwinkel-Toggle anpassen
-- `src/hooks/use-ultra-wide-camera.ts` — Zoom-Capability-API ergänzen, Cycling als Fallback
-- `mem://index.md` — External-Eintrag entfernen
+- `src/components/CameraSetupOverlay.tsx` — Coverage-Selector + Hilfe-Block
+- `src/components/MatchRecordingChoice.tsx` — Sub-Hinweis bei Self/Helfer
+- `src/pages/CameraTrackingPage.tsx` — `coverage` in Calibration persistieren
+- `src/components/DataQualityPanel.tsx` — Halbfeld-Badge
+- `src/pages/MatchReport.tsx` — Halbfeld-Hinweis im Header
+- `src/hooks/use-match-stats.ts` — Null-Setzen nicht-erfassbarer Kennzahlen bei Halbfeld
 
 **Unverändert:**
-- Self/Helfer/Upload-Flows, Frame-Pipeline, Storage, Analyse
+- Frame-Pipeline, Storage, Auto-Kalibrierung, Helfer-Flow — alles nutzt vorhandene Mechanik.
 
-## Validierung nach Umsetzung
+## Was sich für dich konkret ändert
 
-1. „Externe Kamera"-Karte erscheint nicht mehr in `MatchRecordingChoice`.
-2. Direktaufruf `?mode=external` führt sauber auf Self-Flow oder zeigt 404, kein toter Code.
-3. Auf Pixel 8a: Weitwinkel-Button schaltet hörbar/sichtbar in Ultraweit-Bildausschnitt (~0.5x). Zurückschalten auf 1x funktioniert.
-4. Auf Geräten ohne Zoom-Capability (älteres Android): Fallback-Cycling funktioniert wie bisher.
+- Wenn dein Handy nicht das ganze Feld sieht, wirst du im Setup **direkt gefragt**, ob du eine Hälfte oder mit Helfer das ganze Feld filmen willst.
+- Halbfeld-Aufnahmen liefern **ehrliche Kennzahlen** für die sichtbare Hälfte statt geschätzter Werte für das ganze Feld.
+- Im Report siehst du klar, dass es sich um eine Halbfeld-Analyse handelt — keine falschen Erwartungen.
 
