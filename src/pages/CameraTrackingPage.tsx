@@ -89,7 +89,7 @@ export default function CameraTrackingPage() {
   const [showSideSwapDialog, setShowSideSwapDialog] = useState(false);
   const [autoDetectedSwap, setAutoDetectedSwap] = useState<boolean | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const stoppedCaptureRef = useRef<{ frames: string[]; durationSec: number } | null>(null);
+  const stoppedCaptureRef = useRef<{ frames: string[]; timestamps: number[]; durationSec: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const liveCaptureRef = useRef<ReturnType<typeof startLiveCapture> | null>(null);
