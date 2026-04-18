@@ -86,8 +86,11 @@ export async function captureFramesFromFile(
   const ctx = canvas.getContext("2d")!;
 
   const frames: string[] = [];
+  const timestamps: number[] = [];
   let skippedFrames = 0;
   const totalFrames = Math.min(Math.ceil(duration / FRAME_INTERVAL_SEC), MAX_FRAMES);
+  // Synthetic timestamp baseline so uploaded videos still have a monotonically increasing timeline.
+  const syntheticBase = Date.now();
 
   for (let i = 0; i < totalFrames; i++) {
     const seekTime = i * FRAME_INTERVAL_SEC;
@@ -102,6 +105,7 @@ export async function captureFramesFromFile(
     if (isFrameUsable(ctx, canvas.width, canvas.height)) {
       const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
       frames.push(dataUrl.split(",")[1]);
+      timestamps.push(syntheticBase + seekTime * 1000);
     } else {
       skippedFrames++;
     }
@@ -110,7 +114,7 @@ export async function captureFramesFromFile(
   }
 
   URL.revokeObjectURL(url);
-  return { frames, durationSec: Math.round(duration), skippedFrames };
+  return { frames, timestamps, durationSec: Math.round(duration), skippedFrames };
 }
 
 /**
@@ -118,8 +122,17 @@ export async function captureFramesFromFile(
  * Call startLiveCapture with the video element showing the camera stream.
  * Call stop() on the returned object when recording ends.
  */
-export function startLiveCapture(videoEl: HTMLVideoElement, initialFrames?: string[]) {
+export function startLiveCapture(
+  videoEl: HTMLVideoElement,
+  initialFrames?: string[],
+  initialTimestamps?: number[],
+) {
   const frames: string[] = initialFrames ? [...initialFrames] : [];
+  const timestamps: number[] = initialTimestamps
+    ? [...initialTimestamps]
+    : initialFrames
+      ? initialFrames.map((_, i) => Date.now() - (initialFrames.length - i) * FRAME_INTERVAL_SEC * 1000)
+      : [];
   let skippedFrames = 0;
   const canvas = document.createElement("canvas");
   let interval: ReturnType<typeof setInterval> | null = null;
@@ -138,6 +151,7 @@ export function startLiveCapture(videoEl: HTMLVideoElement, initialFrames?: stri
     if (isFrameUsable(ctx, canvas.width, canvas.height)) {
       const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
       frames.push(dataUrl.split(",")[1]);
+      timestamps.push(Date.now());
     } else {
       skippedFrames++;
     }
@@ -151,16 +165,18 @@ export function startLiveCapture(videoEl: HTMLVideoElement, initialFrames?: stri
     stop: (): FrameCaptureResult => {
       if (interval) clearInterval(interval);
       const durationSec = Math.round((Date.now() - startTime) / 1000);
-      return { frames, durationSec, skippedFrames };
+      return { frames, timestamps, durationSec, skippedFrames };
     },
     /** Returns a snapshot of frames captured so far WITHOUT stopping the capture */
     getSnapshot: (): FrameCaptureResult => {
       const durationSec = Math.round((Date.now() - startTime) / 1000);
-      return { frames: [...frames], durationSec, skippedFrames };
+      return { frames: [...frames], timestamps: [...timestamps], durationSec, skippedFrames };
     },
     getFrameCount: () => frames.length,
     getSkippedCount: () => skippedFrames,
     /** Returns new frames since the given index (for delta uploads) */
     getNewFramesSince: (startIndex: number): string[] => frames.slice(startIndex),
+    /** Returns new timestamps since the given index (matches getNewFramesSince) */
+    getNewTimestampsSince: (startIndex: number): number[] => timestamps.slice(startIndex),
   };
 }
