@@ -797,7 +797,7 @@ export default function CameraTrackingPage() {
     }
 
     // Store captured frames for later finalize or resume
-    stoppedCaptureRef.current = { frames: captureResult.frames, durationSec: captureResult.durationSec };
+    stoppedCaptureRef.current = { frames: captureResult.frames, timestamps: captureResult.timestamps, durationSec: captureResult.durationSec };
     setPhase("stopped");
     if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
   }, [matchId]);
@@ -805,7 +805,7 @@ export default function CameraTrackingPage() {
   // Resume recording after accidental stop — re-start capture with existing stream
   const resumeRecording = useCallback(() => {
     if (videoRef.current) {
-      liveCaptureRef.current = startLiveCapture(videoRef.current, stoppedCaptureRef.current?.frames);
+      liveCaptureRef.current = startLiveCapture(videoRef.current, stoppedCaptureRef.current?.frames, stoppedCaptureRef.current?.timestamps);
     }
 
     if (hasHighlights && !isHelper && streamRef.current) {
