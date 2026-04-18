@@ -1,77 +1,89 @@
 
 
-## Analyse der Frage
+## Frage verstanden
 
-Der Nutzer steht real am Spielfeld und kommt mit seinem Handy nicht so weit zurück / so hoch, dass das **ganze Feld** ins Bild passt. Das ist ein häufiges Problem bei Amateurplätzen ohne Tribüne.
+Du möchtest wissen, ob du **mitten im Spiel** (z. B. zur Halbzeit, oder einfach in der 23. Minute) **eine zusätzliche Kamera dazuschalten** kannst — und ob das System dann:
 
-## Was die App heute schon kann (recherchiert)
+1. erkennt, dass eine neue Kamera dazugekommen ist,
+2. weiß, **ab wann** diese Kamera Frames liefert,
+3. alle Frames (auch teilweise überlappende Zeiten) korrekt **chronologisch zusammenführt**.
 
-Beim Blick in die bestehende Architektur (`mem://features/camera-setup-logic`, `mem://features/field-calibration`, `src/lib/types.ts` mit `FieldCoverage`) sehe ich:
+## Aktueller Stand (recherchiert)
 
-- Es gibt bereits den Datentyp **`FieldCoverage`** mit den Werten `"full" | "left_half" | "right_half" | "custom"`.
-- Es gibt bereits **`field_rect`** und **`zoom_level`** im `CalibrationData`-Interface.
-- Die Auto-Kalibrierung über `detect-field-corners` läuft beim Aufnahmestart automatisch.
-- Es werden offiziell **1–3 Smartphones** unterstützt (Mittellinie, plus optional zwei Hälften).
+Aus `mem://architecture/frame-orchestration-and-merging` und `supabase/functions/camera-ops/index.ts`:
 
-Das heißt: Die **Datengrundlage** für Teilfeld-Aufnahmen ist da, sie wird aber im UI heute nicht aktiv als Lösung angeboten und der Nutzer wird nicht erklärend geführt.
+- **Jeder Frame trägt einen Wall-Clock-Timestamp** (ms, `Date.now()`), erfasst clientseitig in `frame-capture.ts`.
+- Helfer schreiben in `_cam{session.camera_index}.json` (cam1, cam2, cam3), Trainer in `_cam0.json`.
+- Nach jedem Upload werden **alle vorhandenen `_cam*.json`-Dateien** geladen, Frames per Timestamp sortiert und zur globalen `{matchId}.json` gemerged.
+- `analyze-match` liest die zeitsortierte globale Datei.
+- Pro Verein sind bis zu **3 aktive Kamera-Codes** gleichzeitig erlaubt (`mem://features/match-setup-constraints`).
+- Helfer können sich über Code + Match-ID jederzeit einklinken.
 
-## Empfohlene Lösung — drei Antwort-Wege im UI
+### Heißt konkret für deine Frage:
 
-Statt nur eine Antwort zu geben, schlage ich vor, dem Nutzer **drei konkrete Wege** direkt im Recording-Setup anzubieten:
+**Ja, technisch funktioniert das schon heute** — mit einer Einschränkung, die ich gleich erkläre.
 
-### Weg 1: Halbfeld-Modus (1 Handy, halbe Coverage)
-- Nutzer wählt aktiv **„Linke Hälfte"** oder **„Rechte Hälfte"**.
-- Auto-Kalibrierung erkennt nur die sichtbare Hälfte, `coverage = "left_half"` / `"right_half"` wird gespeichert.
-- Analyse läuft normal, aber Kennzahlen werden mit **Halbfeld-Hinweis** versehen (z. B. „Nur Heim-Defensive analysiert").
-- Pässe/Events außerhalb des Bildes werden klar als „nicht erfasst" markiert statt geraten.
+| Szenario | Funktioniert heute? |
+|---|---|
+| Helfer #1 startet ab Anpfiff, Helfer #2 schaltet sich in der 23. Minute dazu | **Ja** — cam2-Frames werden ab dem ersten Upload zeitsortiert eingemerged |
+| Helfer schaltet sich erst zur Halbzeit dazu | **Ja** — Frames landen korrekt im H2-Bereich der Timeline |
+| Zwei Helfer filmen zeitweise dieselbe Sekunde | **Ja** — beide Frames werden behalten, chronologisch nebeneinander einsortiert (gibt mehr Datenpunkte für die KI, kein Verlust) |
+| Trainer pausiert, Helfer filmt weiter | **Ja** — Helfer-Frames laufen einfach durch |
 
-### Weg 2: Zwei-Handy-Setup (volle Coverage)
-- Erstes Handy filmt eine Hälfte selbst, zweites Handy via **Helfer-Code** die andere.
-- Bestehender Helfer-Flow + bestehende Frame-Merging-Logik (`_cam0`, `_cam1`) macht das technisch schon möglich.
-- Im UI klare Anleitung: „Stell beide Handys hinter beide Tore, je 45°-Winkel zur Mittellinie."
+**Aktuelle Einschränkung:** Es gibt heute **keine UI-Sichtbarkeit**, dass mitten im Spiel eine neue Kamera dazugekommen ist. Für dich als Trainer ist nicht erkennbar:
+- *„Aha, ab Minute 23 hilft mir Klaus mit zweitem Handy."*
+- *„Wie viele Kameras laufen gerade?"*
+- *„Welche Kamera hat welche Zeitabschnitte abgedeckt?"*
 
-### Weg 3: Weitwinkel + bessere Position (kein Hardware-Wechsel)
-- Hinweis auf den **0.5x-Weitwinkel-Toggle** (gerade gefixt für Pixel 8a).
-- Tipps zur Position: höher stehen (Auto/Bank/Zaun), weiter weg, quer halten.
-- `CameraSetupOverlay` zeigt diese Tipps schon — wir verstärken den Punkt „nicht das ganze Feld? → Weitwinkel + erhöhen".
+Im Report siehst du am Ende nur „X Kameras beteiligt" als Zahl, aber nicht **wann welche** aktiv war.
 
-## Was ich konkret bauen würde
+## Vorschlag — drei kleine Verbesserungen für volle Transparenz
 
-**Phase A — Sofort sichtbare UX (klein, hoher Nutzen):**
+### 1. Live-Anzeige aktiver Kameras im `CameraRemotePanel`
+Im Trainer-Live-Panel zusätzlich für jede aktive Helfer-Session anzeigen:
+- **„Beigetreten: 14:23"** (= `created_at` der Session)
+- **„Frames synchronisiert: 142"** (gibt es schon in `status_data.synced_frames`)
+- **„Erste/letzte Frame-Zeit"** (aus `_cam{i}.json`)
 
-1. **Neue Komponente `FieldCoverageHelp.tsx`** als ausklappbarer „Mein Feld passt nicht ins Bild?"-Hinweis im `CameraSetupOverlay`.
-2. **`MatchRecordingChoice.tsx`** ergänzen: Unter „Ich filme selbst" eine kleine Zusatzzeile „Auch nur eine Hälfte möglich".
-3. **`CameraSetupOverlay.tsx`** ergänzen um einen sichtbaren Mode-Selector: **Ganzes Feld / Linke Hälfte / Rechte Hälfte**, gespeichert in `coverage`.
+So siehst du in Echtzeit, wer wann dazugekommen ist und wer aktiv liefert.
 
-**Phase B — Coverage in Analyse durchziehen:**
+### 2. Coverage-Timeline im Report
+Im `MatchReport.tsx` ein kleiner Streifen unter den KPIs:
 
-4. **`CameraTrackingPage.tsx`** speichert die gewählte `coverage` in `match.calibration` (Feld existiert bereits in `CalibrationData`).
-5. **`MatchReport.tsx` / `DataQualityPanel.tsx`** zeigen ein Badge „Halbfeld-Analyse" wenn `coverage !== "full"`, damit Kennzahlen korrekt eingeordnet werden.
-6. **`use-match-stats.ts`**: Bei Halbfeld-Coverage werden gegnerische Kennzahlen, die ohne sichtbares Feld nicht ableitbar sind (z. B. Pressing-Höhe gegnerische Hälfte), auf `null` gesetzt statt geschätzt — passt zum bestehenden „Truth Mode" aus `mem://features/tracking-ux-transparency`.
+```text
+Kamera-Abdeckung über die Zeit:
+Cam0 (Trainer):  ████████████████████████  0–90'
+Cam1 (Helfer A): ████████░░░░░░░░░░░░░░░░  0–28'
+Cam2 (Helfer B): ░░░░░░░░░░░░████████████  45–90'
+```
 
-**Phase C — Helfer-Empfehlung verstärken (optional):**
+Berechnet aus den `timestamps`-Arrays der einzelnen `_cam{i}.json`-Dateien gegen `recording_started_at` / `recording_ended_at`.
 
-7. Im `CameraSetupOverlay` bei Auswahl „Halbfeld" zusätzlich Hinweis-Card: „Tipp: Mit einem Helfer + zweitem Handy bekommst du das ganze Feld → [Helfer-Code teilen]" → führt direkt in den bestehenden Helfer-Flow.
+### 3. Toast-Benachrichtigung beim Trainer
+Wenn `camera_access_sessions` per Realtime einen neuen Eintrag bekommt während ein Match läuft:
+> *„Neue Kamera ist beigetreten — Helfer 'Klaus' filmt jetzt mit (Cam2)."*
+
+Nutzt das bereits existierende Notification-System (`mem://features/notification-infrastructure`).
+
+## Backend-Änderungen: keine
+
+Die ganze Merge-Logik ist bereits Timestamp-basiert und Race-Condition-sicher. Es geht **rein um UI-Transparenz**.
 
 ## Betroffene Dateien
 
-**Neu:**
-- `src/components/FieldCoverageHelp.tsx`
-
 **Ändern:**
-- `src/components/CameraSetupOverlay.tsx` — Coverage-Selector + Hilfe-Block
-- `src/components/MatchRecordingChoice.tsx` — Sub-Hinweis bei Self/Helfer
-- `src/pages/CameraTrackingPage.tsx` — `coverage` in Calibration persistieren
-- `src/components/DataQualityPanel.tsx` — Halbfeld-Badge
-- `src/pages/MatchReport.tsx` — Halbfeld-Hinweis im Header
-- `src/hooks/use-match-stats.ts` — Null-Setzen nicht-erfassbarer Kennzahlen bei Halbfeld
+- `src/components/CameraRemotePanel.tsx` — Beitritts-Zeit + Frame-Coverage pro Helfer anzeigen
+- `src/pages/MatchReport.tsx` — Kamera-Coverage-Timeline-Streifen einfügen
+- `src/pages/CameraTrackingPage.tsx` — Realtime-Subscription auf `camera_access_sessions` für Trainer-Toast
+- `src/lib/match-analysis.ts` — kleine Helper-Funktion `computeCameraCoverage(matchId)` die per `_cam{i}.json` die Zeit-Spans berechnet
+
+**Neu:**
+- `src/components/CameraCoverageTimeline.tsx` — wiederverwendbarer Coverage-Streifen
 
 **Unverändert:**
-- Frame-Pipeline, Storage, Auto-Kalibrierung, Helfer-Flow — alles nutzt vorhandene Mechanik.
+- Frame-Pipeline, Storage, `camera-ops`, `analyze-match` — die machen alles schon korrekt.
 
-## Was sich für dich konkret ändert
+## Antwort auf deine Frage in einem Satz
 
-- Wenn dein Handy nicht das ganze Feld sieht, wirst du im Setup **direkt gefragt**, ob du eine Hälfte oder mit Helfer das ganze Feld filmen willst.
-- Halbfeld-Aufnahmen liefern **ehrliche Kennzahlen** für die sichtbare Hälfte statt geschätzter Werte für das ganze Feld.
-- Im Report siehst du klar, dass es sich um eine Halbfeld-Analyse handelt — keine falschen Erwartungen.
+**Ja**, du kannst zu **jedem beliebigen Zeitpunkt** (Halbzeit, Mitte H1, sogar in der Nachspielzeit) eine weitere Kamera per Helfer-Code dazuschalten — das System merged alle Frames per echtem Wall-Clock-Timestamp sauber chronologisch, auch bei zeitlichen Überlappungen. Die KI bekommt eine durchgehende, zeitsortierte Frame-Sequenz aus allen aktiven Kameras. Ich schlage zusätzlich die drei UI-Verbesserungen oben vor, damit du diese Flexibilität auch **siehst und nachvollziehen** kannst.
 
