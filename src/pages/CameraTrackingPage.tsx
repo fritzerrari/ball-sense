@@ -310,6 +310,7 @@ export default function CameraTrackingPage() {
   const uploadDelta = useCallback(async () => {
     if (!liveCaptureRef.current || !matchId || !isHelper || !sessionToken) return;
     const newFrames = liveCaptureRef.current.getNewFramesSince(lastUploadedIndexRef.current);
+    const newTimestamps = liveCaptureRef.current.getNewTimestampsSince(lastUploadedIndexRef.current);
     if (newFrames.length === 0) return;
 
     try {
@@ -326,6 +327,7 @@ export default function CameraTrackingPage() {
             session_token: sessionToken,
             match_id: matchId,
             frames: newFrames,
+            timestamps: newTimestamps,
             chunk_index: chunkIndexRef.current,
           }),
         },
@@ -654,9 +656,9 @@ export default function CameraTrackingPage() {
     setUploading(true);
     try {
       if (isHelper) {
-        await uploadViaEdgeFunction(captureResult.frames, captureResult.durationSec, "h1");
+        await uploadViaEdgeFunction(captureResult.frames, captureResult.timestamps, captureResult.durationSec, "h1");
       } else {
-        await uploadDirect(captureResult.frames, captureResult.durationSec, "h1");
+        await uploadDirect(captureResult.frames, captureResult.timestamps, captureResult.durationSec, "h1");
       }
 
       setPhase("halftime_pause");
@@ -864,9 +866,9 @@ export default function CameraTrackingPage() {
       setProgress(40);
 
       if (isHelper) {
-        await uploadViaEdgeFunction(captureResult.frames, captureResult.durationSec, phaseStr);
+        await uploadViaEdgeFunction(captureResult.frames, captureResult.timestamps, captureResult.durationSec, phaseStr);
       } else {
-        await uploadDirect(captureResult.frames, captureResult.durationSec, phaseStr);
+        await uploadDirect(captureResult.frames, captureResult.timestamps, captureResult.durationSec, phaseStr);
       }
 
       setProgress(100);
