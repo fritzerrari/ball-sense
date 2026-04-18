@@ -39,35 +39,53 @@ async function validateSession(supabaseAdmin: any, sessionToken: string, matchId
   return session;
 }
 
-async function updateCanonicalFrameFile(supabaseAdmin: any, matchId: string, newFrames: string[], cameraIndex: number | null) {
+async function updateCanonicalFrameFile(
+  supabaseAdmin: any,
+  matchId: string,
+  newFrames: string[],
+  newTimestamps: number[] | undefined,
+  cameraIndex: number | null,
+) {
   try {
     // Write camera-specific canonical file
-    const camSuffix = cameraIndex != null ? `_cam${cameraIndex}` : "";
-    const camPath = `${matchId}${camSuffix}.json`;
+    const camIdx = cameraIndex ?? 0;
+    const camPath = `${matchId}_cam${camIdx}.json`;
 
     const { data: existing } = await supabaseAdmin.storage
       .from("match-frames")
       .download(camPath);
 
     let camFrames: string[] = [];
+    let camTimestamps: number[] = [];
     let camDuration = 0;
 
     if (existing) {
       try {
         const parsed = JSON.parse(await existing.text());
         camFrames = parsed.frames ?? [];
+        camTimestamps = parsed.timestamps ?? [];
         camDuration = parsed.duration_sec ?? 0;
       } catch { /* start fresh */ }
     }
 
+    // Synthesize timestamps if uploader didn't send them (legacy clients)
+    const baseTs = camTimestamps.length > 0
+      ? camTimestamps[camTimestamps.length - 1] + 30_000
+      : Date.now() - newFrames.length * 30_000;
+    const tsToAppend = (newTimestamps && newTimestamps.length === newFrames.length)
+      ? newTimestamps
+      : newFrames.map((_, i) => baseTs + i * 30_000);
+
     camFrames.push(...newFrames);
+    camTimestamps.push(...tsToAppend);
     camDuration += newFrames.length * 30;
 
     const camJson = JSON.stringify({
       frames: camFrames,
+      timestamps: camTimestamps,
       duration_sec: camDuration,
       phase: "full",
-      camera_index: cameraIndex ?? 0,
+      camera_index: camIdx,
       captured_at: new Date().toISOString(),
     });
 
@@ -75,7 +93,7 @@ async function updateCanonicalFrameFile(supabaseAdmin: any, matchId: string, new
       .from("match-frames")
       .upload(camPath, new Blob([camJson], { type: "application/json" }), { upsert: true });
 
-    // Now merge all camera canonicals into global {matchId}.json
+    // Now merge all camera canonicals into global {matchId}.json — timestamp-sorted
     await mergeAllCameraCanonicals(supabaseAdmin, matchId);
   } catch (err) {
     console.error("canonical frame file update error:", err);
@@ -84,34 +102,45 @@ async function updateCanonicalFrameFile(supabaseAdmin: any, matchId: string, new
 
 async function mergeAllCameraCanonicals(supabaseAdmin: any, matchId: string) {
   try {
-    const allFrames: string[] = [];
+    type Tagged = { frame: string; ts: number; cam: number };
+    const all: Tagged[] = [];
+    let foundAnyCam = false;
     let totalDuration = 0;
 
-    // Try camera-specific files (cam0-3)
-    let foundAnyCam = false;
     for (let cam = 0; cam < 4; cam++) {
       const { data: camFile } = await supabaseAdmin.storage
         .from("match-frames")
         .download(`${matchId}_cam${cam}.json`);
-      if (camFile) {
-        foundAnyCam = true;
-        try {
-          const parsed = JSON.parse(await camFile.text());
-          if (parsed.frames?.length) {
-            allFrames.push(...parsed.frames);
-            totalDuration += parsed.duration_sec ?? 0;
-          }
-        } catch { /* skip corrupt */ }
-      }
+      if (!camFile) continue;
+      foundAnyCam = true;
+      try {
+        const parsed = JSON.parse(await camFile.text());
+        const frames: string[] = parsed.frames ?? [];
+        const timestamps: number[] = parsed.timestamps ?? [];
+        totalDuration += parsed.duration_sec ?? 0;
+        // Synthesize timestamps if missing so we can still order something stable.
+        const baseTs = timestamps.length === frames.length
+          ? timestamps
+          : frames.map((_, i) => i * 30_000 + cam * 1_000);
+        for (let i = 0; i < frames.length; i++) {
+          all.push({ frame: frames[i], ts: baseTs[i] ?? i * 30_000, cam });
+        }
+      } catch { /* skip corrupt */ }
     }
 
-    // If no camera-specific files found, the global file is already the source of truth
     if (!foundAnyCam) return;
+
+    // Time-sorted interleave across all cameras
+    all.sort((a, b) => a.ts - b.ts);
+    const allFrames = all.map((x) => x.frame);
+    const allTimestamps = all.map((x) => x.ts);
 
     const globalJson = JSON.stringify({
       frames: allFrames,
+      timestamps: allTimestamps,
       duration_sec: totalDuration,
       phase: "full",
+      camera_count: new Set(all.map((x) => x.cam)).size,
       captured_at: new Date().toISOString(),
     });
 
