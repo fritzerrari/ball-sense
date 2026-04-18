@@ -367,8 +367,33 @@ export default function CameraTrackingPage() {
     return () => clearInterval(interval);
   }, [isHelper, phase, frameCount]);
 
-  const initCamera = useCallback(async () => {
+  const initCamera = useCallback(async (coverage: import("@/lib/types").FieldCoverage = "full") => {
     try {
+      // Persist chosen coverage to match.fields.calibration so analysis + report can react.
+      if (matchId && !isHelper && coverage !== "full") {
+        try {
+          const { data: matchRow } = await supabase
+            .from("matches")
+            .select("field_id, fields(calibration, width_m, height_m)")
+            .eq("id", matchId)
+            .maybeSingle();
+          const fieldId = (matchRow as any)?.field_id;
+          const existingCal = ((matchRow as any)?.fields?.calibration ?? {}) as Record<string, unknown>;
+          if (fieldId) {
+            await supabase
+              .from("fields")
+              .update({
+                calibration: {
+                  ...existingCal,
+                  coverage,
+                  calibrated_at: new Date().toISOString(),
+                },
+              } as any)
+              .eq("id", fieldId);
+          }
+        } catch { /* non-critical */ }
+      }
+
       // Ensure camera detection completes before starting stream
       const detectedCams = await ultraWide.detectCameras();
       toast.info(`${detectedCams.length} Kamera(s) erkannt`, { duration: 3000 });
@@ -400,7 +425,7 @@ export default function CameraTrackingPage() {
     } catch {
       toast.error("Kamera konnte nicht gestartet werden");
     }
-  }, [ultraWide]);
+  }, [ultraWide, matchId, isHelper]);
 
   const startRecording = useCallback(() => {
     if (videoRef.current) {
@@ -447,8 +472,8 @@ export default function CameraTrackingPage() {
     }
   }, [hasHighlights, isHelper, uploadDelta, updateMatchTiming]);
 
-  const handleSetupComplete = useCallback(async () => {
-    await initCamera();
+  const handleSetupComplete = useCallback(async (coverage: import("@/lib/types").FieldCoverage) => {
+    await initCamera(coverage);
   }, [initCamera]);
 
   const handleReadyStart = useCallback(() => {
@@ -851,7 +876,7 @@ export default function CameraTrackingPage() {
 
         {phase === "setup" && (
           <CameraSetupOverlay
-            onDismiss={() => initCamera()}
+            onDismiss={() => initCamera("full")}
             onStart={handleSetupComplete}
           />
         )}
