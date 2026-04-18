@@ -345,10 +345,19 @@ Deno.serve(async (req) => {
           const ts: number[] = Array.isArray(parsed?.timestamps) ? parsed.timestamps : [];
           const frames: unknown[] = Array.isArray(parsed?.frames) ? parsed.frames : [];
           if (ts.length > 0) {
+            // Loop-based min/max — Math.min(...ts) overflows the call stack for large arrays.
+            let minTs = ts[0];
+            let maxTs = ts[0];
+            for (let i = 1; i < ts.length; i++) {
+              const v = ts[i];
+              if (typeof v !== "number") continue;
+              if (v < minTs) minTs = v;
+              if (v > maxTs) maxTs = v;
+            }
             cameras.push({
               camera_index: cam,
-              first_ts: Math.min(...ts),
-              last_ts: Math.max(...ts),
+              first_ts: minTs,
+              last_ts: maxTs,
               frame_count: frames.length,
             });
           } else if (frames.length > 0) {
