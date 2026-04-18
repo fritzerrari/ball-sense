@@ -252,6 +252,33 @@ export default function CameraTrackingPage() {
     };
   }, [phase]);
 
+  // ── Trainer-only: notify when a new helper camera joins mid-match ──
+  useEffect(() => {
+    if (isHelper || !matchId) return;
+    if (phase !== "recording" && phase !== "halftime_pause" && phase !== "ready") return;
+
+    const channel = supabase
+      .channel(`new-helper-${matchId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "camera_access_sessions",
+          filter: `match_id=eq.${matchId}`,
+        },
+        (payload) => {
+          const cam = (payload.new as { camera_index?: number | null })?.camera_index ?? "?";
+          toast.info(`Neue Kamera beigetreten — Cam ${cam} filmt jetzt mit.`, {
+            description: "Frames werden zeitsortiert in die Analyse eingemerged.",
+          });
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [isHelper, matchId, phase]);
+
 
   // ── Capture a small thumbnail for heartbeat ──
   const captureThumbnail = useCallback((): string | null => {

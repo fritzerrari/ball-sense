@@ -288,6 +288,92 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── ACTION: list-coverage (trainer-only, returns per-camera time spans) ──
+    if (action === "list-coverage") {
+      const authHeader = req.headers.get("authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Authorization required" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!match_id) {
+        return new Response(JSON.stringify({ error: "match_id required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Verify trainer's club owns this match
+      const { data: profile } = await supabaseAdmin
+        .from("profiles").select("club_id").eq("user_id", user.id).maybeSingle();
+      const { data: match } = await supabaseAdmin
+        .from("matches")
+        .select("home_club_id, recording_started_at, recording_ended_at")
+        .eq("id", match_id)
+        .maybeSingle();
+      if (!profile || !match || match.home_club_id !== profile.club_id) {
+        return new Response(JSON.stringify({ error: "Access denied" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Scan _cam{0..3}.json and extract first/last/count of timestamps.
+      const cameras: { camera_index: number; first_ts: number | null; last_ts: number | null; frame_count: number }[] = [];
+      for (let cam = 0; cam < 4; cam++) {
+        const { data: camFile } = await supabaseAdmin.storage
+          .from("match-frames")
+          .download(`${match_id}_cam${cam}.json`);
+        if (!camFile) continue;
+        try {
+          const parsed = JSON.parse(await camFile.text());
+          const ts: number[] = Array.isArray(parsed?.timestamps) ? parsed.timestamps : [];
+          const frames: unknown[] = Array.isArray(parsed?.frames) ? parsed.frames : [];
+          if (ts.length > 0) {
+            cameras.push({
+              camera_index: cam,
+              first_ts: Math.min(...ts),
+              last_ts: Math.max(...ts),
+              frame_count: frames.length,
+            });
+          } else if (frames.length > 0) {
+            cameras.push({
+              camera_index: cam,
+              first_ts: null,
+              last_ts: null,
+              frame_count: frames.length,
+            });
+          }
+        } catch {
+          // ignore broken file
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          recording_started_at: match.recording_started_at,
+          recording_ended_at: match.recording_ended_at,
+          cameras,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // All other actions require session_token + match_id
     if (!session_token || !match_id) {
       return new Response(JSON.stringify({ error: "session_token and match_id required" }), {

@@ -13,6 +13,7 @@ interface CameraSession {
   id: string;
   match_id: string | null;
   camera_index: number | null;
+  created_at: string;
   last_used_at: string | null;
   expires_at: string;
   transfer_authorized: boolean;
@@ -24,6 +25,14 @@ interface CameraSession {
     thumbnail?: string;
   } | null;
   command: string | null;
+}
+
+function formatJoinTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
 }
 
 interface Props {
@@ -49,9 +58,10 @@ export default function CameraRemotePanel({ matchId }: Props) {
   const loadSessions = useCallback(async () => {
     const { data } = await supabase
       .from("camera_access_sessions")
-      .select("id, match_id, camera_index, last_used_at, expires_at, transfer_authorized, status_data, command")
+      .select("id, match_id, camera_index, created_at, last_used_at, expires_at, transfer_authorized, status_data, command")
       .eq("match_id", matchId)
-      .gt("expires_at", new Date().toISOString());
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: true });
 
     setSessions((data as unknown as CameraSession[]) ?? []);
     setLoading(false);
@@ -175,7 +185,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
 
           return (
             <div key={s.id} className="rounded-lg border border-border p-3 space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   {isOnline ? (
                     <Wifi className="h-3.5 w-3.5 text-primary" />
@@ -191,6 +201,10 @@ export default function CameraRemotePanel({ matchId }: Props) {
                   >
                     {PHASE_LABELS[currentPhase] ?? currentPhase}
                   </Badge>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground tabular-nums">
+                  <span>Beigetreten: {formatJoinTime(s.created_at)}</span>
+                  <span>· {syncedFrames} Frames</span>
                 </div>
               </div>
 

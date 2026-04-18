@@ -44,6 +44,7 @@ const FatigueIndicator = lazy(() => import("@/components/FatigueIndicator"));
 const OpponentScoutReport = lazy(() => import("@/components/OpponentScoutReport"));
 const OpponentHistoryProfile = lazy(() => import("@/components/OpponentHistoryProfile"));
 const CameraRemotePanel = lazy(() => import("@/components/CameraRemotePanel"));
+const CameraCoverageTimeline = lazy(() => import("@/components/CameraCoverageTimeline"));
 
 const CATEGORY_ICONS: Record<string, typeof Target> = {
   offense: Target,
@@ -256,6 +257,9 @@ export default function MatchReport() {
 
         {/* Camera Remote */}
         {id && <Suspense fallback={null}><CameraRemotePanel matchId={id} /></Suspense>}
+
+        {/* Camera Coverage Timeline (only renders when 2+ cameras contributed) */}
+        {id && <Suspense fallback={null}><CameraCoverageTimeline matchId={id} /></Suspense>}
 
         {/* Processing state */}
         {isProcessing && (
