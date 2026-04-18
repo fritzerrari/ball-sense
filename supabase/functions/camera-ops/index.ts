@@ -386,7 +386,7 @@ Deno.serve(async (req) => {
 
     // ── ACTION: upload-frames ──
     if (action === "upload-frames") {
-      const { frames, duration_sec, phase } = payload;
+      const { frames, timestamps, duration_sec, phase } = payload;
 
       if (!frames || !Array.isArray(frames) || frames.length === 0) {
         return new Response(JSON.stringify({ error: "No frames provided" }), {
@@ -400,10 +400,13 @@ Deno.serve(async (req) => {
       const suffix = phase && phase !== "full" ? `${camSuffix}_${phase}` : camSuffix;
       const filePath = `${match_id}${suffix}.json`;
 
+      // Phase-specific snapshot file (kept for audit / half-time replays).
       const framesJson = JSON.stringify({
         frames,
+        timestamps: Array.isArray(timestamps) && timestamps.length === frames.length ? timestamps : undefined,
         duration_sec: duration_sec ?? 0,
         phase: phase ?? "full",
+        camera_index: camIdx,
         captured_at: new Date().toISOString(),
       });
 
@@ -423,7 +426,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames, session.camera_index);
+      // Append to camera-canonical and time-merge across all cameras.
+      const tsArr = Array.isArray(timestamps) && timestamps.length === frames.length ? timestamps : undefined;
+      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames, tsArr, session.camera_index);
 
       const { data: job, error: jobError } = await supabaseAdmin
         .from("analysis_jobs")
@@ -444,9 +449,7 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-      // DON'T send inline frames — let analyze-match load from canonical file
-      // which contains ALL accumulated frames (H1 + H2 + chunks merged).
-      // This prevents the bug where only the latest upload's frames are analyzed.
+      // analyze-match loads time-merged canonical from storage (all cameras combined).
       fetch(`${supabaseUrl}/functions/v1/analyze-match`, {
         method: "POST",
         headers: {
