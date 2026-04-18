@@ -504,7 +504,7 @@ Deno.serve(async (req) => {
 
     // ── ACTION: append-frames ──
     if (action === "append-frames") {
-      const { frames, chunk_index } = payload;
+      const { frames, timestamps, chunk_index } = payload;
 
       if (!frames || !Array.isArray(frames) || frames.length === 0) {
         return new Response(JSON.stringify({ error: "No frames provided" }), {
@@ -515,13 +515,16 @@ Deno.serve(async (req) => {
 
       const camIdx = session.camera_index ?? 0;
       const filePath = `${match_id}_cam${camIdx}_chunk_${chunk_index ?? 0}.json`;
+      const tsArr = Array.isArray(timestamps) && timestamps.length === frames.length ? timestamps : undefined;
       const framesJson = JSON.stringify({
         frames,
+        timestamps: tsArr,
         chunk_index: chunk_index ?? 0,
+        camera_index: camIdx,
         captured_at: new Date().toISOString(),
       });
 
-      console.log(`Appending ${frames.length} frames (${(framesJson.length / 1024 / 1024).toFixed(2)} MB) as chunk ${chunk_index ?? 0}`);
+      console.log(`Appending ${frames.length} frames (${(framesJson.length / 1024 / 1024).toFixed(2)} MB) as chunk ${chunk_index ?? 0} cam${camIdx}`);
 
       const { error: uploadError } = await supabaseAdmin.storage
         .from("match-frames")
@@ -537,7 +540,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames, session.camera_index);
+      await updateCanonicalFrameFile(supabaseAdmin, match_id, frames, tsArr, session.camera_index);
 
       const { data: currentSession } = await supabaseAdmin
         .from("camera_access_sessions")
