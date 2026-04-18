@@ -17,24 +17,55 @@ const isEmbeddedPreview = (() => {
   }
 })();
 
-async function cleanupPreviewRuntimeArtifacts() {
-  if ("serviceWorker" in navigator) {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister()));
-  }
+/**
+ * Bumping this string forces a one-time SW + cache wipe in every browser
+ * the next time it loads the app. Increment whenever a stale-cache hang
+ * is suspected after a deploy.
+ */
+const RUNTIME_CLEANUP_VERSION = "2026-04-18-cache-bust-1";
+const CLEANUP_KEY = "fieldiq_runtime_cleanup_version";
 
-  if ("caches" in window) {
-    const cacheKeys = await window.caches.keys();
-    await Promise.all(cacheKeys.map((cacheKey) => window.caches.delete(cacheKey)));
+async function cleanupRuntimeArtifacts() {
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((r) => r.unregister()));
+    }
+    if ("caches" in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.map((k) => window.caches.delete(k)));
+    }
+  } catch {
+    // best-effort
   }
 }
 
-if (isPreviewHost || isEmbeddedPreview) {
-  void cleanupPreviewRuntimeArtifacts();
+async function bootstrap() {
+  // Always wipe in preview/embedded contexts (legacy behavior).
+  if (isPreviewHost || isEmbeddedPreview) {
+    await cleanupRuntimeArtifacts();
+  } else {
+    // On production domains, wipe exactly once per RUNTIME_CLEANUP_VERSION,
+    // then hard-reload so the user gets a fresh bundle without stale SW.
+    try {
+      const stored = localStorage.getItem(CLEANUP_KEY);
+      if (stored !== RUNTIME_CLEANUP_VERSION) {
+        await cleanupRuntimeArtifacts();
+        localStorage.setItem(CLEANUP_KEY, RUNTIME_CLEANUP_VERSION);
+        // Reload once so the freshly fetched bundle takes over.
+        window.location.reload();
+        return;
+      }
+    } catch {
+      // localStorage unavailable — skip versioned cleanup, render normally.
+    }
+  }
+
+  createRoot(document.getElementById("root")!).render(
+    <I18nProvider>
+      <App />
+    </I18nProvider>
+  );
 }
 
-createRoot(document.getElementById("root")!).render(
-  <I18nProvider>
-    <App />
-  </I18nProvider>
-);
+void bootstrap();
