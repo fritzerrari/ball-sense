@@ -69,8 +69,9 @@ export default function HelperQuickEvents({
             return;
           }
           const label = EVENTS.find(e => e.type === row.event_type)?.label ?? row.event_type;
+          const evTeam: "home" | "away" = row.team === "away" ? "away" : "home";
           setRecent(prev => [
-            { id: row.id, type: row.event_type, team: row.team === "away" ? "away" : "home", minute: row.minute, label },
+            { id: row.id, type: row.event_type, team: evTeam, minute: row.minute, label },
             ...prev.filter(e => e.id !== row.id),
           ].slice(0, 5));
         },
