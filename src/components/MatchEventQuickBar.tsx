@@ -70,6 +70,7 @@ export default function MatchEventQuickBar({
   const [activeTeam, setActiveTeam] = useState<ActiveTeam>("home");
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<RecentEvent | null>(null);
+  const [trainerLabel, setTrainerLabel] = useState<string | null>(null);
   const debounceRef = useRef<Record<string, number>>({});
   /** IDs the local user just inserted — used to suppress duplicate Realtime echoes */
   const localInsertIdsRef = useRef<Set<string>>(new Set());
@@ -88,6 +89,26 @@ export default function MatchEventQuickBar({
     const timer = setTimeout(() => setCooldownSet(new Set()), COOLDOWN_MS);
     return () => clearTimeout(timer);
   }, [cooldownSet]);
+
+  // Helpers: read trainer_device_label from match metadata so the lead-only banner
+  // can show e.g. "Trainer (iPhone Sven) protokolliert Events".
+  useEffect(() => {
+    if (!isHelper || !eventLeadOnly || !matchId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("matches")
+        .select("processing_progress")
+        .eq("id", matchId)
+        .maybeSingle();
+      if (cancelled) return;
+      const pp = (data?.processing_progress as any) ?? {};
+      if (typeof pp.trainer_device_label === "string" && pp.trainer_device_label.trim().length > 0) {
+        setTrainerLabel(pp.trainer_device_label.trim());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isHelper, eventLeadOnly, matchId]);
 
   // ── Realtime: surface events from other devices (Trainer ↔ Helper visibility) ──
   useEffect(() => {
@@ -339,7 +360,11 @@ export default function MatchEventQuickBar({
     return (
       <div className="w-full max-w-sm rounded-lg border border-border/40 bg-muted/40 backdrop-blur px-3 py-2 text-[10px] text-muted-foreground flex items-center gap-2">
         <Users className="h-3 w-3" />
-        Trainer protokolliert Events — du filmst nur.
+        <span>
+          {trainerLabel
+            ? `Trainer (${trainerLabel}) protokolliert Events — du filmst nur.`
+            : "Trainer protokolliert Events — du filmst nur."}
+        </span>
       </div>
     );
   }
