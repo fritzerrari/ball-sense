@@ -1,0 +1,1 @@
+UPDATE public.matches SET h2_sides_swapped = false WHERE id = '92606052-d636-4780-9e40-bcf3f6ad3096';
