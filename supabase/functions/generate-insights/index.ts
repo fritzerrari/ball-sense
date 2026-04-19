@@ -271,7 +271,51 @@ REGELN:
                       required: ["minute", "score"],
                     },
                   },
-                  executive_summary: { type: "string", description: "2-3 paragraph executive match summary — incisive, data-driven" },
+                  executive_summary: { type: "string", description: "3-paragraph executive match summary — Endstand mit Tor-Minuten, Spielverlauf in Phasen, taktische Kernerkenntnis. Keine 'schlechte Sicht'-Floskeln." },
+                  chance_quality_analysis: {
+                    type: "object",
+                    description: "Schussqualität & Effizienz pro Team",
+                    properties: {
+                      home: { type: "object", properties: { shots_total: { type: "number" }, shots_on_target: { type: "number" }, accuracy_pct: { type: "number" }, conversion_pct: { type: "number" }, summary: { type: "string" } }, required: ["shots_total","shots_on_target","accuracy_pct","conversion_pct","summary"] },
+                      away: { type: "object", properties: { shots_total: { type: "number" }, shots_on_target: { type: "number" }, accuracy_pct: { type: "number" }, conversion_pct: { type: "number" }, summary: { type: "string" } }, required: ["shots_total","shots_on_target","accuracy_pct","conversion_pct","summary"] },
+                      verdict: { type: "string", description: "Wer hatte die qualitativ besseren Chancen und warum" },
+                    },
+                    required: ["home", "away", "verdict"],
+                  },
+                  tactical_blueprint: {
+                    type: "array",
+                    description: "4 handlungsleitende taktische Bausteine — ersetzt schwammige Schulnoten",
+                    items: {
+                      type: "object",
+                      properties: {
+                        dimension: { type: "string" },
+                        headline: { type: "string" },
+                        observation: { type: "string", description: "Was wurde beobachtet (mit Zahlen)" },
+                        recommendation: { type: "string", description: "Konkrete Empfehlung" },
+                        evidence: { type: "string", description: "Belegende Datenpunkte" },
+                      },
+                      required: ["dimension","headline","observation","recommendation","evidence"],
+                    },
+                  },
+                  shape_recommendation: {
+                    type: "object",
+                    properties: {
+                      formation: { type: "string" },
+                      reasoning: { type: "string" },
+                      key_roles: { type: "array", items: { type: "string" } },
+                    },
+                    required: ["formation","reasoning","key_roles"],
+                  },
+                  set_piece_breakdown: {
+                    type: "object",
+                    properties: {
+                      home_corners: { type: "number" },
+                      away_corners: { type: "number" },
+                      goals_from_set_pieces: { type: "number" },
+                      summary: { type: "string" },
+                    },
+                    required: ["home_corners","away_corners","goals_from_set_pieces","summary"],
+                  },
                   key_insights: {
                     type: "array",
                     description: "5-7 key coaching insights with maximum depth",
