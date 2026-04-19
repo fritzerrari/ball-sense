@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Mountain, Smartphone, CheckCircle2, X, Maximize2, ArrowLeftRight, Square } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Camera, Mountain, Smartphone, CheckCircle2, X, Maximize2, ArrowLeftRight, Square, UserCheck } from "lucide-react";
 import FieldCoverageHelp from "./FieldCoverageHelp";
 import type { FieldCoverage } from "@/lib/types";
 
 interface CameraSetupOverlayProps {
   onDismiss: () => void;
-  onStart: (coverage: FieldCoverage) => void;
+  onStart: (coverage: FieldCoverage, eventLeadOnly: boolean) => void;
+  /** Show the Event-Lead toggle (trainer-only feature). */
+  showEventLeadToggle?: boolean;
 }
 
 const tips = [
