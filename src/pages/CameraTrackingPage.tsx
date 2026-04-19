@@ -1133,12 +1133,13 @@ export default function CameraTrackingPage() {
               </div>
             )}
             <BatteryWarning variant="panel" className="absolute bottom-24 left-4 right-4 z-30" />
-          <CameraSetupOverlay
-            onDismiss={() => initCamera("full")}
-            onStart={handleSetupComplete}
-            showEventLeadToggle={!isHelper}
-            isTrainer={!isHelper}
-          />
+            <CameraSetupOverlay
+              onDismiss={() => initCamera("full")}
+              onStart={handleSetupComplete}
+              showEventLeadToggle={!isHelper}
+              isTrainer={!isHelper}
+            />
+          </>
         )}
 
         {phase === "ready" && (
