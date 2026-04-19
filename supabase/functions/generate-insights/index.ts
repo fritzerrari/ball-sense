@@ -132,7 +132,45 @@ serve(async (req) => {
         scoreSource = "berechnet aus erfassten Tor-Events";
       }
 
-      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nENDERGEBNIS (${scoreSource}): Heim ${homeGoals} : ${awayGoals} Gegner\n\nWICHTIG: Diese Events sind GROUND TRUTH. Das Endergebnis MUSS home_goals=${homeGoals} und away_goals=${awayGoals} sein. Die team-Angabe bei jedem Event ist entscheidend (home=Heimteam, away=Gegner). Tore MÜSSEN im Momentum-Score als Spitzen erscheinen. Karten MÜSSEN in der Discipline-Bewertung berücksichtigt werden.`;
+      // Aggregate event facts per team — fact backbone when vision is poor
+      const countBy = (type: string, team: string) =>
+        matchEvents.filter((e: any) => e.event_type === type && e.team === team).length;
+      const homeShotsOn = countBy("shot_on_target", "home");
+      const awayShotsOn = countBy("shot_on_target", "away");
+      const homeShotsOff = countBy("shot_off_target", "home");
+      const awayShotsOff = countBy("shot_off_target", "away");
+      const homeShots = homeShotsOn + homeShotsOff;
+      const awayShots = awayShotsOn + awayShotsOff;
+      const homeCorners = countBy("corner", "home");
+      const awayCorners = countBy("corner", "away");
+      const homeFouls = countBy("foul", "home");
+      const awayFouls = countBy("foul", "away");
+      const homeYellow = countBy("yellow_card", "home");
+      const awayYellow = countBy("yellow_card", "away");
+      const homeRed = countBy("red_card", "home");
+      const awayRed = countBy("red_card", "away");
+      const homeConv = homeShots > 0 ? Math.round((homeGoals / homeShots) * 100) : 0;
+      const awayConv = awayShots > 0 ? Math.round((awayGoals / awayShots) * 100) : 0;
+      const homeOnRate = homeShots > 0 ? Math.round((homeShotsOn / homeShots) * 100) : 0;
+      const awayOnRate = awayShots > 0 ? Math.round((awayShotsOn / awayShots) * 100) : 0;
+      const goalMins = matchEvents
+        .filter((e: any) => e.event_type === "goal")
+        .map((e: any) => `${e.team === "home" ? "Heim" : "Gast"} ${e.minute}'`);
+
+      const factSheet = `\nTEAM-EVENT-BILANZ (manuell erfasst — GROUND TRUTH):\n` +
+        `                 Heim |  Gast\n` +
+        `Tore:            ${String(homeGoals).padStart(4)} | ${String(awayGoals).padStart(5)}\n` +
+        `Schüsse gesamt:  ${String(homeShots).padStart(4)} | ${String(awayShots).padStart(5)}\n` +
+        `Schüsse aufs Tor:${String(homeShotsOn).padStart(4)} | ${String(awayShotsOn).padStart(5)}\n` +
+        `Eckbälle:        ${String(homeCorners).padStart(4)} | ${String(awayCorners).padStart(5)}\n` +
+        `Fouls:           ${String(homeFouls).padStart(4)} | ${String(awayFouls).padStart(5)}\n` +
+        `Gelb / Rot:      ${homeYellow}/${homeRed}  | ${awayYellow}/${awayRed}\n\n` +
+        `EFFIZIENZ:\n` +
+        `Heim — ${homeOnRate}% Schussgenauigkeit, ${homeConv}% Verwertung\n` +
+        `Gast — ${awayOnRate}% Schussgenauigkeit, ${awayConv}% Verwertung\n\n` +
+        `TOR-VERTEILUNG: ${goalMins.length > 0 ? goalMins.join(", ") : "keine Tore erfasst"}\n`;
+
+      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nENDERGEBNIS (${scoreSource}): Heim ${homeGoals} : ${awayGoals} Gast\n${factSheet}\nKRITISCH: Diese Zahlen sind GROUND TRUTH. Verwerte ALLE Werte aus der Team-Event-Bilanz in 'chance_quality_analysis', 'tactical_blueprint' und 'match_rating'. Schreibe NIE "0 Chancen", "keine Daten" oder "schlechte Sicht macht Bewertung unmöglich" wenn Schüsse, Eckbälle oder Tore erfasst sind. Die team-Angabe (home=Heimteam, away=Gast) bestimmt eindeutig, wem ein Event gehört.`;
     }
     await supabase.from("analysis_jobs").update({ progress: 90 }).eq("id", job_id);
 
