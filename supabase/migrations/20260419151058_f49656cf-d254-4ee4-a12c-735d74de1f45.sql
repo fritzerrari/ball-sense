@@ -1,0 +1,1 @@
+DELETE FROM public.match_events WHERE match_id = '92606052-d636-4780-9e40-bcf3f6ad3096' AND event_type = 'conceded_goal';

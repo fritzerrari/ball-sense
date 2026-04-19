@@ -93,6 +93,13 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
+    // Detect low-vision frames (camera coverage poor) — used to downweight vision-only claims
+    const camPersp = relevantResults.find((r: any) => r.result_type === "camera_perspective")?.data;
+    const lowVision = !!camPersp && (camPersp.estimated_pitch_coverage_pct ?? 100) < 80;
+    const visionCaveat = lowVision
+      ? `\n\nKAMERA-QUALITÄT: ${camPersp.coverage_description ?? "eingeschränkte Sicht"} (Pitch-Coverage ~${camPersp.estimated_pitch_coverage_pct}%). VISION-BASIERTE AUSSAGEN sind dadurch unsicher — VERLASSE DICH PRIMÄR auf manuell erfasste Events (Tore, Schüsse, Karten, Eckbälle) und das Endergebnis. Schreibe NIEMALS "schlechte Sicht macht Bewertung unmöglich" — interpretiere stattdessen die EVENTS und ziehe daraus konkrete taktische Schlüsse.`
+      : "";
+
     const analysisContext = relevantResults.map(r => `${r.result_type}: ${JSON.stringify(r.data)}`).join("\n\n");
     const matchInfo = `${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"} am ${match?.date ?? "?"}`;
 
@@ -125,7 +132,45 @@ serve(async (req) => {
         scoreSource = "berechnet aus erfassten Tor-Events";
       }
 
-      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nENDERGEBNIS (${scoreSource}): Heim ${homeGoals} : ${awayGoals} Gegner\n\nWICHTIG: Diese Events sind GROUND TRUTH. Das Endergebnis MUSS home_goals=${homeGoals} und away_goals=${awayGoals} sein. Die team-Angabe bei jedem Event ist entscheidend (home=Heimteam, away=Gegner). Tore MÜSSEN im Momentum-Score als Spitzen erscheinen. Karten MÜSSEN in der Discipline-Bewertung berücksichtigt werden.`;
+      // Aggregate event facts per team — fact backbone when vision is poor
+      const countBy = (type: string, team: string) =>
+        matchEvents.filter((e: any) => e.event_type === type && e.team === team).length;
+      const homeShotsOn = countBy("shot_on_target", "home");
+      const awayShotsOn = countBy("shot_on_target", "away");
+      const homeShotsOff = countBy("shot_off_target", "home");
+      const awayShotsOff = countBy("shot_off_target", "away");
+      const homeShots = homeShotsOn + homeShotsOff;
+      const awayShots = awayShotsOn + awayShotsOff;
+      const homeCorners = countBy("corner", "home");
+      const awayCorners = countBy("corner", "away");
+      const homeFouls = countBy("foul", "home");
+      const awayFouls = countBy("foul", "away");
+      const homeYellow = countBy("yellow_card", "home");
+      const awayYellow = countBy("yellow_card", "away");
+      const homeRed = countBy("red_card", "home");
+      const awayRed = countBy("red_card", "away");
+      const homeConv = homeShots > 0 ? Math.round((homeGoals / homeShots) * 100) : 0;
+      const awayConv = awayShots > 0 ? Math.round((awayGoals / awayShots) * 100) : 0;
+      const homeOnRate = homeShots > 0 ? Math.round((homeShotsOn / homeShots) * 100) : 0;
+      const awayOnRate = awayShots > 0 ? Math.round((awayShotsOn / awayShots) * 100) : 0;
+      const goalMins = matchEvents
+        .filter((e: any) => e.event_type === "goal")
+        .map((e: any) => `${e.team === "home" ? "Heim" : "Gast"} ${e.minute}'`);
+
+      const factSheet = `\nTEAM-EVENT-BILANZ (manuell erfasst — GROUND TRUTH):\n` +
+        `                 Heim |  Gast\n` +
+        `Tore:            ${String(homeGoals).padStart(4)} | ${String(awayGoals).padStart(5)}\n` +
+        `Schüsse gesamt:  ${String(homeShots).padStart(4)} | ${String(awayShots).padStart(5)}\n` +
+        `Schüsse aufs Tor:${String(homeShotsOn).padStart(4)} | ${String(awayShotsOn).padStart(5)}\n` +
+        `Eckbälle:        ${String(homeCorners).padStart(4)} | ${String(awayCorners).padStart(5)}\n` +
+        `Fouls:           ${String(homeFouls).padStart(4)} | ${String(awayFouls).padStart(5)}\n` +
+        `Gelb / Rot:      ${homeYellow}/${homeRed}  | ${awayYellow}/${awayRed}\n\n` +
+        `EFFIZIENZ:\n` +
+        `Heim — ${homeOnRate}% Schussgenauigkeit, ${homeConv}% Verwertung\n` +
+        `Gast — ${awayOnRate}% Schussgenauigkeit, ${awayConv}% Verwertung\n\n` +
+        `TOR-VERTEILUNG: ${goalMins.length > 0 ? goalMins.join(", ") : "keine Tore erfasst"}\n`;
+
+      eventsContext = `\n\nMANUELL ERFASSTE EREIGNISSE (vom Trainer während des Spiels eingetragen — diese sind FAKTEN, nicht Schätzungen):\n${eventLines.join("\n")}\n\nENDERGEBNIS (${scoreSource}): Heim ${homeGoals} : ${awayGoals} Gast\n${factSheet}\nKRITISCH: Diese Zahlen sind GROUND TRUTH. Verwerte ALLE Werte aus der Team-Event-Bilanz in 'chance_quality_analysis', 'tactical_blueprint' und 'match_rating'. Schreibe NIE "0 Chancen", "keine Daten" oder "schlechte Sicht macht Bewertung unmöglich" wenn Schüsse, Eckbälle oder Tore erfasst sind. Die team-Angabe (home=Heimteam, away=Gast) bestimmt eindeutig, wem ein Event gehört.`;
     }
     await supabase.from("analysis_jobs").update({ progress: 90 }).eq("id", job_id);
 
@@ -140,42 +185,41 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Du bist ein Elite-Fußball-Analyst auf Champions-League-Niveau. Erstelle aus der Spielanalyse ein HOCHPROFESSIONELLES Coaching-Cockpit mit maximaler taktischer Tiefe.
+            content: `Du bist ein Elite-Fußball-Analyst (UEFA-Pro-Niveau), der für einen Cheftrainer das Spielresümee verfasst. Dein Stil: präzise, datengestützt, handlungsleitend — wie ein Match-Briefing eines Performance-Departments.
 
-Die Analyse enthält möglicherweise:
-- pressing_data: Pressing-Linie und Kompaktheit pro Frame
-- transitions: Umschaltmomente (Konter vs. Gegenpressing)
-- pass_directions: Passrichtungs-Tendenzen
-- formation_timeline: Formationswechsel im Spielverlauf
-- frame_positions: Positionen aller erkannten Spieler
-- danger_zones: Gefahrenzonen-Analyse
-- chances: Torchancen und Abschlüsse
-- match_structure: Spielphasen und Tempo
+DATEN-HIERARCHIE (zwingend einzuhalten):
+1. MANUELL ERFASSTE EVENTS (Tore, Schüsse, Eckbälle, Karten, Fouls) sind GROUND TRUTH und IMMER zu verwenden.
+2. Endergebnis und Tor-Verteilung kommen aus dem TEAM-EVENT-BILANZ-Block.
+3. Vision-Daten (frame_positions, formation_timeline, danger_zones) sind ergänzend — bei eingeschränkter Kamera-Coverage NIEMALS dominant.
+4. NIEMALS schreiben "keine Daten", "0 Chancen", "schlechte Sicht macht Bewertung unmöglich" wenn Events vorliegen — interpretiere Events stattdessen taktisch.
 
-DEINE AUFGABE: Erstelle ein vollständiges Coaching-Cockpit mit folgenden Elementen:
+DEINE AUFGABE: Erstelle ein hochprofessionelles Coaching-Cockpit:
 
-1. MATCH RATING (1-10, mit Sub-Scores 1-10 für: offense, defense, transitions, discipline)
-2. TACTICAL GRADES (A-F für: pressing, build_up, final_third, defensive_shape, transitions, set_pieces) — mit BEGRÜNDUNG pro Note
-3. MOMENTUM-PHASEN: Mindestens 6-8 Zeitpunkte mit Minuten-Angabe und Momentum-Score (-100 bis +100, positiv = Heim-Dominanz)
-4. RISK MATRIX: 3-5 konkrete Schwachstellen mit Schweregrad (1-5) und Dringlichkeit (immediate/next_week/monitor)
-5. PLAYER SPOTLIGHT: MVP und Sorgenspieler basierend auf erkannten Mustern
-6. OPPONENT DNA: Gegnerprofil als Spider-Chart-Dimensionen (possession_control, pressing_intensity, counter_attack_threat, defensive_discipline, set_piece_danger, transition_speed — jeweils 0-100)
-7. NEXT-MATCH ACTIONS: 3 "DO" und 3 "DON'T" für das nächste Spiel
-8. TRAININGS-MIKROZYKLUS: 3 Trainingseinheiten (recovery/intensity/tactical) mit konkreten Übungen
+1. EXECUTIVE_SUMMARY (3 Absätze): Endstand mit Tor-Minuten nennen, Spielverlauf in Phasen erzählen, taktische Kernerkenntnis. KEINE Floskeln.
+2. MATCH RATING (1-10 + Sub-Scores für offense/defense/transitions/discipline) — discipline aus Karten/Fouls ableiten.
+3. CHANCE_QUALITY_ANALYSIS: Schussqualität pro Team — Schussgenauigkeit, Verwertungsquote, dominante Phase, Standard-Effizienz (Eckbälle vs. Tore aus Standards).
+4. TACTICAL_BLUEPRINT: 4 konkrete taktische Bausteine (jeweils {dimension, headline, observation, recommendation, evidence}) — KEINE Schulnoten, sondern handlungsleitende Aussagen wie "Spielaufbau über rechte Seite — 65% der Eckbälle aus dieser Zone, in der nächsten Sitzung Doppelpass-Sequenzen Außenverteidiger/Achter trainieren".
+5. SHAPE_RECOMMENDATION: Empfohlene Formation für nächstes Spiel + Begründung aus dem Spielverlauf.
+6. SET_PIECE_BREAKDOWN: Standards-Bilanz (gewonnen/verteidigt) + Empfehlung.
+7. MOMENTUM_PHASES (6-10 Punkte, -100..+100). Tor-Minuten MÜSSEN als Spitzen erscheinen.
+8. RISK_MATRIX (3-5 spezifische Schwachstellen mit Severity 1-5 + Urgency).
+9. PLAYER_SPOTLIGHT (MVP + Concern, basierend auf Mustern, ohne Namen wenn nicht eindeutig).
+10. OPPONENT_DNA (6 Spider-Werte 0-100 + Style-Label).
+11. NEXT_MATCH_ACTIONS (3 DO + 3 DON'T, sehr konkret).
+12. COACHING_CONCLUSIONS (2-3 Absätze, deep tactical).
+13. TRAINING_MICRO_CYCLE (3 Sessions: recovery/intensity/tactical mit Drills).
+14. TRAINING_RECOMMENDATIONS (3-5 Items).
 
 REGELN:
-- Schreibe für professionelle Trainer, nicht für Laien
-- Jede Aussage MUSS sich auf die Daten beziehen — keine generischen Floskeln
-- Momentum-Scores müssen die Spielphasen widerspiegeln
-- Tactical Grades MÜSSEN begründet sein (1-2 Sätze pro Note)
-- Risiken MÜSSEN spezifisch sein (z.B. "Rechte Abwehrseite bei hohem Pressing anfällig" statt "Verteidigung verbessern")
-- Training MUSS direkt auf erkannte Muster referenzieren
-- Sprache: Deutsch
-- Ton: professionell, direkt, analytisch, innovativ`,
+- Beziehe konkrete Zahlen aus der TEAM-EVENT-BILANZ in JEDE Aussage ein (z.B. "5 von 7 Schüssen aufs Tor — 71% Genauigkeit").
+- TACTICAL_BLUEPRINT ersetzt das alte "Notensystem" — schreibe wie ein Performance-Coach, nicht wie ein Lehrer.
+- Bei wenigen Events: Sage WAS du aus den vorhandenen Daten ableitest, nicht WAS FEHLT.
+- Sprache: Deutsch, knapp, aktiv, kein Konjunktiv.
+- Tor-Minuten und Endergebnis MÜSSEN exakt mit dem Ground-Truth-Fact-Sheet übereinstimmen.${visionCaveat ? "\n- Bei eingeschränkter Kamera-Sicht: VERLASSE DICH AUF EVENTS, schweige nicht." : ""}`,
           },
           {
             role: "user",
-            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}${timingContext}${h2SimNote}`,
+            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}${timingContext}${h2SimNote}${visionCaveat}`,
           },
         ],
         tools: [
@@ -227,7 +271,51 @@ REGELN:
                       required: ["minute", "score"],
                     },
                   },
-                  executive_summary: { type: "string", description: "2-3 paragraph executive match summary — incisive, data-driven" },
+                  executive_summary: { type: "string", description: "3-paragraph executive match summary — Endstand mit Tor-Minuten, Spielverlauf in Phasen, taktische Kernerkenntnis. Keine 'schlechte Sicht'-Floskeln." },
+                  chance_quality_analysis: {
+                    type: "object",
+                    description: "Schussqualität & Effizienz pro Team",
+                    properties: {
+                      home: { type: "object", properties: { shots_total: { type: "number" }, shots_on_target: { type: "number" }, accuracy_pct: { type: "number" }, conversion_pct: { type: "number" }, summary: { type: "string" } }, required: ["shots_total","shots_on_target","accuracy_pct","conversion_pct","summary"] },
+                      away: { type: "object", properties: { shots_total: { type: "number" }, shots_on_target: { type: "number" }, accuracy_pct: { type: "number" }, conversion_pct: { type: "number" }, summary: { type: "string" } }, required: ["shots_total","shots_on_target","accuracy_pct","conversion_pct","summary"] },
+                      verdict: { type: "string", description: "Wer hatte die qualitativ besseren Chancen und warum" },
+                    },
+                    required: ["home", "away", "verdict"],
+                  },
+                  tactical_blueprint: {
+                    type: "array",
+                    description: "4 handlungsleitende taktische Bausteine — ersetzt schwammige Schulnoten",
+                    items: {
+                      type: "object",
+                      properties: {
+                        dimension: { type: "string" },
+                        headline: { type: "string" },
+                        observation: { type: "string", description: "Was wurde beobachtet (mit Zahlen)" },
+                        recommendation: { type: "string", description: "Konkrete Empfehlung" },
+                        evidence: { type: "string", description: "Belegende Datenpunkte" },
+                      },
+                      required: ["dimension","headline","observation","recommendation","evidence"],
+                    },
+                  },
+                  shape_recommendation: {
+                    type: "object",
+                    properties: {
+                      formation: { type: "string" },
+                      reasoning: { type: "string" },
+                      key_roles: { type: "array", items: { type: "string" } },
+                    },
+                    required: ["formation","reasoning","key_roles"],
+                  },
+                  set_piece_breakdown: {
+                    type: "object",
+                    properties: {
+                      home_corners: { type: "number" },
+                      away_corners: { type: "number" },
+                      goals_from_set_pieces: { type: "number" },
+                      summary: { type: "string" },
+                    },
+                    required: ["home_corners","away_corners","goals_from_set_pieces","summary"],
+                  },
                   key_insights: {
                     type: "array",
                     description: "5-7 key coaching insights with maximum depth",
@@ -360,7 +448,9 @@ REGELN:
                 },
                 required: [
                   "match_rating", "tactical_grades", "momentum_phases",
-                  "executive_summary", "key_insights", "risk_matrix",
+                  "executive_summary", "chance_quality_analysis", "tactical_blueprint",
+                  "shape_recommendation", "set_piece_breakdown",
+                  "key_insights", "risk_matrix",
                   "player_spotlight", "opponent_dna", "next_match_actions",
                   "coaching_conclusions", "training_micro_cycle", "training_recommendations",
                 ],
@@ -427,6 +517,10 @@ REGELN:
       { section_type: "next_match_actions", title: "Nächstes Spiel", content: JSON.stringify(insights.next_match_actions), confidence: "high", sort_order: 55 },
       { section_type: "coaching", title: "Coaching-Schlussfolgerungen", content: insights.coaching_conclusions, confidence: "high", sort_order: 60 },
       { section_type: "training_micro_cycle", title: "Trainings-Mikrozyklus", content: JSON.stringify(insights.training_micro_cycle), confidence: "high", sort_order: 65 },
+      ...(insights.chance_quality_analysis ? [{ section_type: "chance_quality", title: "Chancenqualität", content: JSON.stringify(insights.chance_quality_analysis), confidence: "high", sort_order: 12 }] : []),
+      ...(insights.tactical_blueprint ? [{ section_type: "tactical_blueprint", title: "Taktischer Blueprint", content: JSON.stringify(insights.tactical_blueprint), confidence: "high", sort_order: 30 }] : []),
+      ...(insights.shape_recommendation ? [{ section_type: "shape_recommendation", title: "Formations-Empfehlung", content: JSON.stringify(insights.shape_recommendation), confidence: "high", sort_order: 32 }] : []),
+      ...(insights.set_piece_breakdown ? [{ section_type: "set_piece_breakdown", title: "Standards-Bilanz", content: JSON.stringify(insights.set_piece_breakdown), confidence: "high", sort_order: 34 }] : []),
       ...(insights.opponent_scouting ? [{
         section_type: "opponent_scouting",
         title: "Gegner-Scouting",
