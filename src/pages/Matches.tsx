@@ -23,7 +23,7 @@ function getMatchTimestamp(match: any) {
 }
 
 function getTimeline(match: any) {
-  if (["live", "tracking", "processing"].includes(match.status)) return "live";
+  if (["live", "tracking", "recording", "processing"].includes(match.status)) return "live";
 
   const now = Date.now();
   const matchTime = getMatchTimestamp(match);
@@ -81,7 +81,7 @@ function ActiveMatchBanner({ match, clubName }: { match: any; clubName: string |
   const label = isTraining ? "Training" : `${clubName} vs ${match.away_club_name || "TBD"}`;
   const dateStr = new Date(match.date).toLocaleDateString(locale);
 
-  if (match.status === "live" || match.status === "tracking") {
+  if (match.status === "live" || match.status === "tracking" || match.status === "recording") {
     return (
       <Link to={`/matches/${match.id}`} className="block">
         <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 sm:p-5 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5">
@@ -179,10 +179,10 @@ export default function Matches() {
   // Matches that need prominent display
   const activeMatches = useMemo(() => {
     return (matches ?? []).filter((m) =>
-      ["live", "tracking", "processing", "done"].includes(m.status)
+      ["live", "tracking", "recording", "processing", "done"].includes(m.status)
     ).sort((a, b) => {
       // Priority: live > processing > done
-      const priority: Record<string, number> = { live: 0, tracking: 0, processing: 1, done: 2 };
+      const priority: Record<string, number> = { live: 0, tracking: 0, recording: 0, processing: 1, done: 2 };
       const pa = priority[a.status] ?? 3;
       const pb = priority[b.status] ?? 3;
       if (pa !== pb) return pa - pb;
@@ -372,7 +372,7 @@ export default function Matches() {
                   const isTraining = match.match_type === "training";
                   const timeline = getTimeline(match);
                   const label = isTraining ? "Training" : `${clubName} vs ${match.away_club_name || "TBD"}`;
-                  const isActive = ["live", "tracking", "processing"].includes(match.status);
+                  const isActive = ["live", "tracking", "recording", "processing"].includes(match.status);
                   const isDone = match.status === "done";
 
                   return (
