@@ -175,7 +175,7 @@ REGELN:
           },
           {
             role: "user",
-            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}${timingContext}`,
+            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}${timingContext}${h2SimNote}`,
           },
         ],
         tools: [
