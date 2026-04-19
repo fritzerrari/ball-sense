@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
-import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff, CloudUpload, ShieldCheck, ShieldOff } from "lucide-react";
+import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff, CloudUpload, ShieldCheck, ShieldOff, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import WalkieTalkie from "@/components/WalkieTalkie";
@@ -23,6 +23,7 @@ interface CameraSession {
     synced_frames?: number;
     updated_at?: string;
     thumbnail?: string;
+    device_label?: string;
   } | null;
   command: string | null;
 }
@@ -54,6 +55,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
   const [loading, setLoading] = useState(true);
   const [sendingCommand, setSendingCommand] = useState<string | null>(null);
   const [togglingAuth, setTogglingAuth] = useState<string | null>(null);
+  const [trainerDeviceLabel, setTrainerDeviceLabel] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
     const { data } = await supabase
@@ -64,6 +66,18 @@ export default function CameraRemotePanel({ matchId }: Props) {
       .order("created_at", { ascending: true });
 
     setSessions((data as unknown as CameraSession[]) ?? []);
+
+    // Read trainer device label from match metadata
+    const { data: match } = await supabase
+      .from("matches")
+      .select("processing_progress")
+      .eq("id", matchId)
+      .maybeSingle();
+    const pp = (match?.processing_progress as any) ?? {};
+    if (typeof pp.trainer_device_label === "string" && pp.trainer_device_label.trim().length > 0) {
+      setTrainerDeviceLabel(pp.trainer_device_label.trim());
+    }
+
     setLoading(false);
   }, [matchId]);
 
@@ -166,8 +180,27 @@ export default function CameraRemotePanel({ matchId }: Props) {
       <CardContent className="pt-5 space-y-4">
         <div className="flex items-center gap-2">
           <Camera className="h-4 w-4 text-primary" />
-          <h3 className="font-semibold text-sm">Kamera-Helfer</h3>
-          <Badge variant="outline" className="text-[10px]">{sessions.length} aktiv</Badge>
+          <h3 className="font-semibold text-sm">Kameras im Match</h3>
+          <Badge variant="outline" className="text-[10px]">{sessions.length + 1} gesamt</Badge>
+        </div>
+
+        {/* Trainer's own device — always shown first */}
+        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-1">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-3.5 w-3.5 text-primary" />
+              <span className="text-sm font-semibold">Dein Gerät · Trainer</span>
+              <Badge variant="default" className="text-[10px]">führend</Badge>
+            </div>
+            {trainerDeviceLabel && (
+              <span className="text-[10px] text-muted-foreground truncate max-w-[180px]">
+                {trainerDeviceLabel}
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Direkter Zugriff — Events, Halbzeit & Stop steuerst du hier auf der Match-Seite.
+          </p>
         </div>
 
         {sessions.map((s) => {
@@ -186,15 +219,20 @@ export default function CameraRemotePanel({ matchId }: Props) {
           return (
             <div key={s.id} className="rounded-lg border border-border p-3 space-y-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   {isOnline ? (
                     <Wifi className="h-3.5 w-3.5 text-primary" />
                   ) : (
                     <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
                   <span className="text-sm font-medium">
-                    Kamera {s.camera_index ?? 1}
+                    Helfer-Kamera {s.camera_index ?? 1}
                   </span>
+                  {statusData.device_label && (
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                      · {statusData.device_label}
+                    </span>
+                  )}
                   <Badge
                     variant={isRecording ? "default" : "secondary"}
                     className="text-[10px]"

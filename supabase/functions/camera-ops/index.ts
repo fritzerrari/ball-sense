@@ -432,13 +432,16 @@ Deno.serve(async (req) => {
 
     // ── ACTION: heartbeat ──
     if (action === "heartbeat") {
-      const { phase, frame_count, thumbnail } = payload;
+      const { phase, frame_count, thumbnail, device_label } = payload;
       const statusUpdate: any = {
         phase: phase ?? "unknown",
         frame_count: frame_count ?? 0,
         updated_at: new Date().toISOString(),
       };
       if (thumbnail) statusUpdate.thumbnail = thumbnail;
+      if (typeof device_label === "string" && device_label.trim().length > 0) {
+        statusUpdate.device_label = device_label.trim().slice(0, 60);
+      }
 
       const { data: currentSession } = await supabaseAdmin
         .from("camera_access_sessions")
@@ -446,8 +449,12 @@ Deno.serve(async (req) => {
         .eq("id", session.id)
         .maybeSingle();
       
-      const existingSyncedFrames = (currentSession?.status_data as any)?.synced_frames ?? 0;
-      statusUpdate.synced_frames = existingSyncedFrames;
+      const existingStatusData = (currentSession?.status_data as any) ?? {};
+      statusUpdate.synced_frames = existingStatusData.synced_frames ?? 0;
+      // Preserve device_label across heartbeats that don't send one
+      if (!statusUpdate.device_label && existingStatusData.device_label) {
+        statusUpdate.device_label = existingStatusData.device_label;
+      }
 
       await supabaseAdmin
         .from("camera_access_sessions")
