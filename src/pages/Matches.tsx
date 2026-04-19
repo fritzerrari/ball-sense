@@ -23,7 +23,7 @@ function getMatchTimestamp(match: any) {
 }
 
 function getTimeline(match: any) {
-  if (["live", "tracking", "processing"].includes(match.status)) return "live";
+  if (["live", "tracking", "recording", "processing"].includes(match.status)) return "live";
 
   const now = Date.now();
   const matchTime = getMatchTimestamp(match);
