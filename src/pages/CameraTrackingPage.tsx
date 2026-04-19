@@ -957,7 +957,7 @@ export default function CameraTrackingPage() {
         <WalkieTalkie
           matchId={matchId}
           userId={isHelper ? (sessionId ?? `helper-${sessionToken.slice(0, 8)}`) : "trainer"}
-          userName={isHelper ? `Kamera ${1}` : "Trainer"}
+          userName={isHelper ? (deviceLabel || "Helfer-Kamera") : (deviceLabel || "Trainer")}
         />
       )}
       <RecordingGuard isRecording={phase === "recording"} frameCount={frameCount} />
