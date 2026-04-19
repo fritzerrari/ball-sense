@@ -465,63 +465,104 @@ export default function MatchReport() {
                 {/* Risk Matrix */}
                 {riskMatrix && <RiskRadar risks={riskMatrix} />}
 
-                {/* Danger Zones + Chances */}
-                {(dangerZones || chances) && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {dangerZones && (
-                      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-                        <CardContent className="pt-5">
-                          <div className="flex items-center gap-2 mb-3">
-                            <AlertTriangle className="h-4 w-4 text-amber-500" />
-                            <h3 className="font-medium text-sm">Gefährdungszonen</h3>
-                          </div>
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Eigene Angriffe</p>
-                              <div className="flex gap-1.5 mt-1">
-                                {(dangerZones.data?.home_attack_zones ?? []).map((z: string) => (
-                                  <Badge key={z} variant="secondary" className="capitalize">{z === "left" ? "Links" : z === "right" ? "Rechts" : "Zentrum"}</Badge>
-                                ))}
-                              </div>
+                {/* Chance Quality (Event-basiert, ersetzt alte Chancen-Box wenn vorhanden) */}
+                {chanceQuality ? (
+                  <ChanceQualityPanel
+                    data={chanceQuality}
+                    homeName={clubName ?? "Heim"}
+                    awayName={match.away_club_name ?? "Gast"}
+                  />
+                ) : (
+                  /* Fallback: Danger Zones + altes Chancen-Layout */
+                  (dangerZones || chances) && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {dangerZones && (
+                        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                          <CardContent className="pt-5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <AlertTriangle className="h-4 w-4 text-amber-500" />
+                              <h3 className="font-medium text-sm">Gefährdungszonen</h3>
                             </div>
-                            {dangerZones.data?.home_vulnerable_zones?.length > 0 && (
+                            <div className="space-y-2">
                               <div>
-                                <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-2">Verwundbar</p>
+                                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Eigene Angriffe</p>
                                 <div className="flex gap-1.5 mt-1">
-                                  {dangerZones.data.home_vulnerable_zones.map((z: string) => (
-                                    <Badge key={z} variant="outline" className="text-amber-500 border-amber-500/30">{z}</Badge>
+                                  {(dangerZones.data?.home_attack_zones ?? []).map((z: string) => (
+                                    <Badge key={z} variant="secondary" className="capitalize">{z === "left" ? "Links" : z === "right" ? "Rechts" : "Zentrum"}</Badge>
                                   ))}
                                 </div>
                               </div>
+                              {dangerZones.data?.home_vulnerable_zones?.length > 0 && (
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-2">Verwundbar</p>
+                                  <div className="flex gap-1.5 mt-1">
+                                    {dangerZones.data.home_vulnerable_zones.map((z: string) => (
+                                      <Badge key={z} variant="outline" className="text-amber-500 border-amber-500/30">{z}</Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {chances && (
+                        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                          <CardContent className="pt-5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Target className="h-4 w-4 text-primary" />
+                              <h3 className="font-medium text-sm">Chancen & Abschlüsse</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="rounded-lg bg-muted/30 p-2.5 text-center">
+                                <p className="text-2xl font-bold font-display">{chances.data?.home_chances ?? "?"}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">Heim</p>
+                              </div>
+                              <div className="rounded-lg bg-muted/30 p-2.5 text-center">
+                                <p className="text-2xl font-bold font-display">{chances.data?.away_chances ?? "?"}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">Gast</p>
+                              </div>
+                            </div>
+                            {chances.data?.pattern_notes && (
+                              <p className="text-xs text-muted-foreground mt-3">{chances.data.pattern_notes}</p>
                             )}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )
+                )}
+
+                {/* Danger Zones zusätzlich, wenn ChanceQuality vorhanden ist */}
+                {chanceQuality && dangerZones && (
+                  <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <h3 className="font-medium text-sm">Gefährdungszonen</h3>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Eigene Angriffe</p>
+                          <div className="flex gap-1.5 mt-1 flex-wrap">
+                            {(dangerZones.data?.home_attack_zones ?? []).map((z: string) => (
+                              <Badge key={z} variant="secondary" className="capitalize">{z === "left" ? "Links" : z === "right" ? "Rechts" : "Zentrum"}</Badge>
+                            ))}
                           </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {chances && (
-                      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-                        <CardContent className="pt-5">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Target className="h-4 w-4 text-primary" />
-                            <h3 className="font-medium text-sm">Chancen & Abschlüsse</h3>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-                              <p className="text-2xl font-bold font-display">{chances.data?.home_chances ?? "?"}</p>
-                              <p className="text-[10px] text-muted-foreground uppercase">Heim</p>
+                        </div>
+                        {dangerZones.data?.home_vulnerable_zones?.length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Verwundbar</p>
+                            <div className="flex gap-1.5 mt-1 flex-wrap">
+                              {dangerZones.data.home_vulnerable_zones.map((z: string) => (
+                                <Badge key={z} variant="outline" className="text-amber-500 border-amber-500/30">{z}</Badge>
+                              ))}
                             </div>
-                            <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-                              <p className="text-2xl font-bold font-display">{chances.data?.away_chances ?? "?"}</p>
-                              <p className="text-[10px] text-muted-foreground uppercase">Gast</p>
-                            </div>
                           </div>
-                          {chances.data?.pattern_notes && (
-                            <p className="text-xs text-muted-foreground mt-3">{chances.data.pattern_notes}</p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Coaching Conclusions */}
