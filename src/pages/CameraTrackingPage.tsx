@@ -507,9 +507,25 @@ export default function CameraTrackingPage() {
     }
   }, [hasHighlights, isHelper, uploadDelta, updateMatchTiming]);
 
-  const handleSetupComplete = useCallback(async (coverage: import("@/lib/types").FieldCoverage) => {
+  const handleSetupComplete = useCallback(async (coverage: import("@/lib/types").FieldCoverage, leadOnly: boolean) => {
+    setEventLeadOnly(leadOnly);
+    // Persist lead-mode flag so helper devices read it
+    if (matchId && !isHelper) {
+      try {
+        const { data: m } = await supabase
+          .from("matches")
+          .select("processing_progress")
+          .eq("id", matchId)
+          .maybeSingle();
+        const prev = (m?.processing_progress as any) ?? {};
+        await supabase
+          .from("matches")
+          .update({ processing_progress: { ...prev, event_lead_only: leadOnly } as any })
+          .eq("id", matchId);
+      } catch { /* non-critical */ }
+    }
     await initCamera(coverage);
-  }, [initCamera]);
+  }, [initCamera, matchId, isHelper]);
 
   const handleReadyStart = useCallback(() => {
     startRecording();
