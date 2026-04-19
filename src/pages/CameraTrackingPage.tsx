@@ -110,6 +110,7 @@ export default function CameraTrackingPage() {
   const [awayTeamName, setAwayTeamName] = useState("Gegner");
   const [liveHomeGoals, setLiveHomeGoals] = useState(0);
   const [liveAwayGoals, setLiveAwayGoals] = useState(0);
+  const [eventLeadOnly, setEventLeadOnly] = useState(false);
 
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
