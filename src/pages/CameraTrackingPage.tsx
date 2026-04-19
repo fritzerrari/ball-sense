@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye, Pause, Play, CloudUpload, Wifi, Maximize2 } from "lucide-react";
+import { Video, Square, CheckCircle2, Loader2, Camera, ImageIcon, Clock, FileText, Eye, Pause, Play, CloudUpload, Wifi, Maximize2, UserCheck, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startLiveCapture } from "@/lib/frame-capture";
@@ -111,6 +111,7 @@ export default function CameraTrackingPage() {
   const [liveHomeGoals, setLiveHomeGoals] = useState(0);
   const [liveAwayGoals, setLiveAwayGoals] = useState(0);
   const [eventLeadOnly, setEventLeadOnly] = useState(false);
+  const [deviceLabel, setDeviceLabel] = useState<string>("");
 
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
@@ -322,6 +323,7 @@ export default function CameraTrackingPage() {
             match_id: matchId,
             phase: currentPhase,
             frame_count: currentFrameCount,
+            ...(deviceLabel ? { device_label: deviceLabel } : {}),
             ...(thumbnail ? { thumbnail } : {}),
           }),
         },
@@ -337,7 +339,7 @@ export default function CameraTrackingPage() {
       // Heartbeat failure is non-critical
     }
     return null;
-  }, [isHelper, matchId, sessionToken, captureThumbnail]);
+  }, [isHelper, matchId, sessionToken, captureThumbnail, deviceLabel]);
 
   // ── Incremental delta upload during recording ──
   const uploadDelta = useCallback(async () => {
@@ -507,8 +509,9 @@ export default function CameraTrackingPage() {
     }
   }, [hasHighlights, isHelper, uploadDelta, updateMatchTiming]);
 
-  const handleSetupComplete = useCallback(async (coverage: import("@/lib/types").FieldCoverage, leadOnly: boolean) => {
+  const handleSetupComplete = useCallback(async (coverage: import("@/lib/types").FieldCoverage, leadOnly: boolean, label: string) => {
     setEventLeadOnly(leadOnly);
+    setDeviceLabel(label);
     // Persist lead-mode flag so helper devices read it
     if (matchId && !isHelper) {
       try {
@@ -520,7 +523,7 @@ export default function CameraTrackingPage() {
         const prev = (m?.processing_progress as any) ?? {};
         await supabase
           .from("matches")
-          .update({ processing_progress: { ...prev, event_lead_only: leadOnly } as any })
+          .update({ processing_progress: { ...prev, event_lead_only: leadOnly, trainer_device_label: label } as any })
           .eq("id", matchId);
       } catch { /* non-critical */ }
     }
