@@ -46,9 +46,10 @@ const coverageOptions: { value: FieldCoverage; label: string; icon: typeof Squar
   { value: "right_half", label: "Rechte Hälfte", icon: ArrowLeftRight, desc: "Nur sichtbare Hälfte wird ausgewertet" },
 ];
 
-export default function CameraSetupOverlay({ onDismiss, onStart }: CameraSetupOverlayProps) {
+export default function CameraSetupOverlay({ onDismiss, onStart, showEventLeadToggle = false }: CameraSetupOverlayProps) {
   const [checked, setChecked] = useState<boolean[]>([false, false, false, false, false]);
   const [coverage, setCoverage] = useState<FieldCoverage>("full");
+  const [eventLeadOnly, setEventLeadOnly] = useState(false);
 
   const allChecked = checked.every(Boolean);
 
