@@ -90,11 +90,21 @@ interface AnalysisResult {
 interface AnalysisJob {
   id: string;
   status: string;
-  progress: number;
+  progress: number | null;
+  error_message?: string | null;
+  created_at?: string;
 }
+
+const ACTIVE_JOB_STATUSES = ["queued", "analyzing", "interpreting"] as const;
+const TERMINAL_JOB_STATUSES = ["complete", "failed", "cancelled"] as const;
 
 function parseJson(content: string): any {
   try { return JSON.parse(content); } catch { return null; }
+}
+
+function resolveActiveJob(jobs: AnalysisJob[] | null | undefined): AnalysisJob | null {
+  if (!jobs?.length) return null;
+  return jobs.find((candidate) => ACTIVE_JOB_STATUSES.includes(candidate.status as typeof ACTIVE_JOB_STATUSES[number])) ?? null;
 }
 
 export default function MatchReport() {
@@ -115,21 +125,21 @@ export default function MatchReport() {
 
   useEffect(() => {
     if (!id) return;
-    loadReportData();
+    void loadReportData();
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("analysis_jobs")
-        .select("id, status, progress")
+        .select("id, status, progress, error_message, created_at")
         .eq("match_id", id)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setJob(data);
-        if (data.status === "complete") {
-          clearInterval(interval);
-          loadReportData();
-        }
+        .limit(5);
+
+      const activeJob = resolveActiveJob(data ?? []);
+      setJob(activeJob);
+
+      if (!activeJob) {
+        clearInterval(interval);
+        void loadReportData();
       }
     }, 3000);
     return () => clearInterval(interval);
@@ -138,16 +148,16 @@ export default function MatchReport() {
   const loadReportData = async () => {
     if (!id) return;
     setLoadingReport(true);
-    const [sectionsRes, trainingRes, resultsRes, jobRes] = await Promise.all([
+    const [sectionsRes, trainingRes, resultsRes, jobsRes] = await Promise.all([
       supabase.from("report_sections").select("*").eq("match_id", id).order("sort_order"),
       supabase.from("training_recommendations").select("*").eq("match_id", id).order("priority"),
       supabase.from("analysis_results").select("*").eq("match_id", id),
-      supabase.from("analysis_jobs").select("id, status, progress").eq("match_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("analysis_jobs").select("id, status, progress, error_message, created_at").eq("match_id", id).order("created_at", { ascending: false }).limit(5),
     ]);
     setSections(sectionsRes.data ?? []);
     setTraining(trainingRes.data ?? []);
     setAnalysisResults(resultsRes.data ?? []);
-    setJob(jobRes.data ?? null);
+    setJob(resolveActiveJob(jobsRes.data ?? []));
     setLoadingReport(false);
   };
 
@@ -197,7 +207,7 @@ export default function MatchReport() {
   const formationTimeline = analysisResults.find(r => r.result_type === "formation_timeline");
   const teamSizeDetected = analysisResults.find(r => r.result_type === "team_size_detected")?.data;
 
-  const isProcessing = job?.status && !["complete", "failed", "cancelled"].includes(job.status);
+  const isProcessing = !!job?.status && !TERMINAL_JOB_STATUSES.includes(job.status as typeof TERMINAL_JOB_STATUSES[number]);
   const hasReport = sections.length > 0;
 
   return (

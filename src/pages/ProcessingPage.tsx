@@ -15,7 +15,10 @@ const STAGES = [
   { key: "complete", label: "Report erstellen", icon: ClipboardList },
 ] as const;
 
-type JobStatus = "queued" | "analyzing" | "interpreting" | "complete" | "failed";
+type JobStatus = "queued" | "analyzing" | "interpreting" | "complete" | "failed" | "cancelled";
+
+const ACTIVE_JOB_STATUSES: JobStatus[] = ["queued", "analyzing", "interpreting"];
+const TERMINAL_JOB_STATUSES: JobStatus[] = ["complete", "failed", "cancelled"];
 
 export default function ProcessingPage() {
   const { id } = useParams();
@@ -39,10 +42,11 @@ export default function ProcessingPage() {
         .maybeSingle();
 
       if (data) {
-        setStatus(data.status as JobStatus);
+        const nextStatus = data.status as JobStatus;
+        setStatus(nextStatus);
         setProgress(data.progress ?? 0);
-        if (data.error_message) setErrorMessage(data.error_message);
-        if (data.status === "complete" || data.status === "failed") clearInterval(interval);
+        setErrorMessage(data.error_message ?? null);
+        if (TERMINAL_JOB_STATUSES.includes(nextStatus)) clearInterval(interval);
       }
     }, 2000);
     return () => clearInterval(interval);
@@ -58,7 +62,7 @@ export default function ProcessingPage() {
         .select("id, status")
         .eq("match_id", id)
         .eq("job_kind", "final")
-        .in("status", ["queued", "analyzing", "interpreting"])
+        .in("status", ACTIVE_JOB_STATUSES)
         .maybeSingle();
 
       if (activeJob) {
@@ -98,20 +102,24 @@ export default function ProcessingPage() {
 
   const currentStageIndex = STAGES.findIndex(s => s.key === status);
   const isComplete = status === "complete";
-  const isFailed = status === "failed";
+  const isFailed = status === "failed" || status === "cancelled";
+  const statusHeading = isComplete
+    ? "Analyse abgeschlossen"
+    : isFailed
+      ? "Analyse fehlgeschlagen"
+      : "Analyse läuft";
+  const statusDescription = isComplete
+    ? "Dein Spielbericht ist fertig."
+    : isFailed
+      ? "Es gab ein Problem bei der Analyse."
+      : "Dein Spielbericht wird automatisch erstellt.";
 
   return (
     <AppLayout>
       <div className="mx-auto max-w-xl py-12">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-display font-bold">
-            {isComplete ? "Analyse abgeschlossen" : isFailed ? "Analyse fehlgeschlagen" : "Analyse läuft"}
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            {isComplete ? "Dein Spielbericht ist fertig." :
-             isFailed ? "Es gab ein Problem bei der Analyse." :
-             "Dein Spielbericht wird automatisch erstellt."}
-          </p>
+          <h1 className="text-2xl font-display font-bold">{statusHeading}</h1>
+          <p className="text-muted-foreground mt-2">{statusDescription}</p>
         </div>
 
         <Card className="border-border bg-card">
