@@ -203,7 +203,44 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Training Recommendations */}
+        {/* Last Report — quick deep-links into the latest match's report tabs */}
+        {(() => {
+          const lastDone = matches?.find(m => m.status === "done");
+          if (!lastDone) return null;
+          const tabs = [
+            { key: "overview", label: "Übersicht", icon: Sparkles },
+            { key: "tactics", label: "Taktik", icon: Brain },
+            { key: "players", label: "Spieler", icon: Users },
+            { key: "training", label: "Training", icon: Zap },
+          ];
+          return (
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-primary" />
+                  <h3 className="text-sm font-semibold text-muted-foreground">Letzter Report</h3>
+                </div>
+                <Link to={`/matches/${lastDone.id}`} className="text-xs text-primary hover:underline">
+                  {clubName} vs {lastDone.away_club_name || "TBD"} →
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {tabs.map(({ key, label, icon: Icon }) => (
+                  <Link
+                    key={key}
+                    to={`/matches/${lastDone.id}?tab=${key}`}
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-border/50 hover:bg-primary/5 hover:border-primary/30 transition-all group"
+                  >
+                    <Icon className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-medium">{label}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Training Recommendations — clickable, jump to the matching match */}
         {recommendations && recommendations.length > 0 && (
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-4">
@@ -212,12 +249,16 @@ export default function Dashboard() {
             </div>
             <div className="space-y-3">
               {recommendations.map((rec) => (
-                <div key={rec.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/50">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 mt-0.5">
+                <Link
+                  key={rec.id}
+                  to={`/matches/${rec.match_id}?tab=training`}
+                  className="flex items-start gap-3 p-3 rounded-lg border border-border/50 hover:bg-primary/5 hover:border-primary/30 transition-all group"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 mt-0.5 group-hover:bg-primary/20 transition-colors">
                     <Zap className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{rec.title}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium group-hover:text-primary transition-colors">{rec.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{rec.description}</p>
                   </div>
                   {rec.priority && (
@@ -229,7 +270,8 @@ export default function Dashboard() {
                       P{rec.priority}
                     </span>
                   )}
-                </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all self-center" />
+                </Link>
               ))}
             </div>
           </div>
