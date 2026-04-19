@@ -110,6 +110,7 @@ export default function CameraTrackingPage() {
   const [awayTeamName, setAwayTeamName] = useState("Gegner");
   const [liveHomeGoals, setLiveHomeGoals] = useState(0);
   const [liveAwayGoals, setLiveAwayGoals] = useState(0);
+  const [eventLeadOnly, setEventLeadOnly] = useState(false);
 
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
@@ -121,7 +122,7 @@ export default function CameraTrackingPage() {
     (async () => {
       const { data: matchData } = await supabase
         .from("matches")
-        .select("match_type, away_club_name, home_club_id")
+        .select("match_type, away_club_name, home_club_id, processing_progress")
         .eq("id", matchId)
         .maybeSingle();
       if (matchData?.match_type) setMatchType(matchData.match_type);
@@ -133,6 +134,11 @@ export default function CameraTrackingPage() {
           .eq("id", matchData.home_club_id)
           .maybeSingle();
         if (club?.name) setHomeTeamName(club.name);
+      }
+      // Read event-lead flag (set by trainer at setup)
+      const pp = (matchData?.processing_progress as any) ?? null;
+      if (pp && typeof pp.event_lead_only === "boolean") {
+        setEventLeadOnly(pp.event_lead_only);
       }
 
       // Load existing goal events to init live score
@@ -501,9 +507,25 @@ export default function CameraTrackingPage() {
     }
   }, [hasHighlights, isHelper, uploadDelta, updateMatchTiming]);
 
-  const handleSetupComplete = useCallback(async (coverage: import("@/lib/types").FieldCoverage) => {
+  const handleSetupComplete = useCallback(async (coverage: import("@/lib/types").FieldCoverage, leadOnly: boolean) => {
+    setEventLeadOnly(leadOnly);
+    // Persist lead-mode flag so helper devices read it
+    if (matchId && !isHelper) {
+      try {
+        const { data: m } = await supabase
+          .from("matches")
+          .select("processing_progress")
+          .eq("id", matchId)
+          .maybeSingle();
+        const prev = (m?.processing_progress as any) ?? {};
+        await supabase
+          .from("matches")
+          .update({ processing_progress: { ...prev, event_lead_only: leadOnly } as any })
+          .eq("id", matchId);
+      } catch { /* non-critical */ }
+    }
     await initCamera(coverage);
-  }, [initCamera]);
+  }, [initCamera, matchId, isHelper]);
 
   const handleReadyStart = useCallback(() => {
     startRecording();
@@ -958,6 +980,7 @@ export default function CameraTrackingPage() {
           <CameraSetupOverlay
             onDismiss={() => initCamera("full")}
             onStart={handleSetupComplete}
+            showEventLeadToggle={!isHelper}
           />
         )}
 
@@ -1097,6 +1120,7 @@ export default function CameraTrackingPage() {
                   isTraining={isTraining}
                   homeTeamName={homeTeamName}
                   awayTeamName={awayTeamName}
+                  eventLeadOnly={eventLeadOnly}
                   onGoalEvent={(team) => {
                     if (team === "home") setLiveHomeGoals(p => p + 1);
                     else setLiveAwayGoals(p => p + 1);
