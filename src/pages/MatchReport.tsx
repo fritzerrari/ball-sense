@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { usePdfExport, PdfReportType } from "@/hooks/use-pdf-export";
 import PostMatchEventEditor from "@/components/PostMatchEventEditor";
+import VideoBackfillUpload from "@/components/VideoBackfillUpload";
 import { useMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -221,6 +222,7 @@ export default function MatchReport() {
             );
           })()}
           {id && <PostMatchEventEditor matchId={id} onEventsChanged={loadReportData} />}
+          {id && <VideoBackfillUpload matchId={id} onComplete={loadReportData} />}
           {hasReport && id && (
             <Popover>
               <PopoverTrigger asChild>

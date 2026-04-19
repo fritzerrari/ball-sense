@@ -499,13 +499,13 @@ export default function CameraTrackingPage() {
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
 
-    // Delta upload every 45s
+    // Delta upload every 15s — tighter window minimizes data loss on crash/battery-out
     if (isHelper) {
       deltaUploadRef.current = setInterval(() => {
         if (deltaRetryCountRef.current < 3) {
           uploadDelta();
         }
-      }, 45000);
+      }, 15000);
     }
   }, [hasHighlights, isHelper, uploadDelta, updateMatchTiming]);
 
@@ -880,7 +880,7 @@ export default function CameraTrackingPage() {
     if (isHelper) {
       deltaUploadRef.current = setInterval(() => {
         if (deltaRetryCountRef.current < 3) uploadDelta();
-      }, 45000);
+      }, 15000);
     }
 
     toast.success("Aufnahme fortgesetzt!");
