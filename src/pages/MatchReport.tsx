@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useState, useEffect, lazy, Suspense } from "react";
 import {
   ArrowLeft, Brain, Lightbulb, Target, Shield, Zap,
@@ -113,6 +113,7 @@ function resolveActiveJob(jobs: AnalysisJob[] | null | undefined): AnalysisJob |
 
 export default function MatchReport() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { clubName } = useAuth();
   const { data: match, isLoading } = useMatch(id);
   const { hasAccess: hasHighlights } = useModuleAccess("video_highlights");
@@ -125,7 +126,20 @@ export default function MatchReport() {
   const [job, setJob] = useState<AnalysisJob | null>(null);
   const [loadingReport, setLoadingReport] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = searchParams.get("tab");
+    return t && ["overview", "tactics", "players", "opponent", "training"].includes(t) ? t : "overview";
+  });
+
+  // Sync tab → URL so the user can share/refresh deep-linked sections
+  useEffect(() => {
+    const current = searchParams.get("tab");
+    if (current === activeTab) return;
+    if (activeTab === "overview" && !current) return;
+    const next = new URLSearchParams(searchParams);
+    if (activeTab === "overview") next.delete("tab"); else next.set("tab", activeTab);
+    setSearchParams(next, { replace: true });
+  }, [activeTab, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!id) return;

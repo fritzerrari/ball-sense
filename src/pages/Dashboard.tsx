@@ -108,29 +108,44 @@ export default function Dashboard() {
         <MatchFlowGuide />
         
 
-        {/* Quick stats */}
+        {/* Quick stats — all clickable */}
         <div className="grid sm:grid-cols-3 gap-4">
-          <div className="glass-card p-5">
+          <Link
+            to="/matches?status=done"
+            className="glass-card p-5 group hover:border-primary/40 hover:bg-primary/5 transition-all"
+            aria-label={`${doneCount} analysierte Spiele anzeigen`}
+          >
             <div className="flex items-center gap-2 mb-2">
               <Swords className="h-4 w-4 text-primary" />
               <span className="text-xs text-muted-foreground">{t("dashboard.analyzed")}</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/40 ml-auto group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
             </div>
             <div className="text-2xl font-bold font-display">{doneCount}</div>
-          </div>
-          <div className="glass-card p-5">
+          </Link>
+          <Link
+            to="/matches?status=processing"
+            className="glass-card p-5 group hover:border-amber-500/40 hover:bg-amber-500/5 transition-all"
+            aria-label={`${processingCount} Analysen in Arbeit anzeigen`}
+          >
             <div className="flex items-center gap-2 mb-2">
               <Loader2 className={`h-4 w-4 ${processingCount > 0 ? "text-amber-500 animate-spin" : "text-muted-foreground"}`} />
               <span className="text-xs text-muted-foreground">{t("dashboard.inAnalysis")}</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/40 ml-auto group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
             </div>
             <div className="text-2xl font-bold font-display">{processingCount}</div>
-          </div>
-          <div className="glass-card p-5">
+          </Link>
+          <Link
+            to="/players"
+            className="glass-card p-5 group hover:border-primary/40 hover:bg-primary/5 transition-all"
+            aria-label={`${players?.length ?? 0} Spieler verwalten`}
+          >
             <div className="flex items-center gap-2 mb-2">
               <Users className="h-4 w-4 text-primary" />
               <span className="text-xs text-muted-foreground">{t("dashboard.players")}</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/40 ml-auto group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
             </div>
             <div className="text-2xl font-bold font-display">{players?.length ?? 0}</div>
-          </div>
+          </Link>
         </div>
 
         {/* Recent matches */}
@@ -188,7 +203,44 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Training Recommendations */}
+        {/* Last Report — quick deep-links into the latest match's report tabs */}
+        {(() => {
+          const lastDone = matches?.find(m => m.status === "done");
+          if (!lastDone) return null;
+          const tabs = [
+            { key: "overview", label: "Übersicht", icon: Sparkles },
+            { key: "tactics", label: "Taktik", icon: Brain },
+            { key: "players", label: "Spieler", icon: Users },
+            { key: "training", label: "Training", icon: Zap },
+          ];
+          return (
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-primary" />
+                  <h3 className="text-sm font-semibold text-muted-foreground">Letzter Report</h3>
+                </div>
+                <Link to={`/matches/${lastDone.id}`} className="text-xs text-primary hover:underline">
+                  {clubName} vs {lastDone.away_club_name || "TBD"} →
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {tabs.map(({ key, label, icon: Icon }) => (
+                  <Link
+                    key={key}
+                    to={`/matches/${lastDone.id}?tab=${key}`}
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-border/50 hover:bg-primary/5 hover:border-primary/30 transition-all group"
+                  >
+                    <Icon className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-medium">{label}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Training Recommendations — clickable, jump to the matching match */}
         {recommendations && recommendations.length > 0 && (
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-4">
@@ -197,12 +249,16 @@ export default function Dashboard() {
             </div>
             <div className="space-y-3">
               {recommendations.map((rec) => (
-                <div key={rec.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/50">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 mt-0.5">
+                <Link
+                  key={rec.id}
+                  to={`/matches/${rec.match_id}?tab=training`}
+                  className="flex items-start gap-3 p-3 rounded-lg border border-border/50 hover:bg-primary/5 hover:border-primary/30 transition-all group"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 mt-0.5 group-hover:bg-primary/20 transition-colors">
                     <Zap className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{rec.title}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium group-hover:text-primary transition-colors">{rec.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{rec.description}</p>
                   </div>
                   {rec.priority && (
@@ -214,7 +270,8 @@ export default function Dashboard() {
                       P{rec.priority}
                     </span>
                   )}
-                </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all self-center" />
+                </Link>
               ))}
             </div>
           </div>

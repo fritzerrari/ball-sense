@@ -12,6 +12,7 @@ import CameraSetupOverlay from "@/components/CameraSetupOverlay";
 import StopConfirmDialog from "@/components/StopConfirmDialog";
 import SideSwapDialog from "@/components/SideSwapDialog";
 import MatchEventQuickBar from "@/components/MatchEventQuickBar";
+import HelperQuickEvents from "@/components/HelperQuickEvents";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
@@ -1335,6 +1336,19 @@ export default function CameraTrackingPage() {
           </div>
         )}
       </div>
+
+      {/* Helper-only big quick-event card — always visible during recording / halftime */}
+      {isHelper && matchId && (phase === "recording" || phase === "halftime_pause") && !eventLeadOnly && (
+        <HelperQuickEvents
+          matchId={matchId}
+          sessionToken={sessionToken}
+          recordingStartTime={recordingStartTime}
+          halfNumber={halfNumber}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+          isTraining={isTraining}
+        />
+      )}
 
       <div className="safe-area-pad border-t border-border bg-background p-3 space-y-1.5">
         {phase === "ready" && (
