@@ -34,6 +34,10 @@ import PlayerSpotlight from "@/components/PlayerSpotlight";
 import OpponentDNA from "@/components/OpponentDNA";
 import TrainingMicroCycle from "@/components/TrainingMicroCycle";
 import QuickActionCards from "@/components/QuickActionCards";
+import ChanceQualityPanel from "@/components/ChanceQualityPanel";
+import TacticalBlueprintBoard from "@/components/TacticalBlueprintBoard";
+import ShapeRecommendationCard from "@/components/ShapeRecommendationCard";
+import SetPieceBreakdown from "@/components/SetPieceBreakdown";
 
 // Lazy-loaded analysis components
 const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
@@ -196,6 +200,10 @@ export default function MatchReport() {
   const nextMatchActions = parseJson(getSection("next_match_actions")?.content ?? "null");
   const trainingMicroCycle = parseJson(getSection("training_micro_cycle")?.content ?? "null");
   const opponentScouting = getSection("opponent_scouting");
+  const chanceQuality = parseJson(getSection("chance_quality")?.content ?? "null");
+  const tacticalBlueprint = parseJson(getSection("tactical_blueprint")?.content ?? "null");
+  const shapeRecommendation = parseJson(getSection("shape_recommendation")?.content ?? "null");
+  const setPieceBreakdown = parseJson(getSection("set_piece_breakdown")?.content ?? "null");
 
   // Analysis results
   const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
@@ -394,8 +402,8 @@ export default function MatchReport() {
                   </motion.div>
                 )}
 
-                {/* Tactical Grades */}
-                {tacticalGrades && <TacticalGradeMatrix grades={tacticalGrades} />}
+                {/* Tactical Grades — nur als Fallback wenn kein Blueprint vorhanden */}
+                {tacticalGrades && !tacticalBlueprint && <TacticalGradeMatrix grades={tacticalGrades} />}
 
                 {/* Momentum Timeline */}
                 {momentumData && <MomentumTimeline data={momentumData} />}
@@ -457,63 +465,104 @@ export default function MatchReport() {
                 {/* Risk Matrix */}
                 {riskMatrix && <RiskRadar risks={riskMatrix} />}
 
-                {/* Danger Zones + Chances */}
-                {(dangerZones || chances) && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {dangerZones && (
-                      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-                        <CardContent className="pt-5">
-                          <div className="flex items-center gap-2 mb-3">
-                            <AlertTriangle className="h-4 w-4 text-amber-500" />
-                            <h3 className="font-medium text-sm">Gefährdungszonen</h3>
-                          </div>
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Eigene Angriffe</p>
-                              <div className="flex gap-1.5 mt-1">
-                                {(dangerZones.data?.home_attack_zones ?? []).map((z: string) => (
-                                  <Badge key={z} variant="secondary" className="capitalize">{z === "left" ? "Links" : z === "right" ? "Rechts" : "Zentrum"}</Badge>
-                                ))}
-                              </div>
+                {/* Chance Quality (Event-basiert, ersetzt alte Chancen-Box wenn vorhanden) */}
+                {chanceQuality ? (
+                  <ChanceQualityPanel
+                    data={chanceQuality}
+                    homeName={clubName ?? "Heim"}
+                    awayName={match.away_club_name ?? "Gast"}
+                  />
+                ) : (
+                  /* Fallback: Danger Zones + altes Chancen-Layout */
+                  (dangerZones || chances) && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {dangerZones && (
+                        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                          <CardContent className="pt-5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <AlertTriangle className="h-4 w-4 text-amber-500" />
+                              <h3 className="font-medium text-sm">Gefährdungszonen</h3>
                             </div>
-                            {dangerZones.data?.home_vulnerable_zones?.length > 0 && (
+                            <div className="space-y-2">
                               <div>
-                                <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-2">Verwundbar</p>
+                                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Eigene Angriffe</p>
                                 <div className="flex gap-1.5 mt-1">
-                                  {dangerZones.data.home_vulnerable_zones.map((z: string) => (
-                                    <Badge key={z} variant="outline" className="text-amber-500 border-amber-500/30">{z}</Badge>
+                                  {(dangerZones.data?.home_attack_zones ?? []).map((z: string) => (
+                                    <Badge key={z} variant="secondary" className="capitalize">{z === "left" ? "Links" : z === "right" ? "Rechts" : "Zentrum"}</Badge>
                                   ))}
                                 </div>
                               </div>
+                              {dangerZones.data?.home_vulnerable_zones?.length > 0 && (
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground mt-2">Verwundbar</p>
+                                  <div className="flex gap-1.5 mt-1">
+                                    {dangerZones.data.home_vulnerable_zones.map((z: string) => (
+                                      <Badge key={z} variant="outline" className="text-amber-500 border-amber-500/30">{z}</Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {chances && (
+                        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                          <CardContent className="pt-5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Target className="h-4 w-4 text-primary" />
+                              <h3 className="font-medium text-sm">Chancen & Abschlüsse</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="rounded-lg bg-muted/30 p-2.5 text-center">
+                                <p className="text-2xl font-bold font-display">{chances.data?.home_chances ?? "?"}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">Heim</p>
+                              </div>
+                              <div className="rounded-lg bg-muted/30 p-2.5 text-center">
+                                <p className="text-2xl font-bold font-display">{chances.data?.away_chances ?? "?"}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">Gast</p>
+                              </div>
+                            </div>
+                            {chances.data?.pattern_notes && (
+                              <p className="text-xs text-muted-foreground mt-3">{chances.data.pattern_notes}</p>
                             )}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )
+                )}
+
+                {/* Danger Zones zusätzlich, wenn ChanceQuality vorhanden ist */}
+                {chanceQuality && dangerZones && (
+                  <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                    <CardContent className="pt-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <h3 className="font-medium text-sm">Gefährdungszonen</h3>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Eigene Angriffe</p>
+                          <div className="flex gap-1.5 mt-1 flex-wrap">
+                            {(dangerZones.data?.home_attack_zones ?? []).map((z: string) => (
+                              <Badge key={z} variant="secondary" className="capitalize">{z === "left" ? "Links" : z === "right" ? "Rechts" : "Zentrum"}</Badge>
+                            ))}
                           </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {chances && (
-                      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-                        <CardContent className="pt-5">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Target className="h-4 w-4 text-primary" />
-                            <h3 className="font-medium text-sm">Chancen & Abschlüsse</h3>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-                              <p className="text-2xl font-bold font-display">{chances.data?.home_chances ?? "?"}</p>
-                              <p className="text-[10px] text-muted-foreground uppercase">Heim</p>
+                        </div>
+                        {dangerZones.data?.home_vulnerable_zones?.length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Verwundbar</p>
+                            <div className="flex gap-1.5 mt-1 flex-wrap">
+                              {dangerZones.data.home_vulnerable_zones.map((z: string) => (
+                                <Badge key={z} variant="outline" className="text-amber-500 border-amber-500/30">{z}</Badge>
+                              ))}
                             </div>
-                            <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-                              <p className="text-2xl font-bold font-display">{chances.data?.away_chances ?? "?"}</p>
-                              <p className="text-[10px] text-muted-foreground uppercase">Gast</p>
-                            </div>
                           </div>
-                          {chances.data?.pattern_notes && (
-                            <p className="text-xs text-muted-foreground mt-3">{chances.data.pattern_notes}</p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Coaching Conclusions */}
@@ -530,55 +579,85 @@ export default function MatchReport() {
                 )}
               </TabsContent>
 
-              {/* ═══ TACTICS TAB ═══ */}
+              {/* ═══ TACTICS TAB — neu konzipiert ═══ */}
               <TabsContent value="tactics" className="space-y-4">
-                {/* Tactical Replay */}
-                {framePositions?.data?.frames?.length > 0 && (
-                  <Suspense fallback={<SkeletonCard count={1} />}>
-                    <TacticalReplay
-                      frames={framePositions.data.frames}
-                      intervalSec={framePositions.data.interval_sec ?? 30}
-                      teamSizeDetected={teamSizeDetected}
-                    />
-                  </Suspense>
+                {/* 1. Tactical Blueprint — die wichtigste Erkenntnis zuerst */}
+                {tacticalBlueprint && Array.isArray(tacticalBlueprint) && (
+                  <TacticalBlueprintBoard blocks={tacticalBlueprint} />
                 )}
 
-                {/* Video Highlights */}
-                {hasHighlights && id && (
-                  <Suspense fallback={<SkeletonCard count={1} />}>
-                    <HighlightGallery matchId={id} />
-                  </Suspense>
+                {/* 2. Shape Recommendation für nächstes Match */}
+                {shapeRecommendation && <ShapeRecommendationCard data={shapeRecommendation} />}
+
+                {/* 3. Set Pieces */}
+                {setPieceBreakdown && (
+                  <SetPieceBreakdown
+                    data={setPieceBreakdown}
+                    homeName={clubName ?? "Heim"}
+                    awayName={match.away_club_name ?? "Gast"}
+                  />
                 )}
 
-                {/* Pressing */}
-                {pressingData?.data?.length > 0 && (
-                  <Suspense fallback={<SkeletonCard count={1} />}>
-                    <PressingChart data={pressingData.data} intervalSec={framePositions?.data?.interval_sec ?? 30} />
-                  </Suspense>
+                {/* 4. Tactical Grades (Schulnoten als sekundäre Sicht, klein) */}
+                {tacticalGrades && (
+                  <details className="group">
+                    <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-1 py-2">
+                      <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+                      Klassische Bewertungs-Matrix anzeigen
+                    </summary>
+                    <div className="mt-2">
+                      <TacticalGradeMatrix grades={tacticalGrades} />
+                    </div>
+                  </details>
                 )}
 
-                {/* Transitions */}
-                {transitions?.data?.length > 0 && (
-                  <Suspense fallback={<SkeletonCard count={1} />}>
-                    <TransitionAnalysis data={transitions.data} intervalSec={framePositions?.data?.interval_sec ?? 30} />
-                  </Suspense>
+                {/* 5. Visualisierungen aus Vision-Daten — nur wenn vorhanden */}
+                {(framePositions?.data?.frames?.length > 0 || hasHighlights || pressingData?.data?.length > 0 || transitions?.data?.length > 0 || passDirections?.data || formationTimeline?.data?.length > 0) && (
+                  <>
+                    <div className="flex items-center gap-2 pt-2">
+                      <div className="h-px flex-1 bg-border/50" />
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Visuelle Analysen</span>
+                      <div className="h-px flex-1 bg-border/50" />
+                    </div>
+
+                    {framePositions?.data?.frames?.length > 0 && (
+                      <Suspense fallback={<SkeletonCard count={1} />}>
+                        <TacticalReplay
+                          frames={framePositions.data.frames}
+                          intervalSec={framePositions.data.interval_sec ?? 30}
+                          teamSizeDetected={teamSizeDetected}
+                        />
+                      </Suspense>
+                    )}
+                    {hasHighlights && id && (
+                      <Suspense fallback={<SkeletonCard count={1} />}>
+                        <HighlightGallery matchId={id} />
+                      </Suspense>
+                    )}
+                    {pressingData?.data?.length > 0 && (
+                      <Suspense fallback={<SkeletonCard count={1} />}>
+                        <PressingChart data={pressingData.data} intervalSec={framePositions?.data?.interval_sec ?? 30} />
+                      </Suspense>
+                    )}
+                    {transitions?.data?.length > 0 && (
+                      <Suspense fallback={<SkeletonCard count={1} />}>
+                        <TransitionAnalysis data={transitions.data} intervalSec={framePositions?.data?.interval_sec ?? 30} />
+                      </Suspense>
+                    )}
+                    {passDirections?.data && (
+                      <Suspense fallback={<SkeletonCard count={1} />}>
+                        <PassDirectionMap data={passDirections.data} />
+                      </Suspense>
+                    )}
+                    {formationTimeline?.data?.length > 0 && (
+                      <Suspense fallback={<SkeletonCard count={1} />}>
+                        <FormationTimeline data={formationTimeline.data} />
+                      </Suspense>
+                    )}
+                  </>
                 )}
 
-                {/* Pass Direction Map */}
-                {passDirections?.data && (
-                  <Suspense fallback={<SkeletonCard count={1} />}>
-                    <PassDirectionMap data={passDirections.data} />
-                  </Suspense>
-                )}
-
-                {/* Formation Timeline */}
-                {formationTimeline?.data?.length > 0 && (
-                  <Suspense fallback={<SkeletonCard count={1} />}>
-                    <FormationTimeline data={formationTimeline.data} />
-                  </Suspense>
-                )}
-
-                {!framePositions && !pressingData && !transitions && !passDirections && !formationTimeline && (
+                {!tacticalBlueprint && !shapeRecommendation && !setPieceBreakdown && !tacticalGrades && !framePositions && !pressingData && !transitions && !passDirections && !formationTimeline && (
                   <div className="py-12 text-center text-muted-foreground text-sm">
                     Keine taktischen Daten verfügbar. Starte eine neue Analyse.
                   </div>
