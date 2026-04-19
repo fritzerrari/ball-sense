@@ -1019,6 +1019,9 @@ export default function CameraTrackingPage() {
     setPhase("analyzing");
     setProgress(20);
 
+    // Frames are now uploaded — drop the IndexedDB safety copy
+    void clearPersistedFrames();
+
     const phaseStr = halfNumber === 2 ? "h2" : "full";
 
     try {
@@ -1109,6 +1112,27 @@ export default function CameraTrackingPage() {
         )}
 
         {phase === "setup" && (
+          <>
+            {pendingRecovery && (
+              <div className="absolute top-4 left-4 right-4 z-40 rounded-lg border border-amber-500/50 bg-amber-500/10 backdrop-blur p-3 space-y-2">
+                <p className="text-sm font-semibold text-amber-100">
+                  🛟 {pendingRecovery.frameCount} ungesicherte Frames gefunden
+                </p>
+                <p className="text-xs text-amber-100/80">
+                  Eine vorherige Aufnahme wurde unterbrochen (Crash / Akku leer). Frames jetzt nachladen?
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={recoverPendingFrames} disabled={recovering} className="flex-1">
+                    {recovering ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CloudUpload className="h-3 w-3 mr-1" />}
+                    Hochladen
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { void clearPersistedFrames(); setPendingRecovery(null); }}>
+                    Verwerfen
+                  </Button>
+                </div>
+              </div>
+            )}
+            <BatteryWarning variant="panel" className="absolute bottom-24 left-4 right-4 z-30" />
           <CameraSetupOverlay
             onDismiss={() => initCamera("full")}
             onStart={handleSetupComplete}
@@ -1219,6 +1243,7 @@ export default function CameraTrackingPage() {
               <div className="bg-black/60 rounded-full px-3 py-1.5">
                 <span className="text-xs text-white font-medium">{frameCount} Frames</span>
               </div>
+              <BatteryWarning variant="pill" />
               {isHelper && syncedFrames > 0 && (
                 <div className="flex items-center gap-1 bg-primary/80 rounded-full px-2 py-0.5">
                   <CloudUpload className="h-2.5 w-2.5 text-white" />
