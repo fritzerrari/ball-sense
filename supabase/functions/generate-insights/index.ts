@@ -93,6 +93,13 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
+    // Detect low-vision frames (camera coverage poor) — used to downweight vision-only claims
+    const camPersp = relevantResults.find((r: any) => r.result_type === "camera_perspective")?.data;
+    const lowVision = !!camPersp && (camPersp.estimated_pitch_coverage_pct ?? 100) < 80;
+    const visionCaveat = lowVision
+      ? `\n\nKAMERA-QUALITÄT: ${camPersp.coverage_description ?? "eingeschränkte Sicht"} (Pitch-Coverage ~${camPersp.estimated_pitch_coverage_pct}%). VISION-BASIERTE AUSSAGEN sind dadurch unsicher — VERLASSE DICH PRIMÄR auf manuell erfasste Events (Tore, Schüsse, Karten, Eckbälle) und das Endergebnis. Schreibe NIEMALS "schlechte Sicht macht Bewertung unmöglich" — interpretiere stattdessen die EVENTS und ziehe daraus konkrete taktische Schlüsse.`
+      : "";
+
     const analysisContext = relevantResults.map(r => `${r.result_type}: ${JSON.stringify(r.data)}`).join("\n\n");
     const matchInfo = `${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"} am ${match?.date ?? "?"}`;
 
