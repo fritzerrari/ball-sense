@@ -34,6 +34,10 @@ import PlayerSpotlight from "@/components/PlayerSpotlight";
 import OpponentDNA from "@/components/OpponentDNA";
 import TrainingMicroCycle from "@/components/TrainingMicroCycle";
 import QuickActionCards from "@/components/QuickActionCards";
+import ChanceQualityPanel from "@/components/ChanceQualityPanel";
+import TacticalBlueprintBoard from "@/components/TacticalBlueprintBoard";
+import ShapeRecommendationCard from "@/components/ShapeRecommendationCard";
+import SetPieceBreakdown from "@/components/SetPieceBreakdown";
 
 // Lazy-loaded analysis components
 const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
@@ -196,6 +200,10 @@ export default function MatchReport() {
   const nextMatchActions = parseJson(getSection("next_match_actions")?.content ?? "null");
   const trainingMicroCycle = parseJson(getSection("training_micro_cycle")?.content ?? "null");
   const opponentScouting = getSection("opponent_scouting");
+  const chanceQuality = parseJson(getSection("chance_quality")?.content ?? "null");
+  const tacticalBlueprint = parseJson(getSection("tactical_blueprint")?.content ?? "null");
+  const shapeRecommendation = parseJson(getSection("shape_recommendation")?.content ?? "null");
+  const setPieceBreakdown = parseJson(getSection("set_piece_breakdown")?.content ?? "null");
 
   // Analysis results
   const dangerZones = analysisResults.find(r => r.result_type === "danger_zones");
