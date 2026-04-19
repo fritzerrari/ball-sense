@@ -12,6 +12,7 @@ import CameraSetupOverlay from "@/components/CameraSetupOverlay";
 import StopConfirmDialog from "@/components/StopConfirmDialog";
 import SideSwapDialog from "@/components/SideSwapDialog";
 import MatchEventQuickBar from "@/components/MatchEventQuickBar";
+import HelperQuickEvents from "@/components/HelperQuickEvents";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
