@@ -123,10 +123,28 @@ export default function CameraSetupOverlay({ onDismiss, onStart, showEventLeadTo
             </div>
           )}
         </div>
+
+        {/* Event-Lead toggle (trainer-only) */}
+        {showEventLeadToggle && (
+          <div className="rounded-xl border border-border bg-card p-4 flex items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <UserCheck className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">Nur ich protokolliere Events</p>
+                <Switch checked={eventLeadOnly} onCheckedChange={setEventLeadOnly} />
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Helfer-Geräte zeigen die Tor-/Karten-Buttons nicht an. Du behältst die volle Kontrolle, sie filmen nur.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 space-y-2 sticky bottom-0 bg-background/95 backdrop-blur-sm pt-2">
-        <Button onClick={() => onStart(coverage)} size="lg" className="w-full gap-2 h-14 text-base">
+        <Button onClick={() => onStart(coverage, eventLeadOnly)} size="lg" className="w-full gap-2 h-14 text-base">
           <Camera className="h-5 w-5" />
           {allChecked ? "Aufnahme starten" : "Trotzdem starten"}
         </Button>
