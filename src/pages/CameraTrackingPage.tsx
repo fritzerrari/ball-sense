@@ -120,6 +120,20 @@ export default function CameraTrackingPage() {
   const isHelper = !!sessionToken?.trim();
   const isTraining = matchType === "training";
 
+  // Battery monitoring
+  const battery = useBatteryStatus();
+  const batteryLevel = battery?.level ?? null;
+  const severity = batterySeverity(battery);
+  const lastBatteryToastRef = useRef<{ low: number; critical: number }>({ low: 0, critical: 0 });
+
+  // Pending-frame recovery state (recovered from IndexedDB on mount)
+  const [pendingRecovery, setPendingRecovery] = useState<{
+    matchId: string;
+    frameCount: number;
+    cameraIndex: number;
+  } | null>(null);
+  const [recovering, setRecovering] = useState(false);
+
   // Fetch match_type and team names when matchId is set
   useEffect(() => {
     if (!matchId) return;
