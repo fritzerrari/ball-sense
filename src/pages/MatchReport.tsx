@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { usePdfExport, PdfReportType } from "@/hooks/use-pdf-export";
 import PostMatchEventEditor from "@/components/PostMatchEventEditor";
 import VideoBackfillUpload from "@/components/VideoBackfillUpload";
+import PendingFramesRecoveryBanner from "@/components/PendingFramesRecoveryBanner";
 import { useMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -202,6 +203,7 @@ export default function MatchReport() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-5xl space-y-5">
+        <PendingFramesRecoveryBanner />
         {/* Compact Nav */}
         <div className="flex items-center gap-3 flex-wrap">
           <Link to="/matches" className="rounded-lg p-2 transition-colors hover:bg-muted">
