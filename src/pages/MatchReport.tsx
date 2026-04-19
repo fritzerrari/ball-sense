@@ -402,8 +402,8 @@ export default function MatchReport() {
                   </motion.div>
                 )}
 
-                {/* Tactical Grades */}
-                {tacticalGrades && <TacticalGradeMatrix grades={tacticalGrades} />}
+                {/* Tactical Grades — nur als Fallback wenn kein Blueprint vorhanden */}
+                {tacticalGrades && !tacticalBlueprint && <TacticalGradeMatrix grades={tacticalGrades} />}
 
                 {/* Momentum Timeline */}
                 {momentumData && <MomentumTimeline data={momentumData} />}
