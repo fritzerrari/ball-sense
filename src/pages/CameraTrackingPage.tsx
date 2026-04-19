@@ -1114,11 +1114,11 @@ export default function CameraTrackingPage() {
         {phase === "setup" && (
           <>
             {pendingRecovery && (
-              <div className="absolute top-4 left-4 right-4 z-40 rounded-lg border border-amber-500/50 bg-amber-500/10 backdrop-blur p-3 space-y-2">
-                <p className="text-sm font-semibold text-amber-100">
+              <div className="absolute top-4 left-4 right-4 z-40 rounded-lg border border-warning/50 bg-warning/10 backdrop-blur p-3 space-y-2">
+                <p className="text-sm font-semibold text-warning">
                   🛟 {pendingRecovery.frameCount} ungesicherte Frames gefunden
                 </p>
-                <p className="text-xs text-amber-100/80">
+                <p className="text-xs text-warning/80">
                   Eine vorherige Aufnahme wurde unterbrochen (Crash / Akku leer). Frames jetzt nachladen?
                 </p>
                 <div className="flex gap-2">
