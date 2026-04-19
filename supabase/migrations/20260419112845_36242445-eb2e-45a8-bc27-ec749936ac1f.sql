@@ -1,0 +1,1 @@
+UPDATE public.matches SET status = 'recording' WHERE id = '92606052-d636-4780-9e40-bcf3f6ad3096' AND status = 'processing';
