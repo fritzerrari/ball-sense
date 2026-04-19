@@ -108,29 +108,44 @@ export default function Dashboard() {
         <MatchFlowGuide />
         
 
-        {/* Quick stats */}
+        {/* Quick stats — all clickable */}
         <div className="grid sm:grid-cols-3 gap-4">
-          <div className="glass-card p-5">
+          <Link
+            to="/matches?status=done"
+            className="glass-card p-5 group hover:border-primary/40 hover:bg-primary/5 transition-all"
+            aria-label={`${doneCount} analysierte Spiele anzeigen`}
+          >
             <div className="flex items-center gap-2 mb-2">
               <Swords className="h-4 w-4 text-primary" />
               <span className="text-xs text-muted-foreground">{t("dashboard.analyzed")}</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/40 ml-auto group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
             </div>
             <div className="text-2xl font-bold font-display">{doneCount}</div>
-          </div>
-          <div className="glass-card p-5">
+          </Link>
+          <Link
+            to="/matches?status=processing"
+            className="glass-card p-5 group hover:border-amber-500/40 hover:bg-amber-500/5 transition-all"
+            aria-label={`${processingCount} Analysen in Arbeit anzeigen`}
+          >
             <div className="flex items-center gap-2 mb-2">
               <Loader2 className={`h-4 w-4 ${processingCount > 0 ? "text-amber-500 animate-spin" : "text-muted-foreground"}`} />
               <span className="text-xs text-muted-foreground">{t("dashboard.inAnalysis")}</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/40 ml-auto group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
             </div>
             <div className="text-2xl font-bold font-display">{processingCount}</div>
-          </div>
-          <div className="glass-card p-5">
+          </Link>
+          <Link
+            to="/players"
+            className="glass-card p-5 group hover:border-primary/40 hover:bg-primary/5 transition-all"
+            aria-label={`${players?.length ?? 0} Spieler verwalten`}
+          >
             <div className="flex items-center gap-2 mb-2">
               <Users className="h-4 w-4 text-primary" />
               <span className="text-xs text-muted-foreground">{t("dashboard.players")}</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/40 ml-auto group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
             </div>
             <div className="text-2xl font-bold font-display">{players?.length ?? 0}</div>
-          </div>
+          </Link>
         </div>
 
         {/* Recent matches */}
