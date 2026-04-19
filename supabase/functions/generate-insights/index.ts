@@ -517,6 +517,10 @@ REGELN:
       { section_type: "next_match_actions", title: "Nächstes Spiel", content: JSON.stringify(insights.next_match_actions), confidence: "high", sort_order: 55 },
       { section_type: "coaching", title: "Coaching-Schlussfolgerungen", content: insights.coaching_conclusions, confidence: "high", sort_order: 60 },
       { section_type: "training_micro_cycle", title: "Trainings-Mikrozyklus", content: JSON.stringify(insights.training_micro_cycle), confidence: "high", sort_order: 65 },
+      ...(insights.chance_quality_analysis ? [{ section_type: "chance_quality", title: "Chancenqualität", content: JSON.stringify(insights.chance_quality_analysis), confidence: "high", sort_order: 12 }] : []),
+      ...(insights.tactical_blueprint ? [{ section_type: "tactical_blueprint", title: "Taktischer Blueprint", content: JSON.stringify(insights.tactical_blueprint), confidence: "high", sort_order: 30 }] : []),
+      ...(insights.shape_recommendation ? [{ section_type: "shape_recommendation", title: "Formations-Empfehlung", content: JSON.stringify(insights.shape_recommendation), confidence: "high", sort_order: 32 }] : []),
+      ...(insights.set_piece_breakdown ? [{ section_type: "set_piece_breakdown", title: "Standards-Bilanz", content: JSON.stringify(insights.set_piece_breakdown), confidence: "high", sort_order: 34 }] : []),
       ...(insights.opponent_scouting ? [{
         section_type: "opponent_scouting",
         title: "Gegner-Scouting",
