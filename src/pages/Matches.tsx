@@ -372,7 +372,7 @@ export default function Matches() {
                   const isTraining = match.match_type === "training";
                   const timeline = getTimeline(match);
                   const label = isTraining ? "Training" : `${clubName} vs ${match.away_club_name || "TBD"}`;
-                  const isActive = ["live", "tracking", "processing"].includes(match.status);
+                  const isActive = ["live", "tracking", "recording", "processing"].includes(match.status);
                   const isDone = match.status === "done";
 
                   return (
