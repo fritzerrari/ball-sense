@@ -980,6 +980,7 @@ export default function CameraTrackingPage() {
           <CameraSetupOverlay
             onDismiss={() => initCamera("full")}
             onStart={handleSetupComplete}
+            showEventLeadToggle={!isHelper}
           />
         )}
 
