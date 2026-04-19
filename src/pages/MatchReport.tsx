@@ -196,7 +196,7 @@ export default function MatchReport() {
   const formationTimeline = analysisResults.find(r => r.result_type === "formation_timeline");
   const teamSizeDetected = analysisResults.find(r => r.result_type === "team_size_detected")?.data;
 
-  const isProcessing = job?.status && !["complete", "failed"].includes(job.status);
+  const isProcessing = job?.status && !["complete", "failed", "cancelled"].includes(job.status);
   const hasReport = sections.length > 0;
 
   return (
