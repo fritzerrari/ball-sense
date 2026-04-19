@@ -55,6 +55,7 @@ export default function CameraRemotePanel({ matchId }: Props) {
   const [loading, setLoading] = useState(true);
   const [sendingCommand, setSendingCommand] = useState<string | null>(null);
   const [togglingAuth, setTogglingAuth] = useState<string | null>(null);
+  const [trainerDeviceLabel, setTrainerDeviceLabel] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
     const { data } = await supabase
@@ -65,6 +66,18 @@ export default function CameraRemotePanel({ matchId }: Props) {
       .order("created_at", { ascending: true });
 
     setSessions((data as unknown as CameraSession[]) ?? []);
+
+    // Read trainer device label from match metadata
+    const { data: match } = await supabase
+      .from("matches")
+      .select("processing_progress")
+      .eq("id", matchId)
+      .maybeSingle();
+    const pp = (match?.processing_progress as any) ?? {};
+    if (typeof pp.trainer_device_label === "string" && pp.trainer_device_label.trim().length > 0) {
+      setTrainerDeviceLabel(pp.trainer_device_label.trim());
+    }
+
     setLoading(false);
   }, [matchId]);
 
