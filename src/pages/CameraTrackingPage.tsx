@@ -984,6 +984,7 @@ export default function CameraTrackingPage() {
             onDismiss={() => initCamera("full")}
             onStart={handleSetupComplete}
             showEventLeadToggle={!isHelper}
+            isTrainer={!isHelper}
           />
         )}
 
