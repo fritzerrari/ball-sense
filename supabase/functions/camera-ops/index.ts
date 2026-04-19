@@ -565,7 +565,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── ACTION: log-event ──
+    // ── ACTION: log-event (with 8s server-side dedup across all devices) ──
     if (action === "log-event") {
       const { event_type, minute, team } = payload;
 
@@ -576,12 +576,39 @@ Deno.serve(async (req) => {
         });
       }
 
-      const { error: eventError } = await supabaseAdmin.from("match_events").insert({
-        match_id,
-        event_type,
-        minute,
-        team: team ?? "home",
-      });
+      const teamSafe = team ?? "home";
+      const DEDUP_WINDOW_SEC = 8;
+      const sinceIso = new Date(Date.now() - DEDUP_WINDOW_SEC * 1000).toISOString();
+
+      // Look for an existing event of same (match, type, team) within the dedup window.
+      const { data: existing } = await supabaseAdmin
+        .from("match_events")
+        .select("id")
+        .eq("match_id", match_id)
+        .eq("event_type", event_type)
+        .eq("team", teamSafe)
+        .gte("created_at", sinceIso)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing?.id) {
+        return new Response(
+          JSON.stringify({ success: true, id: existing.id, deduplicated: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { data: inserted, error: eventError } = await supabaseAdmin
+        .from("match_events")
+        .insert({
+          match_id,
+          event_type,
+          minute,
+          team: teamSafe,
+        })
+        .select("id")
+        .single();
 
       if (eventError) {
         console.error("Event insert error:", eventError);
@@ -592,7 +619,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true }),
+        JSON.stringify({ success: true, id: inserted?.id, deduplicated: false }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
