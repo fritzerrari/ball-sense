@@ -122,7 +122,7 @@ export default function CameraTrackingPage() {
     (async () => {
       const { data: matchData } = await supabase
         .from("matches")
-        .select("match_type, away_club_name, home_club_id")
+        .select("match_type, away_club_name, home_club_id, processing_progress")
         .eq("id", matchId)
         .maybeSingle();
       if (matchData?.match_type) setMatchType(matchData.match_type);
@@ -134,6 +134,11 @@ export default function CameraTrackingPage() {
           .eq("id", matchData.home_club_id)
           .maybeSingle();
         if (club?.name) setHomeTeamName(club.name);
+      }
+      // Read event-lead flag (set by trainer at setup)
+      const pp = (matchData?.processing_progress as any) ?? null;
+      if (pp && typeof pp.event_lead_only === "boolean") {
+        setEventLeadOnly(pp.event_lead_only);
       }
 
       // Load existing goal events to init live score
