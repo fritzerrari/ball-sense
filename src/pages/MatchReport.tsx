@@ -42,9 +42,9 @@ import SetPieceBreakdown from "@/components/SetPieceBreakdown";
 // Lazy-loaded analysis components
 const CoachingCockpit = lazy(() => import("@/components/CoachingCockpit"));
 const HighlightGallery = lazy(() => import("@/components/HighlightGallery"));
-const PressingChart = lazy(() => import("@/components/PressingChart"));
+const TacticalAIChat = lazy(() => import("@/components/TacticalAIChat"));
+const HighlightStory = lazy(() => import("@/components/HighlightStory"));
 const TransitionAnalysis = lazy(() => import("@/components/TransitionAnalysis"));
-const PassDirectionMap = lazy(() => import("@/components/PassDirectionMap"));
 const FormationTimeline = lazy(() => import("@/components/FormationTimeline"));
 const FatigueIndicator = lazy(() => import("@/components/FatigueIndicator"));
 const OpponentScoutReport = lazy(() => import("@/components/OpponentScoutReport"));
@@ -611,41 +611,48 @@ export default function MatchReport() {
                   </details>
                 )}
 
-                {/* 5. Visualisierungen aus Vision-Daten — nur wenn vorhanden */}
-                {(framePositions?.data?.frames?.length > 0 || hasHighlights || pressingData?.data?.length > 0 || transitions?.data?.length > 0 || passDirections?.data || formationTimeline?.data?.length > 0) && (
+                {/* 5. KI-Gamechanger + Visualisierungen */}
+                <div className="flex items-center gap-2 pt-2">
+                  <div className="h-px flex-1 bg-border/50" />
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">KI-Gamechanger</span>
+                  <div className="h-px flex-1 bg-border/50" />
+                </div>
+
+                {id && (
+                  <Suspense fallback={<SkeletonCard count={1} />}>
+                    <CoachingCockpit
+                      matchId={id}
+                      defaultMoment={match?.status === "complete" ? "fulltime" : "halftime"}
+                    />
+                  </Suspense>
+                )}
+
+                {id && (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <Suspense fallback={<SkeletonCard count={1} />}>
+                      <TacticalAIChat matchId={id} />
+                    </Suspense>
+                    <Suspense fallback={<SkeletonCard count={1} />}>
+                      <HighlightStory matchId={id} />
+                    </Suspense>
+                  </div>
+                )}
+
+                {(hasHighlights || transitions?.data?.length > 0 || formationTimeline?.data?.length > 0) && (
                   <>
                     <div className="flex items-center gap-2 pt-2">
                       <div className="h-px flex-1 bg-border/50" />
                       <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Visuelle Analysen</span>
                       <div className="h-px flex-1 bg-border/50" />
                     </div>
-
-                    {id && (
-                      <Suspense fallback={<SkeletonCard count={1} />}>
-                        <CoachingCockpit
-                          matchId={id}
-                          defaultMoment={match?.status === "complete" ? "fulltime" : "halftime"}
-                        />
-                      </Suspense>
-                    )}
                     {hasHighlights && id && (
                       <Suspense fallback={<SkeletonCard count={1} />}>
                         <HighlightGallery matchId={id} />
                       </Suspense>
                     )}
-                    {pressingData?.data?.length > 0 && (
-                      <Suspense fallback={<SkeletonCard count={1} />}>
-                        <PressingChart data={pressingData.data} intervalSec={framePositions?.data?.interval_sec ?? 30} />
-                      </Suspense>
-                    )}
                     {transitions?.data?.length > 0 && (
                       <Suspense fallback={<SkeletonCard count={1} />}>
                         <TransitionAnalysis data={transitions.data} intervalSec={framePositions?.data?.interval_sec ?? 30} />
-                      </Suspense>
-                    )}
-                    {passDirections?.data && (
-                      <Suspense fallback={<SkeletonCard count={1} />}>
-                        <PassDirectionMap data={passDirections.data} />
                       </Suspense>
                     )}
                     {formationTimeline?.data?.length > 0 && (
@@ -656,7 +663,7 @@ export default function MatchReport() {
                   </>
                 )}
 
-                {!tacticalBlueprint && !shapeRecommendation && !setPieceBreakdown && !tacticalGrades && !framePositions && !pressingData && !transitions && !passDirections && !formationTimeline && (
+                {!tacticalBlueprint && !shapeRecommendation && !setPieceBreakdown && !tacticalGrades && !framePositions && !transitions && !formationTimeline && (
                   <div className="py-12 text-center text-muted-foreground text-sm">
                     Keine taktischen Daten verfügbar. Starte eine neue Analyse.
                   </div>
