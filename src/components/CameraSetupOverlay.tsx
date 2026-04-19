@@ -156,7 +156,7 @@ export default function CameraSetupOverlay({ onDismiss, onStart, showEventLeadTo
               <p className="text-xs text-muted-foreground mt-0.5 mb-2">
                 {isTrainer
                   ? "So erkennst du dieses Gerät später im Bericht."
-                  : "So sieht der Trainer, welche Kamera du bist (z. B. „Tribüne", „Sven's iPhone")."}
+                  : "So sieht der Trainer, welche Kamera du bist (z. B. Tribüne, Mein iPhone)."}
               </p>
               <Input
                 value={deviceLabel}
