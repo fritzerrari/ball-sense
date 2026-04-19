@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, X, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { insertMatchEventDeduped } from "@/lib/match-events";
 import type { VideoRecorderHandle, HighlightClip } from "@/lib/video-recorder";
 
 interface Props {
@@ -17,6 +18,8 @@ interface Props {
   isTraining?: boolean;
   homeTeamName?: string;
   awayTeamName?: string;
+  /** When true, the bar is hidden for helpers (only the trainer logs events). */
+  eventLeadOnly?: boolean;
   onGoalEvent?: (team: "home" | "away") => void;
   onEventDeleted?: (eventType: string, team: string) => void;
 }
@@ -41,6 +44,8 @@ interface RecentEvent {
   team: ActiveTeam;
   minute: number;
   label: string;
+  /** True when the event was first seen via Realtime from another device. */
+  external?: boolean;
 }
 
 const COOLDOWN_MS = 3000;
@@ -55,6 +60,7 @@ export default function MatchEventQuickBar({
   isTraining = false,
   homeTeamName = "Heim",
   awayTeamName = "Gegner",
+  eventLeadOnly = false,
   onGoalEvent,
   onEventDeleted,
 }: Props) {
@@ -65,8 +71,11 @@ export default function MatchEventQuickBar({
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<RecentEvent | null>(null);
   const debounceRef = useRef<Record<string, number>>({});
+  /** IDs the local user just inserted — used to suppress duplicate Realtime echoes */
+  const localInsertIdsRef = useRef<Set<string>>(new Set());
 
   const isHome = activeTeam === "home";
+  const isHelper = !!sessionToken;
 
   const TRAINING_EXCLUDED: EventType[] = ["substitution", "corner", "free_kick"];
   const visibleButtons = isTraining
@@ -79,6 +88,52 @@ export default function MatchEventQuickBar({
     const timer = setTimeout(() => setCooldownSet(new Set()), COOLDOWN_MS);
     return () => clearTimeout(timer);
   }, [cooldownSet]);
+
+  // ── Realtime: surface events from other devices (Trainer ↔ Helper visibility) ──
+  useEffect(() => {
+    if (!matchId) return;
+    const channel = supabase
+      .channel(`match-events-${matchId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "match_events", filter: `match_id=eq.${matchId}` },
+        (payload) => {
+          const row = payload.new as { id: string; event_type: string; team: string; minute: number };
+          if (!row?.id) return;
+          // Suppress echoes from our own insert
+          if (localInsertIdsRef.current.has(row.id)) {
+            localInsertIdsRef.current.delete(row.id);
+            return;
+          }
+          const label = EVENT_BUTTONS.find(b => b.type === row.event_type)?.label ?? row.event_type;
+          const team = (row.team === "away" ? "away" : "home") as ActiveTeam;
+          setRecentEvents(prev => {
+            if (prev.some(e => e.id === row.id)) return prev;
+            return [
+              { id: row.id, type: row.event_type as EventType, team, minute: row.minute, label, external: true },
+              ...prev,
+            ].slice(0, 4);
+          });
+          const teamLabel = team === "home" ? homeTeamName : awayTeamName;
+          toast.info(`${label} (${teamLabel}, Min. ${row.minute}) — von anderem Gerät`, { duration: 3500 });
+          if (row.event_type === "goal" && onGoalEvent) onGoalEvent(team);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "match_events", filter: `match_id=eq.${matchId}` },
+        (payload) => {
+          const oldRow = payload.old as { id?: string; event_type?: string; team?: string };
+          if (!oldRow?.id) return;
+          setRecentEvents(prev => prev.filter(e => e.id !== oldRow.id));
+          if (oldRow.event_type === "goal" && oldRow.team && onEventDeleted) {
+            onEventDeleted(oldRow.event_type, oldRow.team);
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [matchId, homeTeamName, awayTeamName, onGoalEvent, onEventDeleted]);
 
   const toggleTeam = useCallback(() => {
     setActiveTeam(prev => {
@@ -110,6 +165,7 @@ export default function MatchEventQuickBar({
       }
 
       let insertedId: string | undefined;
+      let wasDeduplicated = false;
 
       if (sessionToken) {
         const res = await fetch(
@@ -136,18 +192,21 @@ export default function MatchEventQuickBar({
         }
         const resData = await res.json();
         insertedId = resData?.id;
+        wasDeduplicated = !!resData?.deduplicated;
       } else {
-        const { data: inserted, error: eventError } = await supabase.from("match_events").insert({
-          match_id: matchId,
-          event_type: eventType,
-          minute,
+        // Trainer path — use shared deduped helper
+        const result = await insertMatchEventDeduped({
+          matchId,
+          eventType,
           team: activeTeam,
+          minute,
           notes: clip ? "Highlight-Clip gespeichert" : undefined,
-        }).select("id").single();
-        if (eventError) throw eventError;
-        insertedId = inserted?.id;
+        });
+        if (!result) throw new Error("Event konnte nicht gespeichert werden");
+        insertedId = result.id;
+        wasDeduplicated = result.deduplicated;
 
-        if (clip) {
+        if (clip && !wasDeduplicated) {
           const ext = clip.mimeType.includes("mp4") ? "mp4" : "webm";
           const filePath = `${matchId}/highlight_${eventType}_${minute}.${ext}`;
 
@@ -179,6 +238,9 @@ export default function MatchEventQuickBar({
         }
       }
 
+      // Track our insert so the Realtime echo doesn't show a duplicate toast
+      if (insertedId) localInsertIdsRef.current.add(insertedId);
+
       // Success flash
       setSuccessSet(prev => new Set(prev).add(eventType));
       setTimeout(() => {
@@ -202,19 +264,26 @@ export default function MatchEventQuickBar({
       // Add to recent events
       const eventLabel = EVENT_BUTTONS.find(b => b.type === eventType)?.label ?? eventType;
       if (insertedId) {
-        setRecentEvents(prev => [
-          { id: insertedId!, type: eventType, team: activeTeam, minute, label: eventLabel },
-          ...prev,
-        ].slice(0, 3));
+        setRecentEvents(prev => {
+          if (prev.some(e => e.id === insertedId)) return prev;
+          return [
+            { id: insertedId!, type: eventType, team: activeTeam, minute, label: eventLabel },
+            ...prev,
+          ].slice(0, 4);
+        });
       }
 
-      // Notify parent about goals
-      if (eventType === "goal" && onGoalEvent) {
+      // Notify parent about goals (only on a fresh insert; deduplicated path already counted)
+      if (eventType === "goal" && onGoalEvent && !wasDeduplicated) {
         onGoalEvent(activeTeam);
       }
 
       if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-      toast.success(`${eventLabel} (${teamLabel}) ✓`);
+      if (wasDeduplicated) {
+        toast.info(`${eventLabel} (${teamLabel}) — bereits erfasst`, { duration: 2500 });
+      } else {
+        toast.success(`${eventLabel} (${teamLabel}) ✓`);
+      }
     } catch (err: any) {
       toast.error(err.message ?? "Event konnte nicht gespeichert werden");
     } finally {
@@ -264,6 +333,16 @@ export default function MatchEventQuickBar({
     }
     setDeleteTarget(null);
   }, [matchId, sessionToken, onEventDeleted]);
+
+  // Event-Lead mode: hide bar from helpers entirely
+  if (eventLeadOnly && isHelper) {
+    return (
+      <div className="w-full max-w-sm rounded-lg border border-border/40 bg-muted/40 backdrop-blur px-3 py-2 text-[10px] text-muted-foreground flex items-center gap-2">
+        <Users className="h-3 w-3" />
+        Trainer protokolliert Events — du filmst nur.
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-sm space-y-1.5">
@@ -331,16 +410,22 @@ export default function MatchEventQuickBar({
         })}
       </div>
 
-      {/* Recent events (undo chips) */}
+      {/* Recent events (undo chips) — includes events from other devices */}
       {recentEvents.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {recentEvents.map((ev) => (
             <Badge
               key={ev.id}
               variant="secondary"
-              className="gap-1 text-[10px] py-0.5 px-2 cursor-pointer hover:bg-destructive/10 hover:border-destructive/30 transition-colors"
+              className={`gap-1 text-[10px] py-0.5 px-2 cursor-pointer transition-colors ${
+                ev.external
+                  ? "bg-accent/40 border-accent/60 hover:bg-destructive/10 hover:border-destructive/30"
+                  : "hover:bg-destructive/10 hover:border-destructive/30"
+              }`}
               onClick={() => setDeleteTarget(ev)}
+              title={ev.external ? "Von anderem Gerät — antippen zum Löschen" : "Antippen zum Löschen"}
             >
+              {ev.external && <Users className="h-2.5 w-2.5 opacity-70" />}
               {ev.minute}' {ev.label}
               <X className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
             </Badge>
