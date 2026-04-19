@@ -276,6 +276,96 @@ export default function CameraTrackingPage() {
     };
   }, [phase]);
 
+  // ── Battery low/critical toasts (rate-limited to 1× per severity per 5min) ──
+  useEffect(() => {
+    if (phase !== "recording" || !battery) return;
+    const now = Date.now();
+    if (severity === "critical" && now - lastBatteryToastRef.current.critical > 5 * 60 * 1000) {
+      lastBatteryToastRef.current.critical = now;
+      toast.error(`Akku ${battery.level}% — Aufnahme JETZT stoppen!`, {
+        description: "Frames werden lokal gesichert und automatisch hochgeladen, sobald du die Seite wieder öffnest.",
+        duration: 12000,
+      });
+      if (navigator.vibrate) navigator.vibrate([100, 100, 100, 100, 100]);
+    } else if (severity === "low" && now - lastBatteryToastRef.current.low > 5 * 60 * 1000) {
+      lastBatteryToastRef.current.low = now;
+      toast.warning(`Akku ${battery.level}% — bald Aufnahme beenden`, { duration: 8000 });
+    }
+  }, [battery, severity, phase]);
+
+  // ── Persist frames to IndexedDB every 10s during recording (crash-safety) ──
+  useEffect(() => {
+    if (phase !== "recording" || !matchId) return;
+    const interval = setInterval(() => {
+      const snapshot = liveCaptureRef.current?.getSnapshot();
+      if (!snapshot || snapshot.frames.length === 0) return;
+      void persistFrames({
+        matchId,
+        sessionToken: isHelper ? sessionToken : undefined,
+        cameraIndex: 0, // helper cam index resolved server-side; 0 is safe default for trainer
+        halfNumber,
+        frames: snapshot.frames,
+        timestamps: snapshot.timestamps,
+        startedAt: recordingStartTime || Date.now(),
+      });
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, [phase, matchId, isHelper, sessionToken, halfNumber, recordingStartTime]);
+
+  // ── Recovery: on mount, check IndexedDB for orphaned frames ──
+  useEffect(() => {
+    if (!matchId || phase === "restoring" || phase === "code") return;
+    void (async () => {
+      const pending = await readPendingFrames(matchId);
+      if (pending && isOrphaned(pending) && pending.frames.length > 0) {
+        setPendingRecovery({
+          matchId: pending.matchId,
+          frameCount: pending.frames.length,
+          cameraIndex: pending.cameraIndex,
+        });
+      }
+    })();
+  }, [matchId, phase]);
+
+  // Recovery action: upload pending frames as a backfill chunk + clear local copy
+  const recoverPendingFrames = useCallback(async () => {
+    if (!matchId) return;
+    const pending = await readPendingFrames(matchId);
+    if (!pending || pending.frames.length === 0) {
+      setPendingRecovery(null);
+      return;
+    }
+    setRecovering(true);
+    try {
+      const camIdx = pending.cameraIndex ?? 0;
+      // Use a high chunk number to avoid colliding with existing chunks
+      const filePath = `${matchId}_cam${camIdx}_chunk_${900 + Math.floor(Date.now() / 1000) % 99}.json`;
+      const body = JSON.stringify({
+        frames: pending.frames,
+        timestamps: pending.timestamps,
+        camera_index: camIdx,
+        captured_at: new Date(pending.startedAt).toISOString(),
+        recovered: true,
+      });
+      const { error } = await supabase.storage
+        .from("match-frames")
+        .upload(filePath, new Blob([body], { type: "application/json" }), { upsert: true });
+      if (error) throw error;
+      await clearPendingFrames(matchId);
+      setPendingRecovery(null);
+      toast.success(`${pending.frames.length} gerettete Frames hochgeladen`);
+    } catch (err: any) {
+      toast.error(`Recovery fehlgeschlagen: ${err?.message ?? "unbekannt"}`);
+    } finally {
+      setRecovering(false);
+    }
+  }, [matchId]);
+
+  // Clear persisted frames after successful finalize (called from finalizeStop below)
+  const clearPersistedFrames = useCallback(async () => {
+    if (matchId) await clearPendingFrames(matchId);
+  }, [matchId]);
+
   // ── Trainer-only: notify when a new helper camera joins mid-match ──
   useEffect(() => {
     if (isHelper || !matchId) return;
