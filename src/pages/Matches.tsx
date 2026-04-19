@@ -179,10 +179,10 @@ export default function Matches() {
   // Matches that need prominent display
   const activeMatches = useMemo(() => {
     return (matches ?? []).filter((m) =>
-      ["live", "tracking", "processing", "done"].includes(m.status)
+      ["live", "tracking", "recording", "processing", "done"].includes(m.status)
     ).sort((a, b) => {
       // Priority: live > processing > done
-      const priority: Record<string, number> = { live: 0, tracking: 0, processing: 1, done: 2 };
+      const priority: Record<string, number> = { live: 0, tracking: 0, recording: 0, processing: 1, done: 2 };
       const pa = priority[a.status] ?? 3;
       const pb = priority[b.status] ?? 3;
       if (pa !== pb) return pa - pb;
