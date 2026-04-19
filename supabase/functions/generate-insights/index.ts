@@ -448,7 +448,9 @@ REGELN:
                 },
                 required: [
                   "match_rating", "tactical_grades", "momentum_phases",
-                  "executive_summary", "key_insights", "risk_matrix",
+                  "executive_summary", "chance_quality_analysis", "tactical_blueprint",
+                  "shape_recommendation", "set_piece_breakdown",
+                  "key_insights", "risk_matrix",
                   "player_spotlight", "opponent_dna", "next_match_actions",
                   "coaching_conclusions", "training_micro_cycle", "training_recommendations",
                 ],
