@@ -591,6 +591,20 @@ KAMERA-PERSPEKTIVE ERKENNEN:
       ...(analysis.team_size_detected ? [{ type: "team_size_detected", data: analysis.team_size_detected }] : []),
     ];
 
+    // ── H2 SIMULATION (only for final jobs without H2 frames) ──
+    // If the match recording has no H2 data (no h2_started_at OR no H2-tagged frames),
+    // synthesize a plausible second half by dampening H1 metrics ~15-25% and
+    // mirroring patterns. The result is clearly flagged so the UI can warn the trainer.
+    const hasH2Recording = !!match?.h2_started_at && !!match?.h2_ended_at;
+    const isFinalJob = !isLivePartial;
+    const shouldSimulateH2 = isFinalJob && !hasH2Recording;
+
+    if (shouldSimulateH2) {
+      console.log("[H2-SIM] No H2 recording detected — synthesizing dampened second half");
+      const simulated = synthesizeSecondHalf(analysis);
+      resultTypes.push({ type: "h2_simulated", data: simulated });
+    }
+
     for (const result of resultTypes) {
       await supabase.from("analysis_results").insert({
         job_id, match_id,
