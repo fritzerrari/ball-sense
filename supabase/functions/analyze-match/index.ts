@@ -117,6 +117,83 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
   return null;
 }
 
+/** Numeric clamp helper. */
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+/**
+ * Synthesize a plausible H2 dataset from H1 analysis.
+ *
+ * Strategy:
+ *   - Both teams ~15-20% schwächer (Kondition lässt nach, Pressing-Linie sinkt).
+ *   - Pressing-Linie 5-8 Punkte tiefer, Kompaktheit ~10% breiter (lockerer).
+ *   - Chancen leicht reduziert, Ballverluste leicht häufiger.
+ *   - Frame-Positionen werden NICHT erfunden (vermeidet falsche Heatmaps).
+ *   - Resultat klar als simulated=true markiert mit Begründung.
+ */
+function synthesizeSecondHalf(h1: any): any {
+  const dampen = (v: number, factor = 0.18): number => clamp(v * (1 - factor), 0, 100);
+  const slightlyMore = (v: number, factor = 0.10): number => clamp(v * (1 + factor), 0, 100);
+
+  const pressing = Array.isArray(h1.pressing_data)
+    ? h1.pressing_data.slice(0, 8).map((p: any, i: number) => ({
+        frame_index: 1000 + i,
+        pressing_line_home: clamp((p.pressing_line_home ?? 50) - 6, 0, 100),
+        pressing_line_away: clamp((p.pressing_line_away ?? 50) - 5, 0, 100),
+        compactness_home: clamp((p.compactness_home ?? 30) * 1.12, 0, 100),
+        compactness_away: clamp((p.compactness_away ?? 30) * 1.10, 0, 100),
+      }))
+    : [];
+
+  const transitions = Array.isArray(h1.transitions)
+    ? h1.transitions.slice(0, 4).map((t: any, i: number) => ({
+        frame_index: 1000 + i * 2,
+        type: t.type ?? "ball_loss_gegenpressing",
+        speed: t.speed === "fast" ? "medium" : t.speed ?? "slow",
+        players_in_new_phase: Math.max(2, Math.round((t.players_in_new_phase ?? 4) * 0.8)),
+        description: `${t.description ?? "Umschaltmoment"} (Schlussphase, geringere Intensität)`,
+      }))
+    : [];
+
+  const passDirHome = h1.pass_directions?.home ?? {};
+  const passDirAway = h1.pass_directions?.away ?? {};
+  const passDirections = {
+    home: {
+      long_pct: slightlyMore(passDirHome.long_pct ?? 35, 0.15), // mehr lange Bälle bei Müdigkeit
+      short_pct: dampen(passDirHome.short_pct ?? 65, 0.10),
+      build_up_left_pct: passDirHome.build_up_left_pct ?? 33,
+      build_up_center_pct: passDirHome.build_up_center_pct ?? 34,
+      build_up_right_pct: passDirHome.build_up_right_pct ?? 33,
+    },
+    away: {
+      long_pct: slightlyMore(passDirAway.long_pct ?? 40, 0.20),
+      short_pct: dampen(passDirAway.short_pct ?? 60, 0.15),
+      build_up_left_pct: passDirAway.build_up_left_pct ?? 33,
+      build_up_center_pct: passDirAway.build_up_center_pct ?? 34,
+      build_up_right_pct: passDirAway.build_up_right_pct ?? 33,
+    },
+  };
+
+  const chances = {
+    home_chances: Math.max(0, Math.round((h1.chances?.home_chances ?? 3) * 0.85)),
+    away_chances: Math.max(0, Math.round((h1.chances?.away_chances ?? 2) * 0.75)),
+    home_shots: Math.max(0, Math.round((h1.chances?.home_shots ?? 5) * 0.80)),
+    away_shots: Math.max(0, Math.round((h1.chances?.away_shots ?? 3) * 0.70)),
+    pattern_notes: "Beide Teams agieren mit nachlassender Intensität — typische Schlussphasen-Dynamik.",
+  };
+
+  return {
+    simulated: true,
+    reason: "Keine Frames der 2. Halbzeit verfügbar (H2-Aufnahme nicht persistiert). Werte wurden auf Basis der H1-Muster mit ~15-20% Leistungsdämpfung beider Teams plausibel synthetisiert.",
+    pressing_data: pressing,
+    transitions,
+    pass_directions: passDirections,
+    chances,
+    intensity_drop_pct: 18,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -590,6 +667,20 @@ KAMERA-PERSPEKTIVE ERKENNEN:
       ...(analysis.camera_perspective ? [{ type: "camera_perspective", data: analysis.camera_perspective }] : []),
       ...(analysis.team_size_detected ? [{ type: "team_size_detected", data: analysis.team_size_detected }] : []),
     ];
+
+    // ── H2 SIMULATION (only for final jobs without H2 frames) ──
+    // If the match recording has no H2 data (no h2_started_at OR no H2-tagged frames),
+    // synthesize a plausible second half by dampening H1 metrics ~15-25% and
+    // mirroring patterns. The result is clearly flagged so the UI can warn the trainer.
+    const hasH2Recording = !!match?.h2_started_at && !!match?.h2_ended_at;
+    const isFinalJob = !isLivePartial;
+    const shouldSimulateH2 = isFinalJob && !hasH2Recording;
+
+    if (shouldSimulateH2) {
+      console.log("[H2-SIM] No H2 recording detected — synthesizing dampened second half");
+      const simulated = synthesizeSecondHalf(analysis);
+      resultTypes.push({ type: "h2_simulated", data: simulated });
+    }
 
     for (const result of resultTypes) {
       await supabase.from("analysis_results").insert({

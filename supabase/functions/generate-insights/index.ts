@@ -96,6 +96,12 @@ serve(async (req) => {
     const analysisContext = relevantResults.map(r => `${r.result_type}: ${JSON.stringify(r.data)}`).join("\n\n");
     const matchInfo = `${match?.away_club_name ? `Heim vs ${match.away_club_name}` : "Spiel"} am ${match?.date ?? "?"}`;
 
+    // Detect simulated H2 — produced by analyze-match when no H2 frames available
+    const h2Sim = relevantResults.find((r: any) => r.result_type === "h2_simulated")?.data;
+    const h2SimNote = h2Sim
+      ? `\n\nWICHTIG — H2 SIMULIERT: Es gibt KEINE realen Aufnahmen der 2. Halbzeit. Die folgenden H2-Werte wurden auf Basis der H1-Muster synthetisiert (Intensitätsdämpfung ~${h2Sim.intensity_drop_pct ?? 18}%, beide Teams etwas schwächer).\n\nH2-SIMULATIONS-DATEN:\n${JSON.stringify(h2Sim, null, 2)}\n\nFüge im executive_summary und in den key_insights MINDESTENS EINEN klaren Hinweis ein, dass H2 simuliert wurde und die Aussagen für die zweite Halbzeit Hochrechnungen sind. Confidence für H2-Aussagen MUSS "estimated" sein.`
+      : "";
+
     // Build match events context
     let eventsContext = "";
     if (matchEvents && matchEvents.length > 0) {
@@ -169,7 +175,7 @@ REGELN:
           },
           {
             role: "user",
-            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}${timingContext}`,
+            content: `Erstelle das vollständige Coaching-Cockpit für: ${matchInfo}\n\nAnalyse-Ergebnisse:\n${analysisContext}${eventsContext}${timingContext}${h2SimNote}`,
           },
         ],
         tools: [
