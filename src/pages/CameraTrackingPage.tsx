@@ -979,6 +979,28 @@ export default function CameraTrackingPage() {
       <div className="relative flex-1 bg-black">
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
 
+        {/* Persistent role/device badge — visible in all live phases so trainer & helpers always know who is who */}
+        {(phase === "ready" || phase === "recording" || phase === "halftime_pause" || phase === "stopped") && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 backdrop-blur-md border text-[10px] font-semibold shadow-lg ${
+              isHelper
+                ? "bg-accent/80 border-accent-foreground/20 text-accent-foreground"
+                : "bg-primary/85 border-primary-foreground/20 text-primary-foreground"
+            }`}>
+              {isHelper ? <Users className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
+              <span>
+                {isHelper ? "Helfer-Kamera" : "Trainer-Gerät · führend"}
+              </span>
+              {deviceLabel && (
+                <>
+                  <span className="opacity-60">·</span>
+                  <span className="font-normal opacity-90 max-w-[140px] truncate">{deviceLabel}</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {phase === "setup" && (
           <CameraSetupOverlay
             onDismiss={() => initCamera("full")}
