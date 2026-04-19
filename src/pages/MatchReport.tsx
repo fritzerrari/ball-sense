@@ -40,7 +40,7 @@ import ShapeRecommendationCard from "@/components/ShapeRecommendationCard";
 import SetPieceBreakdown from "@/components/SetPieceBreakdown";
 
 // Lazy-loaded analysis components
-const TacticalReplay = lazy(() => import("@/components/TacticalReplay"));
+const CoachingCockpit = lazy(() => import("@/components/CoachingCockpit"));
 const HighlightGallery = lazy(() => import("@/components/HighlightGallery"));
 const PressingChart = lazy(() => import("@/components/PressingChart"));
 const TransitionAnalysis = lazy(() => import("@/components/TransitionAnalysis"));
@@ -620,12 +620,11 @@ export default function MatchReport() {
                       <div className="h-px flex-1 bg-border/50" />
                     </div>
 
-                    {framePositions?.data?.frames?.length > 0 && (
+                    {id && (
                       <Suspense fallback={<SkeletonCard count={1} />}>
-                        <TacticalReplay
-                          frames={framePositions.data.frames}
-                          intervalSec={framePositions.data.interval_sec ?? 30}
-                          teamSizeDetected={teamSizeDetected}
+                        <CoachingCockpit
+                          matchId={id}
+                          defaultMoment={match?.status === "complete" ? "fulltime" : "halftime"}
                         />
                       </Suspense>
                     )}
