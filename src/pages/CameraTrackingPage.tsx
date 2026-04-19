@@ -19,6 +19,7 @@ import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
 import BatteryWarning from "@/components/BatteryWarning";
 import { useBatteryStatus, batterySeverity } from "@/hooks/use-battery-status";
 import { persistFrames, readPendingFrames, clearPendingFrames, isOrphaned } from "@/lib/frame-persistence";
+import PendingFramesRecoveryBanner from "@/components/PendingFramesRecoveryBanner";
 
 type Phase = "code" | "restoring" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
@@ -1054,7 +1055,12 @@ export default function CameraTrackingPage() {
         </div>
       </div>
     ) : (
-      <CameraCodeEntry onSuccess={handleCodeSuccess} />
+      <div className="min-h-[100dvh] bg-background">
+        <div className="mx-auto max-w-md px-4 pt-4">
+          <PendingFramesRecoveryBanner className="mb-4" />
+        </div>
+        <CameraCodeEntry onSuccess={handleCodeSuccess} />
+      </div>
     );
   }
 
