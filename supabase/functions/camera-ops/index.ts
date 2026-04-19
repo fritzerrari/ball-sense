@@ -624,6 +624,36 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── ACTION: delete-event (helper-driven undo via session token) ──
+    if (action === "delete-event") {
+      const { event_id } = payload;
+      if (!event_id) {
+        return new Response(JSON.stringify({ error: "event_id required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: delError } = await supabaseAdmin
+        .from("match_events")
+        .delete()
+        .eq("id", event_id)
+        .eq("match_id", match_id);
+
+      if (delError) {
+        console.error("Event delete error:", delError);
+        return new Response(JSON.stringify({ error: "Event delete failed" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // ── ACTION: append-frames ──
     if (action === "append-frames") {
       const { frames, timestamps, chunk_index } = payload;
