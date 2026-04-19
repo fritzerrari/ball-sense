@@ -1120,6 +1120,7 @@ export default function CameraTrackingPage() {
                   isTraining={isTraining}
                   homeTeamName={homeTeamName}
                   awayTeamName={awayTeamName}
+                  eventLeadOnly={eventLeadOnly}
                   onGoalEvent={(team) => {
                     if (team === "home") setLiveHomeGoals(p => p + 1);
                     else setLiveAwayGoals(p => p + 1);
