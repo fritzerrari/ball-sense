@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
-import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff, CloudUpload, ShieldCheck, ShieldOff } from "lucide-react";
+import { Camera, Play, Pause, Square, Loader2, Wifi, WifiOff, CloudUpload, ShieldCheck, ShieldOff, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import WalkieTalkie from "@/components/WalkieTalkie";
@@ -23,6 +23,7 @@ interface CameraSession {
     synced_frames?: number;
     updated_at?: string;
     thumbnail?: string;
+    device_label?: string;
   } | null;
   command: string | null;
 }
