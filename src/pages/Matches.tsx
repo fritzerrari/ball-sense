@@ -81,7 +81,7 @@ function ActiveMatchBanner({ match, clubName }: { match: any; clubName: string |
   const label = isTraining ? "Training" : `${clubName} vs ${match.away_club_name || "TBD"}`;
   const dateStr = new Date(match.date).toLocaleDateString(locale);
 
-  if (match.status === "live" || match.status === "tracking") {
+  if (match.status === "live" || match.status === "tracking" || match.status === "recording") {
     return (
       <Link to={`/matches/${match.id}`} className="block">
         <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 sm:p-5 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5">
