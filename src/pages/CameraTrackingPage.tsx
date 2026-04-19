@@ -16,6 +16,9 @@ import { useModuleAccess } from "@/hooks/use-module-access";
 import CameraCodeEntry from "@/components/CameraCodeEntry";
 import WalkieTalkie from "@/components/WalkieTalkie";
 import { useUltraWideCamera } from "@/hooks/use-ultra-wide-camera";
+import BatteryWarning from "@/components/BatteryWarning";
+import { useBatteryStatus, batterySeverity } from "@/hooks/use-battery-status";
+import { persistFrames, readPendingFrames, clearPendingFrames, isOrphaned } from "@/lib/frame-persistence";
 
 type Phase = "code" | "restoring" | "setup" | "ready" | "recording" | "halftime_pause" | "stopped" | "analyzing" | "done";
 
@@ -116,6 +119,20 @@ export default function CameraTrackingPage() {
   useIsAuthenticated();
   const isHelper = !!sessionToken?.trim();
   const isTraining = matchType === "training";
+
+  // Battery monitoring
+  const battery = useBatteryStatus();
+  const batteryLevel = battery?.level ?? null;
+  const severity = batterySeverity(battery);
+  const lastBatteryToastRef = useRef<{ low: number; critical: number }>({ low: 0, critical: 0 });
+
+  // Pending-frame recovery state (recovered from IndexedDB on mount)
+  const [pendingRecovery, setPendingRecovery] = useState<{
+    matchId: string;
+    frameCount: number;
+    cameraIndex: number;
+  } | null>(null);
+  const [recovering, setRecovering] = useState(false);
 
   // Fetch match_type and team names when matchId is set
   useEffect(() => {
@@ -258,6 +275,96 @@ export default function CameraTrackingPage() {
       window.removeEventListener("online", handleOnline);
     };
   }, [phase]);
+
+  // ── Battery low/critical toasts (rate-limited to 1× per severity per 5min) ──
+  useEffect(() => {
+    if (phase !== "recording" || !battery) return;
+    const now = Date.now();
+    if (severity === "critical" && now - lastBatteryToastRef.current.critical > 5 * 60 * 1000) {
+      lastBatteryToastRef.current.critical = now;
+      toast.error(`Akku ${battery.level}% — Aufnahme JETZT stoppen!`, {
+        description: "Frames werden lokal gesichert und automatisch hochgeladen, sobald du die Seite wieder öffnest.",
+        duration: 12000,
+      });
+      if (navigator.vibrate) navigator.vibrate([100, 100, 100, 100, 100]);
+    } else if (severity === "low" && now - lastBatteryToastRef.current.low > 5 * 60 * 1000) {
+      lastBatteryToastRef.current.low = now;
+      toast.warning(`Akku ${battery.level}% — bald Aufnahme beenden`, { duration: 8000 });
+    }
+  }, [battery, severity, phase]);
+
+  // ── Persist frames to IndexedDB every 10s during recording (crash-safety) ──
+  useEffect(() => {
+    if (phase !== "recording" || !matchId) return;
+    const interval = setInterval(() => {
+      const snapshot = liveCaptureRef.current?.getSnapshot();
+      if (!snapshot || snapshot.frames.length === 0) return;
+      void persistFrames({
+        matchId,
+        sessionToken: isHelper ? sessionToken : undefined,
+        cameraIndex: 0, // helper cam index resolved server-side; 0 is safe default for trainer
+        halfNumber,
+        frames: snapshot.frames,
+        timestamps: snapshot.timestamps,
+        startedAt: recordingStartTime || Date.now(),
+      });
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, [phase, matchId, isHelper, sessionToken, halfNumber, recordingStartTime]);
+
+  // ── Recovery: on mount, check IndexedDB for orphaned frames ──
+  useEffect(() => {
+    if (!matchId || phase === "restoring" || phase === "code") return;
+    void (async () => {
+      const pending = await readPendingFrames(matchId);
+      if (pending && isOrphaned(pending) && pending.frames.length > 0) {
+        setPendingRecovery({
+          matchId: pending.matchId,
+          frameCount: pending.frames.length,
+          cameraIndex: pending.cameraIndex,
+        });
+      }
+    })();
+  }, [matchId, phase]);
+
+  // Recovery action: upload pending frames as a backfill chunk + clear local copy
+  const recoverPendingFrames = useCallback(async () => {
+    if (!matchId) return;
+    const pending = await readPendingFrames(matchId);
+    if (!pending || pending.frames.length === 0) {
+      setPendingRecovery(null);
+      return;
+    }
+    setRecovering(true);
+    try {
+      const camIdx = pending.cameraIndex ?? 0;
+      // Use a high chunk number to avoid colliding with existing chunks
+      const filePath = `${matchId}_cam${camIdx}_chunk_${900 + Math.floor(Date.now() / 1000) % 99}.json`;
+      const body = JSON.stringify({
+        frames: pending.frames,
+        timestamps: pending.timestamps,
+        camera_index: camIdx,
+        captured_at: new Date(pending.startedAt).toISOString(),
+        recovered: true,
+      });
+      const { error } = await supabase.storage
+        .from("match-frames")
+        .upload(filePath, new Blob([body], { type: "application/json" }), { upsert: true });
+      if (error) throw error;
+      await clearPendingFrames(matchId);
+      setPendingRecovery(null);
+      toast.success(`${pending.frames.length} gerettete Frames hochgeladen`);
+    } catch (err: any) {
+      toast.error(`Recovery fehlgeschlagen: ${err?.message ?? "unbekannt"}`);
+    } finally {
+      setRecovering(false);
+    }
+  }, [matchId]);
+
+  // Clear persisted frames after successful finalize (called from finalizeStop below)
+  const clearPersistedFrames = useCallback(async () => {
+    if (matchId) await clearPendingFrames(matchId);
+  }, [matchId]);
 
   // ── Trainer-only: notify when a new helper camera joins mid-match ──
   useEffect(() => {
@@ -499,13 +606,13 @@ export default function CameraTrackingPage() {
     }, 5000);
     (streamRef as any)._countInterval = countInterval;
 
-    // Delta upload every 45s
+    // Delta upload every 15s — tighter window minimizes data loss on crash/battery-out
     if (isHelper) {
       deltaUploadRef.current = setInterval(() => {
         if (deltaRetryCountRef.current < 3) {
           uploadDelta();
         }
-      }, 45000);
+      }, 15000);
     }
   }, [hasHighlights, isHelper, uploadDelta, updateMatchTiming]);
 
@@ -880,7 +987,7 @@ export default function CameraTrackingPage() {
     if (isHelper) {
       deltaUploadRef.current = setInterval(() => {
         if (deltaRetryCountRef.current < 3) uploadDelta();
-      }, 45000);
+      }, 15000);
     }
 
     toast.success("Aufnahme fortgesetzt!");
@@ -911,6 +1018,9 @@ export default function CameraTrackingPage() {
 
     setPhase("analyzing");
     setProgress(20);
+
+    // Frames are now uploaded — drop the IndexedDB safety copy
+    void clearPersistedFrames();
 
     const phaseStr = halfNumber === 2 ? "h2" : "full";
 
@@ -1002,12 +1112,34 @@ export default function CameraTrackingPage() {
         )}
 
         {phase === "setup" && (
-          <CameraSetupOverlay
-            onDismiss={() => initCamera("full")}
-            onStart={handleSetupComplete}
-            showEventLeadToggle={!isHelper}
-            isTrainer={!isHelper}
-          />
+          <>
+            {pendingRecovery && (
+              <div className="absolute top-4 left-4 right-4 z-40 rounded-lg border border-warning/50 bg-warning/10 backdrop-blur p-3 space-y-2">
+                <p className="text-sm font-semibold text-warning">
+                  🛟 {pendingRecovery.frameCount} ungesicherte Frames gefunden
+                </p>
+                <p className="text-xs text-warning/80">
+                  Eine vorherige Aufnahme wurde unterbrochen (Crash / Akku leer). Frames jetzt nachladen?
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={recoverPendingFrames} disabled={recovering} className="flex-1">
+                    {recovering ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CloudUpload className="h-3 w-3 mr-1" />}
+                    Hochladen
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { void clearPersistedFrames(); setPendingRecovery(null); }}>
+                    Verwerfen
+                  </Button>
+                </div>
+              </div>
+            )}
+            <BatteryWarning variant="panel" className="absolute bottom-24 left-4 right-4 z-30" />
+            <CameraSetupOverlay
+              onDismiss={() => initCamera("full")}
+              onStart={handleSetupComplete}
+              showEventLeadToggle={!isHelper}
+              isTrainer={!isHelper}
+            />
+          </>
         )}
 
         {phase === "ready" && (
@@ -1112,6 +1244,7 @@ export default function CameraTrackingPage() {
               <div className="bg-black/60 rounded-full px-3 py-1.5">
                 <span className="text-xs text-white font-medium">{frameCount} Frames</span>
               </div>
+              <BatteryWarning variant="pill" />
               {isHelper && syncedFrames > 0 && (
                 <div className="flex items-center gap-1 bg-primary/80 rounded-full px-2 py-0.5">
                   <CloudUpload className="h-2.5 w-2.5 text-white" />
