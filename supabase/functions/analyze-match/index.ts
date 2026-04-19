@@ -8,6 +8,16 @@ const corsHeaders = {
 
 /** Try to load frames from storage with fallback chain. Camera-files are time-merged. */
 async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number } | null> {
+  const listChunkFiles = async (prefix: string): Promise<string[]> => {
+    const { data } = await supabase.storage.from("match-frames").list("", {
+      limit: 500,
+      search: prefix,
+    });
+    return (data ?? [])
+      .map((entry: { name: string }) => entry.name)
+      .filter((name: string) => name.startsWith(prefix));
+  };
+
   // 1. Try canonical file (already time-merged across all cameras by camera-ops)
   const { data: mainFile } = await supabase.storage.from("match-frames").download(`${matchId}.json`);
   if (mainFile) {
@@ -60,28 +70,42 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
   // 4. Try chunk files (camera-specific first, then legacy) — also time-merge if timestamps present.
   const taggedChunks: Tagged[] = [];
   for (let cam = 0; cam < 4; cam++) {
-    for (let i = 0; i < 100; i++) {
-      const { data: chunkFile } = await supabase.storage.from("match-frames").download(`${matchId}_cam${cam}_chunk_${i}.json`);
-      if (!chunkFile) break;
+    const chunkNames = (await listChunkFiles(`${matchId}_cam${cam}_chunk_`))
+      .sort((a: string, b: string) => {
+        const aIdx = Number(a.match(/_chunk_(\d+)\.json$/)?.[1] ?? -1);
+        const bIdx = Number(b.match(/_chunk_(\d+)\.json$/)?.[1] ?? -1);
+        return aIdx - bIdx;
+      });
+    for (const chunkName of chunkNames) {
       try {
+        const { data: chunkFile } = await supabase.storage.from("match-frames").download(chunkName);
+        if (!chunkFile) continue;
         const parsed = JSON.parse(await chunkFile.text());
         const fr: string[] = parsed.frames ?? [];
         const ts: number[] = parsed.timestamps ?? [];
+        const chunkIndex = Number(chunkName.match(/_chunk_(\d+)\.json$/)?.[1] ?? 0);
         for (let j = 0; j < fr.length; j++) {
-          taggedChunks.push({ frame: fr[j], ts: ts[j] ?? (i * 100 + j) * 30_000 + cam * 1_000 });
+          taggedChunks.push({ frame: fr[j], ts: ts[j] ?? (chunkIndex * 100 + j) * 30_000 + cam * 1_000 });
         }
       } catch { /* skip corrupt */ }
     }
   }
   // Then try legacy non-camera chunks
-  for (let i = 0; i < 100; i++) {
-    const { data: chunkFile } = await supabase.storage.from("match-frames").download(`${matchId}_chunk_${i}.json`);
-    if (!chunkFile) break;
+  const legacyChunkNames = (await listChunkFiles(`${matchId}_chunk_`))
+    .sort((a: string, b: string) => {
+      const aIdx = Number(a.match(/_chunk_(\d+)\.json$/)?.[1] ?? -1);
+      const bIdx = Number(b.match(/_chunk_(\d+)\.json$/)?.[1] ?? -1);
+      return aIdx - bIdx;
+    });
+  for (const chunkName of legacyChunkNames) {
     try {
+      const { data: chunkFile } = await supabase.storage.from("match-frames").download(chunkName);
+      if (!chunkFile) continue;
       const parsed = JSON.parse(await chunkFile.text());
       const fr: string[] = parsed.frames ?? [];
+      const chunkIndex = Number(chunkName.match(/_chunk_(\d+)\.json$/)?.[1] ?? 0);
       for (let j = 0; j < fr.length; j++) {
-        taggedChunks.push({ frame: fr[j], ts: (i * 100 + j) * 30_000 });
+        taggedChunks.push({ frame: fr[j], ts: (chunkIndex * 100 + j) * 30_000 });
       }
     } catch { /* skip corrupt */ }
   }
