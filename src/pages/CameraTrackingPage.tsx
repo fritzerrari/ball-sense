@@ -1337,6 +1337,19 @@ export default function CameraTrackingPage() {
         )}
       </div>
 
+      {/* Helper-only big quick-event card — always visible during recording / halftime */}
+      {isHelper && matchId && (phase === "recording" || phase === "halftime_pause") && !eventLeadOnly && (
+        <HelperQuickEvents
+          matchId={matchId}
+          sessionToken={sessionToken}
+          recordingStartTime={recordingStartTime}
+          halfNumber={halfNumber}
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+          isTraining={isTraining}
+        />
+      )}
+
       <div className="safe-area-pad border-t border-border bg-background p-3 space-y-1.5">
         {phase === "ready" && (
           <Button
