@@ -407,7 +407,7 @@ serve(async (req) => {
       .select("*, fields(name), home_club:clubs!matches_home_club_id_fkey(name, logo_url)")
       .eq("id", match_id).single();
 
-    const [sectionsRes, recRes, evtRes, tsRes, hpsRes, apsRes, luRes] = await Promise.all([
+    const [sectionsRes, recRes, evtRes, tsRes, hpsRes, apsRes, luRes, autoPatternsRes] = await Promise.all([
       supabase.from("report_sections").select("*").eq("match_id", match_id).order("sort_order"),
       supabase.from("training_recommendations").select("*").eq("match_id", match_id).order("priority"),
       supabase.from("match_events").select("*").eq("match_id", match_id).order("minute"),
@@ -415,6 +415,7 @@ serve(async (req) => {
       supabase.from("player_match_stats").select("*, players(name, number, position)").eq("match_id", match_id).eq("team", "home").order("rating", { ascending: false }),
       supabase.from("player_match_stats").select("*, players(name, number, position)").eq("match_id", match_id).eq("team", "away").order("rating", { ascending: false }),
       supabase.from("match_lineups").select("*").eq("match_id", match_id).order("team").order("starting", { ascending: false }),
+      supabase.from("match_videos").select("event_type, event_minute, duration_sec").eq("match_id", match_id).eq("video_type", "auto_pattern").order("event_minute"),
     ]);
 
     const sections = sectionsRes.data ?? [];
@@ -424,6 +425,9 @@ serve(async (req) => {
     const homePS = hpsRes.data ?? [];
     const awayPS = apsRes.data ?? [];
     const lineups = luRes.data ?? [];
+    const autoPatterns = autoPatternsRes.data ?? [];
+    const cockpitCache: any = (match as any)?.cockpit_cache ?? null;
+    const contextCache: any = (match as any)?.context_cache ?? null;
 
     let prepData: any = null;
     if ((report_type === "match_prep" || report_type === "halftime_tactics") && match?.home_club_id) {
@@ -1234,6 +1238,71 @@ h3{font-size:13px;font-weight:700;color:#334155;margin:12px 0 6px}
               <div class="day-focus">${d.focus}</div>
               <span class="day-intensity ${(d.intensity ?? "").toLowerCase()}">${d.intensity}</span>
             </div>`).join("")}</div>` : ""}
+          ${footer}
+        </div>`);
+      }
+
+      // 15.5 — DECISION COCKPIT + LIGA-KONTEXT + AUTO-PATTERNS (Phase-2 data)
+      const cockpitPriorities: any[] = Array.isArray(cockpitCache?.priorities) ? cockpitCache.priorities : [];
+      const contextKpis: any[] = Array.isArray(contextCache?.kpis) ? contextCache.kpis : [];
+      const contextNarrative = typeof contextCache?.narrative === "string" ? contextCache.narrative : "";
+      const hasCockpit = cockpitPriorities.length > 0;
+      const hasContext = contextKpis.length > 0 || contextNarrative;
+      const hasPatterns = autoPatterns.length > 0;
+
+      if (hasCockpit || hasContext || hasPatterns) {
+        const PRIO_COLORS: Record<string, string> = {
+          high: "#dc2626", medium: "#ea580c", low: "#16a34a",
+          critical: "#991b1b",
+        };
+        const TREND_ICON: Record<string, string> = { up: "▲", down: "▼", flat: "▬" };
+        const TREND_COLOR: Record<string, string> = { up: "#16a34a", down: "#dc2626", flat: "#94a3b8" };
+
+        const cockpitBlock = hasCockpit
+          ? `<h3 style="margin-top:0">🎛️ Decision-Cockpit Prioritäten</h3>
+             ${cockpitPriorities.slice(0, 5).map((p: any, i: number) => {
+               const color = PRIO_COLORS[String(p.priority ?? "medium").toLowerCase()] ?? "#2563eb";
+               return `<div class="insight-card" style="border-left:4px solid ${color};margin-bottom:8px">
+                 <div class="insight-title" style="color:${color}">${i + 1}. ${p.title ?? "Priorität"}</div>
+                 ${p.detail ? `<div class="insight-desc">${p.detail}</div>` : ""}
+                 ${p.action ? `<div style="font-size:10px;margin-top:4px;color:#0f172a"><strong>Maßnahme:</strong> ${p.action}</div>` : ""}
+                 ${p.minute != null ? `<span class="insight-cat">Min ${p.minute}</span>` : ""}
+               </div>`;
+             }).join("")}`
+          : "";
+
+        const contextBlock = hasContext
+          ? `<h3 style="margin-top:14px">🌐 Liga-Kontext</h3>
+             ${contextNarrative ? `<div class="card" style="margin-bottom:8px"><p style="font-size:10.5px;line-height:1.6">${contextNarrative}</p></div>` : ""}
+             ${contextKpis.length > 0 ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+               ${contextKpis.slice(0, 6).map((k: any) => {
+                 const tIcon = TREND_ICON[String(k.trend ?? "flat")] ?? "—";
+                 const tColor = TREND_COLOR[String(k.trend ?? "flat")] ?? "#94a3b8";
+                 return `<div class="card" style="text-align:center">
+                   <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px">${k.label ?? "KPI"}</div>
+                   <div style="font-size:18px;font-weight:800;color:#0f172a;margin:3px 0">${k.value ?? "—"}</div>
+                   ${k.benchmark != null ? `<div style="font-size:9px;color:${tColor};font-weight:700">${tIcon} vs Liga ${k.benchmark}</div>` : ""}
+                 </div>`;
+               }).join("")}
+             </div>` : ""}`
+          : "";
+
+        const patternBlock = hasPatterns
+          ? `<h3 style="margin-top:14px">✨ Auto-Pattern Insights</h3>
+             <p style="font-size:9.5px;color:#64748b;margin-bottom:6px">Automatisch erkannte taktische Muster aus Position- und Eventdaten.</p>
+             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+               ${autoPatterns.slice(0, 12).map((p: any) => `<div class="insight-card" style="padding:6px 10px">
+                 <div style="font-size:10px;font-weight:700;color:#2563eb">Min ${p.event_minute ?? "?"}'</div>
+                 <div style="font-size:10px;color:#0f172a;margin-top:2px">${p.event_type ?? "Pattern"}</div>
+               </div>`).join("")}
+             </div>`
+          : "";
+
+        pages.push(`<div class="page page-break">
+          <h2><span class="sec-icon">🧭</span> Cockpit · Kontext · Patterns</h2>
+          ${cockpitBlock}
+          ${contextBlock}
+          ${patternBlock}
           ${footer}
         </div>`);
       }
