@@ -1,13 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, Flame, BrainCircuit, ChevronRight } from "lucide-react";
+import { Dumbbell, Flame, BrainCircuit, ChevronRight, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
+import { useEffect, useRef } from "react";
 
 interface Drill {
   name: string;
   duration_min: number;
   description: string;
   linked_pattern?: string;
+  trigger?: string;
+  trigger_minutes?: number[];
+  drill_key?: string;
 }
 
 interface Session {
@@ -29,6 +34,16 @@ const SESSION_CONFIG: Record<string, { icon: typeof Dumbbell; color: string; lab
 };
 
 export default function TrainingMicroCycle({ sessions }: Props) {
+  const [searchParams] = useSearchParams();
+  const targetDrillKey = searchParams.get("drill");
+  const highlightedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (targetDrillKey && highlightedRef.current) {
+      highlightedRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [targetDrillKey]);
+
   if (!sessions?.length) return null;
 
   return (
@@ -44,7 +59,6 @@ export default function TrainingMicroCycle({ sessions }: Props) {
             <h2 className="font-semibold font-display">Trainings-Mikrozyklus</h2>
           </div>
 
-          {/* Timeline connector */}
           <div className="relative">
             <div className="absolute left-4 top-8 bottom-8 w-0.5 bg-gradient-to-b from-blue-400 via-orange-400 to-primary hidden sm:block" />
 
@@ -60,7 +74,6 @@ export default function TrainingMicroCycle({ sessions }: Props) {
                     transition={{ delay: 0.7 + i * 0.15 }}
                     className={`rounded-xl border ${config.color.split(" ").slice(2).join(" ")} p-4 sm:ml-10 relative`}
                   >
-                    {/* Timeline dot */}
                     <div className="absolute -left-[2.05rem] top-4 hidden sm:flex h-5 w-5 items-center justify-center rounded-full bg-card border-2 border-current">
                       <Icon className="h-3 w-3" />
                     </div>
@@ -76,23 +89,51 @@ export default function TrainingMicroCycle({ sessions }: Props) {
 
                     {session.drills?.length > 0 && (
                       <div className="mt-3 space-y-2">
-                        {session.drills.map((drill, j) => (
-                          <div key={j} className="flex items-start gap-2 rounded-lg bg-card/60 border border-border/30 p-2.5">
-                            <div className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono font-bold">
-                              {drill.duration_min}'
+                        {session.drills.map((drill, j) => {
+                          const isTarget = targetDrillKey && drill.drill_key === targetDrillKey;
+                          return (
+                            <div
+                              key={j}
+                              ref={isTarget ? highlightedRef : undefined}
+                              className={`flex items-start gap-2 rounded-lg border p-2.5 transition-all ${
+                                isTarget
+                                  ? "bg-primary/10 border-primary/40 ring-2 ring-primary/30"
+                                  : "bg-card/60 border-border/30"
+                              }`}
+                            >
+                              <div className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono font-bold">
+                                {drill.duration_min}'
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-medium">{drill.name}</p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">{drill.description}</p>
+
+                                {/* Auslöser - der echte Daten-Beleg, warum diese Übung */}
+                                {drill.trigger && (
+                                  <div className="mt-2 rounded-md bg-amber-500/5 border border-amber-500/20 px-2 py-1.5">
+                                    <p className="text-[10px] text-amber-500 font-semibold flex items-center gap-1 mb-0.5">
+                                      <AlertCircle className="h-3 w-3" />
+                                      Auslöser im Spiel
+                                    </p>
+                                    <p className="text-[11px] text-foreground/90 leading-relaxed">
+                                      {drill.trigger}
+                                      {drill.trigger_minutes && drill.trigger_minutes.length > 0 && (
+                                        <span className="text-muted-foreground"> (Min {drill.trigger_minutes.join(", ")})</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {drill.linked_pattern && !drill.trigger && (
+                                  <p className="text-[10px] text-primary/70 mt-1 flex items-center gap-0.5">
+                                    <ChevronRight className="h-3 w-3" />
+                                    {drill.linked_pattern}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium">{drill.name}</p>
-                              <p className="text-[11px] text-muted-foreground mt-0.5">{drill.description}</p>
-                              {drill.linked_pattern && (
-                                <p className="text-[10px] text-primary/70 mt-1 flex items-center gap-0.5">
-                                  <ChevronRight className="h-3 w-3" />
-                                  {drill.linked_pattern}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </motion.div>
