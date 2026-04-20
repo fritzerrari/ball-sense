@@ -407,7 +407,7 @@ serve(async (req) => {
       .select("*, fields(name), home_club:clubs!matches_home_club_id_fkey(name, logo_url)")
       .eq("id", match_id).single();
 
-    const [sectionsRes, recRes, evtRes, tsRes, hpsRes, apsRes, luRes] = await Promise.all([
+    const [sectionsRes, recRes, evtRes, tsRes, hpsRes, apsRes, luRes, autoPatternsRes] = await Promise.all([
       supabase.from("report_sections").select("*").eq("match_id", match_id).order("sort_order"),
       supabase.from("training_recommendations").select("*").eq("match_id", match_id).order("priority"),
       supabase.from("match_events").select("*").eq("match_id", match_id).order("minute"),
@@ -415,6 +415,7 @@ serve(async (req) => {
       supabase.from("player_match_stats").select("*, players(name, number, position)").eq("match_id", match_id).eq("team", "home").order("rating", { ascending: false }),
       supabase.from("player_match_stats").select("*, players(name, number, position)").eq("match_id", match_id).eq("team", "away").order("rating", { ascending: false }),
       supabase.from("match_lineups").select("*").eq("match_id", match_id).order("team").order("starting", { ascending: false }),
+      supabase.from("match_videos").select("event_type, event_minute, duration_sec").eq("match_id", match_id).eq("video_type", "auto_pattern").order("event_minute"),
     ]);
 
     const sections = sectionsRes.data ?? [];
@@ -424,6 +425,9 @@ serve(async (req) => {
     const homePS = hpsRes.data ?? [];
     const awayPS = apsRes.data ?? [];
     const lineups = luRes.data ?? [];
+    const autoPatterns = autoPatternsRes.data ?? [];
+    const cockpitCache: any = (match as any)?.cockpit_cache ?? null;
+    const contextCache: any = (match as any)?.context_cache ?? null;
 
     let prepData: any = null;
     if ((report_type === "match_prep" || report_type === "halftime_tactics") && match?.home_club_id) {
