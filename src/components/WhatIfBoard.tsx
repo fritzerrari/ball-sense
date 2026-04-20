@@ -99,7 +99,7 @@ export default function WhatIfBoard({ matchId }: Props) {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2">
         {PRESETS.map(({ key, label, icon: Icon, color }) => (
           <Button
             key={key}
@@ -107,14 +107,14 @@ export default function WhatIfBoard({ matchId }: Props) {
             size="sm"
             disabled={loading !== null}
             onClick={() => runScenario(key)}
-            className="justify-start gap-2 h-auto py-2.5 text-xs"
+            className="justify-start gap-2 h-auto py-2.5 px-2.5 text-xs min-w-0"
           >
             {loading === key ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
             ) : (
               <Icon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
             )}
-            <span className="truncate text-left">{label}</span>
+            <span className="truncate text-left flex-1 min-w-0">{label}</span>
           </Button>
         ))}
       </div>
@@ -133,7 +133,7 @@ export default function WhatIfBoard({ matchId }: Props) {
             size="sm"
             disabled={!customPrompt.trim() || loading !== null}
             onClick={() => runScenario(undefined, customPrompt.trim())}
-            className="gap-1.5"
+            className="gap-1.5 w-full sm:w-auto"
           >
             {loading === "custom" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             Szenario berechnen
