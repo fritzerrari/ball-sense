@@ -1,119 +1,218 @@
-import { useMemo, useState } from "react";
-import { Lightbulb, Sparkles } from "lucide-react";
-import { FORMATIONS, POSITION_LABELS } from "@/lib/constants";
-import { AI_DISCLAIMER, AI_RECOMMENDATION_DISCLAIMER } from "@/lib/data-quality";
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sparkles, Loader2, Target, AlertTriangle, Dumbbell,
+  Shuffle, Shield, Zap, Lock, MoveDown, MoveUp,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const FORMATION_LAYOUTS: Record<string, string[]> = {
-  "4-4-2": ["TW", "LV", "IV", "IV", "RV", "LM", "ZM", "ZM", "RM", "ST", "ST"],
-  "4-3-3": ["TW", "LV", "IV", "IV", "RV", "ZM", "ZDM", "ZM", "LA", "ST", "RA"],
-  "3-5-2": ["TW", "LIV", "IV", "RIV", "LM", "ZM", "ZDM", "ZM", "RM", "ST", "ST"],
-  "4-2-3-1": ["TW", "LV", "IV", "IV", "RV", "ZDM", "ZDM", "LA", "ZOM", "RA", "ST"],
-  "3-4-3": ["TW", "LIV", "IV", "RIV", "LM", "ZM", "ZM", "RM", "LA", "ST", "RA"],
-  "5-3-2": ["TW", "LV", "LIV", "IV", "RIV", "RV", "ZM", "ZDM", "ZM", "ST", "ST"],
-  "5-4-1": ["TW", "LV", "LIV", "IV", "RIV", "RV", "LM", "ZM", "ZM", "RM", "ST"],
-};
+interface WhatIfResult {
+  predicted_outcome: string;
+  confidence: "low" | "medium" | "high";
+  key_changes: string[];
+  risks: string[];
+  training_focus: string;
+}
 
-const SLOT_CLASSES = [
-  "left-[50%] top-[88%] -translate-x-1/2",
-  "left-[14%] top-[72%] -translate-x-1/2",
-  "left-[36%] top-[72%] -translate-x-1/2",
-  "left-[64%] top-[72%] -translate-x-1/2",
-  "left-[86%] top-[72%] -translate-x-1/2",
-  "left-[14%] top-[50%] -translate-x-1/2",
-  "left-[36%] top-[50%] -translate-x-1/2",
-  "left-[50%] top-[42%] -translate-x-1/2",
-  "left-[64%] top-[50%] -translate-x-1/2",
-  "left-[32%] top-[24%] -translate-x-1/2",
-  "left-[68%] top-[24%] -translate-x-1/2",
+interface ScenarioResponse {
+  scenario: string;
+  scenario_key: string;
+  result: WhatIfResult;
+  generated_at: string;
+}
+
+interface Props {
+  matchId: string;
+}
+
+const PRESETS: { key: string; label: string; icon: typeof Shuffle; color: string }[] = [
+  { key: "no_early_fouls", label: "Ohne frühe Fouls", icon: Shield, color: "text-amber-500" },
+  { key: "switch_formation", label: "Andere Formation", icon: Shuffle, color: "text-primary" },
+  { key: "high_press", label: "Hohes Pressing", icon: MoveUp, color: "text-emerald-500" },
+  { key: "deep_block", label: "Tiefer Block", icon: MoveDown, color: "text-blue-500" },
+  { key: "no_concession", label: "Kein frühes Gegentor", icon: Lock, color: "text-destructive" },
+  { key: "more_possession", label: "Mehr Ballbesitz", icon: Zap, color: "text-purple-500" },
 ];
 
-export function WhatIfBoard({ players }: { players: Array<{ id?: string | null; players?: { name?: string | null; position?: string | null } | null; pass_accuracy?: number | null; duels_won?: number | null; duels_total?: number | null; ball_recoveries?: number | null; rating?: number | null; }> }) {
-  const [formation, setFormation] = useState("4-3-3");
-  const layout = FORMATION_LAYOUTS[formation] ?? FORMATION_LAYOUTS["4-3-3"];
+const CONFIDENCE_CONFIG = {
+  high: { label: "Hohe Konfidenz", color: "bg-emerald-500/15 text-emerald-500" },
+  medium: { label: "Mittlere Konfidenz", color: "bg-amber-500/15 text-amber-500" },
+  low: { label: "Niedrige Konfidenz", color: "bg-muted text-muted-foreground" },
+};
 
-  const suggestions = useMemo(() => {
-    const defenders = players.filter((player) => ["LV", "RV", "IV", "LIV", "RIV", "ZDM"].includes(player.players?.position || ""));
-    const attackers = players.filter((player) => ["LA", "RA", "ST", "HS", "ZOM"].includes(player.players?.position || ""));
-    const avgDuelRate = defenders.length
-      ? defenders.reduce((sum, player) => {
-          const total = player.duels_total || 0;
-          return sum + (total > 0 ? ((player.duels_won || 0) / total) * 100 : 0);
-        }, 0) / defenders.length
-      : 0;
-    const avgPassing = players.length
-      ? players.reduce((sum, player) => sum + (player.pass_accuracy || 0), 0) / players.length
-      : 0;
+export default function WhatIfBoard({ matchId }: Props) {
+  const [scenarios, setScenarios] = useState<ScenarioResponse[]>([]);
+  const [loading, setLoading] = useState<string | null>(null);
+  const [customPrompt, setCustomPrompt] = useState("");
 
-    return [
-      avgDuelRate < 50
-        ? "Mehr Absicherung im Zentrum sinnvoll: Eine Formation mit zusätzlichem ZDM oder Dreierkette könnte das Restverteidigen stabilisieren."
-        : "Die Defensivbasis wirkt stabil genug, um offensivere Rollen in höheren Zonen zu testen.",
-      attackers.length < 3
-        ? "Im letzten Datensatz sind wenige klare Offensivrollen erkennbar; ein Umbau auf 4-2-3-1 kann Zwischenräume besser besetzen."
-        : "Mehr Breite über LA/RA kann helfen, Außenkorridore im Angriff sauberer zu besetzen.",
-      avgPassing < 78
-        ? "Wenn du einen passsicheren Spieler tiefer ziehst, verbessert sich wahrscheinlich Aufbau und Pressingresistenz."
-        : "Mit der aktuellen Passqualität kann ein zusätzlicher Offensivspieler zwischen den Linien getestet werden.",
-    ];
-  }, [players]);
+  const runScenario = async (scenarioKey?: string, customText?: string) => {
+    const id = scenarioKey ?? "custom";
+    setLoading(id);
+    try {
+      const { data, error } = await supabase.functions.invoke("what-if-scenario", {
+        body: {
+          match_id: matchId,
+          scenario_key: scenarioKey,
+          custom_prompt: customText,
+        },
+      });
+      if (error) throw error;
+      if (data?.error === "rate_limited") {
+        toast.error("Rate-Limit erreicht — kurz warten.");
+        return;
+      }
+      if (data?.error === "credits_required") {
+        toast.error("KI-Guthaben aufgebraucht.");
+        return;
+      }
+      if (data?.result) {
+        setScenarios((prev) => [data as ScenarioResponse, ...prev].slice(0, 5));
+        if (customText) setCustomPrompt("");
+      }
+    } catch (err) {
+      console.error("what-if error", err);
+      toast.error("Szenario konnte nicht erstellt werden.");
+    } finally {
+      setLoading(null);
+    }
+  };
 
   return (
-    <div className="glass-card space-y-5 p-5 sm:p-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <h3 className="text-base font-semibold font-display">Was-wäre-wenn-Analyse</h3>
-          <p className="text-sm text-muted-foreground">Interaktive Ersteinschätzung für Positionswechsel und Formationsumbauten.</p>
+    <div className="space-y-4">
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-3 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-3"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+          <Sparkles className="h-4 w-4 text-primary" />
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Sparkles className="h-4 w-4" />
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-widest text-primary font-semibold">Was-wäre-wenn</p>
+          <p className="text-xs text-muted-foreground">KI-Szenarien für alternative Spielverläufe</p>
         </div>
+      </motion.div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {PRESETS.map(({ key, label, icon: Icon, color }) => (
+          <Button
+            key={key}
+            variant="outline"
+            size="sm"
+            disabled={loading !== null}
+            onClick={() => runScenario(key)}
+            className="justify-start gap-2 h-auto py-2.5 text-xs"
+          >
+            {loading === key ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+            ) : (
+              <Icon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
+            )}
+            <span className="truncate text-left">{label}</span>
+          </Button>
+        ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <label htmlFor="formation-select" className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Formation</label>
-        <select id="formation-select" value={formation} onChange={(event) => setFormation(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
-          {FORMATIONS.map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-      </div>
+      <Card className="border-border/50">
+        <CardContent className="pt-4 space-y-2">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Eigenes Szenario</p>
+          <Textarea
+            placeholder="z. B. Was wäre, wenn der Stürmer die Großchance in Min 34 verwandelt hätte?"
+            value={customPrompt}
+            onChange={(e) => setCustomPrompt(e.target.value)}
+            rows={2}
+            className="text-sm resize-none"
+          />
+          <Button
+            size="sm"
+            disabled={!customPrompt.trim() || loading !== null}
+            onClick={() => runScenario(undefined, customPrompt.trim())}
+            className="gap-1.5"
+          >
+            {loading === "custom" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            Szenario berechnen
+          </Button>
+        </CardContent>
+      </Card>
 
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-        <div className="relative overflow-x-auto rounded-3xl border border-border bg-pitch/15 p-4">
-          <div className="min-w-[560px] sm:min-w-[640px]">
-            <div className="absolute inset-4 rounded-[1.25rem] border border-pitch-line/40" />
-            <div className="absolute bottom-4 left-1/2 top-4 w-px -translate-x-1/2 bg-pitch-line/30" />
-            <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pitch-line/30" />
-            <div className="relative h-[420px]">
-              {layout.map((slot, index) => {
-                const player = players[index];
-                return (
-                  <div key={`${slot}-${index}`} className={`absolute ${SLOT_CLASSES[index] || SLOT_CLASSES[SLOT_CLASSES.length - 1]}`}>
-                    <div className="w-[74px] rounded-2xl border border-border bg-background/90 px-2 py-2 text-center shadow-sm sm:w-[88px] lg:w-[96px]">
-                      <p className="truncate text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{POSITION_LABELS[slot] || slot}</p>
-                      <p className="mt-1 line-clamp-2 break-words text-[11px] font-semibold leading-4 sm:text-xs">{player?.players?.name || "Offen"}</p>
-                      <p className="mt-1 truncate text-[10px] text-muted-foreground sm:text-[11px]">{player?.players?.position ? POSITION_LABELS[player.players.position] || player.players.position : "Noch kein Profil"}</p>
+      {loading && !scenarios.length && <Skeleton className="h-32 w-full" />}
+
+      <AnimatePresence>
+        {scenarios.map((s, idx) => {
+          const cfg = CONFIDENCE_CONFIG[s.result.confidence];
+          return (
+            <motion.div
+              key={s.generated_at}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ delay: idx * 0.05 }}
+            >
+              <Card className="border-primary/20 bg-card/80 backdrop-blur-sm relative overflow-hidden">
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-primary/60 to-transparent" />
+                <CardContent className="pt-5 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs italic text-muted-foreground flex-1">"{s.scenario}"</p>
+                    <Badge className={`${cfg.color} border-0 text-[10px] shrink-0`}>{cfg.label}</Badge>
+                  </div>
+
+                  <div className="rounded-lg bg-primary/10 px-3 py-2 flex items-start gap-2">
+                    <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wider text-primary font-semibold">Prognose</p>
+                      <p className="text-sm font-semibold text-foreground">{s.result.predicted_outcome}</p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
 
-        <div className="space-y-3">
-          {suggestions.map((idea) => (
-            <div key={idea} className="flex items-start gap-2 rounded-2xl border border-border bg-background/60 p-3 text-sm text-muted-foreground">
-              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span className="leading-6">{idea}</span>
-            </div>
-          ))}
-          <div className="rounded-2xl border border-border bg-secondary/50 p-3 text-xs leading-5 text-muted-foreground">
-            <p>{AI_RECOMMENDATION_DISCLAIMER}</p>
-            <p className="mt-1">{AI_DISCLAIMER}</p>
-          </div>
-        </div>
-      </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Veränderungen im Spielverlauf
+                    </p>
+                    <ul className="space-y-1">
+                      {s.result.key_changes.map((c, i) => (
+                        <li key={i} className="text-xs text-foreground/90 flex items-start gap-1.5">
+                          <span className="text-primary mt-0.5">•</span>
+                          <span>{c}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-2">
+                    <AlertTriangle className="h-3 w-3 text-amber-500 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold">Risiken</p>
+                      <p className="text-[11px] text-foreground/90">{s.result.risks.join(" · ")}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-2">
+                    <Dumbbell className="h-3 w-3 text-emerald-500 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wider text-emerald-500 font-semibold">
+                        Trainings-Fokus
+                      </p>
+                      <p className="text-[11px] text-foreground/90">{s.result.training_focus}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+
+      {!scenarios.length && !loading && (
+        <p className="text-[11px] text-center text-muted-foreground/60 py-4">
+          Wähle ein Preset oder formuliere ein eigenes Szenario, um eine KI-Prognose zu erhalten.
+        </p>
+      )}
     </div>
   );
 }
