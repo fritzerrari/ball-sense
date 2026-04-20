@@ -1160,6 +1160,7 @@ export type Database = {
           cockpit_cache: Json | null
           consent_minors_confirmed: boolean
           consent_players_confirmed: boolean
+          context_cache: Json | null
           created_at: string
           date: string
           field_id: string
@@ -1190,6 +1191,7 @@ export type Database = {
           cockpit_cache?: Json | null
           consent_minors_confirmed?: boolean
           consent_players_confirmed?: boolean
+          context_cache?: Json | null
           created_at?: string
           date: string
           field_id: string
@@ -1220,6 +1222,7 @@ export type Database = {
           cockpit_cache?: Json | null
           consent_minors_confirmed?: boolean
           consent_players_confirmed?: boolean
+          context_cache?: Json | null
           created_at?: string
           date?: string
           field_id?: string

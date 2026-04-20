@@ -33,6 +33,7 @@ import RiskRadar from "@/components/RiskRadar";
 import PlayerSpotlight from "@/components/PlayerSpotlight";
 import PlayerDevelopmentCards from "@/components/PlayerDevelopmentCards";
 import DecisionCockpit from "@/components/DecisionCockpit";
+import MatchContextBanner from "@/components/MatchContextBanner";
 import OpponentDNA from "@/components/OpponentDNA";
 import TrainingMicroCycle from "@/components/TrainingMicroCycle";
 import QuickActionCards from "@/components/QuickActionCards";
@@ -396,6 +397,7 @@ export default function MatchReport() {
 
               {/* ═══ COCKPIT TAB — Decision-First ═══ */}
               <TabsContent value="cockpit" className="space-y-4">
+                {id && <MatchContextBanner matchId={id} />}
                 {id && <DecisionCockpit matchId={id} onJumpToTab={handleJumpToTab} />}
               </TabsContent>
 
