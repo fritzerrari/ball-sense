@@ -1,52 +1,43 @@
 
-## Kontext-Check
-Das System nimmt **keine vollständigen Match-Videos** auf:
-- `video-recorder.ts` puffert nur 30s im RAM für Highlight-Clips bei Live-Events (Tor, Karte etc.)
-- `auto-clip-detector` legt nur **virtuelle Marker** an (`file_path: auto://...`)
-- Die eigentliche Analyse läuft über **JPEG-Frames alle 30s** (siehe `mem://architecture/match-intelligence-pipeline-v2`)
+## Ziel
+Die "Was-wäre-wenn"-Szenarien (`what-if-scenario` Edge Function) liefern aktuell teils zu konkrete, scheinbar deterministische Aussagen ("2:0 statt 3:0", harte Kausalketten). Der User möchte das **analytische Niveau anheben**: vorsichtige Formulierungen, Wahrscheinlichkeiten statt Ergebnisse, Berücksichtigung von Gegenrisiken und Abhängigkeiten.
 
-→ **„Video-Mapping" und „Click-to-jump" sind sinnlos** ohne echtes Video. Stattdessen müssen wir die **Daten-Drilldowns** (Heatmap, Events, Positionen) zum Zeitpunkt des Patterns zeigen.
+## Was wir ändern
 
-## Neu priorisierte offene Punkte
+### 1. System-Prompt in `supabase/functions/what-if-scenario/index.ts` schärfen
+Der aktuelle Prompt sagt nur "Sei konkret und ehrlich". Wir präzisieren ihn um die vom User benannten Analyse-Standards:
 
-### Phase 1 — Cockpit-Kern (was noch fehlt)
-- **1.1 Cockpit-Fallback-Banner**: Wenn AI-Gateway 500 zurückgibt, klares UI-Banner statt Toast-Spam.
-- **1.2 Mobile-Layout** für `WhatIfBoard` und `AutoPatternClips` (aktuell desktop-fokussiert, Buttons brechen <380px).
+**Neue Leitplanken im Prompt:**
+- **Keine deterministischen Endergebnisse** ("2:0 statt 3:0") → stattdessen Wahrscheinlichkeiten/Tendenzen ("geringere Wahrscheinlichkeit für frühes Gegentor", "stabilerer Spielverlauf wahrscheinlich")
+- **Kausalitäten absichern**: jede Folge mit Bedingung formulieren ("falls Standardsituation", "abhängig von Positionsstruktur")
+- **Gegenrisiken zwingend nennen** (z. B. "weniger Fouls = evtl. weniger Aggressivität, Gegner bekommt mehr Raum")
+- **Vereinfachungen vermeiden**: keine simplen 1:1-Ableitungen ("weniger Fouls = mehr Ballbesitz" ❌)
+- **Analyse-Level anheben**: Formulierungen wie "kontinuierliche Spielphasen mit Potenzial zur Kontrolle" statt "mehr Kontrolle"
 
-### Phase 2 — Verknüpfung & Drilldowns (statt Video-Mapping)
-- **2.1 AutoPatternClips → Daten-Drilldown**: Klick auf ein Pattern öffnet `MetricDetailDialog` mit:
-  - Heatmap-Ausschnitt zur Pattern-Minute
-  - Beteiligte Events aus `match_events` im Zeitfenster ±2 min
-  - Optional: Positions-Snapshot (statisches Mini-Replay 30s aus `positions_raw`)
-- **2.2 MatchContextBanner Drilldown**: Klick auf KPI-Pill (z.B. „Pässe +12% vs Liga") öffnet Dialog mit Verlaufsdiagramm der letzten 10 Spiele.
-- **2.3 WhatIfBoard ↔ Training**: Aus einem Szenario-Ergebnis direkt einen Trainings-Fokus an `TrainingMicroCycle` übernehmen (Button „In Training übernehmen").
-- **2.4 Liga-Benchmark Opt-in UI**: Toggle in `Settings.tsx` für `benchmark_opt_ins` (Backend existiert, UI fehlt).
+### 2. JSON-Schema des Tool-Calls erweitern
+Aktuell: `predicted_outcome` (string) — verleitet zu konkreten Scores.
 
-### Phase 3 — Report & Distribution
-- **3.1 PDF-Report erweitern**: `generate-pdf-report` rendert noch nicht:
-  - Cockpit-Prioritäten (`DecisionCockpit`-Daten)
-  - Liga-Kontext-Pills
-  - What-if-Top-Szenario
-  - Auto-Pattern-Liste (als statische Bullet-Points mit Minute + Beschreibung)
-- **3.2 Push-Notifications**: Service Worker mit Web Push API, aktuell nur In-App Bell.
-- **3.3 Gegner-Scouting Auto-Trigger**: Nach jedem Final-Job automatisch Scouting-Profil für den gespielten Gegner aktualisieren.
+**Neu:**
+- `predicted_outcome` umbenennen/präzisieren in `predicted_tendency` (string, kein konkretes Ergebnis erlaubt — Beispiel-Hinweis im `description`-Feld)
+- Neues Feld: `assumptions` (array, 1–3 Einträge) — explizite Bedingungen, unter denen die Prognose gilt
+- `key_changes`: jedes Item soll mit Wahrscheinlichkeits-Adverb beginnen ("wahrscheinlich", "tendenziell", "potenziell")
+- `risks` von 1–2 auf **2–3 Pflichtfelder** erhöhen (Gegenrisiko + Nebeneffekt + Abhängigkeit)
+- `confidence` bleibt — aber Default-Tendenz zu `low`/`medium` (Anweisung im Prompt: nur `high` bei sehr klarer Datenlage)
 
-## Was wir streichen / anpassen
-- ❌ ~~Video-Mapping für Auto-Clips~~ → ersetzt durch **2.1 Daten-Drilldown**
-- ❌ ~~Click-to-jump in Video-Player~~ → kein echtes Video vorhanden
-- ⚠️ `AutoPatternClips` umbenennen in **„Auto-Pattern Insights"** (kein Clip-Bezug mehr)
+### 3. Frontend `WhatIfBoard.tsx` an neue Schema anpassen
+- Interface `WhatIfResult` umbenennen: `predicted_outcome` → `predicted_tendency`
+- Neuer Block "Annahmen" (mit `Info`-Icon) zwischen Prognose und Veränderungen
+- Risiken-Block: mehrzeilig statt `risks.join(" · ")` (jetzt 2–3 Items, lesbarer als Liste)
+- UI-Label "Prognose" → "Tendenz" (klarere Erwartungshaltung)
 
-## Empfohlene Reihenfolge
-| Block | Aufwand | Wert |
-|---|---|---|
-| **Phase 1** (1.1 + 1.2) | klein | hoch (Stabilität) |
-| **Phase 2.1 + 2.2** | mittel | sehr hoch (echter Drilldown statt toter Klicks) |
-| **Phase 2.4** | klein | mittel (PRO-Feature freischalten) |
-| **Phase 3.1** | mittel | hoch (Report ist Trainer-Endprodukt) |
-| **Phase 2.3** | klein | mittel |
-| **Phase 3.2 + 3.3** | groß | mittel (nice-to-have) |
+### 4. Backwards-Compat
+Edge Function liest weiter `predicted_outcome` als Fallback (falls alte gecachte Antworten irgendwo persistiert sind), schreibt aber neu `predicted_tendency`. Frontend prüft beide Felder.
 
-## Nächster konkreter Schritt
-Ich schlage vor: **Phase 1 + 2.1 + 2.2 in einem Loop** (Cockpit-Stabilisierung + echte Drilldowns für Patterns/Context). Das macht das Cockpit produktiv nutzbar.
+## Dateien
+- `supabase/functions/what-if-scenario/index.ts` — Prompt + Tool-Schema
+- `src/components/WhatIfBoard.tsx` — Interface, Render-Layout, Labels
 
-Sag „**los: Phase 1 + 2.1 + 2.2**" oder wähle eine andere Kombination.
+## Was wir NICHT ändern
+- Preset-Buttons & Custom-Prompt-Flow bleiben identisch
+- Pin-to-Training Feature bleibt
+- Lovable AI Gateway / Modell (`google/gemini-2.5-flash`) bleibt — die Verbesserung erfolgt rein über Prompt-Engineering
