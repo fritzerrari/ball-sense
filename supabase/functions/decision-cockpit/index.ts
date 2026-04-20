@@ -44,71 +44,112 @@ const drillKeyByEventType: Record<string, string> = {
 
 function findLinkedVideoId(videos: any[], minutes: number[]) {
   for (const minute of minutes) {
-    const match = videos.find((video: any) => Number(video.event_minute) === Number(minute));
+    const match = videos.find((video: any) =>
+      Number(video.event_minute) === Number(minute)
+    );
     if (match?.id) return String(match.id);
   }
   return "";
 }
 
-function buildFallbackCockpit(teamIdentity: string, events: any[], videos: any[], stats: any[]): CockpitResponse {
+function buildFallbackCockpit(
+  teamIdentity: string,
+  events: any[],
+  videos: any[],
+  stats: any[],
+): CockpitResponse {
   const sortedEvents = [...events]
     .filter((event: any) => typeof event.minute === "number")
     .sort((a: any, b: any) => a.minute - b.minute);
 
-  const homeStats = stats.find((row: any) => row.team === "home") ?? stats[0] ?? null;
-  const conceded = sortedEvents.filter((event: any) => event.event_type === "conceded_goal");
-  const attacking = sortedEvents.filter((event: any) => ["goal", "shot", "shot_on_target", "assist"].includes(event.event_type));
-  const discipline = sortedEvents.filter((event: any) => ["foul", "yellow_card", "red_card", "yellow_red_card"].includes(event.event_type));
+  const homeStats = stats.find((row: any) => row.team === "home") ?? stats[0] ??
+    null;
+  const conceded = sortedEvents.filter((event: any) =>
+    event.event_type === "conceded_goal"
+  );
+  const attacking = sortedEvents.filter((event: any) =>
+    ["goal", "shot", "shot_on_target", "assist"].includes(event.event_type)
+  );
+  const discipline = sortedEvents.filter((event: any) =>
+    ["foul", "yellow_card", "red_card", "yellow_red_card"].includes(
+      event.event_type,
+    )
+  );
 
   const templates: Array<Omit<Priority, "rank">> = [];
 
   if (conceded.length > 0) {
-    const minutes = conceded.slice(0, 3).map((event: any) => Number(event.minute));
+    const minutes = conceded.slice(0, 3).map((event: any) =>
+      Number(event.minute)
+    );
     templates.push({
       impact_type: "kostet_tore",
       title: "Gegentore aus Schlüsselmomenten verhindern",
-      evidence: `Gegentore bzw. klare Negativmomente in Min ${minutes.join(", ")}. Fokus auf Absicherung nach Ballverlust und Restverteidigung.`,
+      evidence: `Gegentore bzw. klare Negativmomente in Min ${
+        minutes.join(", ")
+      }. Fokus auf Absicherung nach Ballverlust und Restverteidigung.`,
       linked_event_minutes: minutes,
       linked_video_id: findLinkedVideoId(videos, minutes),
       linked_drill_key: "restverteidigung_6v6",
-      recommendation: "Trainiere Restverteidigung und die ersten 5 Sekunden nach Ballverlust unter Gegnerdruck.",
+      recommendation:
+        "Trainiere Restverteidigung und die ersten 5 Sekunden nach Ballverlust unter Gegnerdruck.",
     });
   }
 
   if (discipline.length > 0) {
-    const minutes = discipline.slice(0, 3).map((event: any) => Number(event.minute));
+    const minutes = discipline.slice(0, 3).map((event: any) =>
+      Number(event.minute)
+    );
     templates.push({
       impact_type: "risiko",
       title: "Foul- und Kartenmanagement schärfen",
-      evidence: `Mehrere Risikoaktionen in Min ${minutes.join(", ")}. Das kann gegen stärkere Gegner direkt kippen.`,
+      evidence: `Mehrere Risikoaktionen in Min ${
+        minutes.join(", ")
+      }. Das kann gegen stärkere Gegner direkt kippen.`,
       linked_event_minutes: minutes,
       linked_video_id: findLinkedVideoId(videos, minutes),
-      linked_drill_key: drillKeyByEventType[discipline[0]?.event_type] ?? "zweikampf_timing",
-      recommendation: "Trainiere Anlaufwinkel, Zweikampf-Timing und die Absicherung nach überspieltem Druck.",
+      linked_drill_key: drillKeyByEventType[discipline[0]?.event_type] ??
+        "zweikampf_timing",
+      recommendation:
+        "Trainiere Anlaufwinkel, Zweikampf-Timing und die Absicherung nach überspieltem Druck.",
     });
   }
 
   if (attacking.length > 0) {
-    const minutes = attacking.slice(0, 3).map((event: any) => Number(event.minute));
+    const minutes = attacking.slice(0, 3).map((event: any) =>
+      Number(event.minute)
+    );
     templates.push({
       impact_type: "bringt_tore",
       title: "Offensivmuster konsequent ausbauen",
-      evidence: `Positive Offensivaktionen in Min ${minutes.join(", ")}. Daraus lässt sich ein wiederholbares Muster ableiten.`,
+      evidence: `Positive Offensivaktionen in Min ${
+        minutes.join(", ")
+      }. Daraus lässt sich ein wiederholbares Muster ableiten.`,
       linked_event_minutes: minutes,
       linked_video_id: findLinkedVideoId(videos, minutes),
-      linked_drill_key: drillKeyByEventType[attacking[0]?.event_type] ?? "abschluss_im_letzten_drittel",
-      recommendation: "Wiederhole die erfolgreichsten Angriffe im Training mit klaren Triggern für Tiefgang und Abschluss.",
+      linked_drill_key: drillKeyByEventType[attacking[0]?.event_type] ??
+        "abschluss_im_letzten_drittel",
+      recommendation:
+        "Wiederhole die erfolgreichsten Angriffe im Training mit klaren Triggern für Tiefgang und Abschluss.",
     });
   }
 
   if (homeStats && typeof homeStats.possession_pct === "number") {
     templates.push({
       impact_type: homeStats.possession_pct >= 55 ? "staerke" : "risiko",
-      title: homeStats.possession_pct >= 55 ? "Ballkontrolle gezielt nutzen" : "Ballbesitz unter Druck stabilisieren",
-      evidence: `Team-Statistik: ${Math.round(homeStats.possession_pct)}% Ballbesitz. Das muss klarer in Chance oder Kontrolle übersetzt werden.`,
-      linked_event_minutes: sortedEvents.slice(0, 2).map((event: any) => Number(event.minute)).filter(Number.isFinite),
+      title: homeStats.possession_pct >= 55
+        ? "Ballkontrolle gezielt nutzen"
+        : "Ballbesitz unter Druck stabilisieren",
+      evidence: `Team-Statistik: ${
+        Math.round(homeStats.possession_pct)
+      }% Ballbesitz. Das muss klarer in Chance oder Kontrolle übersetzt werden.`,
+      linked_event_minutes: sortedEvents.slice(0, 2).map((event: any) =>
+        Number(event.minute)
+      ).filter(Number.isFinite),
       linked_video_id: "",
-      linked_drill_key: homeStats.possession_pct >= 55 ? "positionsspiel_7v7" : "druckresistenz_aufbau",
+      linked_drill_key: homeStats.possession_pct >= 55
+        ? "positionsspiel_7v7"
+        : "druckresistenz_aufbau",
       recommendation: homeStats.possession_pct >= 55
         ? "Verbinde Ballkontrolle mit vertikalen Anschlussaktionen statt sterilem Besitz."
         : "Trainiere Aufbau unter Gegnerdruck mit klaren Klatsch-/Dreh-Optionen.",
@@ -117,37 +158,59 @@ function buildFallbackCockpit(teamIdentity: string, events: any[], videos: any[]
 
   while (templates.length < 3) {
     templates.push({
-      impact_type: templates.length === 0 ? "kostet_tore" : templates.length === 1 ? "risiko" : "staerke",
-      title: templates.length === 0 ? "Kritische Spielsituation präziser absichern" : templates.length === 1 ? "Risikomuster früher stoppen" : "Stärke gezielt verstärken",
-      evidence: "Die vorhandenen Match-Daten reichen für eine belastbare Trainer-Priorisierung, auch ohne vollständige AI-Antwort.",
-      linked_event_minutes: sortedEvents.slice(templates.length, templates.length + 2).map((event: any) => Number(event.minute)).filter(Number.isFinite),
+      impact_type: templates.length === 0
+        ? "kostet_tore"
+        : templates.length === 1
+        ? "risiko"
+        : "staerke",
+      title: templates.length === 0
+        ? "Kritische Spielsituation präziser absichern"
+        : templates.length === 1
+        ? "Risikomuster früher stoppen"
+        : "Stärke gezielt verstärken",
+      evidence:
+        "Die vorhandenen Match-Daten reichen für eine belastbare Trainer-Priorisierung, auch ohne vollständige AI-Antwort.",
+      linked_event_minutes: sortedEvents.slice(
+        templates.length,
+        templates.length + 2,
+      ).map((event: any) => Number(event.minute)).filter(Number.isFinite),
       linked_video_id: "",
-      linked_drill_key: templates.length === 0 ? "restverteidigung_6v6" : templates.length === 1 ? "gegenpressing_reaktion" : "positionsspiel_7v7",
+      linked_drill_key: templates.length === 0
+        ? "restverteidigung_6v6"
+        : templates.length === 1
+        ? "gegenpressing_reaktion"
+        : "positionsspiel_7v7",
       recommendation: templates.length === 0
         ? "Arbeite an Absicherung und Rollenverhalten in Umschaltmomenten."
         : templates.length === 1
-          ? "Definiere klare Auslöser, wann Druck, Foul oder Rückzug die beste Entscheidung ist."
-          : "Identifiziere euer bestes Muster und trainiere es mit Wiederholungen unter Gegnerdruck.",
+        ? "Definiere klare Auslöser, wann Druck, Foul oder Rückzug die beste Entscheidung ist."
+        : "Identifiziere euer bestes Muster und trainiere es mit Wiederholungen unter Gegnerdruck.",
     });
   }
 
-  const priorities = templates.slice(0, 3).map((item, index) => ({ ...item, rank: (index + 1) as 1 | 2 | 3 }));
+  const priorities = templates.slice(0, 3).map((item, index) => ({
+    ...item,
+    rank: (index + 1) as 1 | 2 | 3,
+  }));
   const dnaMatchScore = teamIdentity === "unbekannt"
     ? 50
     : homeStats && typeof homeStats.possession_pct === "number"
-      ? Math.max(35, Math.min(85, Math.round(homeStats.possession_pct)))
-      : 58;
+    ? Math.max(35, Math.min(85, Math.round(homeStats.possession_pct)))
+    : 58;
 
   return {
     dna_match_score: dnaMatchScore,
-    dna_comment: "Fallback-Modus aktiv: Priorisierung wurde aus vorhandenen Match-Daten und Events statt aus der AI-Antwort erzeugt.",
+    dna_comment:
+      "Fallback-Modus aktiv: Priorisierung wurde aus vorhandenen Match-Daten und Events statt aus der AI-Antwort erzeugt.",
     priorities,
     fallback: true,
   };
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -177,13 +240,18 @@ serve(async (req) => {
     }
 
     if (!force_refresh && matchRow.cockpit_cache?.priorities) {
-      return new Response(JSON.stringify({ cockpit: matchRow.cockpit_cache, cached: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ cockpit: matchRow.cockpit_cache, cached: true }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const [eventsRes, sectionsRes, videosRes, statsRes] = await Promise.all([
-      supabase.from("match_events").select("*").eq("match_id", match_id).order("minute"),
+      supabase.from("match_events").select("*").eq("match_id", match_id).order(
+        "minute",
+      ),
       supabase.from("report_sections").select("*").eq("match_id", match_id),
       supabase
         .from("match_videos")
@@ -204,11 +272,23 @@ serve(async (req) => {
     const opponent = matchRow.away_club_name ?? "Gegner";
 
     const eventsSummary = events
-      .map((e: any) => `Min ${e.minute} ${e.team}: ${e.event_type}${e.player_name ? ` (${e.player_name})` : ""}${e.event_zone ? ` [${e.event_zone}]` : ""}`)
+      .map((e: any) =>
+        `Min ${e.minute} ${e.team}: ${e.event_type}${
+          e.player_name ? ` (${e.player_name})` : ""
+        }${e.event_zone ? ` [${e.event_zone}]` : ""}`
+      )
       .join("\n");
 
     const sectionsCompact = sections
-      .filter((s: any) => ["summary", "coaching", "tactical_blueprint", "risk_matrix", "next_match_actions"].includes(s.section_type))
+      .filter((s: any) =>
+        [
+          "summary",
+          "coaching",
+          "tactical_blueprint",
+          "risk_matrix",
+          "next_match_actions",
+        ].includes(s.section_type)
+      )
       .map((s: any) => `## ${s.title}\n${s.content.slice(0, 800)}`)
       .join("\n\n");
 
@@ -216,7 +296,8 @@ serve(async (req) => {
       .map((v: any) => `Min ${v.event_minute} → ${v.event_type} (id:${v.id})`)
       .join("\n");
 
-    const systemPrompt = `Du bist ein Profi-Trainer-Coach. Aufgabe: Aus den Spieldaten die EXAKT 3 wichtigsten Entscheidungs-Punkte für den Trainer extrahieren — keine schönen Texte, sondern harte Priorisierung nach Impact.
+    const systemPrompt =
+      `Du bist ein Profi-Trainer-Coach. Aufgabe: Aus den Spieldaten die EXAKT 3 wichtigsten Entscheidungs-Punkte für den Trainer extrahieren — keine schönen Texte, sondern harte Priorisierung nach Impact.
 
 Regeln:
 - Rank 1 = das, was Tore gekostet hat oder am meisten Verbesserung bringt
@@ -246,95 +327,132 @@ Liefere Top 3 Entscheidungen + DNA-Match-Score (0-100, wie nah am gewählten Sti
     let cockpit: CockpitResponse;
 
     try {
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "set_cockpit_decisions",
-                description: "Liefert Top-3-Entscheidungen + DNA-Bewertung",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    dna_match_score: {
-                      type: "number",
-                      description: "0-100: wie nah am gewählten Spielstil",
-                    },
-                    dna_comment: { type: "string" },
-                    priorities: {
-                      type: "array",
-                      minItems: 3,
-                      maxItems: 3,
-                      items: {
-                        type: "object",
-                        properties: {
-                          rank: { type: "integer", enum: [1, 2, 3] },
-                          impact_type: {
-                            type: "string",
-                            enum: ["kostet_tore", "bringt_tore", "risiko", "staerke"],
+      const aiResp = await fetch(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "set_cockpit_decisions",
+                  description: "Liefert Top-3-Entscheidungen + DNA-Bewertung",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      dna_match_score: {
+                        type: "number",
+                        description: "0-100: wie nah am gewählten Spielstil",
+                      },
+                      dna_comment: { type: "string" },
+                      priorities: {
+                        type: "array",
+                        minItems: 3,
+                        maxItems: 3,
+                        items: {
+                          type: "object",
+                          properties: {
+                            rank: { type: "integer", enum: [1, 2, 3] },
+                            impact_type: {
+                              type: "string",
+                              enum: [
+                                "kostet_tore",
+                                "bringt_tore",
+                                "risiko",
+                                "staerke",
+                              ],
+                            },
+                            title: {
+                              type: "string",
+                              description: "kurz, max 60 Zeichen",
+                            },
+                            evidence: {
+                              type: "string",
+                              description:
+                                "Konkreter Beleg mit Minute(n), z.B. 'Min 23, 67: Gegentor nach Ballverlust im Zentrum'",
+                            },
+                            linked_event_minutes: {
+                              type: "array",
+                              items: { type: "integer" },
+                            },
+                            linked_video_id: {
+                              type: "string",
+                              description:
+                                "ID eines passenden Highlight-Videos oder leer",
+                            },
+                            linked_drill_key: {
+                              type: "string",
+                              description:
+                                "Slug der passenden Übung, z.B. '6v6_umschalt' oder leer",
+                            },
+                            recommendation: {
+                              type: "string",
+                              description: "Eine konkrete Handlung",
+                            },
                           },
-                          title: { type: "string", description: "kurz, max 60 Zeichen" },
-                          evidence: {
-                            type: "string",
-                            description: "Konkreter Beleg mit Minute(n), z.B. 'Min 23, 67: Gegentor nach Ballverlust im Zentrum'",
-                          },
-                          linked_event_minutes: {
-                            type: "array",
-                            items: { type: "integer" },
-                          },
-                          linked_video_id: {
-                            type: "string",
-                            description: "ID eines passenden Highlight-Videos oder leer",
-                          },
-                          linked_drill_key: {
-                            type: "string",
-                            description: "Slug der passenden Übung, z.B. '6v6_umschalt' oder leer",
-                          },
-                          recommendation: {
-                            type: "string",
-                            description: "Eine konkrete Handlung",
-                          },
+                          required: [
+                            "rank",
+                            "impact_type",
+                            "title",
+                            "evidence",
+                            "linked_event_minutes",
+                            "linked_video_id",
+                            "linked_drill_key",
+                            "recommendation",
+                          ],
+                          additionalProperties: false,
                         },
-                        required: ["rank", "impact_type", "title", "evidence", "linked_event_minutes", "linked_video_id", "linked_drill_key", "recommendation"],
-                        additionalProperties: false,
                       },
                     },
+                    required: ["dna_match_score", "dna_comment", "priorities"],
+                    additionalProperties: false,
                   },
-                  required: ["dna_match_score", "dna_comment", "priorities"],
-                  additionalProperties: false,
                 },
               },
+            ],
+            tool_choice: {
+              type: "function",
+              function: { name: "set_cockpit_decisions" },
             },
-          ],
-          tool_choice: { type: "function", function: { name: "set_cockpit_decisions" } },
-        }),
-      });
+          }),
+        },
+      );
 
       if (!aiResp.ok) {
         const bodyText = await aiResp.text();
         console.error("AI error", aiResp.status, bodyText);
         if (aiResp.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit erreicht, bitte gleich nochmal versuchen." }), {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return new Response(
+            JSON.stringify({
+              error: "Rate limit erreicht, bitte gleich nochmal versuchen.",
+            }),
+            {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
         }
         if (aiResp.status === 402) {
-          return new Response(JSON.stringify({ error: "AI-Guthaben aufgebraucht. Bitte in Lovable Cloud aufladen." }), {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return new Response(
+            JSON.stringify({
+              error:
+                "AI-Guthaben aufgebraucht. Bitte in Lovable Cloud aufladen.",
+            }),
+            {
+              status: 402,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
         }
         throw new Error(`AI gateway failed: ${aiResp.status}`);
       }
@@ -360,7 +478,9 @@ Liefere Top 3 Entscheidungen + DNA-Match-Score (0-100, wie nah am gewählten Sti
           rank: (index + 1) as 1 | 2 | 3,
           linked_video_id: priority.linked_video_id ?? "",
           linked_drill_key: priority.linked_drill_key ?? "",
-          linked_event_minutes: Array.isArray(priority.linked_event_minutes) ? priority.linked_event_minutes : [],
+          linked_event_minutes: Array.isArray(priority.linked_event_minutes)
+            ? priority.linked_event_minutes
+            : [],
         }));
     }
 
@@ -372,14 +492,24 @@ Liefere Top 3 Entscheidungen + DNA-Match-Score (0-100, wie nah am gewählten Sti
       .update({ cockpit_cache: cockpit })
       .eq("id", match_id);
 
-    return new Response(JSON.stringify({ cockpit, cached: false, fallback: cockpit.fallback ?? false }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        cockpit,
+        cached: false,
+        fallback: cockpit.fallback ?? false,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (err) {
     console.error("decision-cockpit error", err);
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "unknown" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : "unknown" }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });
