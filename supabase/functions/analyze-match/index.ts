@@ -723,6 +723,16 @@ KAMERA-PERSPEKTIVE ERKENNEN:
       body: JSON.stringify({ match_id, job_id }),
     }).catch((err) => console.error("generate-insights server trigger error:", err));
 
+    // Fire-and-forget: refresh opponent scouting profile after final analysis
+    fetch(`${supabaseUrl}/functions/v1/update-opponent-scout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ match_id }),
+    }).catch((err) => console.error("update-opponent-scout trigger error:", err));
+
     return new Response(JSON.stringify({
       success: true,
       frames_analyzed: selectedFrames.length,
