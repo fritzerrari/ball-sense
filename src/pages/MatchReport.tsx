@@ -699,7 +699,10 @@ export default function MatchReport() {
 
               {/* ═══ PLAYERS TAB ═══ */}
               <TabsContent value="players" className="space-y-4">
-                {/* Player Spotlight */}
+                {/* AI Player Development Cards (neu, datenbasiert pro Spieler) */}
+                {id && <PlayerDevelopmentCards matchId={id} />}
+
+                {/* Player Spotlight (MVP/Sorgenspieler) — bleibt als Schnell-Übersicht */}
                 {playerSpotlight?.mvp && playerSpotlight?.concern && (
                   <PlayerSpotlight mvp={playerSpotlight.mvp} concern={playerSpotlight.concern} />
                 )}
@@ -709,12 +712,6 @@ export default function MatchReport() {
                   <Suspense fallback={<SkeletonCard count={1} />}>
                     <FatigueIndicator frames={framePositions.data.frames} intervalSec={framePositions.data.interval_sec ?? 30} />
                   </Suspense>
-                )}
-
-                {!playerSpotlight && !framePositions && (
-                  <div className="py-12 text-center text-muted-foreground text-sm">
-                    Keine Spieler-Daten verfügbar.
-                  </div>
                 )}
               </TabsContent>
 
