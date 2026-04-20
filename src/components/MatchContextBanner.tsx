@@ -197,12 +197,28 @@ export default function MatchContextBanner({ matchId, compact = false }: Props) 
                   vs. <span className="font-semibold">{data!.label}</span>
                   <span className="text-muted-foreground/60"> · n={data!.sample_size}</span>
                 </p>
-                <KpiRow block={data!} />
+                <KpiRow
+                  block={data!}
+                  onPick={(kpi) => {
+                    const benchmarkAbs = (data as any)![kpi]?.abs ?? null;
+                    openDrilldown(kpi, data!.label, benchmarkAbs);
+                  }}
+                />
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+      <ContextKpiDetailDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        matchId={matchId}
+        clubId={clubId}
+        kpiKey={activeKpi}
+        scopeLabel={activeScopeLabel}
+        currentValue={activeKpi ? (context?.current?.[KPI_TO_CURRENT_KEY[activeKpi]] ?? null) : null}
+        benchmarkValue={activeBenchmark}
+      />
     </motion.div>
   );
 }
