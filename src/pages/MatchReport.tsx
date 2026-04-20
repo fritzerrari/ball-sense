@@ -31,6 +31,8 @@ import MomentumTimeline from "@/components/MomentumTimeline";
 import TacticalGradeMatrix from "@/components/TacticalGradeMatrix";
 import RiskRadar from "@/components/RiskRadar";
 import PlayerSpotlight from "@/components/PlayerSpotlight";
+import PlayerDevelopmentCards from "@/components/PlayerDevelopmentCards";
+import DecisionCockpit from "@/components/DecisionCockpit";
 import OpponentDNA from "@/components/OpponentDNA";
 import TrainingMicroCycle from "@/components/TrainingMicroCycle";
 import QuickActionCards from "@/components/QuickActionCards";
@@ -126,18 +128,29 @@ export default function MatchReport() {
   const [job, setJob] = useState<AnalysisJob | null>(null);
   const [loadingReport, setLoadingReport] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
+  const VALID_TABS = ["cockpit", "overview", "tactics", "players", "opponent", "training"] as const;
   const [activeTab, setActiveTab] = useState(() => {
     const t = searchParams.get("tab");
-    return t && ["overview", "tactics", "players", "opponent", "training"].includes(t) ? t : "overview";
+    return t && (VALID_TABS as readonly string[]).includes(t) ? t : "cockpit";
   });
+
+  const handleJumpToTab = (tab: string, extra?: Record<string, string>) => {
+    setActiveTab(tab);
+    if (extra) {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", tab);
+      Object.entries(extra).forEach(([k, v]) => next.set(k, v));
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   // Sync tab → URL so the user can share/refresh deep-linked sections
   useEffect(() => {
     const current = searchParams.get("tab");
     if (current === activeTab) return;
-    if (activeTab === "overview" && !current) return;
+    if (activeTab === "cockpit" && !current) return;
     const next = new URLSearchParams(searchParams);
-    if (activeTab === "overview") next.delete("tab"); else next.set("tab", activeTab);
+    if (activeTab === "cockpit") next.delete("tab"); else next.set("tab", activeTab);
     setSearchParams(next, { replace: true });
   }, [activeTab, searchParams, setSearchParams]);
 
@@ -354,7 +367,11 @@ export default function MatchReport() {
 
             {/* TAB NAVIGATION */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="w-full grid grid-cols-5 h-11">
+              <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 h-auto sm:h-11">
+                <TabsTrigger value="cockpit" className="gap-1.5 text-xs sm:text-sm">
+                  <Brain className="h-3.5 w-3.5 hidden sm:block" />
+                  Cockpit
+                </TabsTrigger>
                 <TabsTrigger value="overview" className="gap-1.5 text-xs sm:text-sm">
                   <Lightbulb className="h-3.5 w-3.5 hidden sm:block" />
                   Übersicht
@@ -376,6 +393,12 @@ export default function MatchReport() {
                   Training
                 </TabsTrigger>
               </TabsList>
+
+              {/* ═══ COCKPIT TAB — Decision-First ═══ */}
+              <TabsContent value="cockpit" className="space-y-4">
+                {id && <DecisionCockpit matchId={id} onJumpToTab={handleJumpToTab} />}
+              </TabsContent>
+
 
               {/* ═══ OVERVIEW TAB ═══ */}
               <TabsContent value="overview" className="space-y-4">
@@ -686,7 +709,10 @@ export default function MatchReport() {
 
               {/* ═══ PLAYERS TAB ═══ */}
               <TabsContent value="players" className="space-y-4">
-                {/* Player Spotlight */}
+                {/* AI Player Development Cards (neu, datenbasiert pro Spieler) */}
+                {id && <PlayerDevelopmentCards matchId={id} />}
+
+                {/* Player Spotlight (MVP/Sorgenspieler) — bleibt als Schnell-Übersicht */}
                 {playerSpotlight?.mvp && playerSpotlight?.concern && (
                   <PlayerSpotlight mvp={playerSpotlight.mvp} concern={playerSpotlight.concern} />
                 )}
@@ -696,12 +722,6 @@ export default function MatchReport() {
                   <Suspense fallback={<SkeletonCard count={1} />}>
                     <FatigueIndicator frames={framePositions.data.frames} intervalSec={framePositions.data.interval_sec ?? 30} />
                   </Suspense>
-                )}
-
-                {!playerSpotlight && !framePositions && (
-                  <div className="py-12 text-center text-muted-foreground text-sm">
-                    Keine Spieler-Daten verfügbar.
-                  </div>
                 )}
               </TabsContent>
 
