@@ -28,6 +28,7 @@ export default function NewMatch() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [fieldId, setFieldId] = useState("");
   const [awayName, setAwayName] = useState("");
+  const [teamIdentity, setTeamIdentity] = useState<string>("");
 
   const [creating, setCreating] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
@@ -60,7 +61,8 @@ export default function NewMatch() {
           status: "setup",
           consent_players_confirmed: true,
           consent_minors_confirmed: true,
-        })
+          team_identity: teamIdentity || null,
+        } as any)
         .select()
         .single();
       if (error) throw error;
@@ -240,6 +242,39 @@ export default function NewMatch() {
                   <option key={f.id} value={f.id}>{f.name}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Team-DNA / Spielidentität */}
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                Spielidentität (Team-DNA)
+                <span className="text-xs text-muted-foreground/70 ml-1">— wie wollt ihr spielen?</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: "pressing", label: "Pressing", emoji: "🔥" },
+                  { key: "ballbesitz", label: "Ballbesitz", emoji: "⚙️" },
+                  { key: "umschalt", label: "Umschalten", emoji: "⚡" },
+                  { key: "defensiv", label: "Defensiv-kompakt", emoji: "🛡️" },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setTeamIdentity(teamIdentity === opt.key ? "" : opt.key)}
+                    className={`rounded-lg border px-3 py-2.5 text-sm text-left transition-all ${
+                      teamIdentity === opt.key
+                        ? "border-primary bg-primary/10 text-primary font-semibold"
+                        : "border-border bg-muted hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="mr-1.5">{opt.emoji}</span>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground/70 mt-1.5">
+                Optional — das Cockpit bewertet dann, wie nah ihr an eurer DNA gespielt habt.
+              </p>
             </div>
 
             <Button

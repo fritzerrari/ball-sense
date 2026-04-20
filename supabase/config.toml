@@ -42,3 +42,9 @@ verify_jwt = false
 
 [functions.generate-pdf-report]
 verify_jwt = false
+
+[functions.decision-cockpit]
+verify_jwt = false
+
+[functions.player-development]
+verify_jwt = false
