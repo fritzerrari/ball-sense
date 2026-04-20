@@ -367,7 +367,11 @@ export default function MatchReport() {
 
             {/* TAB NAVIGATION */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="w-full grid grid-cols-5 h-11">
+              <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 h-auto sm:h-11">
+                <TabsTrigger value="cockpit" className="gap-1.5 text-xs sm:text-sm">
+                  <Brain className="h-3.5 w-3.5 hidden sm:block" />
+                  Cockpit
+                </TabsTrigger>
                 <TabsTrigger value="overview" className="gap-1.5 text-xs sm:text-sm">
                   <Lightbulb className="h-3.5 w-3.5 hidden sm:block" />
                   Übersicht
@@ -389,6 +393,12 @@ export default function MatchReport() {
                   Training
                 </TabsTrigger>
               </TabsList>
+
+              {/* ═══ COCKPIT TAB — Decision-First ═══ */}
+              <TabsContent value="cockpit" className="space-y-4">
+                {id && <DecisionCockpit matchId={id} onJumpToTab={handleJumpToTab} />}
+              </TabsContent>
+
 
               {/* ═══ OVERVIEW TAB ═══ */}
               <TabsContent value="overview" className="space-y-4">
