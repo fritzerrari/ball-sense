@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sparkles, Loader2, Target, AlertTriangle, Dumbbell,
-  Shuffle, Shield, Zap, Lock, MoveDown, MoveUp, Pin,
+  Shuffle, Shield, Zap, Lock, MoveDown, MoveUp, Pin, Info,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,8 +14,10 @@ import { toast } from "sonner";
 import { pinTrainingFocus } from "@/lib/pinned-training-focus";
 
 interface WhatIfResult {
-  predicted_outcome: string;
+  predicted_tendency?: string;
+  predicted_outcome?: string; // legacy fallback
   confidence: "low" | "medium" | "high";
+  assumptions?: string[];
   key_changes: string[];
   risks: string[];
   training_focus: string;
@@ -166,10 +168,29 @@ export default function WhatIfBoard({ matchId }: Props) {
                   <div className="rounded-lg bg-primary/10 px-3 py-2 flex items-start gap-2">
                     <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-wider text-primary font-semibold">Prognose</p>
-                      <p className="text-sm font-semibold text-foreground">{s.result.predicted_outcome}</p>
+                      <p className="text-[10px] uppercase tracking-wider text-primary font-semibold">Tendenz</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {s.result.predicted_tendency ?? s.result.predicted_outcome ?? "—"}
+                      </p>
                     </div>
                   </div>
+
+                  {s.result.assumptions && s.result.assumptions.length > 0 && (
+                    <div className="rounded-lg bg-muted/40 px-2.5 py-2 flex items-start gap-1.5">
+                      <Info className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Annahmen</p>
+                        <ul className="space-y-0.5 mt-0.5">
+                          {s.result.assumptions.map((a, i) => (
+                            <li key={i} className="text-[11px] text-foreground/80 flex items-start gap-1">
+                              <span className="text-muted-foreground mt-0.5">·</span>
+                              <span>{a}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
@@ -187,9 +208,16 @@ export default function WhatIfBoard({ matchId }: Props) {
 
                   <div className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-2">
                     <AlertTriangle className="h-3 w-3 text-amber-500 mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold">Risiken</p>
-                      <p className="text-[11px] text-foreground/90">{s.result.risks.join(" · ")}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold">Risiken & Abhängigkeiten</p>
+                      <ul className="space-y-0.5 mt-0.5">
+                        {s.result.risks.map((r, i) => (
+                          <li key={i} className="text-[11px] text-foreground/90 flex items-start gap-1">
+                            <span className="text-amber-500 mt-0.5">·</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
 
