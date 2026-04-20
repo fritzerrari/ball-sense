@@ -1,117 +1,52 @@
 
+## Kontext-Check
+Das System nimmt **keine vollständigen Match-Videos** auf:
+- `video-recorder.ts` puffert nur 30s im RAM für Highlight-Clips bei Live-Events (Tor, Karte etc.)
+- `auto-clip-detector` legt nur **virtuelle Marker** an (`file_path: auto://...`)
+- Die eigentliche Analyse läuft über **JPEG-Frames alle 30s** (siehe `mem://architecture/match-intelligence-pipeline-v2`)
 
-## Mein Take auf die Kritik
+→ **„Video-Mapping" und „Click-to-jump" sind sinnlos** ohne echtes Video. Stattdessen müssen wir die **Daten-Drilldowns** (Heatmap, Events, Positionen) zum Zeitpunkt des Patterns zeigen.
 
-Der Reviewer hat **recht**. Wir haben das Tool zu sehr in Richtung "schöner Bericht" entwickelt. Was fehlt, ist der **Sprung vom Analyse-Assistent zum Entscheidungs-Coach**.
+## Neu priorisierte offene Punkte
 
-Die gute Nachricht: **Wir haben fast alle Bausteine schon** (Highlight-Clips, AI-Chat, Coaching-Cockpit, Training-Microcycle, Player-Stats). Sie sind nur nicht **verzahnt** und nicht **priorisiert**. Statt "alles ist wichtig" brauchen wir "**hier sind die Top 3, alles andere ist Detail**".
+### Phase 1 — Cockpit-Kern (was noch fehlt)
+- **1.1 Cockpit-Fallback-Banner**: Wenn AI-Gateway 500 zurückgibt, klares UI-Banner statt Toast-Spam.
+- **1.2 Mobile-Layout** für `WhatIfBoard` und `AutoPatternClips` (aktuell desktop-fokussiert, Buttons brechen <380px).
 
-Ich schlage einen **3-Phasen-Umbau** vor — gestaffelt nach Impact, nicht nach Aufwand. Wir machen **nicht alles auf einmal**, sondern Phase 1 jetzt (größter Hebel), dann iterieren.
+### Phase 2 — Verknüpfung & Drilldowns (statt Video-Mapping)
+- **2.1 AutoPatternClips → Daten-Drilldown**: Klick auf ein Pattern öffnet `MetricDetailDialog` mit:
+  - Heatmap-Ausschnitt zur Pattern-Minute
+  - Beteiligte Events aus `match_events` im Zeitfenster ±2 min
+  - Optional: Positions-Snapshot (statisches Mini-Replay 30s aus `positions_raw`)
+- **2.2 MatchContextBanner Drilldown**: Klick auf KPI-Pill (z.B. „Pässe +12% vs Liga") öffnet Dialog mit Verlaufsdiagramm der letzten 10 Spiele.
+- **2.3 WhatIfBoard ↔ Training**: Aus einem Szenario-Ergebnis direkt einen Trainings-Fokus an `TrainingMicroCycle` übernehmen (Button „In Training übernehmen").
+- **2.4 Liga-Benchmark Opt-in UI**: Toggle in `Settings.tsx` für `benchmark_opt_ins` (Backend existiert, UI fehlt).
 
----
+### Phase 3 — Report & Distribution
+- **3.1 PDF-Report erweitern**: `generate-pdf-report` rendert noch nicht:
+  - Cockpit-Prioritäten (`DecisionCockpit`-Daten)
+  - Liga-Kontext-Pills
+  - What-if-Top-Szenario
+  - Auto-Pattern-Liste (als statische Bullet-Points mit Minute + Beschreibung)
+- **3.2 Push-Notifications**: Service Worker mit Web Push API, aktuell nur In-App Bell.
+- **3.3 Gegner-Scouting Auto-Trigger**: Nach jedem Final-Job automatisch Scouting-Profil für den gespielten Gegner aktualisieren.
 
-## Phase 1: Trainer-Cockpit (jetzt) — die 4 wichtigsten Upgrades
+## Was wir streichen / anpassen
+- ❌ ~~Video-Mapping für Auto-Clips~~ → ersetzt durch **2.1 Daten-Drilldown**
+- ❌ ~~Click-to-jump in Video-Player~~ → kein echtes Video vorhanden
+- ⚠️ `AutoPatternClips` umbenennen in **„Auto-Pattern Insights"** (kein Clip-Bezug mehr)
 
-### 1.1 "Decision Cockpit" als neuer **Top-Reiter** (ersetzt nicht, ergänzt)
+## Empfohlene Reihenfolge
+| Block | Aufwand | Wert |
+|---|---|---|
+| **Phase 1** (1.1 + 1.2) | klein | hoch (Stabilität) |
+| **Phase 2.1 + 2.2** | mittel | sehr hoch (echter Drilldown statt toter Klicks) |
+| **Phase 2.4** | klein | mittel (PRO-Feature freischalten) |
+| **Phase 3.1** | mittel | hoch (Report ist Trainer-Endprodukt) |
+| **Phase 2.3** | klein | mittel |
+| **Phase 3.2 + 3.3** | groß | mittel (nice-to-have) |
 
-Eine einzige Seite, die der Trainer **vor** dem Bericht sieht:
+## Nächster konkreter Schritt
+Ich schlage vor: **Phase 1 + 2.1 + 2.2 in einem Loop** (Cockpit-Stabilisierung + echte Drilldowns für Patterns/Context). Das macht das Cockpit produktiv nutzbar.
 
-```text
-┌─────────────────────────────────────────────────────┐
-│  ENTSCHEIDUNGS-COCKPIT                              │
-├─────────────────────────────────────────────────────┤
-│  🔴 #1 KRITISCH (kostet Tore)                       │
-│     "Zentrum offen bei Ballverlust → 2 Gegentore"   │
-│     [▶ Szene ansehen]  [📋 Training öffnen]         │
-│                                                     │
-│  🟠 #2 RISIKO (gegen stärkere Teams)                │
-│     "5 frühe Fouls — taktisch ok hier, riskant      │
-│      gegen Ligaspitze"                              │
-│     [▶ Foul-Clips]                                  │
-│                                                     │
-│  🟢 #3 STÄRKE (ausbauen)                            │
-│     "30% Aufbau über rechts erfolgreich"            │
-│     [▶ Beste Szene]                                 │
-└─────────────────────────────────────────────────────┘
-```
-
-**Was neu ist:**
-- **Harte Top-3-Priorisierung** mit Impact-Bewertung (kostet Tore / bringt Tore / Risiko)
-- Jede Aussage hat **direkt einen Clip-Button** (Video-Verknüpfung — Punkt 3 der Kritik)
-- Jede Aussage hat **direkt einen Trainings-Button** → springt zur passenden Übung
-- Edge Function `decision-cockpit` (neu): nutzt Spiel-Events + Stats + bestehende `report_sections`, lässt Gemini **priorisieren statt beschreiben** (Tool-Call mit `priority`, `impact_type`, `linked_event_minute`, `linked_video_id`, `linked_drill_key`)
-
-### 1.2 Spielidentität / Team-DNA (Punkt 6)
-
-**Neuer Setup-Step bei Match-Erstellung:**
-- Trainer wählt **eine** Identität: `Pressing` / `Ballbesitz` / `Umschalt` / `Defensiv-kompakt`
-- Speichern in `matches.team_identity` (neue Spalte)
-- Cockpit bewertet jede Phase: **"Wie nah wart ihr an eurer DNA?"** (0-100%)
-- Wenn nicht gesetzt → KI schlägt vor basierend auf gespielten Mustern
-
-### 1.3 Spieler-individuelle Karten (Punkt 4) — überarbeitet
-
-`PlayerSpotlight` wird zu **`PlayerDevelopmentCards`**:
-- Pro Spieler (Top 5 + alle anklickbar):
-  - **2 Stärken** (datenbasiert, mit Beispiel-Minute)
-  - **2 Entwicklungsfelder** (mit konkreter Spielsituation)
-  - **1 zugeordnete Übung** aus dem Microcycle
-  - **▶-Button** → relevanter Clip (falls vorhanden)
-- Edge Function `player-development` (neu) generiert das pro Spieler
-
-### 1.4 Trainings-Ableitung "echt" (Punkt 5)
-
-`TrainingMicroCycle` wird umgebaut:
-- Jede Übung zeigt **explizit ihren Auslöser**:
-  ```
-  Übung: 6v6 Umschaltspiel mit Zonenbindung
-  ↑ Weil: Zentrum offen bei Ballverlust (Min 23, 67)
-  [▶ Auslöser-Szene]
-  ```
-- Statt "Standard-Bibliothek" → echte `data → situation → drill`-Kette via Tool-Call
-
----
-
-## Phase 2 (später, separater Loop)
-
-- **Was-wäre-wenn-Simulationen** (Punkt 7) — bauen wir bewusst noch nicht, weil das einen eigenen Mini-ML-Layer braucht. Heute haben wir schon den `TacticalAIChat`, der das textuell macht — das reicht erstmal.
-- **Kontext-Intelligenz Liga/Gegner** (Punkt 2) — sobald wir Liga-Daten haben (api-football.com), bewertet das Cockpit relativ statt absolut.
-- **Auto-Clip-Generierung aus Heatmap-Mustern** (statt nur aus Events) — größerer Eingriff in `analyze-match`.
-
----
-
-## Konkrete Code-Änderungen Phase 1
-
-| Datei | Aktion |
-|---|---|
-| `supabase/functions/decision-cockpit/index.ts` | **NEU** — Tool-Call mit `top_priorities[]`, jeweils `priority`, `impact`, `linked_event_minute`, `linked_drill_key`, `evidence` |
-| `supabase/functions/player-development/index.ts` | **NEU** — pro Spieler 2 Stärken + 2 Felder + 1 Drill |
-| `src/components/DecisionCockpit.tsx` | **NEU** — Top-3-Karten mit Clip- & Drill-Sprung |
-| `src/components/PlayerDevelopmentCards.tsx` | **NEU** — ersetzt aktuellen `PlayerSpotlight` im Player-Tab |
-| `src/components/TrainingMicroCycle.tsx` | **EDIT** — Auslöser-Spalte + Clip-Button |
-| `src/pages/MatchReport.tsx` | **EDIT** — neuer **erster** Tab "Cockpit" (Decision-First), bestehende Tabs bleiben |
-| `src/pages/NewMatch.tsx` | **EDIT** — Team-DNA-Auswahl im Wizard |
-| Migration | `matches.team_identity text`, optional Spalte für Cockpit-Cache |
-| Cross-Linking | Cockpit-Cards setzen URL-Param `?tab=training&drill=xyz` bzw. `?clip=video_id` — bestehende Tab-Sync-Logik nutzen |
-
----
-
-## Was wir bewusst **nicht** tun
-
-- **Kein vollständiger Neubau** — die Infrastruktur stimmt
-- **Kein "noch mehr Charts"** — Kritik war: zu viel "schön", zu wenig "entscheidend"
-- **Kein Was-wäre-wenn-Simulator** in Phase 1 — zu groß, lieber gut als schnell
-- **PDF-Report bleibt erstmal wie er ist** — der ist gerade neu und gut, das Cockpit ist ein **separater** Layer
-
----
-
-## Erwartetes Ergebnis nach Phase 1
-
-Der Trainer öffnet den Report und sieht **zuerst**:
-> "Diese 3 Dinge entscheiden dein nächstes Spiel. Klick → Szene. Klick → Training."
-
-Statt heute:
-> "Hier sind 12 wunderschön formulierte Erkenntnisse, viel Spaß beim Lesen."
-
-**Das** ist der Sprung vom Analyse-Assistenten zum Entscheidungs-Coach.
-
+Sag „**los: Phase 1 + 2.1 + 2.2**" oder wähle eine andere Kombination.
