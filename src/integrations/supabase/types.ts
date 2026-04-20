@@ -1157,6 +1157,7 @@ export type Database = {
           away_club_name: string | null
           away_formation: string | null
           away_score: number | null
+          cockpit_cache: Json | null
           consent_minors_confirmed: boolean
           consent_players_confirmed: boolean
           created_at: string
@@ -1178,6 +1179,7 @@ export type Database = {
           recording_ended_at: string | null
           recording_started_at: string | null
           status: string
+          team_identity: string | null
           track_opponent: boolean
         }
         Insert: {
@@ -1185,6 +1187,7 @@ export type Database = {
           away_club_name?: string | null
           away_formation?: string | null
           away_score?: number | null
+          cockpit_cache?: Json | null
           consent_minors_confirmed?: boolean
           consent_players_confirmed?: boolean
           created_at?: string
@@ -1206,6 +1209,7 @@ export type Database = {
           recording_ended_at?: string | null
           recording_started_at?: string | null
           status?: string
+          team_identity?: string | null
           track_opponent?: boolean
         }
         Update: {
@@ -1213,6 +1217,7 @@ export type Database = {
           away_club_name?: string | null
           away_formation?: string | null
           away_score?: number | null
+          cockpit_cache?: Json | null
           consent_minors_confirmed?: boolean
           consent_players_confirmed?: boolean
           created_at?: string
@@ -1234,6 +1239,7 @@ export type Database = {
           recording_ended_at?: string | null
           recording_started_at?: string | null
           status?: string
+          team_identity?: string | null
           track_opponent?: boolean
         }
         Relationships: [
