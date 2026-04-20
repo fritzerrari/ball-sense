@@ -1,80 +1,117 @@
 
 
-## Frage
+## Mein Take auf die Kritik
 
-Darf nur **eine** Person Events (Tor, Ecke, Chance, Karte etc.) protokollieren — und was passiert, wenn **zwei** Personen (z. B. Trainer + Helfer) das fast gleichzeitig tun?
+Der Reviewer hat **recht**. Wir haben das Tool zu sehr in Richtung "schöner Bericht" entwickelt. Was fehlt, ist der **Sprung vom Analyse-Assistent zum Entscheidungs-Coach**.
 
-## Aktueller Stand (recherchiert)
+Die gute Nachricht: **Wir haben fast alle Bausteine schon** (Highlight-Clips, AI-Chat, Coaching-Cockpit, Training-Microcycle, Player-Stats). Sie sind nur nicht **verzahnt** und nicht **priorisiert**. Statt "alles ist wichtig" brauchen wir "**hier sind die Top 3, alles andere ist Detail**".
 
-Aus `src/components/MatchEventQuickBar.tsx` und `supabase/functions/camera-ops/index.ts`:
+Ich schlage einen **3-Phasen-Umbau** vor — gestaffelt nach Impact, nicht nach Aufwand. Wir machen **nicht alles auf einmal**, sondern Phase 1 jetzt (größter Hebel), dann iterieren.
 
-### Wer kann heute Events anlegen?
+---
 
-| Rolle | Event-Quick-Bar sichtbar? | Schreibweg |
-|---|---|---|
-| **Trainer** (eingeloggt, Self-Mode) | Ja | Direkt in `match_events` via Supabase-Client (RLS auf eigenen Club) |
-| **Helfer** (nur Code, kein Login) | Ja, wenn `MatchEventQuickBar` mit `sessionToken` gerendert wird | Über `camera-ops`-Edge-Function (`action: "log-event"`) |
-| **Andere Vereinsmitglieder** | Nein, RLS verbietet Insert auf fremde `home_club_id` | — |
+## Phase 1: Trainer-Cockpit (jetzt) — die 4 wichtigsten Upgrades
 
-→ Es können also **mehrere Personen gleichzeitig** Events anlegen: ein Trainer und 1–3 Helfer pro Spiel.
+### 1.1 "Decision Cockpit" als neuer **Top-Reiter** (ersetzt nicht, ergänzt)
 
-### Was passiert technisch bei (fast) gleichzeitigem Klick?
-
-1. **Beide Events werden gespeichert.** Jeder Insert erzeugt eine eigene UUID, es gibt keinen Unique-Constraint auf `(match_id, event_type, minute, team)`. Ergebnis: **doppelte Tore in der Liste**, doppelter Score-Hochzähler in `MatchScorecard`.
-2. **Lokaler Debounce hilft nur pro Gerät** — 500 ms in `debounceRef`, 3 s `cooldownSet`. Beides ist clientseitig und greift **nicht** zwischen verschiedenen Geräten.
-3. **Realtime-Sync zwischen den Geräten gibt es nicht** für `match_events` — der zweite Tipper sieht den Klick des ersten nicht und drückt nochmal.
-4. **Auswirkung im Bericht:** doppelte Goals erhöhen `home_score`/`away_score` falsch, verfälschen den Match-Verlauf und die Highlight-Clips (zwei 20s-Clips für dasselbe Tor).
-
-### Was schützt heute schon?
-
-- **`PostMatchEventEditor`** erlaubt nach dem Spiel manuelles Löschen/Korrigieren — Ground Truth wird so gesetzt.
-- **Undo-Chips** in der QuickBar (3 letzte Events pro Gerät) können sofort entfernt werden — aber nur die eigenen, nicht die vom anderen Gerät.
-
-## Lösungsvorschlag — drei Stufen
-
-### Stufe 1: Server-Deduplizierung (Pflicht, klein, hoher Nutzen)
-
-In `camera-ops` (`log-event`) und in einem neuen DB-Helper für den Trainer-Pfad: Vor jedem Insert prüfen, ob in den letzten **8 Sekunden** für dasselbe `match_id` + `event_type` + `team` schon ein Event existiert. Wenn ja → kein neuer Insert, stattdessen die existierende ID zurückgeben (idempotent).
-
-→ Doppel-Klick zwischen zwei Geräten produziert nur **ein** Event. Beide UIs zeigen denselben Eintrag in der Undo-Liste.
+Eine einzige Seite, die der Trainer **vor** dem Bericht sieht:
 
 ```text
-Trainer drückt "Tor Heim" um 14:23:05
-Helfer drückt "Tor Heim" um 14:23:09
-   → Server findet existierendes Event (4s zurück, gleicher Typ, gleiches Team)
-   → gibt bestehende ID zurück, kein Insert
-   → home_score bleibt korrekt bei +1
+┌─────────────────────────────────────────────────────┐
+│  ENTSCHEIDUNGS-COCKPIT                              │
+├─────────────────────────────────────────────────────┤
+│  🔴 #1 KRITISCH (kostet Tore)                       │
+│     "Zentrum offen bei Ballverlust → 2 Gegentore"   │
+│     [▶ Szene ansehen]  [📋 Training öffnen]         │
+│                                                     │
+│  🟠 #2 RISIKO (gegen stärkere Teams)                │
+│     "5 frühe Fouls — taktisch ok hier, riskant      │
+│      gegen Ligaspitze"                              │
+│     [▶ Foul-Clips]                                  │
+│                                                     │
+│  🟢 #3 STÄRKE (ausbauen)                            │
+│     "30% Aufbau über rechts erfolgreich"            │
+│     [▶ Beste Szene]                                 │
+└─────────────────────────────────────────────────────┘
 ```
 
-### Stufe 2: Live-Anzeige fremder Events (UI-Transparenz)
+**Was neu ist:**
+- **Harte Top-3-Priorisierung** mit Impact-Bewertung (kostet Tore / bringt Tore / Risiko)
+- Jede Aussage hat **direkt einen Clip-Button** (Video-Verknüpfung — Punkt 3 der Kritik)
+- Jede Aussage hat **direkt einen Trainings-Button** → springt zur passenden Übung
+- Edge Function `decision-cockpit` (neu): nutzt Spiel-Events + Stats + bestehende `report_sections`, lässt Gemini **priorisieren statt beschreiben** (Tool-Call mit `priority`, `impact_type`, `linked_event_minute`, `linked_video_id`, `linked_drill_key`)
 
-Realtime-Subscription auf `match_events` in `MatchEventQuickBar` und Trainer-Dashboard. Wenn ein anderes Gerät ein Event setzt:
-- Toast: *„Helfer hat ‚Ecke Heim, Min. 23' protokolliert"*
-- Event erscheint in der Undo-Chip-Leiste **aller** verbundenen Geräte
+### 1.2 Spielidentität / Team-DNA (Punkt 6)
 
-→ Trainer sieht sofort, dass Helfer schon getippt hat, und drückt nicht doppelt.
+**Neuer Setup-Step bei Match-Erstellung:**
+- Trainer wählt **eine** Identität: `Pressing` / `Ballbesitz` / `Umschalt` / `Defensiv-kompakt`
+- Speichern in `matches.team_identity` (neue Spalte)
+- Cockpit bewertet jede Phase: **"Wie nah wart ihr an eurer DNA?"** (0-100%)
+- Wenn nicht gesetzt → KI schlägt vor basierend auf gespielten Mustern
 
-### Stufe 3: Optionaler „Event-Lead"-Modus (für Profis)
+### 1.3 Spieler-individuelle Karten (Punkt 4) — überarbeitet
 
-Im `CameraSetupOverlay` Schalter „Nur ich protokolliere Events". Wenn aktiv, blendet die QuickBar bei allen Helfer-Sessions des Matches aus. Der Trainer behält die volle Kontrolle, Helfer liefern nur Frames.
+`PlayerSpotlight` wird zu **`PlayerDevelopmentCards`**:
+- Pro Spieler (Top 5 + alle anklickbar):
+  - **2 Stärken** (datenbasiert, mit Beispiel-Minute)
+  - **2 Entwicklungsfelder** (mit konkreter Spielsituation)
+  - **1 zugeordnete Übung** aus dem Microcycle
+  - **▶-Button** → relevanter Clip (falls vorhanden)
+- Edge Function `player-development` (neu) generiert das pro Spieler
 
-→ Für Vereine, die klare Rollen wollen.
+### 1.4 Trainings-Ableitung "echt" (Punkt 5)
 
-## Betroffene Dateien
+`TrainingMicroCycle` wird umgebaut:
+- Jede Übung zeigt **explizit ihren Auslöser**:
+  ```
+  Übung: 6v6 Umschaltspiel mit Zonenbindung
+  ↑ Weil: Zentrum offen bei Ballverlust (Min 23, 67)
+  [▶ Auslöser-Szene]
+  ```
+- Statt "Standard-Bibliothek" → echte `data → situation → drill`-Kette via Tool-Call
 
-**Ändern:**
-- `supabase/functions/camera-ops/index.ts` — `log-event` mit 8s-Dedup-Lookup
-- `src/components/MatchEventQuickBar.tsx` — Trainer-Pfad nutzt neuen Dedup-Helper, Realtime-Subscription für fremde Events, Undo-Chips zeigen auch fremde
-- `src/components/CameraSetupOverlay.tsx` — Optional: Schalter „Nur ich protokolliere Events"
-- `src/pages/CameraTrackingPage.tsx` — Liest Lead-Flag aus Match-Setup, gibt an QuickBar weiter
+---
 
-**Neu:**
-- `src/lib/match-events.ts` — Wiederverwendbarer `insertMatchEventDeduped(matchId, type, team, minute)`-Helper für den Trainer-Direktpfad
+## Phase 2 (später, separater Loop)
 
-**Unverändert:**
-- `match_events` Schema, RLS, `PostMatchEventEditor`, Highlight-Pipeline
+- **Was-wäre-wenn-Simulationen** (Punkt 7) — bauen wir bewusst noch nicht, weil das einen eigenen Mini-ML-Layer braucht. Heute haben wir schon den `TacticalAIChat`, der das textuell macht — das reicht erstmal.
+- **Kontext-Intelligenz Liga/Gegner** (Punkt 2) — sobald wir Liga-Daten haben (api-football.com), bewertet das Cockpit relativ statt absolut.
+- **Auto-Clip-Generierung aus Heatmap-Mustern** (statt nur aus Events) — größerer Eingriff in `analyze-match`.
 
-## Antwort in einem Satz
+---
 
-**Heute** kann jeder (Trainer + Helfer) Events anlegen — bei gleichzeitigem Klick entstehen **doppelte Einträge** und der Score wird falsch hochgezählt. Mit der vorgeschlagenen **8-Sekunden-Server-Deduplizierung + Realtime-Anzeige fremder Events** wird das Problem sauber gelöst, ohne jemandem die QuickBar wegzunehmen.
+## Konkrete Code-Änderungen Phase 1
+
+| Datei | Aktion |
+|---|---|
+| `supabase/functions/decision-cockpit/index.ts` | **NEU** — Tool-Call mit `top_priorities[]`, jeweils `priority`, `impact`, `linked_event_minute`, `linked_drill_key`, `evidence` |
+| `supabase/functions/player-development/index.ts` | **NEU** — pro Spieler 2 Stärken + 2 Felder + 1 Drill |
+| `src/components/DecisionCockpit.tsx` | **NEU** — Top-3-Karten mit Clip- & Drill-Sprung |
+| `src/components/PlayerDevelopmentCards.tsx` | **NEU** — ersetzt aktuellen `PlayerSpotlight` im Player-Tab |
+| `src/components/TrainingMicroCycle.tsx` | **EDIT** — Auslöser-Spalte + Clip-Button |
+| `src/pages/MatchReport.tsx` | **EDIT** — neuer **erster** Tab "Cockpit" (Decision-First), bestehende Tabs bleiben |
+| `src/pages/NewMatch.tsx` | **EDIT** — Team-DNA-Auswahl im Wizard |
+| Migration | `matches.team_identity text`, optional Spalte für Cockpit-Cache |
+| Cross-Linking | Cockpit-Cards setzen URL-Param `?tab=training&drill=xyz` bzw. `?clip=video_id` — bestehende Tab-Sync-Logik nutzen |
+
+---
+
+## Was wir bewusst **nicht** tun
+
+- **Kein vollständiger Neubau** — die Infrastruktur stimmt
+- **Kein "noch mehr Charts"** — Kritik war: zu viel "schön", zu wenig "entscheidend"
+- **Kein Was-wäre-wenn-Simulator** in Phase 1 — zu groß, lieber gut als schnell
+- **PDF-Report bleibt erstmal wie er ist** — der ist gerade neu und gut, das Cockpit ist ein **separater** Layer
+
+---
+
+## Erwartetes Ergebnis nach Phase 1
+
+Der Trainer öffnet den Report und sieht **zuerst**:
+> "Diese 3 Dinge entscheiden dein nächstes Spiel. Klick → Szene. Klick → Training."
+
+Statt heute:
+> "Hier sind 12 wunderschön formulierte Erkenntnisse, viel Spaß beim Lesen."
+
+**Das** ist der Sprung vom Analyse-Assistenten zum Entscheidungs-Coach.
 
