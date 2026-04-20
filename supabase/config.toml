@@ -48,3 +48,12 @@ verify_jwt = false
 
 [functions.player-development]
 verify_jwt = false
+
+[functions.match-context]
+verify_jwt = false
+
+[functions.what-if-scenario]
+verify_jwt = false
+
+[functions.auto-clip-detector]
+verify_jwt = false
