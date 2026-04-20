@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Mic, Target, Shield, Zap, Heart, Brain, Volume2, Square,
-  Sparkles, Loader2, RefreshCw, ClipboardCopy, Flame, Activity,
+  Sparkles, Loader2, RefreshCw, ClipboardCopy, Flame, Activity, AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -59,21 +59,38 @@ export default function CoachingCockpit({ matchId, defaultMoment = "halftime" }:
   const [data, setData] = useState<AddressData | null>(null);
   const [score, setScore] = useState<{ home: number; away: number; opponent: string } | null>(null);
   const [speaking, setSpeaking] = useState(false);
+  const [errorState, setErrorState] = useState<{ kind: "rate_limit" | "credits" | "gateway" | "unknown"; msg: string } | null>(null);
 
   const generate = async () => {
     setLoading(true);
     setData(null);
+    setErrorState(null);
     try {
       const { data: resp, error } = await supabase.functions.invoke("coaching-cockpit", {
         body: { match_id: matchId, moment, tone },
       });
-      if (error) throw error;
-      if (resp?.error) throw new Error(resp.error);
+      if (error) {
+        const status = (error as any)?.context?.status ?? (error as any)?.status;
+        if (status === 429) {
+          setErrorState({ kind: "rate_limit", msg: "Zu viele Anfragen — bitte kurz warten." });
+        } else if (status === 402) {
+          setErrorState({ kind: "credits", msg: "KI-Guthaben aufgebraucht. Bitte aufladen." });
+        } else if (status >= 500) {
+          setErrorState({ kind: "gateway", msg: "AI-Gateway aktuell nicht verfügbar. Versuch es in einigen Minuten erneut." });
+        } else {
+          setErrorState({ kind: "unknown", msg: error.message ?? "Unbekannter Fehler" });
+        }
+        return;
+      }
+      if (resp?.error) {
+        setErrorState({ kind: "unknown", msg: String(resp.error) });
+        return;
+      }
       setData(resp.address);
       setScore(resp.score);
       toast.success("Ansprache erstellt");
     } catch (e: any) {
-      toast.error(e.message ?? "Fehler beim Generieren");
+      setErrorState({ kind: "unknown", msg: e.message ?? "Fehler beim Generieren" });
     } finally {
       setLoading(false);
     }
@@ -161,8 +178,31 @@ export default function CoachingCockpit({ matchId, defaultMoment = "halftime" }:
         </Button>
       </Card>
 
+      {/* Error fallback banner */}
+      {errorState && !loading && (
+        <Card className="p-4 border border-destructive/30 bg-destructive/5">
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 rounded-lg bg-destructive/15 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+            </div>
+            <div className="flex-1 min-w-0 space-y-1">
+              <p className="text-sm font-semibold text-destructive">
+                {errorState.kind === "rate_limit" && "Rate-Limit erreicht"}
+                {errorState.kind === "credits" && "Guthaben aufgebraucht"}
+                {errorState.kind === "gateway" && "KI vorübergehend nicht erreichbar"}
+                {errorState.kind === "unknown" && "Ansprache fehlgeschlagen"}
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed break-words">{errorState.msg}</p>
+              <Button onClick={generate} size="sm" variant="outline" className="mt-2 h-7 gap-1.5 text-xs">
+                <RefreshCw className="h-3 w-3" /> Erneut versuchen
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Empty state */}
-      {!data && !loading && (
+      {!data && !loading && !errorState && (
         <Card className="p-6 text-center border-dashed border-border/60">
           <Mic className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
           <p className="text-sm text-muted-foreground">

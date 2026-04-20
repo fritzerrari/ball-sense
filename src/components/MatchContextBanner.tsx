@@ -7,6 +7,8 @@ import { TrendingUp, TrendingDown, Minus, Trophy, History, RefreshCw, Loader2, I
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/components/AuthProvider";
+import ContextKpiDetailDialog, { type KpiKey } from "@/components/ContextKpiDetailDialog";
 
 interface DeltaValue { abs: number | null; pct: number | null; }
 interface KpiBlock {
@@ -63,23 +65,53 @@ function DeltaPill({ value }: { value: DeltaValue }) {
   );
 }
 
-function KpiRow({ block }: { block: KpiBlock }) {
+function KpiRow({
+  block,
+  onPick,
+}: {
+  block: KpiBlock;
+  onPick: (k: KpiKey) => void;
+}) {
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
       {(Object.keys(KPI_LABELS) as Array<keyof typeof KPI_LABELS>).map((k) => (
-        <div key={k} className="rounded-lg bg-muted/40 px-2 py-1.5 text-center">
-          <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{KPI_LABELS[k]}</p>
+        <button
+          key={k}
+          type="button"
+          onClick={() => onPick(k as KpiKey)}
+          className="rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
+          <p className="text-[9px] uppercase tracking-wide text-muted-foreground truncate">{KPI_LABELS[k]}</p>
           <DeltaPill value={block[k]} />
-        </div>
+        </button>
       ))}
     </div>
   );
 }
 
 export default function MatchContextBanner({ matchId, compact = false }: Props) {
+  const { clubId } = useAuth();
   const [context, setContext] = useState<MatchContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeKpi, setActiveKpi] = useState<KpiKey | null>(null);
+  const [activeScopeLabel, setActiveScopeLabel] = useState<string>("");
+  const [activeBenchmark, setActiveBenchmark] = useState<number | null>(null);
+
+  const KPI_TO_CURRENT_KEY: Record<KpiKey, string> = {
+    possession: "possession_pct",
+    total_distance: "total_distance_km",
+    avg_distance: "avg_distance_km",
+    top_speed: "top_speed_kmh",
+  };
+
+  const openDrilldown = (kpi: KpiKey, scopeLabel: string, blockBenchmarkAbs: number | null) => {
+    setActiveKpi(kpi);
+    setActiveScopeLabel(scopeLabel);
+    setActiveBenchmark(blockBenchmarkAbs);
+    setDialogOpen(true);
+  };
 
   const load = async (force = false) => {
     if (force) setRefreshing(true);
@@ -165,12 +197,28 @@ export default function MatchContextBanner({ matchId, compact = false }: Props) 
                   vs. <span className="font-semibold">{data!.label}</span>
                   <span className="text-muted-foreground/60"> · n={data!.sample_size}</span>
                 </p>
-                <KpiRow block={data!} />
+                <KpiRow
+                  block={data!}
+                  onPick={(kpi) => {
+                    const benchmarkAbs = (data as any)![kpi]?.abs ?? null;
+                    openDrilldown(kpi, data!.label, benchmarkAbs);
+                  }}
+                />
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+      <ContextKpiDetailDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        matchId={matchId}
+        clubId={clubId}
+        kpiKey={activeKpi}
+        scopeLabel={activeScopeLabel}
+        currentValue={activeKpi ? (context?.current?.[KPI_TO_CURRENT_KEY[activeKpi]] ?? null) : null}
+        benchmarkValue={activeBenchmark}
+      />
     </motion.div>
   );
 }
