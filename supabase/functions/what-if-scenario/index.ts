@@ -75,16 +75,25 @@ Deno.serve(async (req) => {
 
     const scenarioText = customPrompt || SCENARIO_PRESETS[scenarioKey!] || scenarioKey!;
 
-    const systemPrompt = `Du bist ein erfahrener Fußballtrainer und Spielanalyst. Du erhältst Spieldaten und ein hypothetisches Szenario.
+    const systemPrompt = `Du bist ein erfahrener Fußballtrainer und Spielanalyst auf Profi-Niveau. Du erhältst Spieldaten und ein hypothetisches Szenario.
 
-Aufgabe: Bewerte realistisch, wie sich das Szenario auf den Spielausgang ausgewirkt hätte. Sei konkret und ehrlich — kein Wunschdenken.
+Aufgabe: Bewerte fundiert und differenziert, wie sich das Szenario tendenziell auf den Spielverlauf ausgewirkt hätte. Sei analytisch ehrlich — kein Wunschdenken, aber auch keine Scheingenauigkeit.
 
-Gib zurück:
-- predicted_outcome: kurze Spielergebnis-Prognose (z. B. "1:1 statt 0:2")
-- confidence: low | medium | high
-- key_changes: 2–4 konkrete Veränderungen im Spielverlauf
-- risks: 1–2 Risiken oder Nebenwirkungen des Szenarios
-- training_focus: 1 Trainingsempfehlung, um das Szenario realistischer umzusetzen`;
+WICHTIGE ANALYSE-LEITPLANKEN (zwingend einhalten):
+1. **KEINE deterministischen Endergebnisse**: Sage NIEMALS "2:0 statt 3:0" oder ähnlich konkrete Score-Prognosen. Stattdessen: Wahrscheinlichkeiten und Tendenzen ("geringere Wahrscheinlichkeit für frühes Gegentor", "stabilerer Spielverlauf wahrscheinlich", "Tendenz zu kontrollierterem Aufbau").
+2. **Kausalitäten IMMER absichern**: Jede Folge mit einer Bedingung formulieren ("falls das Gegentor aus einer Standardsituation entstand", "abhängig von der eigenen Positionsstruktur", "sofern der Gegner nicht umstellt").
+3. **Gegenrisiken zwingend benennen**: Jedes Szenario hat Nebenwirkungen. Beispiel: "weniger Fouls" → evtl. weniger taktische Aggressivität, Gegner bekommt mehr Raum im offenen Spiel.
+4. **Vereinfachungen vermeiden**: Keine 1:1-Ableitungen wie "weniger Fouls = mehr Ballbesitz". Ballbesitz hängt von vielen Faktoren ab.
+5. **Sprache präzise heben**: Statt "mehr Kontrolle" → "mehr kontinuierliche Spielphasen mit Potenzial zur Kontrolle, abhängig von der Positionsstruktur".
+6. **Confidence-Disziplin**: Default ist "low" oder "medium". "high" NUR bei sehr klarer Datenlage (z. B. mehrere konkrete Events stützen die Hypothese eindeutig).
+
+Gib zurück (über tool call):
+- predicted_tendency: qualitative Tendenz, KEIN konkretes Ergebnis (z. B. "stabilerer Spielverlauf mit reduziertem Risiko für frühes Gegentor")
+- confidence: low | medium | high — bevorzugt low/medium
+- assumptions: 1–3 explizite Bedingungen, unter denen die Prognose gilt (z. B. "Annahme: frühes Gegentor entstand aus Standardsituation")
+- key_changes: 2–4 Veränderungen, jede MUSS mit einem Wahrscheinlichkeits-Adverb beginnen ("Wahrscheinlich …", "Tendenziell …", "Potenziell …")
+- risks: 2–3 Gegenrisiken, Nebeneffekte oder Abhängigkeiten
+- training_focus: 1 konkrete Trainingsempfehlung, um das Szenario realistischer abrufen zu können`;
 
     const userPrompt = `Spiel: ${match.away_club_name ?? "Gegner"}
 Ergebnis: ${match.home_score ?? "?"}:${match.away_score ?? "?"}
@@ -116,17 +125,43 @@ Szenario: ${scenarioText}`;
                 type: "function",
                 function: {
                   name: "what_if_result",
-                  description: "Strukturiertes Was-wäre-wenn-Resultat",
+                  description: "Strukturiertes Was-wäre-wenn-Resultat mit qualitativen Tendenzen statt deterministischer Endergebnisse",
                   parameters: {
                     type: "object",
                     properties: {
-                      predicted_outcome: { type: "string" },
-                      confidence: { type: "string", enum: ["low", "medium", "high"] },
-                      key_changes: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
-                      risks: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 2 },
+                      predicted_tendency: {
+                        type: "string",
+                        description: "Qualitative Spielverlauf-Tendenz, KEIN konkretes Ergebnis. Schlecht: '2:0 statt 3:0'. Gut: 'stabilerer Spielverlauf mit reduziertem Risiko für frühes Gegentor'.",
+                      },
+                      confidence: {
+                        type: "string",
+                        enum: ["low", "medium", "high"],
+                        description: "Bevorzugt low/medium. 'high' nur bei sehr klarer Datenlage.",
+                      },
+                      assumptions: {
+                        type: "array",
+                        items: { type: "string" },
+                        minItems: 1,
+                        maxItems: 3,
+                        description: "Explizite Bedingungen, unter denen die Prognose gilt.",
+                      },
+                      key_changes: {
+                        type: "array",
+                        items: { type: "string" },
+                        minItems: 2,
+                        maxItems: 4,
+                        description: "Jedes Item MUSS mit Wahrscheinlichkeits-Adverb beginnen ('Wahrscheinlich …', 'Tendenziell …', 'Potenziell …').",
+                      },
+                      risks: {
+                        type: "array",
+                        items: { type: "string" },
+                        minItems: 2,
+                        maxItems: 3,
+                        description: "Gegenrisiken, Nebeneffekte oder Abhängigkeiten des Szenarios.",
+                      },
                       training_focus: { type: "string" },
                     },
-                    required: ["predicted_outcome", "confidence", "key_changes", "risks", "training_focus"],
+                    required: ["predicted_tendency", "confidence", "assumptions", "key_changes", "risks", "training_focus"],
                     additionalProperties: false,
                   },
                 },
@@ -158,17 +193,31 @@ Szenario: ${scenarioText}`;
     }
 
     if (!result) {
-      // Fallback heuristic
+      // Fallback heuristic — bewusst vorsichtig formuliert
       result = {
-        predicted_outcome: "Leicht verbessertes Ergebnis möglich",
+        predicted_tendency: "Tendenz zu stabilerem Spielverlauf — konkrete Wirkung ohne KI-Auswertung nicht belastbar quantifizierbar",
         confidence: "low",
-        key_changes: [
-          "Weniger Druck-Situationen in der eigenen Hälfte",
-          "Kontrolliertere Spielphasen im Mittelfeld",
+        assumptions: [
+          "Annahme: Spielstruktur und Gegnerverhalten bleiben weitgehend vergleichbar",
         ],
-        risks: ["Szenario-Annahme schwer messbar ohne KI-Auswertung"],
+        key_changes: [
+          "Tendenziell weniger Druck-Situationen in der eigenen Hälfte, abhängig von der Pressing-Höhe des Gegners",
+          "Potenziell kontinuierlichere Spielphasen im Mittelfeld, sofern die Positionsstruktur stabil bleibt",
+        ],
+        risks: [
+          "Szenario-Annahme schwer messbar ohne vollständige KI-Auswertung",
+          "Reduzierte Aggressivität könnte dem Gegner mehr Raum im offenen Spiel geben",
+        ],
         training_focus: "Situationstraining zum Szenario im nächsten Microcycle einplanen",
       };
+    }
+
+    // Backwards-Compat: Legacy 'predicted_outcome' auf 'predicted_tendency' mappen
+    if (result.predicted_outcome && !result.predicted_tendency) {
+      result.predicted_tendency = result.predicted_outcome;
+    }
+    if (!result.assumptions || !Array.isArray(result.assumptions) || result.assumptions.length === 0) {
+      result.assumptions = ["Annahme basiert auf vorhandenen Spieldaten, ohne weitere Kontextprüfung"];
     }
 
     return new Response(
