@@ -239,7 +239,7 @@ export default function WhatIfBoard({ matchId }: Props) {
                         pinTrainingFocus(matchId, {
                           scenario: s.scenario,
                           focus: s.result.training_focus,
-                          predicted_outcome: s.result.predicted_outcome,
+                          predicted_outcome: s.result.predicted_tendency ?? s.result.predicted_outcome ?? "",
                         });
                         toast.success("Trainings-Fokus übernommen", {
                           description: "Sichtbar im Trainings-Mikrozyklus.",
