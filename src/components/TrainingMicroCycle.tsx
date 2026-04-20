@@ -1,9 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, Flame, BrainCircuit, ChevronRight, AlertCircle } from "lucide-react";
-import { motion } from "framer-motion";
-import { useSearchParams } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Dumbbell, Flame, BrainCircuit, ChevronRight, AlertCircle, Pin, X, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams, useParams } from "react-router-dom";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { clearPinnedTrainingFocus, getPinnedTrainingFocus, type PinnedTrainingFocus } from "@/lib/pinned-training-focus";
 
 interface Drill {
   name: string;
@@ -35,8 +37,21 @@ const SESSION_CONFIG: Record<string, { icon: typeof Dumbbell; color: string; lab
 
 export default function TrainingMicroCycle({ sessions }: Props) {
   const [searchParams] = useSearchParams();
+  const { id: matchIdParam } = useParams<{ id: string }>();
   const targetDrillKey = searchParams.get("drill");
   const highlightedRef = useRef<HTMLDivElement>(null);
+  const [pinned, setPinned] = useState<PinnedTrainingFocus | null>(null);
+
+  const refreshPinned = useCallback(() => {
+    if (matchIdParam) setPinned(getPinnedTrainingFocus(matchIdParam));
+  }, [matchIdParam]);
+
+  useEffect(() => {
+    refreshPinned();
+    const handler = () => refreshPinned();
+    window.addEventListener("pinned-training-focus-changed", handler);
+    return () => window.removeEventListener("pinned-training-focus-changed", handler);
+  }, [refreshPinned]);
 
   useEffect(() => {
     if (targetDrillKey && highlightedRef.current) {
@@ -44,7 +59,7 @@ export default function TrainingMicroCycle({ sessions }: Props) {
     }
   }, [targetDrillKey]);
 
-  if (!sessions?.length) return null;
+  if (!sessions?.length && !pinned) return null;
 
   return (
     <motion.div

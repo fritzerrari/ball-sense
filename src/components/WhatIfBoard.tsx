@@ -6,11 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sparkles, Loader2, Target, AlertTriangle, Dumbbell,
-  Shuffle, Shield, Zap, Lock, MoveDown, MoveUp,
+  Shuffle, Shield, Zap, Lock, MoveDown, MoveUp, Pin,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { pinTrainingFocus } from "@/lib/pinned-training-focus";
 
 interface WhatIfResult {
   predicted_outcome: string;
@@ -192,14 +193,34 @@ export default function WhatIfBoard({ matchId }: Props) {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-2">
-                    <Dumbbell className="h-3 w-3 text-emerald-500 mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-wider text-emerald-500 font-semibold">
-                        Trainings-Fokus
-                      </p>
-                      <p className="text-[11px] text-foreground/90">{s.result.training_focus}</p>
+                  <div className="rounded-lg bg-emerald-500/10 px-2.5 py-2 space-y-2">
+                    <div className="flex items-start gap-1.5">
+                      <Dumbbell className="h-3 w-3 text-emerald-500 mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] uppercase tracking-wider text-emerald-500 font-semibold">
+                          Trainings-Fokus
+                        </p>
+                        <p className="text-[11px] text-foreground/90">{s.result.training_focus}</p>
+                      </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-full gap-1.5 text-[11px] border-emerald-500/30 hover:bg-emerald-500/15 hover:text-emerald-500"
+                      onClick={() => {
+                        pinTrainingFocus(matchId, {
+                          scenario: s.scenario,
+                          focus: s.result.training_focus,
+                          predicted_outcome: s.result.predicted_outcome,
+                        });
+                        toast.success("Trainings-Fokus übernommen", {
+                          description: "Sichtbar im Trainings-Mikrozyklus.",
+                        });
+                      }}
+                    >
+                      <Pin className="h-3 w-3" />
+                      In Training übernehmen
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
