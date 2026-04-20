@@ -7,6 +7,7 @@ import { Sparkles, RefreshCw, Loader2, AlertTriangle, TrendingUp, Info, Target }
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import PatternDetailDialog from "@/components/PatternDetailDialog";
 
 interface PatternClip {
   id?: string;
@@ -20,6 +21,7 @@ interface PatternClip {
 
 interface Props {
   matchId: string;
+  /** @deprecated Kein echtes Video — Klick öffnet jetzt Daten-Drilldown */
   onJumpToMinute?: (minute: number) => void;
 }
 
@@ -50,6 +52,8 @@ export default function AutoPatternClips({ matchId, onJumpToMinute }: Props) {
   const [clips, setClips] = useState<PatternClip[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPattern, setSelectedPattern] = useState<PatternClip | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const load = async (force = false) => {
     if (force) setRefreshing(true);
@@ -84,14 +88,15 @@ export default function AutoPatternClips({ matchId, onJumpToMinute }: Props) {
   }, [matchId]);
 
   return (
+    <>
     <Card className="border-border/50">
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Auto-Clips aus Mustern
-          {clips.length > 0 && <Badge variant="secondary" className="text-xs">{clips.length}</Badge>}
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm sm:text-base min-w-0">
+          <Sparkles className="h-4 w-4 text-primary shrink-0" />
+          <span className="truncate">Auto-Pattern Insights</span>
+          {clips.length > 0 && <Badge variant="secondary" className="text-xs shrink-0">{clips.length}</Badge>}
         </CardTitle>
-        <Button variant="ghost" size="sm" onClick={() => load(true)} disabled={refreshing} className="gap-1.5">
+        <Button variant="ghost" size="sm" onClick={() => load(true)} disabled={refreshing} className="gap-1.5 shrink-0">
           <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
           <span className="hidden sm:inline">Neu</span>
         </Button>
@@ -121,23 +126,27 @@ export default function AutoPatternClips({ matchId, onJumpToMinute }: Props) {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                onClick={() => onJumpToMinute?.(c.event_minute)}
-                className={`w-full text-left rounded-lg border ${sev.border} bg-card/60 hover:bg-card transition-colors p-3 flex items-start gap-3`}
+                onClick={() => {
+                  onJumpToMinute?.(c.event_minute);
+                  setSelectedPattern(c);
+                  setDialogOpen(true);
+                }}
+                className={`w-full text-left rounded-lg border ${sev.border} bg-card/60 hover:bg-card transition-colors p-2.5 sm:p-3 flex items-start gap-2 sm:gap-3`}
               >
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${sev.bg}`}>
+                <div className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg ${sev.bg}`}>
                   <Icon className={`h-4 w-4 ${sev.color}`} />
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono text-muted-foreground">Min {c.event_minute}</span>
-                    <Badge className={`${sev.bg} ${sev.color} border-0 text-[10px]`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    <span className="text-[10px] sm:text-xs font-mono text-muted-foreground">Min {c.event_minute}</span>
+                    <Badge className={`${sev.bg} ${sev.color} border-0 text-[10px] truncate max-w-[140px]`}>
                       {PATTERN_LABELS[c.event_type] ?? c.event_type}
                     </Badge>
                     <span className="text-[10px] text-muted-foreground">{c.duration_sec}s</span>
                   </div>
-                  <p className="text-sm font-medium leading-snug">{c.label ?? PATTERN_LABELS[c.event_type] ?? c.event_type}</p>
+                  <p className="text-xs sm:text-sm font-medium leading-snug break-words">{c.label ?? PATTERN_LABELS[c.event_type] ?? c.event_type}</p>
                   {c.description && (
-                    <p className="text-xs text-muted-foreground leading-relaxed">{c.description}</p>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed break-words">{c.description}</p>
                   )}
                 </div>
               </motion.button>
@@ -146,5 +155,12 @@ export default function AutoPatternClips({ matchId, onJumpToMinute }: Props) {
         )}
       </CardContent>
     </Card>
+    <PatternDetailDialog
+      open={dialogOpen}
+      onOpenChange={setDialogOpen}
+      matchId={matchId}
+      pattern={selectedPattern}
+    />
+    </>
   );
 }
