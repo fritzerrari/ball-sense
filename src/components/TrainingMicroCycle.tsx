@@ -74,6 +74,50 @@ export default function TrainingMicroCycle({ sessions }: Props) {
             <h2 className="font-semibold font-display">Trainings-Mikrozyklus</h2>
           </div>
 
+          <AnimatePresence>
+            {pinned && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="mb-4 rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 relative"
+              >
+                <button
+                  type="button"
+                  onClick={() => matchIdParam && clearPinnedTrainingFocus(matchIdParam)}
+                  className="absolute top-2 right-2 h-6 w-6 rounded-full hover:bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Pin entfernen"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <div className="flex items-start gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                    <Pin className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1 pr-6">
+                    <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-primary font-semibold">
+                      <Sparkles className="h-3 w-3" />
+                      Aus What-if übernommen
+                    </div>
+                    <p className="text-sm font-semibold mt-1 leading-snug">{pinned.focus}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1 italic">"{pinned.scenario}"</p>
+                    {pinned.predicted_outcome && (
+                      <p className="text-[11px] text-foreground/80 mt-1.5">
+                        <span className="text-muted-foreground">Prognose:</span> {pinned.predicted_outcome}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!sessions?.length && pinned && (
+            <p className="text-[11px] text-center text-muted-foreground/60 py-4">
+              Noch kein KI-Mikrozyklus generiert — der Fokus oben ist deine manuelle Priorität.
+            </p>
+          )}
+
           <div className="relative">
             <div className="absolute left-4 top-8 bottom-8 w-0.5 bg-gradient-to-b from-blue-400 via-orange-400 to-primary hidden sm:block" />
 
