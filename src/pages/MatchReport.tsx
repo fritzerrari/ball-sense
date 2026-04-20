@@ -31,6 +31,8 @@ import MomentumTimeline from "@/components/MomentumTimeline";
 import TacticalGradeMatrix from "@/components/TacticalGradeMatrix";
 import RiskRadar from "@/components/RiskRadar";
 import PlayerSpotlight from "@/components/PlayerSpotlight";
+import PlayerDevelopmentCards from "@/components/PlayerDevelopmentCards";
+import DecisionCockpit from "@/components/DecisionCockpit";
 import OpponentDNA from "@/components/OpponentDNA";
 import TrainingMicroCycle from "@/components/TrainingMicroCycle";
 import QuickActionCards from "@/components/QuickActionCards";
@@ -126,18 +128,29 @@ export default function MatchReport() {
   const [job, setJob] = useState<AnalysisJob | null>(null);
   const [loadingReport, setLoadingReport] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
+  const VALID_TABS = ["cockpit", "overview", "tactics", "players", "opponent", "training"] as const;
   const [activeTab, setActiveTab] = useState(() => {
     const t = searchParams.get("tab");
-    return t && ["overview", "tactics", "players", "opponent", "training"].includes(t) ? t : "overview";
+    return t && (VALID_TABS as readonly string[]).includes(t) ? t : "cockpit";
   });
+
+  const handleJumpToTab = (tab: string, extra?: Record<string, string>) => {
+    setActiveTab(tab);
+    if (extra) {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", tab);
+      Object.entries(extra).forEach(([k, v]) => next.set(k, v));
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   // Sync tab → URL so the user can share/refresh deep-linked sections
   useEffect(() => {
     const current = searchParams.get("tab");
     if (current === activeTab) return;
-    if (activeTab === "overview" && !current) return;
+    if (activeTab === "cockpit" && !current) return;
     const next = new URLSearchParams(searchParams);
-    if (activeTab === "overview") next.delete("tab"); else next.set("tab", activeTab);
+    if (activeTab === "cockpit") next.delete("tab"); else next.set("tab", activeTab);
     setSearchParams(next, { replace: true });
   }, [activeTab, searchParams, setSearchParams]);
 
