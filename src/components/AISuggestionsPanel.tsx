@@ -76,8 +76,8 @@ export default function AISuggestionsPanel({ matchId, onEventsChanged }: Props) 
       }
       const sceneRow = data?.find((r) => r.result_type === "scenes");
       const goalRow = data?.find((r) => r.result_type === "goal_candidates");
-      const s = Array.isArray(sceneRow?.data) ? (sceneRow!.data as SceneItem[]) : [];
-      const g = Array.isArray(goalRow?.data) ? (goalRow!.data as GoalCandidate[]) : [];
+      const s = Array.isArray(sceneRow?.data) ? (sceneRow!.data as unknown as SceneItem[]) : [];
+      const g = Array.isArray(goalRow?.data) ? (goalRow!.data as unknown as GoalCandidate[]) : [];
       setScenes(
         s
           .filter((x) => typeof x?.minute === "number" && typeof x?.type === "string")
