@@ -68,6 +68,32 @@ export interface DemoData {
     counterAttacks: number;
     setPlayGoals: number;
   };
+  /** Optional AI suggestions from Phase 3 — derived on demand if missing. */
+  aiSuggestions?: {
+    scenes: Array<{
+      minute: number;
+      type:
+        | "open_play"
+        | "corner_kick"
+        | "free_kick"
+        | "throw_in"
+        | "kickoff"
+        | "penalty"
+        | "stoppage"
+        | "goal_celebration";
+      team?: "home" | "away" | "unknown";
+      confidence?: number;
+      evidence?: string;
+    }>;
+    goalCandidates: Array<{
+      minute: number;
+      team?: "home" | "away" | "unknown";
+      confidence?: number;
+      scorer_jersey?: number;
+      assist_jersey?: number;
+      evidence?: string;
+    }>;
+  };
 }
 
 // Position-based hotspot templates for realistic heatmaps
@@ -442,4 +468,82 @@ export function getDemoDataByIndex(index: number): DemoData {
  */
 export function getAllDemoData(): DemoData[] {
   return DEMO_DATASETS;
+}
+
+/**
+ * Phase 3 — derive plausible scene + goal candidates from a demo dataset.
+ * Deterministic per match (seeded by score + corners) so every reload shows
+ * the same suggestions. Use when `data.aiSuggestions` is not pre-populated.
+ */
+export function getDemoAISuggestions(data: DemoData): NonNullable<DemoData["aiSuggestions"]> {
+  if (data.aiSuggestions) return data.aiSuggestions;
+
+  const { homeScore, awayScore } = data.matchInfo;
+  const corners = data.teamStats.corners ?? 0;
+  const fouls = data.teamStats.fouls ?? 0;
+  const seed = homeScore * 17 + awayScore * 31 + corners * 7 + fouls;
+  const rand = (i: number) => ((seed + i * 53) % 90) + 1; // minute 1..90
+
+  const scorers = data.players.filter((p) => p.goals > 0);
+
+  const goalCandidates: NonNullable<DemoData["aiSuggestions"]>["goalCandidates"] = [];
+  let goalIdx = 0;
+  for (let i = 0; i < homeScore; i++) {
+    const scorer = scorers[goalIdx++ % Math.max(1, scorers.length)];
+    goalCandidates.push({
+      minute: rand(i + 1),
+      team: "home",
+      confidence: 0.78 + ((seed + i) % 15) / 100,
+      scorer_jersey: scorer?.num,
+      evidence: "Ball im Netz erkannt, Jubel-Cluster im Strafraum",
+    });
+  }
+  for (let i = 0; i < awayScore; i++) {
+    goalCandidates.push({
+      minute: rand(homeScore + i + 1),
+      team: "away",
+      confidence: 0.72 + ((seed + i) % 18) / 100,
+      evidence: "Schiedsrichter zeigt Richtung Mittelkreis",
+    });
+  }
+  goalCandidates.sort((a, b) => a.minute - b.minute);
+
+  const scenes: NonNullable<DemoData["aiSuggestions"]>["scenes"] = [];
+  for (let i = 0; i < Math.min(corners, 4); i++) {
+    scenes.push({
+      minute: rand(100 + i),
+      type: "corner_kick",
+      team: i % 2 === 0 ? "home" : "away",
+      confidence: 0.82,
+      evidence: "Spieler an Eckfahne, Strafraum gefüllt",
+    });
+  }
+  if (fouls > 5) {
+    scenes.push({
+      minute: rand(200),
+      type: "free_kick",
+      team: "home",
+      confidence: 0.7,
+      evidence: "Mauer bildet sich vor dem Tor",
+    });
+  }
+  if (data.apiStats.setPlayGoals > 0) {
+    scenes.push({
+      minute: rand(250),
+      type: "penalty",
+      team: "home",
+      confidence: 0.88,
+      evidence: "Schiedsrichter zeigt auf den Punkt",
+    });
+  }
+  scenes.push({
+    minute: 1,
+    type: "kickoff",
+    team: "home",
+    confidence: 0.95,
+    evidence: "Anstoß im Mittelkreis",
+  });
+  scenes.sort((a, b) => a.minute - b.minute);
+
+  return { scenes, goalCandidates };
 }
