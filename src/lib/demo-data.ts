@@ -68,6 +68,32 @@ export interface DemoData {
     counterAttacks: number;
     setPlayGoals: number;
   };
+  /** Optional AI suggestions from Phase 3 — derived on demand if missing. */
+  aiSuggestions?: {
+    scenes: Array<{
+      minute: number;
+      type:
+        | "open_play"
+        | "corner_kick"
+        | "free_kick"
+        | "throw_in"
+        | "kickoff"
+        | "penalty"
+        | "stoppage"
+        | "goal_celebration";
+      team?: "home" | "away" | "unknown";
+      confidence?: number;
+      evidence?: string;
+    }>;
+    goalCandidates: Array<{
+      minute: number;
+      team?: "home" | "away" | "unknown";
+      confidence?: number;
+      scorer_jersey?: number;
+      assist_jersey?: number;
+      evidence?: string;
+    }>;
+  };
 }
 
 // Position-based hotspot templates for realistic heatmaps
