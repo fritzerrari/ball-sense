@@ -408,7 +408,7 @@ function buildQualityHint(t: FrameTelemetry | undefined): string {
   }
 }
 
-
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const supabase = createClient(
