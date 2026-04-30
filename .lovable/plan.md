@@ -1,43 +1,113 @@
+## Wichtige Klarstellung vorab
+
+Die in der Diskussion erwähnte `lib/footballTracker.js` mit Roboflow/YOLO **existiert in diesem Codebase nicht**. Das aktuelle System macht **keine Browser-seitige Object-Detection**, sondern:
+
+```
+Kamera → Frame-Capture (alle 30s, JPEG 640px) → Storage Upload → Gemini Vision (Server) → Events/Stats
+```
+
+Phase 1 wird daher an die **tatsächliche** Architektur angepasst — die Quick Wins zielen auf die Frame-Capture-Schicht und die Server-Analyse, nicht auf eine Browser-YOLO-Pipeline (die es nicht gibt).
 
 ## Ziel
-Die "Was-wäre-wenn"-Szenarien (`what-if-scenario` Edge Function) liefern aktuell teils zu konkrete, scheinbar deterministische Aussagen ("2:0 statt 3:0", harte Kausalketten). Der User möchte das **analytische Niveau anheben**: vorsichtige Formulierungen, Wahrscheinlichkeiten statt Ergebnisse, Berücksichtigung von Gegenrisiken und Abhängigkeiten.
+Vier risikoarme Verbesserungen, die **Frame-Qualität, Effizienz und Tracking-Genauigkeit** sofort spürbar erhöhen, ohne die hart erkämpfte Recording-Stabilität (Wake Lock, iOS Safari, Battery, Frame-Persistence) zu gefährden.
 
-## Was wir ändern
+---
 
-### 1. System-Prompt in `supabase/functions/what-if-scenario/index.ts` schärfen
-Der aktuelle Prompt sagt nur "Sei konkret und ehrlich". Wir präzisieren ihn um die vom User benannten Analyse-Standards:
+## Quick Win #1 — Adaptive Frame-Rate
 
-**Neue Leitplanken im Prompt:**
-- **Keine deterministischen Endergebnisse** ("2:0 statt 3:0") → stattdessen Wahrscheinlichkeiten/Tendenzen ("geringere Wahrscheinlichkeit für frühes Gegentor", "stabilerer Spielverlauf wahrscheinlich")
-- **Kausalitäten absichern**: jede Folge mit Bedingung formulieren ("falls Standardsituation", "abhängig von Positionsstruktur")
-- **Gegenrisiken zwingend nennen** (z. B. "weniger Fouls = evtl. weniger Aggressivität, Gegner bekommt mehr Raum")
-- **Vereinfachungen vermeiden**: keine simplen 1:1-Ableitungen ("weniger Fouls = mehr Ballbesitz" ❌)
-- **Analyse-Level anheben**: Formulierungen wie "kontinuierliche Spielphasen mit Potenzial zur Kontrolle" statt "mehr Kontrolle"
+**Was:** Statt starrer 30s Intervall — dynamisch zwischen 15s und 60s wechseln je nach Spielphase.
 
-### 2. JSON-Schema des Tool-Calls erweitern
-Aktuell: `predicted_outcome` (string) — verleitet zu konkreten Scores.
+**Wie:**
+- Bewegungs-Detektor: Pixel-Diff zwischen aufeinanderfolgenden Capture-Versuchen (Mini-Snapshot alle 5s, kein Upload).
+- **Hohe Bewegung** (Konter, Strafraumszene) → Intervall auf 15s reduzieren.
+- **Niedrige Bewegung** (Pause, Standardsituation) → 60s.
+- Default bleibt 30s.
 
-**Neu:**
-- `predicted_outcome` umbenennen/präzisieren in `predicted_tendency` (string, kein konkretes Ergebnis erlaubt — Beispiel-Hinweis im `description`-Feld)
-- Neues Feld: `assumptions` (array, 1–3 Einträge) — explizite Bedingungen, unter denen die Prognose gilt
-- `key_changes`: jedes Item soll mit Wahrscheinlichkeits-Adverb beginnen ("wahrscheinlich", "tendenziell", "potenziell")
-- `risks` von 1–2 auf **2–3 Pflichtfelder** erhöhen (Gegenrisiko + Nebeneffekt + Abhängigkeit)
-- `confidence` bleibt — aber Default-Tendenz zu `low`/`medium` (Anweisung im Prompt: nur `high` bei sehr klarer Datenlage)
+**Datei:** `src/lib/frame-capture.ts` (`startLiveCapture`)
 
-### 3. Frontend `WhatIfBoard.tsx` an neue Schema anpassen
-- Interface `WhatIfResult` umbenennen: `predicted_outcome` → `predicted_tendency`
-- Neuer Block "Annahmen" (mit `Info`-Icon) zwischen Prognose und Veränderungen
-- Risiken-Block: mehrzeilig statt `risks.join(" · ")` (jetzt 2–3 Items, lesbarer als Liste)
-- UI-Label "Prognose" → "Tendenz" (klarere Erwartungshaltung)
+**Risiko:** Niedrig — bei Fehler Fallback auf festen 30s-Intervall.
 
-### 4. Backwards-Compat
-Edge Function liest weiter `predicted_outcome` als Fallback (falls alte gecachte Antworten irgendwo persistiert sind), schreibt aber neu `predicted_tendency`. Frontend prüft beide Felder.
+**Nutzen:** ~30 % mehr relevante Frames bei intensiven Phasen, weniger Upload-Volumen in Pausen.
 
-## Dateien
-- `supabase/functions/what-if-scenario/index.ts` — Prompt + Tool-Schema
-- `src/components/WhatIfBoard.tsx` — Interface, Render-Layout, Labels
+---
 
-## Was wir NICHT ändern
-- Preset-Buttons & Custom-Prompt-Flow bleiben identisch
-- Pin-to-Training Feature bleibt
-- Lovable AI Gateway / Modell (`google/gemini-2.5-flash`) bleibt — die Verbesserung erfolgt rein über Prompt-Engineering
+## Quick Win #2 — Erweiterte Frame-Qualitäts-Checks
+
+**Was:** Aktuell nur Helligkeit + Varianz. Ergänzen um **Schärfe-Erkennung** und **Duplicate-Detection**.
+
+**Wie:**
+- **Laplacian-Approximation** (vereinfacht via Sobel-X+Y auf Subsample) → Blur-Score. Frames unter Schwelle skippen.
+- **Perceptual Hash (dHash 8x8)** des aktuellen Frames mit dem letzten vergleichen → wenn identisch (Kamera steht still, gleiche Szene), skippen.
+- Counter `skippedReasons: { dark, uniform, blurry, duplicate }` für Telemetrie.
+
+**Datei:** `src/lib/frame-capture.ts` (`isFrameUsable` erweitern → `assessFrameQuality`)
+
+**Risiko:** Niedrig — Schwellwerte konservativ, im Zweifel Frame durchlassen.
+
+**Nutzen:** Weniger Garbage-Frames an Gemini → präzisere Events, weniger AI-Kosten.
+
+---
+
+## Quick Win #3 — Web Worker für Frame-Encoding
+
+**Was:** JPEG-Encoding (`canvas.toDataURL`) und Quality-Checks aus dem Main-Thread auslagern.
+
+**Wie:**
+- Neuer Worker `src/lib/workers/frame-encoder.worker.ts` mit `OffscreenCanvas`.
+- Main-Thread liefert `ImageBitmap` (via `createImageBitmap(video)`) an Worker → Worker macht Resize, Quality-Check, JPEG-Encode → liefert Base64 zurück.
+- **iOS Safari Fallback:** `OffscreenCanvas` ist auf älteren iOS-Versionen limitiert → Feature-Detection, bei Fehler Sync-Pfad nutzen (= aktueller Code, unverändert).
+
+**Datei:** neu `src/lib/workers/frame-encoder.worker.ts`, edit `src/lib/frame-capture.ts`
+
+**Risiko:** Niedrig dank Fallback. Vite hat native Worker-Support (`new Worker(new URL(...), { type: 'module' })`).
+
+**Nutzen:** UI bleibt während Capture flüssig (kein Frame-Drop bei Animationen, smoother Recording-Overlay).
+
+---
+
+## Quick Win #4 — Smart Frame Selection vor Upload
+
+**Was:** Vor dem Storage-Upload eine **letzte Auswahl-Schicht** — pro 90s-Fenster nur die N besten Frames hochladen.
+
+**Wie:**
+- Quality-Score pro Frame: `brightness_score * 0.3 + variance_score * 0.3 + sharpness_score * 0.4` (aus #2).
+- Im 90s-Fenster: behalte Top-3 nach Score, verwerfe Rest.
+- Aktuell werden ~3 Frames/90s ohnehin captured → wir verwerfen jetzt nur, wenn **mehr** da sind (z.B. dank #1 bei hoher Bewegung).
+- Komplementär zu #1: wir capturen mehr, uploaden aber selektiv das Beste.
+
+**Datei:** `src/lib/frame-capture.ts` (Pre-Upload-Selektion in `getNewFramesSince`).
+
+**Risiko:** Niedrig — bei wenigen Frames bleibt alles wie heute.
+
+**Nutzen:** Konstante Upload-Rate auch bei adaptiver Capture, bessere Frame-Qualität pro AI-Call.
+
+---
+
+## Was wir NICHT ändern (bewusst)
+
+- ❌ Server-Pipeline (`analyze-match`, Gemini-Modelle) — Backend bleibt unangetastet
+- ❌ `frame-persistence.ts` (IndexedDB) — Recovery-Logik ist robust, nicht anfassen
+- ❌ Wake Lock / Orientation Lock / `opacity: 0` iOS-Hack — Stabilität bleibt
+- ❌ Halbzeit-Logik, Camera-Streams, Heartbeats
+- ❌ Kein neues ML-Modell im Browser, kein Roboflow, keine WebGPU
+- ❌ Bestehende Konstanten (`FRAME_INTERVAL_SEC`, `CAPTURE_WIDTH`, `JPEG_QUALITY`) als Defaults erhalten
+
+## Telemetrie & Validierung
+
+- Skip-Counter (`skippedReasons`) wird optional an `match-frames`-Manifest angehängt → wir sehen im Backend ob die Filter zu aggressiv sind.
+- Rollback-Möglichkeit: Feature-Flag `ENABLE_ADAPTIVE_CAPTURE = true` oben in `frame-capture.ts` → bei Problem auf `false` setzen, alter Code läuft.
+
+## Geänderte Dateien (insgesamt 2 + 1 neu)
+
+- `src/lib/frame-capture.ts` (erweitert)
+- `src/lib/workers/frame-encoder.worker.ts` (neu, mit Sync-Fallback)
+- (optional) Telemetrie-Feld im Frame-Upload-Manifest in `CameraTrackingPage.tsx`
+
+## Reihenfolge der Umsetzung
+
+1. #2 Quality-Checks erweitern (reine Funktion, keine Architektur-Änderung)
+2. #1 Adaptive Frame-Rate (baut auf Bewegungs-Diff aus #2 auf)
+3. #4 Smart Selection (nutzt Scores aus #2)
+4. #3 Web Worker (zum Schluss, weil größte strukturelle Änderung)
+
+Jeder Schritt einzeln testbar — falls einer Probleme macht, bleibt der Rest stabil.
