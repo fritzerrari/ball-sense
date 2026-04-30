@@ -314,6 +314,9 @@ export default function MatchReport() {
         {/* Camera Coverage Timeline (only renders when 2+ cameras contributed) */}
         {id && <Suspense fallback={null}><CameraCoverageTimeline matchId={id} /></Suspense>}
 
+        {/* AI Suggestions: Scenes & Goal candidates from Phase 3 */}
+        {id && <AISuggestionsPanel matchId={id} onEventsChanged={loadReportData} />}
+
         {/* Processing state */}
         {isProcessing && (
           <Card className="border-primary/20 bg-primary/5">
