@@ -100,7 +100,7 @@ export default function AISuggestionsPanel({ matchId, onEventsChanged }: Props) 
   const importGoal = async (g: GoalCandidate, key: string) => {
     setImportingKey(key);
     try {
-      const { error } = await supabase.from("match_events").insert({
+      const payload: any = {
         match_id: matchId,
         event_type: "goal",
         minute: g.minute,
@@ -110,7 +110,8 @@ export default function AISuggestionsPanel({ matchId, onEventsChanged }: Props) 
         notes: `KI-Vorschlag (Konfidenz ${(g.confidence ?? 0).toFixed(2)})${
           g.evidence ? ` · ${g.evidence}` : ""
         }`,
-      });
+      };
+      const { error } = await supabase.from("match_events").insert(payload);
       if (error) throw error;
       setImported((prev) => new Set(prev).add(key));
       toast.success("Tor-Event übernommen");
