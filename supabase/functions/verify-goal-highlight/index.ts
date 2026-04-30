@@ -264,6 +264,36 @@ Antworte ehrlich:
 
 async function persistVerdict(supabase: any, match_id: string, minute: number, verdict: Verdict) {
   try {
+    // Find or create a job to satisfy the analysis_results.job_id FK.
+    let jobId: string | null = null;
+    const { data: existingJob } = await supabase
+      .from("analysis_jobs")
+      .select("id")
+      .eq("match_id", match_id)
+      .eq("job_kind", "goal_verification")
+      .maybeSingle();
+    if (existingJob?.id) {
+      jobId = existingJob.id;
+    } else {
+      const { data: newJob } = await supabase
+        .from("analysis_jobs")
+        .insert({
+          match_id,
+          job_kind: "goal_verification",
+          status: "complete",
+          progress: 100,
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+        })
+        .select("id")
+        .maybeSingle();
+      jobId = newJob?.id ?? null;
+    }
+    if (!jobId) {
+      console.warn("[verify-goal] no job_id available — verdict not persisted");
+      return;
+    }
+
     // Idempotent: delete prior verdict for same minute, then insert.
     await supabase
       .from("analysis_results")
@@ -274,7 +304,7 @@ async function persistVerdict(supabase: any, match_id: string, minute: number, v
 
     await supabase.from("analysis_results").insert({
       match_id,
-      job_id: match_id, // placeholder — schema requires job_id; use match_id for verification rows
+      job_id: jobId,
       result_type: "goal_verification",
       data: { minute, ...verdict, created_at: new Date().toISOString() },
       confidence: verdict.confidence,
