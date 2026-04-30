@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { usePdfExport, PdfReportType } from "@/hooks/use-pdf-export";
 import PostMatchEventEditor from "@/components/PostMatchEventEditor";
+import AISuggestionsPanel from "@/components/AISuggestionsPanel";
 import VideoBackfillUpload from "@/components/VideoBackfillUpload";
 import PendingFramesRecoveryBanner from "@/components/PendingFramesRecoveryBanner";
 import { useMatch } from "@/hooks/use-matches";
@@ -312,6 +313,9 @@ export default function MatchReport() {
 
         {/* Camera Coverage Timeline (only renders when 2+ cameras contributed) */}
         {id && <Suspense fallback={null}><CameraCoverageTimeline matchId={id} /></Suspense>}
+
+        {/* AI Suggestions: Scenes & Goal candidates from Phase 3 */}
+        {id && <AISuggestionsPanel matchId={id} onEventsChanged={loadReportData} />}
 
         {/* Processing state */}
         {isProcessing && (
