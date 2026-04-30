@@ -537,7 +537,11 @@ Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 WICHTIG: 
 - Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.
 - Wenn ein Frame eine Nahaufnahme zeigt (< 30% Feldabdeckung), markiere ihn als "detail" Frame.
-- Frames mit schlechter Qualität oder ohne erkennbares Spielfeld als "unusable" markieren.`,
+- Frames mit schlechter Qualität oder ohne erkennbares Spielfeld als "unusable" markieren.
+
+ZUSÄTZLICH (optional, NUR wenn klar erkennbar):
+- scenes: Klassifiziere Frames mit erkennbarer Spielsituation (Eckball/Freistoß/Einwurf/Anstoß/Strafstoß/Spielfluss/Unterbrechung/Torjubel). Frame_index = Index im übergebenen Bilderstrom.
+- goal_candidates: Frames bei denen mit hoher Wahrscheinlichkeit ein TOR gefallen ist. Achte auf: Ball im Netz, Spieler-Jubeltrauben, Spieler laufen zur Mittellinie, Gegner stehen niedergeschlagen, Schiri zeigt zur Mitte. Nur starke Hinweise (confidence >= 0.5) angeben. Schätze die Spielminute aus dem Frame-Index (Frame ${selectedFrames.length} ≈ Ende, Frame 0 ≈ Anfang) und der Gesamtdauer ${duration_sec ? Math.round(duration_sec / 60) : "?"} min.`,
       },
     ];
 
@@ -782,6 +786,36 @@ KAMERA-PERSPEKTIVE ERKENNEN:
                   },
                   visual_quality: { type: "string", enum: ["good", "moderate", "poor"] },
                   confidence: { type: "number" },
+                  scenes: {
+                    type: "array",
+                    description: "Detected play scenes per frame: open_play, corner_kick, free_kick, throw_in, kickoff, penalty, stoppage, goal_celebration. Optional — only include frames where scene is identifiable.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        frame_index: { type: "integer" },
+                        type: { type: "string", enum: ["open_play", "corner_kick", "free_kick", "throw_in", "kickoff", "penalty", "stoppage", "goal_celebration"] },
+                        team: { type: "string", enum: ["home", "away", "neutral"] },
+                        confidence: { type: "number" },
+                        notes: { type: "string" },
+                      },
+                      required: ["frame_index", "type", "confidence"],
+                    },
+                  },
+                  goal_candidates: {
+                    type: "array",
+                    description: "Frames where a goal LIKELY occurred. Indicators: ball in net, players celebrating in groups, players running to halfway line, opponents standing dejected, referee gesture toward center. Only include strong candidates (confidence >= 0.5).",
+                    items: {
+                      type: "object",
+                      properties: {
+                        frame_index: { type: "integer" },
+                        team: { type: "string", enum: ["home", "away"] },
+                        minute: { type: "integer", description: "Estimated match minute" },
+                        confidence: { type: "number" },
+                        evidence: { type: "string", description: "What you observed (e.g. 'home players celebrating, away keeper retrieving ball from net')" },
+                      },
+                      required: ["frame_index", "team", "confidence", "evidence"],
+                    },
+                  },
                 },
                 required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "frame_positions", "pressing_data", "transitions", "pass_directions", "formation_timeline", "camera_perspective", "team_size_detected", "visual_quality", "confidence"],
               },
@@ -888,6 +922,8 @@ KAMERA-PERSPEKTIVE ERKENNEN:
       ...(analysis.formation_timeline?.length ? [{ type: "formation_timeline", data: analysis.formation_timeline }] : []),
       ...(analysis.camera_perspective ? [{ type: "camera_perspective", data: analysis.camera_perspective }] : []),
       ...(analysis.team_size_detected ? [{ type: "team_size_detected", data: analysis.team_size_detected }] : []),
+      ...(Array.isArray(analysis.scenes) && analysis.scenes.length ? [{ type: "scenes", data: analysis.scenes }] : []),
+      ...(Array.isArray(analysis.goal_candidates) && analysis.goal_candidates.length ? [{ type: "goal_candidates", data: analysis.goal_candidates }] : []),
     ];
 
     // ── H2 SIMULATION (only for final jobs without H2 frames) ──
