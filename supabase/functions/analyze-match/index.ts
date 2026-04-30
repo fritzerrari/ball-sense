@@ -864,6 +864,12 @@ KAMERA-PERSPEKTIVE ERKENNEN:
       }
     }
 
+    // ── A: Persistente Field-Calibration auf alle Koordinaten anwenden ──
+    applyFieldCalibration(analysis, match?.fields?.calibration);
+
+    // ── B: Trajectory-Smoothing (Kalman 1D) für Spieler & Ball ──
+    smoothTrajectories(analysis);
+
     // For live_partial: don't delete old results, just add new ones
     if (!isLivePartial) {
       await supabase.from("analysis_results").delete().eq("match_id", match_id);
