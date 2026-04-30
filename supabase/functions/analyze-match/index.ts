@@ -233,7 +233,182 @@ function synthesizeSecondHalf(h1: any): any {
   };
 }
 
-serve(async (req) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// A — Persistent Field Calibration / Coverage Correction
+// ─────────────────────────────────────────────────────────────────────────────
+
+function transformPoint(x: number, y: number, calibration: any): { x: number; y: number } {
+  if (!calibration || typeof calibration !== "object") return { x, y };
+  try {
+    const H = calibration.homography_matrix;
+    if (Array.isArray(H) && H.length === 9 && H.every((n: any) => typeof n === "number")) {
+      const u = x / 100, v = y / 100;
+      const denom = H[6] * u + H[7] * v + H[8];
+      if (Math.abs(denom) > 1e-6) {
+        const gx = (H[0] * u + H[1] * v + H[2]) / denom;
+        const gy = (H[3] * u + H[4] * v + H[5]) / denom;
+        return { x: clamp(gx * 100, 0, 100), y: clamp(gy * 100, 0, 100) };
+      }
+    }
+    const coverage = calibration.coverage;
+    if (coverage === "left_half") return { x: clamp(x * 0.5, 0, 100), y };
+    if (coverage === "right_half") return { x: clamp(50 + x * 0.5, 0, 100), y };
+    if (coverage === "custom" && calibration.rect) {
+      const r = calibration.rect;
+      const rx = Number(r.x) || 0, ry = Number(r.y) || 0;
+      const rw = Number(r.w) || 1, rh = Number(r.h) || 1;
+      return {
+        x: clamp(rx * 100 + (x / 100) * rw * 100, 0, 100),
+        y: clamp(ry * 100 + (y / 100) * rh * 100, 0, 100),
+      };
+    }
+  } catch (e) {
+    console.warn("[A] transformPoint failed, identity fallback:", e);
+  }
+  return { x, y };
+}
+
+function applyFieldCalibration(analysis: any, calibration: any): void {
+  if (!calibration || typeof calibration !== "object") return;
+  if ((calibration.coverage === "full" || !calibration.coverage) && !calibration.homography_matrix && !calibration.rect) {
+    return;
+  }
+  try {
+    if (Array.isArray(analysis?.frame_positions)) {
+      for (const fr of analysis.frame_positions) {
+        if (Array.isArray(fr?.players)) {
+          for (const p of fr.players) {
+            if (typeof p?.x === "number" && typeof p?.y === "number") {
+              const t = transformPoint(p.x, p.y, calibration);
+              p.x = t.x; p.y = t.y;
+            }
+          }
+        }
+        if (fr?.ball && typeof fr.ball.x === "number" && typeof fr.ball.y === "number") {
+          const t = transformPoint(fr.ball.x, fr.ball.y, calibration);
+          fr.ball.x = t.x; fr.ball.y = t.y;
+        }
+      }
+    }
+    if (Array.isArray(analysis?.danger_zones)) {
+      for (const z of analysis.danger_zones) {
+        if (typeof z?.x === "number" && typeof z?.y === "number") {
+          const t = transformPoint(z.x, z.y, calibration);
+          z.x = t.x; z.y = t.y;
+        }
+      }
+    }
+    console.log(`[A] Field calibration applied (coverage=${calibration.coverage ?? "n/a"}, homography=${!!calibration.homography_matrix})`);
+  } catch (e) {
+    console.warn("[A] applyFieldCalibration failed, analysis untouched:", e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// B — Trajectory Smoothing (1D Kalman per axis, per stable-key entity)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function kalman1D(values: number[], Q: number, R: number): number[] {
+  if (!values.length) return values;
+  const out = new Array(values.length);
+  let x = values[0];
+  let p = 1.0;
+  out[0] = x;
+  for (let i = 1; i < values.length; i++) {
+    p = p + Q;
+    const k = p / (p + R);
+    x = x + k * (values[i] - x);
+    p = (1 - k) * p;
+    out[i] = x;
+  }
+  return out;
+}
+
+function playerKey(team: string | undefined | null, p: any): string | null {
+  if (!p || !team) return null;
+  if (p.id) return `${team}#id:${p.id}`;
+  if (typeof p.shirt_number === "number") return `${team}#n:${p.shirt_number}`;
+  if (typeof p.number === "number") return `${team}#n:${p.number}`;
+  return null;
+}
+
+function smoothTrajectories(analysis: any): void {
+  const frames = analysis?.frame_positions;
+  if (!Array.isArray(frames) || frames.length < 3) return;
+  try {
+    type Obs = { frameIdx: number; playerRef: any };
+    const groups = new Map<string, Obs[]>();
+    const ballObs: { frameIdx: number; ballRef: any }[] = [];
+
+    for (let i = 0; i < frames.length; i++) {
+      const fr = frames[i];
+      if (Array.isArray(fr?.players)) {
+        for (const p of fr.players) {
+          if (p?.estimated === true) continue;
+          if (typeof p?.x !== "number" || typeof p?.y !== "number") continue;
+          const team = p.team ?? p.side ?? null;
+          const key = playerKey(team, p);
+          if (!key) continue;
+          const list = groups.get(key) ?? [];
+          list.push({ frameIdx: i, playerRef: p });
+          groups.set(key, list);
+        }
+      }
+      if (fr?.ball && typeof fr.ball.x === "number" && typeof fr.ball.y === "number") {
+        ballObs.push({ frameIdx: i, ballRef: fr.ball });
+      }
+    }
+
+    let smoothedPlayers = 0;
+    for (const [, list] of groups) {
+      if (list.length < 3) continue;
+      const xs = list.map((o) => o.playerRef.x);
+      const ys = list.map((o) => o.playerRef.y);
+      const sxs = kalman1D(xs, 2.0, 8.0);
+      const sys = kalman1D(ys, 2.0, 8.0);
+      for (let i = 0; i < list.length; i++) {
+        list[i].playerRef.x = clamp(sxs[i], 0, 100);
+        list[i].playerRef.y = clamp(sys[i], 0, 100);
+      }
+      smoothedPlayers++;
+    }
+
+    if (ballObs.length >= 3) {
+      const bxs = ballObs.map((o) => o.ballRef.x);
+      const bys = ballObs.map((o) => o.ballRef.y);
+      const sbxs = kalman1D(bxs, 10.0, 6.0);
+      const sbys = kalman1D(bys, 10.0, 6.0);
+      for (let i = 0; i < ballObs.length; i++) {
+        ballObs[i].ballRef.x = clamp(sbxs[i], 0, 100);
+        ballObs[i].ballRef.y = clamp(sbys[i], 0, 100);
+      }
+    }
+
+    console.log(`[B] Trajectory smoothing applied (${smoothedPlayers} players, ball=${ballObs.length >= 3})`);
+  } catch (e) {
+    console.warn("[B] smoothTrajectories failed, raw values kept:", e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C — Quality-aware prompt hint (Phase-1 telemetry → Gemini prompt)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildQualityHint(t: FrameTelemetry | undefined): string {
+  if (!t || t.total_skipped <= 0) return "";
+  try {
+    const r = t.skipped_reasons;
+    const intervals = t.adaptive_intervals_seen;
+    const intervalLine = intervals.length > 0
+      ? ` Adaptives Capture-Intervall: ${Math.min(...intervals)}–${Math.max(...intervals)}s je nach Spielintensität.`
+      : "";
+    return `\n\nFRAME-QUALITÄT (vor Upload gefiltert): ${t.total_skipped} Frames verworfen (dunkel: ${r.dark}, einheitlich: ${r.uniform}, unscharf: ${r.blurry}, Duplikat: ${r.duplicate}).${intervalLine} Bewerte Konfidenz konservativ wenn ein Bild dennoch unscharf oder unvollständig wirkt.`;
+  } catch {
+    return "";
+  }
+}
+
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const supabase = createClient(
