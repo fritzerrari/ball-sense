@@ -453,9 +453,16 @@ export default function CameraTrackingPage() {
   // ── Incremental delta upload during recording ──
   const uploadDelta = useCallback(async () => {
     if (!liveCaptureRef.current || !matchId || !isHelper || !sessionToken) return;
-    const newFrames = liveCaptureRef.current.getNewFramesSince(lastUploadedIndexRef.current);
-    const newTimestamps = liveCaptureRef.current.getNewTimestampsSince(lastUploadedIndexRef.current);
+    const cap = liveCaptureRef.current;
+    const newFrames = cap.getNewFramesSince(lastUploadedIndexRef.current);
+    const newTimestamps = cap.getNewTimestampsSince(lastUploadedIndexRef.current);
     if (newFrames.length === 0) return;
+
+    // Phase-1 telemetry: skip-reasons + adaptive interval + frame count baseline.
+    // Backend may ignore unknown fields; we send them best-effort for diagnostics.
+    const skippedReasons = cap.getSkippedReasons?.() ?? null;
+    const currentIntervalSec = cap.getCurrentIntervalSec?.() ?? null;
+    const totalSkipped = cap.getSkippedCount?.() ?? 0;
 
     try {
       const res = await fetch(
@@ -473,6 +480,12 @@ export default function CameraTrackingPage() {
             frames: newFrames,
             timestamps: newTimestamps,
             chunk_index: chunkIndexRef.current,
+            telemetry: {
+              skipped_total: totalSkipped,
+              skipped_reasons: skippedReasons,
+              adaptive_interval_sec: currentIntervalSec,
+              uploaded_so_far: lastUploadedIndexRef.current + newFrames.length,
+            },
           }),
         },
       );
