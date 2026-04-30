@@ -537,7 +537,11 @@ Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 WICHTIG: 
 - Beschreibe NUR was du siehst. Wenn ein Bild unklar ist, sage das ehrlich.
 - Wenn ein Frame eine Nahaufnahme zeigt (< 30% Feldabdeckung), markiere ihn als "detail" Frame.
-- Frames mit schlechter Qualität oder ohne erkennbares Spielfeld als "unusable" markieren.`,
+- Frames mit schlechter Qualität oder ohne erkennbares Spielfeld als "unusable" markieren.
+
+ZUSÄTZLICH (optional, NUR wenn klar erkennbar):
+- scenes: Klassifiziere Frames mit erkennbarer Spielsituation (Eckball/Freistoß/Einwurf/Anstoß/Strafstoß/Spielfluss/Unterbrechung/Torjubel). Frame_index = Index im übergebenen Bilderstrom.
+- goal_candidates: Frames bei denen mit hoher Wahrscheinlichkeit ein TOR gefallen ist. Achte auf: Ball im Netz, Spieler-Jubeltrauben, Spieler laufen zur Mittellinie, Gegner stehen niedergeschlagen, Schiri zeigt zur Mitte. Nur starke Hinweise (confidence >= 0.5) angeben. Schätze die Spielminute aus dem Frame-Index (Frame ${selectedFrames.length} ≈ Ende, Frame 0 ≈ Anfang) und der Gesamtdauer ${duration_sec ? Math.round(duration_sec / 60) : "?"} min.`,
       },
     ];
 
