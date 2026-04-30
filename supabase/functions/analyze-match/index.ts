@@ -51,12 +51,15 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       .filter((name: string) => name.startsWith(prefix));
   };
 
+  const telemetry = emptyTelemetry();
+
   // 1. Try canonical file (already time-merged across all cameras by camera-ops)
   const { data: mainFile } = await supabase.storage.from("match-frames").download(`${matchId}.json`);
   if (mainFile) {
     try {
       const parsed = JSON.parse(await mainFile.text());
-      if (parsed.frames?.length) return { frames: parsed.frames, duration_sec: parsed.duration_sec ?? 0 };
+      mergeTelemetry(telemetry, parsed.telemetry);
+      if (parsed.frames?.length) return { frames: parsed.frames, duration_sec: parsed.duration_sec ?? 0, telemetry };
     } catch { /* corrupt */ }
   }
 
@@ -69,18 +72,18 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
     if (!camFile) continue;
     try {
       const parsed = JSON.parse(await camFile.text());
+      mergeTelemetry(telemetry, parsed.telemetry);
       const fr: string[] = parsed.frames ?? [];
       const ts: number[] = parsed.timestamps ?? [];
       camDuration += parsed.duration_sec ?? 0;
       for (let i = 0; i < fr.length; i++) {
-        // Stable synthetic ts if missing: order frames per cam, slightly offset by cam id.
         taggedCam.push({ frame: fr[i], ts: ts[i] ?? i * 30_000 + cam * 1_000 });
       }
     } catch { /* skip */ }
   }
   if (taggedCam.length > 0) {
     taggedCam.sort((a, b) => a.ts - b.ts);
-    return { frames: taggedCam.map((t) => t.frame), duration_sec: camDuration };
+    return { frames: taggedCam.map((t) => t.frame), duration_sec: camDuration, telemetry };
   }
 
   // 3. Try half files (_h1 + _h2) — these are trainer self-recording snapshots.
@@ -91,6 +94,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
     if (halfFile) {
       try {
         const parsed = JSON.parse(await halfFile.text());
+        mergeTelemetry(telemetry, parsed.telemetry);
         if (parsed.frames?.length) {
           allHalfFrames.push(...parsed.frames);
           totalDuration += parsed.duration_sec ?? 0;
@@ -98,7 +102,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       } catch { /* skip */ }
     }
   }
-  if (allHalfFrames.length > 0) return { frames: allHalfFrames, duration_sec: totalDuration };
+  if (allHalfFrames.length > 0) return { frames: allHalfFrames, duration_sec: totalDuration, telemetry };
 
   // 4. Try chunk files (camera-specific first, then legacy) — also time-merge if timestamps present.
   const taggedChunks: Tagged[] = [];
@@ -114,6 +118,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
         const { data: chunkFile } = await supabase.storage.from("match-frames").download(chunkName);
         if (!chunkFile) continue;
         const parsed = JSON.parse(await chunkFile.text());
+        mergeTelemetry(telemetry, parsed.telemetry);
         const fr: string[] = parsed.frames ?? [];
         const ts: number[] = parsed.timestamps ?? [];
         const chunkIndex = Number(chunkName.match(/_chunk_(\d+)\.json$/)?.[1] ?? 0);
@@ -135,6 +140,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       const { data: chunkFile } = await supabase.storage.from("match-frames").download(chunkName);
       if (!chunkFile) continue;
       const parsed = JSON.parse(await chunkFile.text());
+      mergeTelemetry(telemetry, parsed.telemetry);
       const fr: string[] = parsed.frames ?? [];
       const chunkIndex = Number(chunkName.match(/_chunk_(\d+)\.json$/)?.[1] ?? 0);
       for (let j = 0; j < fr.length; j++) {
@@ -144,7 +150,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
   }
   if (taggedChunks.length > 0) {
     taggedChunks.sort((a, b) => a.ts - b.ts);
-    return { frames: taggedChunks.map((t) => t.frame), duration_sec: taggedChunks.length * 30 };
+    return { frames: taggedChunks.map((t) => t.frame), duration_sec: taggedChunks.length * 30, telemetry };
   }
 
   return null;
