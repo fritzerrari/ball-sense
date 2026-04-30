@@ -131,7 +131,7 @@ export default function AISuggestionsPanel({ matchId, onEventsChanged }: Props) 
     }
     setImportingKey(key);
     try {
-      const { error } = await supabase.from("match_events").insert({
+      const payload: any = {
         match_id: matchId,
         event_type: eventType,
         minute: s.minute,
@@ -139,7 +139,8 @@ export default function AISuggestionsPanel({ matchId, onEventsChanged }: Props) 
         notes: `KI-Vorschlag · ${SCENE_LABELS[s.type]?.label ?? s.type}${
           s.evidence ? ` · ${s.evidence}` : ""
         }`,
-      });
+      };
+      const { error } = await supabase.from("match_events").insert(payload);
       if (error) throw error;
       setImported((prev) => new Set(prev).add(key));
       toast.success("Szene als Event übernommen");
