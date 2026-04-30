@@ -922,6 +922,8 @@ KAMERA-PERSPEKTIVE ERKENNEN:
       ...(analysis.formation_timeline?.length ? [{ type: "formation_timeline", data: analysis.formation_timeline }] : []),
       ...(analysis.camera_perspective ? [{ type: "camera_perspective", data: analysis.camera_perspective }] : []),
       ...(analysis.team_size_detected ? [{ type: "team_size_detected", data: analysis.team_size_detected }] : []),
+      ...(Array.isArray(analysis.scenes) && analysis.scenes.length ? [{ type: "scenes", data: analysis.scenes }] : []),
+      ...(Array.isArray(analysis.goal_candidates) && analysis.goal_candidates.length ? [{ type: "goal_candidates", data: analysis.goal_candidates }] : []),
     ];
 
     // ── H2 SIMULATION (only for final jobs without H2 frames) ──
