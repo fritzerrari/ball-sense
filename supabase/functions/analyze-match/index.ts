@@ -431,6 +431,7 @@ serve(async (req) => {
 
     let frames = inlineFrames as string[] | undefined;
     let duration_sec = inlineDuration as number | undefined;
+    let frameTelemetry: FrameTelemetry | undefined;
     const isLivePartial = phase === "live_partial";
 
     // If no inline frames, load from Storage with fallback chain
