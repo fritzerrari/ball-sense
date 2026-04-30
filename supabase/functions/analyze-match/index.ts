@@ -7,7 +7,40 @@ const corsHeaders = {
 };
 
 /** Try to load frames from storage with fallback chain. Camera-files are time-merged. */
-async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number } | null> {
+/** Aggregated telemetry collected from all loaded frame chunks (Phase 1 quick-wins). */
+interface FrameTelemetry {
+  total_skipped: number;
+  skipped_reasons: { dark: number; uniform: number; blurry: number; duplicate: number };
+  adaptive_intervals_seen: number[];
+  chunk_count: number;
+}
+
+function emptyTelemetry(): FrameTelemetry {
+  return {
+    total_skipped: 0,
+    skipped_reasons: { dark: 0, uniform: 0, blurry: 0, duplicate: 0 },
+    adaptive_intervals_seen: [],
+    chunk_count: 0,
+  };
+}
+
+function mergeTelemetry(target: FrameTelemetry, raw: any): void {
+  if (!raw || typeof raw !== "object") return;
+  target.chunk_count++;
+  if (typeof raw.skipped_total === "number") target.total_skipped += raw.skipped_total;
+  const sr = raw.skipped_reasons;
+  if (sr && typeof sr === "object") {
+    target.skipped_reasons.dark += Number(sr.dark) || 0;
+    target.skipped_reasons.uniform += Number(sr.uniform) || 0;
+    target.skipped_reasons.blurry += Number(sr.blurry) || 0;
+    target.skipped_reasons.duplicate += Number(sr.duplicate) || 0;
+  }
+  if (typeof raw.adaptive_interval_sec === "number" && raw.adaptive_interval_sec > 0) {
+    target.adaptive_intervals_seen.push(raw.adaptive_interval_sec);
+  }
+}
+
+async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number; telemetry: FrameTelemetry } | null> {
   const listChunkFiles = async (prefix: string): Promise<string[]> => {
     const { data } = await supabase.storage.from("match-frames").list("", {
       limit: 500,
@@ -18,12 +51,15 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       .filter((name: string) => name.startsWith(prefix));
   };
 
+  const telemetry = emptyTelemetry();
+
   // 1. Try canonical file (already time-merged across all cameras by camera-ops)
   const { data: mainFile } = await supabase.storage.from("match-frames").download(`${matchId}.json`);
   if (mainFile) {
     try {
       const parsed = JSON.parse(await mainFile.text());
-      if (parsed.frames?.length) return { frames: parsed.frames, duration_sec: parsed.duration_sec ?? 0 };
+      mergeTelemetry(telemetry, parsed.telemetry);
+      if (parsed.frames?.length) return { frames: parsed.frames, duration_sec: parsed.duration_sec ?? 0, telemetry };
     } catch { /* corrupt */ }
   }
 
@@ -36,18 +72,18 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
     if (!camFile) continue;
     try {
       const parsed = JSON.parse(await camFile.text());
+      mergeTelemetry(telemetry, parsed.telemetry);
       const fr: string[] = parsed.frames ?? [];
       const ts: number[] = parsed.timestamps ?? [];
       camDuration += parsed.duration_sec ?? 0;
       for (let i = 0; i < fr.length; i++) {
-        // Stable synthetic ts if missing: order frames per cam, slightly offset by cam id.
         taggedCam.push({ frame: fr[i], ts: ts[i] ?? i * 30_000 + cam * 1_000 });
       }
     } catch { /* skip */ }
   }
   if (taggedCam.length > 0) {
     taggedCam.sort((a, b) => a.ts - b.ts);
-    return { frames: taggedCam.map((t) => t.frame), duration_sec: camDuration };
+    return { frames: taggedCam.map((t) => t.frame), duration_sec: camDuration, telemetry };
   }
 
   // 3. Try half files (_h1 + _h2) — these are trainer self-recording snapshots.
@@ -58,6 +94,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
     if (halfFile) {
       try {
         const parsed = JSON.parse(await halfFile.text());
+        mergeTelemetry(telemetry, parsed.telemetry);
         if (parsed.frames?.length) {
           allHalfFrames.push(...parsed.frames);
           totalDuration += parsed.duration_sec ?? 0;
@@ -65,7 +102,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       } catch { /* skip */ }
     }
   }
-  if (allHalfFrames.length > 0) return { frames: allHalfFrames, duration_sec: totalDuration };
+  if (allHalfFrames.length > 0) return { frames: allHalfFrames, duration_sec: totalDuration, telemetry };
 
   // 4. Try chunk files (camera-specific first, then legacy) — also time-merge if timestamps present.
   const taggedChunks: Tagged[] = [];
@@ -81,6 +118,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
         const { data: chunkFile } = await supabase.storage.from("match-frames").download(chunkName);
         if (!chunkFile) continue;
         const parsed = JSON.parse(await chunkFile.text());
+        mergeTelemetry(telemetry, parsed.telemetry);
         const fr: string[] = parsed.frames ?? [];
         const ts: number[] = parsed.timestamps ?? [];
         const chunkIndex = Number(chunkName.match(/_chunk_(\d+)\.json$/)?.[1] ?? 0);
@@ -102,6 +140,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       const { data: chunkFile } = await supabase.storage.from("match-frames").download(chunkName);
       if (!chunkFile) continue;
       const parsed = JSON.parse(await chunkFile.text());
+      mergeTelemetry(telemetry, parsed.telemetry);
       const fr: string[] = parsed.frames ?? [];
       const chunkIndex = Number(chunkName.match(/_chunk_(\d+)\.json$/)?.[1] ?? 0);
       for (let j = 0; j < fr.length; j++) {
@@ -111,7 +150,7 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
   }
   if (taggedChunks.length > 0) {
     taggedChunks.sort((a, b) => a.ts - b.ts);
-    return { frames: taggedChunks.map((t) => t.frame), duration_sec: taggedChunks.length * 30 };
+    return { frames: taggedChunks.map((t) => t.frame), duration_sec: taggedChunks.length * 30, telemetry };
   }
 
   return null;
@@ -194,6 +233,181 @@ function synthesizeSecondHalf(h1: any): any {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// A — Persistent Field Calibration / Coverage Correction
+// ─────────────────────────────────────────────────────────────────────────────
+
+function transformPoint(x: number, y: number, calibration: any): { x: number; y: number } {
+  if (!calibration || typeof calibration !== "object") return { x, y };
+  try {
+    const H = calibration.homography_matrix;
+    if (Array.isArray(H) && H.length === 9 && H.every((n: any) => typeof n === "number")) {
+      const u = x / 100, v = y / 100;
+      const denom = H[6] * u + H[7] * v + H[8];
+      if (Math.abs(denom) > 1e-6) {
+        const gx = (H[0] * u + H[1] * v + H[2]) / denom;
+        const gy = (H[3] * u + H[4] * v + H[5]) / denom;
+        return { x: clamp(gx * 100, 0, 100), y: clamp(gy * 100, 0, 100) };
+      }
+    }
+    const coverage = calibration.coverage;
+    if (coverage === "left_half") return { x: clamp(x * 0.5, 0, 100), y };
+    if (coverage === "right_half") return { x: clamp(50 + x * 0.5, 0, 100), y };
+    if (coverage === "custom" && calibration.rect) {
+      const r = calibration.rect;
+      const rx = Number(r.x) || 0, ry = Number(r.y) || 0;
+      const rw = Number(r.w) || 1, rh = Number(r.h) || 1;
+      return {
+        x: clamp(rx * 100 + (x / 100) * rw * 100, 0, 100),
+        y: clamp(ry * 100 + (y / 100) * rh * 100, 0, 100),
+      };
+    }
+  } catch (e) {
+    console.warn("[A] transformPoint failed, identity fallback:", e);
+  }
+  return { x, y };
+}
+
+function applyFieldCalibration(analysis: any, calibration: any): void {
+  if (!calibration || typeof calibration !== "object") return;
+  if ((calibration.coverage === "full" || !calibration.coverage) && !calibration.homography_matrix && !calibration.rect) {
+    return;
+  }
+  try {
+    if (Array.isArray(analysis?.frame_positions)) {
+      for (const fr of analysis.frame_positions) {
+        if (Array.isArray(fr?.players)) {
+          for (const p of fr.players) {
+            if (typeof p?.x === "number" && typeof p?.y === "number") {
+              const t = transformPoint(p.x, p.y, calibration);
+              p.x = t.x; p.y = t.y;
+            }
+          }
+        }
+        if (fr?.ball && typeof fr.ball.x === "number" && typeof fr.ball.y === "number") {
+          const t = transformPoint(fr.ball.x, fr.ball.y, calibration);
+          fr.ball.x = t.x; fr.ball.y = t.y;
+        }
+      }
+    }
+    if (Array.isArray(analysis?.danger_zones)) {
+      for (const z of analysis.danger_zones) {
+        if (typeof z?.x === "number" && typeof z?.y === "number") {
+          const t = transformPoint(z.x, z.y, calibration);
+          z.x = t.x; z.y = t.y;
+        }
+      }
+    }
+    console.log(`[A] Field calibration applied (coverage=${calibration.coverage ?? "n/a"}, homography=${!!calibration.homography_matrix})`);
+  } catch (e) {
+    console.warn("[A] applyFieldCalibration failed, analysis untouched:", e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// B — Trajectory Smoothing (1D Kalman per axis, per stable-key entity)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function kalman1D(values: number[], Q: number, R: number): number[] {
+  if (!values.length) return values;
+  const out = new Array(values.length);
+  let x = values[0];
+  let p = 1.0;
+  out[0] = x;
+  for (let i = 1; i < values.length; i++) {
+    p = p + Q;
+    const k = p / (p + R);
+    x = x + k * (values[i] - x);
+    p = (1 - k) * p;
+    out[i] = x;
+  }
+  return out;
+}
+
+function playerKey(team: string | undefined | null, p: any): string | null {
+  if (!p || !team) return null;
+  if (p.id) return `${team}#id:${p.id}`;
+  if (typeof p.shirt_number === "number") return `${team}#n:${p.shirt_number}`;
+  if (typeof p.number === "number") return `${team}#n:${p.number}`;
+  return null;
+}
+
+function smoothTrajectories(analysis: any): void {
+  const frames = analysis?.frame_positions;
+  if (!Array.isArray(frames) || frames.length < 3) return;
+  try {
+    type Obs = { frameIdx: number; playerRef: any };
+    const groups = new Map<string, Obs[]>();
+    const ballObs: { frameIdx: number; ballRef: any }[] = [];
+
+    for (let i = 0; i < frames.length; i++) {
+      const fr = frames[i];
+      if (Array.isArray(fr?.players)) {
+        for (const p of fr.players) {
+          if (p?.estimated === true) continue;
+          if (typeof p?.x !== "number" || typeof p?.y !== "number") continue;
+          const team = p.team ?? p.side ?? null;
+          const key = playerKey(team, p);
+          if (!key) continue;
+          const list = groups.get(key) ?? [];
+          list.push({ frameIdx: i, playerRef: p });
+          groups.set(key, list);
+        }
+      }
+      if (fr?.ball && typeof fr.ball.x === "number" && typeof fr.ball.y === "number") {
+        ballObs.push({ frameIdx: i, ballRef: fr.ball });
+      }
+    }
+
+    let smoothedPlayers = 0;
+    for (const [, list] of groups) {
+      if (list.length < 3) continue;
+      const xs = list.map((o) => o.playerRef.x);
+      const ys = list.map((o) => o.playerRef.y);
+      const sxs = kalman1D(xs, 2.0, 8.0);
+      const sys = kalman1D(ys, 2.0, 8.0);
+      for (let i = 0; i < list.length; i++) {
+        list[i].playerRef.x = clamp(sxs[i], 0, 100);
+        list[i].playerRef.y = clamp(sys[i], 0, 100);
+      }
+      smoothedPlayers++;
+    }
+
+    if (ballObs.length >= 3) {
+      const bxs = ballObs.map((o) => o.ballRef.x);
+      const bys = ballObs.map((o) => o.ballRef.y);
+      const sbxs = kalman1D(bxs, 10.0, 6.0);
+      const sbys = kalman1D(bys, 10.0, 6.0);
+      for (let i = 0; i < ballObs.length; i++) {
+        ballObs[i].ballRef.x = clamp(sbxs[i], 0, 100);
+        ballObs[i].ballRef.y = clamp(sbys[i], 0, 100);
+      }
+    }
+
+    console.log(`[B] Trajectory smoothing applied (${smoothedPlayers} players, ball=${ballObs.length >= 3})`);
+  } catch (e) {
+    console.warn("[B] smoothTrajectories failed, raw values kept:", e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C — Quality-aware prompt hint (Phase-1 telemetry → Gemini prompt)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildQualityHint(t: FrameTelemetry | undefined): string {
+  if (!t || t.total_skipped <= 0) return "";
+  try {
+    const r = t.skipped_reasons;
+    const intervals = t.adaptive_intervals_seen;
+    const intervalLine = intervals.length > 0
+      ? ` Adaptives Capture-Intervall: ${Math.min(...intervals)}–${Math.max(...intervals)}s je nach Spielintensität.`
+      : "";
+    return `\n\nFRAME-QUALITÄT (vor Upload gefiltert): ${t.total_skipped} Frames verworfen (dunkel: ${r.dark}, einheitlich: ${r.uniform}, unscharf: ${r.blurry}, Duplikat: ${r.duplicate}).${intervalLine} Bewerte Konfidenz konservativ wenn ein Bild dennoch unscharf oder unvollständig wirkt.`;
+  } catch {
+    return "";
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -217,6 +431,7 @@ serve(async (req) => {
 
     let frames = inlineFrames as string[] | undefined;
     let duration_sec = inlineDuration as number | undefined;
+    let frameTelemetry: FrameTelemetry | undefined;
     const isLivePartial = phase === "live_partial";
 
     // If no inline frames, load from Storage with fallback chain
@@ -236,6 +451,7 @@ serve(async (req) => {
 
       frames = storageResult.frames;
       duration_sec = storageResult.duration_sec;
+      frameTelemetry = storageResult.telemetry;
     }
 
     if (!frames || frames.length === 0) {
@@ -304,7 +520,7 @@ Kontext:
 - Datum: ${match?.date ?? "unbekannt"}
 - Platzgröße: ${match?.fields?.width_m ?? 105}x${match?.fields?.height_m ?? 68}m
 - Feldtyp: ${fieldType !== "unknown" ? fieldType : "Standard-Großfeld"}
-- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten${calibrationNote}
+- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten${calibrationNote}${buildQualityHint(frameTelemetry)}
 
 Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Spielerverteilung und Formationen
@@ -647,6 +863,12 @@ KAMERA-PERSPEKTIVE ERKENNEN:
         }
       }
     }
+
+    // ── A: Persistente Field-Calibration auf alle Koordinaten anwenden ──
+    applyFieldCalibration(analysis, match?.fields?.calibration);
+
+    // ── B: Trajectory-Smoothing (Kalman 1D) für Spieler & Ball ──
+    smoothTrajectories(analysis);
 
     // For live_partial: don't delete old results, just add new ones
     if (!isLivePartial) {
