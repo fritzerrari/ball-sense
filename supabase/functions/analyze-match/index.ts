@@ -450,6 +450,7 @@ serve(async (req) => {
 
       frames = storageResult.frames;
       duration_sec = storageResult.duration_sec;
+      frameTelemetry = storageResult.telemetry;
     }
 
     if (!frames || frames.length === 0) {
