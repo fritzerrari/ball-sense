@@ -7,7 +7,40 @@ const corsHeaders = {
 };
 
 /** Try to load frames from storage with fallback chain. Camera-files are time-merged. */
-async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number } | null> {
+/** Aggregated telemetry collected from all loaded frame chunks (Phase 1 quick-wins). */
+interface FrameTelemetry {
+  total_skipped: number;
+  skipped_reasons: { dark: number; uniform: number; blurry: number; duplicate: number };
+  adaptive_intervals_seen: number[];
+  chunk_count: number;
+}
+
+function emptyTelemetry(): FrameTelemetry {
+  return {
+    total_skipped: 0,
+    skipped_reasons: { dark: 0, uniform: 0, blurry: 0, duplicate: 0 },
+    adaptive_intervals_seen: [],
+    chunk_count: 0,
+  };
+}
+
+function mergeTelemetry(target: FrameTelemetry, raw: any): void {
+  if (!raw || typeof raw !== "object") return;
+  target.chunk_count++;
+  if (typeof raw.skipped_total === "number") target.total_skipped += raw.skipped_total;
+  const sr = raw.skipped_reasons;
+  if (sr && typeof sr === "object") {
+    target.skipped_reasons.dark += Number(sr.dark) || 0;
+    target.skipped_reasons.uniform += Number(sr.uniform) || 0;
+    target.skipped_reasons.blurry += Number(sr.blurry) || 0;
+    target.skipped_reasons.duplicate += Number(sr.duplicate) || 0;
+  }
+  if (typeof raw.adaptive_interval_sec === "number" && raw.adaptive_interval_sec > 0) {
+    target.adaptive_intervals_seen.push(raw.adaptive_interval_sec);
+  }
+}
+
+async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number; telemetry: FrameTelemetry } | null> {
   const listChunkFiles = async (prefix: string): Promise<string[]> => {
     const { data } = await supabase.storage.from("match-frames").list("", {
       limit: 500,
