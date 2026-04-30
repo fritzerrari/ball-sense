@@ -782,6 +782,36 @@ KAMERA-PERSPEKTIVE ERKENNEN:
                   },
                   visual_quality: { type: "string", enum: ["good", "moderate", "poor"] },
                   confidence: { type: "number" },
+                  scenes: {
+                    type: "array",
+                    description: "Detected play scenes per frame: open_play, corner_kick, free_kick, throw_in, kickoff, penalty, stoppage, goal_celebration. Optional — only include frames where scene is identifiable.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        frame_index: { type: "integer" },
+                        type: { type: "string", enum: ["open_play", "corner_kick", "free_kick", "throw_in", "kickoff", "penalty", "stoppage", "goal_celebration"] },
+                        team: { type: "string", enum: ["home", "away", "neutral"] },
+                        confidence: { type: "number" },
+                        notes: { type: "string" },
+                      },
+                      required: ["frame_index", "type", "confidence"],
+                    },
+                  },
+                  goal_candidates: {
+                    type: "array",
+                    description: "Frames where a goal LIKELY occurred. Indicators: ball in net, players celebrating in groups, players running to halfway line, opponents standing dejected, referee gesture toward center. Only include strong candidates (confidence >= 0.5).",
+                    items: {
+                      type: "object",
+                      properties: {
+                        frame_index: { type: "integer" },
+                        team: { type: "string", enum: ["home", "away"] },
+                        minute: { type: "integer", description: "Estimated match minute" },
+                        confidence: { type: "number" },
+                        evidence: { type: "string", description: "What you observed (e.g. 'home players celebrating, away keeper retrieving ball from net')" },
+                      },
+                      required: ["frame_index", "team", "confidence", "evidence"],
+                    },
+                  },
                 },
                 required: ["match_structure", "danger_zones", "chances", "ball_loss_patterns", "frame_positions", "pressing_data", "transitions", "pass_directions", "formation_timeline", "camera_perspective", "team_size_detected", "visual_quality", "confidence"],
               },
