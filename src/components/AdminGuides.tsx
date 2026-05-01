@@ -12,6 +12,7 @@ import {
   Plus, Trash2, Save, Loader2, Sparkles, BookOpen, GripVertical,
   ChevronDown, ChevronUp, Image as ImageIcon,
 } from "lucide-react";
+import AdminHandbookDownload from "./AdminHandbookDownload";
 
 interface GuideChapter {
   title: string;
