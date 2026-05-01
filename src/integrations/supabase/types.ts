@@ -797,6 +797,7 @@ export type Database = {
       documentation: {
         Row: {
           active: boolean
+          audience: string
           category: string
           content: string
           created_at: string
@@ -810,6 +811,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          audience?: string
           category?: string
           content?: string
           created_at?: string
@@ -823,6 +825,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          audience?: string
           category?: string
           content?: string
           created_at?: string
