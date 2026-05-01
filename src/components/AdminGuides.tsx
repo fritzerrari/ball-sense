@@ -247,6 +247,8 @@ Antworte NUR mit dem JSON-Array, kein anderer Text.`,
 
   return (
     <div className="space-y-6">
+      <AdminHandbookDownload />
+
       {/* Guide list */}
       <div className="glass-card overflow-x-auto">
         <table className="w-full text-sm">
