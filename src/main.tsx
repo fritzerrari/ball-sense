@@ -22,7 +22,7 @@ const isEmbeddedPreview = (() => {
  * the next time it loads the app. Increment whenever a stale-cache hang
  * is suspected after a deploy.
  */
-const RUNTIME_CLEANUP_VERSION = "2026-04-18-cache-bust-1";
+const RUNTIME_CLEANUP_VERSION = "2026-05-01-cache-bust-2";
 const CLEANUP_KEY = "fieldiq_runtime_cleanup_version";
 
 async function cleanupRuntimeArtifacts() {
