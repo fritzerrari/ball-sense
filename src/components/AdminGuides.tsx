@@ -12,6 +12,7 @@ import {
   Plus, Trash2, Save, Loader2, Sparkles, BookOpen, GripVertical,
   ChevronDown, ChevronUp, Image as ImageIcon,
 } from "lucide-react";
+import AdminHandbookDownload from "./AdminHandbookDownload";
 
 interface GuideChapter {
   title: string;
@@ -246,6 +247,8 @@ Antworte NUR mit dem JSON-Array, kein anderer Text.`,
 
   return (
     <div className="space-y-6">
+      <AdminHandbookDownload />
+
       {/* Guide list */}
       <div className="glass-card overflow-x-auto">
         <table className="w-full text-sm">
