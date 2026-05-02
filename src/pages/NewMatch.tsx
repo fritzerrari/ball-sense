@@ -29,6 +29,8 @@ export default function NewMatch() {
   const [fieldId, setFieldId] = useState("");
   const [awayName, setAwayName] = useState("");
   const [teamIdentity, setTeamIdentity] = useState<string>("");
+  const [homeJerseyColor, setHomeJerseyColor] = useState<string>("#22c55e");
+  const [awayJerseyColor, setAwayJerseyColor] = useState<string>("#ef4444");
 
   const [creating, setCreating] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
