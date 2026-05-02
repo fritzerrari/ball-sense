@@ -486,6 +486,13 @@ serve(async (req) => {
       ? `\nWICHTIG: Die Kamera zeigt nur einen Teilausschnitt des Feldes (${coverage === "left_half" ? "linke Hälfte" : coverage === "right_half" ? "rechte Hälfte" : "individueller Ausschnitt"}). Positionsangaben normalisieren auf das GESAMTE Feld.`
       : "";
 
+    // Jersey colors — provide stable team-assignment hint to Gemini
+    const homeJersey = (match as any)?.home_jersey_color as string | null;
+    const awayJersey = (match as any)?.away_jersey_color as string | null;
+    const jerseyNote = (homeJersey || awayJersey)
+      ? `\nTRIKOTFARBEN: Heim-Team trägt ${homeJersey ?? "unbekannt"}, Gast-Team trägt ${awayJersey ?? "unbekannt"} (Hex-Farbcodes). Verwende diese Farben als primären Hinweis zur Team-Zuordnung — nicht Position oder Spielrichtung. Bei ähnlichen Farben oder schwachem Licht: konservativ kennzeichnen statt raten.`
+      : "";
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       await supabase.from("analysis_jobs").update({
