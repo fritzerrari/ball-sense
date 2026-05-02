@@ -51,6 +51,7 @@ interface SuggestedEvent {
   player_name?: string;
   related_player_name?: string;
   notes?: string;
+  confidence?: number;
 }
 
 export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props) {
@@ -341,37 +342,45 @@ export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {suggestions.map((ev, idx) => (
-                  <div key={idx} className="flex items-center gap-3 rounded-lg border border-border/50 p-2.5 text-sm">
-                    <span className="text-xs font-mono text-muted-foreground w-8">{ev.minute}'</span>
-                    <span className="flex-1 truncate">
-                      {EVENT_LABELS[ev.event_type] ?? ev.event_type}
-                      {ev.player_name && ` · ${ev.player_name}`}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">{ev.team === "home" ? "H" : "G"}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0"
-                      disabled={importingIdx === idx}
-                      onClick={() => importSuggestion(idx)}
-                    >
-                      {importingIdx === idx ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0"
-                      onClick={() => setSuggestions((prev) => prev.filter((_, i) => i !== idx))}
-                    >
-                      <X className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                  </div>
-                ))}
+                {suggestions.map((ev, idx) => {
+                  const lowConfidence = typeof ev.confidence === "number" && ev.confidence < 0.7;
+                  return (
+                    <div key={idx} className="flex items-center gap-3 rounded-lg border border-border/50 p-2.5 text-sm">
+                      <span className="text-xs font-mono text-muted-foreground w-8">{ev.minute}'</span>
+                      <span className="flex-1 truncate">
+                        {EVENT_LABELS[ev.event_type] ?? ev.event_type}
+                        {ev.player_name && ` · ${ev.player_name}`}
+                        {lowConfidence && (
+                          <span className="ml-2 inline-flex items-center rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                            Bitte prüfen
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{ev.team === "home" ? "H" : "G"}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        disabled={importingIdx === idx}
+                        onClick={() => importSuggestion(idx)}
+                      >
+                        {importingIdx === idx ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setSuggestions((prev) => prev.filter((_, i) => i !== idx))}
+                      >
+                        <X className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  );
+                })}
                 <Button
                   size="sm"
                   variant="secondary"

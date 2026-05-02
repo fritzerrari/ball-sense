@@ -29,6 +29,15 @@ const MOTION_PROBE_INTERVAL_SEC = 5;  // lightweight probe (no upload)
 const MOTION_HIGH_THRESHOLD = 18;     // mean abs pixel diff (0-255) → fast
 const MOTION_LOW_THRESHOLD = 4;       // → slow
 
+// ===== Boost-Takt — high-density capture near goal events =====
+// Triggered when motion concentrates strongly on one side of the frame
+// (likely attack near the box). Falls back to adaptive interval after
+// motion calms down again.
+const ENABLE_BOOST_CAPTURE = true;
+const BOOST_INTERVAL_SEC = 5;
+const BOOST_ASYMMETRY_THRESHOLD = 0.35; // |L-R|/(L+R)
+const BOOST_MIN_MOTION = 10;            // minimum overall motion to consider
+
 // ===== Quick Win #2 — Quality thresholds =====
 const MIN_BRIGHTNESS = 15;
 const MIN_VARIANCE = 200;
@@ -292,7 +301,10 @@ export function startLiveCapture(
   let lastCaptureAt = 0;
   let stopped = false;
 
-  // ---- Motion probe (drives adaptive interval) ----
+  let boostActive = false;
+  let boostIntervalSec = BOOST_INTERVAL_SEC;
+
+  // ---- Motion probe (drives adaptive interval + boost detection) ----
   const probe = () => {
     if (videoEl.videoWidth === 0) return;
     try {
@@ -300,11 +312,34 @@ export function startLiveCapture(
       const cur = probeCtx.getImageData(0, 0, probeCanvas.width, probeCanvas.height).data;
       if (lastProbe) {
         let diff = 0;
-        const n = cur.length;
-        for (let i = 0; i < n; i += 4) {
-          diff += Math.abs(cur[i] - lastProbe[i]);
+        let leftDiff = 0;
+        let rightDiff = 0;
+        const w = probeCanvas.width;
+        const h = probeCanvas.height;
+        const half = Math.floor(w / 2);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            const d = Math.abs(cur[i] - lastProbe[i]);
+            diff += d;
+            if (x < half) leftDiff += d; else rightDiff += d;
+          }
         }
-        const meanDiff = diff / (n / 4);
+        const pixelCount = w * h;
+        const meanDiff = diff / pixelCount;
+        const asymmetry = (leftDiff + rightDiff) > 0
+          ? Math.abs(leftDiff - rightDiff) / (leftDiff + rightDiff)
+          : 0;
+
+        // Boost-Takt: strong one-sided motion → likely attack near the box
+        if (ENABLE_BOOST_CAPTURE
+          && meanDiff >= BOOST_MIN_MOTION
+          && asymmetry >= BOOST_ASYMMETRY_THRESHOLD) {
+          boostActive = true;
+        } else {
+          boostActive = false;
+        }
+
         if (ENABLE_ADAPTIVE_CAPTURE) {
           if (meanDiff > MOTION_HIGH_THRESHOLD) currentIntervalSec = ADAPTIVE_MIN_INTERVAL_SEC;
           else if (meanDiff < MOTION_LOW_THRESHOLD) currentIntervalSec = ADAPTIVE_MAX_INTERVAL_SEC;
@@ -347,13 +382,14 @@ export function startLiveCapture(
     }
   };
 
-  // ---- Self-rescheduling loop (supports adaptive interval) ----
+  // ---- Self-rescheduling loop (supports adaptive interval + boost) ----
   const scheduleNext = () => {
     if (stopped) return;
+    const intervalSec = boostActive ? boostIntervalSec : currentIntervalSec;
     captureTimer = setTimeout(async () => {
       await capture();
       scheduleNext();
-    }, currentIntervalSec * 1000);
+    }, intervalSec * 1000);
   };
 
   // Kick off
@@ -429,7 +465,9 @@ export function startLiveCapture(
     /** Skip-reason breakdown for telemetry (Quick Win #2). */
     getSkippedReasons: (): SkipReasons => ({ ...skippedReasons }),
     /** Current adaptive interval in seconds (Quick Win #1). */
-    getCurrentIntervalSec: () => currentIntervalSec,
+    getCurrentIntervalSec: () => (boostActive ? boostIntervalSec : currentIntervalSec),
+    /** True when boost-takt is active (one-sided high motion → likely scoring chance). */
+    isBoostActive: () => boostActive,
     /** Returns new frames since the given index (raw, for delta uploads). */
     getNewFramesSince: (startIndex: number): string[] => frames.slice(startIndex),
     getNewTimestampsSince: (startIndex: number): number[] => timestamps.slice(startIndex),

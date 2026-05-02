@@ -1159,6 +1159,8 @@ export type Database = {
           away_club_id: string | null
           away_club_name: string | null
           away_formation: string | null
+          away_jersey_color: string | null
+          away_jersey_secondary: string | null
           away_score: number | null
           cockpit_cache: Json | null
           consent_minors_confirmed: boolean
@@ -1174,6 +1176,8 @@ export type Database = {
           h2_started_at: string | null
           home_club_id: string
           home_formation: string | null
+          home_jersey_color: string | null
+          home_jersey_secondary: string | null
           home_score: number | null
           id: string
           kickoff: string | null
@@ -1190,6 +1194,8 @@ export type Database = {
           away_club_id?: string | null
           away_club_name?: string | null
           away_formation?: string | null
+          away_jersey_color?: string | null
+          away_jersey_secondary?: string | null
           away_score?: number | null
           cockpit_cache?: Json | null
           consent_minors_confirmed?: boolean
@@ -1205,6 +1211,8 @@ export type Database = {
           h2_started_at?: string | null
           home_club_id: string
           home_formation?: string | null
+          home_jersey_color?: string | null
+          home_jersey_secondary?: string | null
           home_score?: number | null
           id?: string
           kickoff?: string | null
@@ -1221,6 +1229,8 @@ export type Database = {
           away_club_id?: string | null
           away_club_name?: string | null
           away_formation?: string | null
+          away_jersey_color?: string | null
+          away_jersey_secondary?: string | null
           away_score?: number | null
           cockpit_cache?: Json | null
           consent_minors_confirmed?: boolean
@@ -1236,6 +1246,8 @@ export type Database = {
           h2_started_at?: string | null
           home_club_id?: string
           home_formation?: string | null
+          home_jersey_color?: string | null
+          home_jersey_secondary?: string | null
           home_score?: number | null
           id?: string
           kickoff?: string | null

@@ -29,6 +29,8 @@ export default function NewMatch() {
   const [fieldId, setFieldId] = useState("");
   const [awayName, setAwayName] = useState("");
   const [teamIdentity, setTeamIdentity] = useState<string>("");
+  const [homeJerseyColor, setHomeJerseyColor] = useState<string>("#22c55e");
+  const [awayJerseyColor, setAwayJerseyColor] = useState<string>("#ef4444");
 
   const [creating, setCreating] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
@@ -62,6 +64,8 @@ export default function NewMatch() {
           consent_players_confirmed: true,
           consent_minors_confirmed: true,
           team_identity: teamIdentity || null,
+          home_jersey_color: homeJerseyColor || null,
+          away_jersey_color: awayJerseyColor || null,
         } as any)
         .select()
         .single();
@@ -244,7 +248,36 @@ export default function NewMatch() {
               </select>
             </div>
 
-            {/* Team-DNA / Spielidentität */}
+            {/* Trikotfarben — hilft der KI, beide Teams sicher zu unterscheiden */}
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                Trikotfarben
+                <span className="text-xs text-muted-foreground/70 ml-1">— hilft der KI bei der Team-Zuordnung</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted px-3 py-2.5 h-12">
+                  <input
+                    type="color"
+                    value={homeJerseyColor}
+                    onChange={(e) => setHomeJerseyColor(e.target.value)}
+                    className="h-7 w-10 rounded cursor-pointer border-0 bg-transparent"
+                    aria-label="Heim-Trikotfarbe"
+                  />
+                  <span className="text-sm text-foreground">Heim</span>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted px-3 py-2.5 h-12">
+                  <input
+                    type="color"
+                    value={awayJerseyColor}
+                    onChange={(e) => setAwayJerseyColor(e.target.value)}
+                    className="h-7 w-10 rounded cursor-pointer border-0 bg-transparent"
+                    aria-label="Auswärts-Trikotfarbe"
+                  />
+                  <span className="text-sm text-foreground">Gast</span>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
                 Spielidentität (Team-DNA)
