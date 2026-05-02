@@ -64,6 +64,8 @@ export default function NewMatch() {
           consent_players_confirmed: true,
           consent_minors_confirmed: true,
           team_identity: teamIdentity || null,
+          home_jersey_color: homeJerseyColor || null,
+          away_jersey_color: awayJerseyColor || null,
         } as any)
         .select()
         .single();
