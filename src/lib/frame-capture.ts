@@ -465,7 +465,9 @@ export function startLiveCapture(
     /** Skip-reason breakdown for telemetry (Quick Win #2). */
     getSkippedReasons: (): SkipReasons => ({ ...skippedReasons }),
     /** Current adaptive interval in seconds (Quick Win #1). */
-    getCurrentIntervalSec: () => currentIntervalSec,
+    getCurrentIntervalSec: () => (boostActive ? boostIntervalSec : currentIntervalSec),
+    /** True when boost-takt is active (one-sided high motion → likely scoring chance). */
+    isBoostActive: () => boostActive,
     /** Returns new frames since the given index (raw, for delta uploads). */
     getNewFramesSince: (startIndex: number): string[] => frames.slice(startIndex),
     getNewTimestampsSince: (startIndex: number): number[] => timestamps.slice(startIndex),
