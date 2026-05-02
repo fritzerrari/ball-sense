@@ -29,6 +29,15 @@ const MOTION_PROBE_INTERVAL_SEC = 5;  // lightweight probe (no upload)
 const MOTION_HIGH_THRESHOLD = 18;     // mean abs pixel diff (0-255) → fast
 const MOTION_LOW_THRESHOLD = 4;       // → slow
 
+// ===== Boost-Takt — high-density capture near goal events =====
+// Triggered when motion concentrates strongly on one side of the frame
+// (likely attack near the box). Falls back to adaptive interval after
+// motion calms down again.
+const ENABLE_BOOST_CAPTURE = true;
+const BOOST_INTERVAL_SEC = 5;
+const BOOST_ASYMMETRY_THRESHOLD = 0.35; // |L-R|/(L+R)
+const BOOST_MIN_MOTION = 10;            // minimum overall motion to consider
+
 // ===== Quick Win #2 — Quality thresholds =====
 const MIN_BRIGHTNESS = 15;
 const MIN_VARIANCE = 200;
