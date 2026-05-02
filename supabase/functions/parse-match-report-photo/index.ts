@@ -118,6 +118,9 @@ Regeln:
         player_name: e.player_name || null,
         related_player_name: e.related_player_name || null,
         notes: e.notes || null,
+        confidence: typeof e.confidence === "number"
+          ? Math.max(0, Math.min(1, e.confidence))
+          : 0.7,
       }));
 
     return new Response(JSON.stringify({ events: sanitized }), {
