@@ -51,6 +51,7 @@ interface SuggestedEvent {
   player_name?: string;
   related_player_name?: string;
   notes?: string;
+  confidence?: number;
 }
 
 export default function PostMatchEventEditor({ matchId, onEventsChanged }: Props) {
