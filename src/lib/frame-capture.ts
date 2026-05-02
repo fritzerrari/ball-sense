@@ -301,7 +301,10 @@ export function startLiveCapture(
   let lastCaptureAt = 0;
   let stopped = false;
 
-  // ---- Motion probe (drives adaptive interval) ----
+  let boostActive = false;
+  let boostIntervalSec = BOOST_INTERVAL_SEC;
+
+  // ---- Motion probe (drives adaptive interval + boost detection) ----
   const probe = () => {
     if (videoEl.videoWidth === 0) return;
     try {
@@ -309,11 +312,34 @@ export function startLiveCapture(
       const cur = probeCtx.getImageData(0, 0, probeCanvas.width, probeCanvas.height).data;
       if (lastProbe) {
         let diff = 0;
-        const n = cur.length;
-        for (let i = 0; i < n; i += 4) {
-          diff += Math.abs(cur[i] - lastProbe[i]);
+        let leftDiff = 0;
+        let rightDiff = 0;
+        const w = probeCanvas.width;
+        const h = probeCanvas.height;
+        const half = Math.floor(w / 2);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            const d = Math.abs(cur[i] - lastProbe[i]);
+            diff += d;
+            if (x < half) leftDiff += d; else rightDiff += d;
+          }
         }
-        const meanDiff = diff / (n / 4);
+        const pixelCount = w * h;
+        const meanDiff = diff / pixelCount;
+        const asymmetry = (leftDiff + rightDiff) > 0
+          ? Math.abs(leftDiff - rightDiff) / (leftDiff + rightDiff)
+          : 0;
+
+        // Boost-Takt: strong one-sided motion → likely attack near the box
+        if (ENABLE_BOOST_CAPTURE
+          && meanDiff >= BOOST_MIN_MOTION
+          && asymmetry >= BOOST_ASYMMETRY_THRESHOLD) {
+          boostActive = true;
+        } else {
+          boostActive = false;
+        }
+
         if (ENABLE_ADAPTIVE_CAPTURE) {
           if (meanDiff > MOTION_HIGH_THRESHOLD) currentIntervalSec = ADAPTIVE_MIN_INTERVAL_SEC;
           else if (meanDiff < MOTION_LOW_THRESHOLD) currentIntervalSec = ADAPTIVE_MAX_INTERVAL_SEC;
