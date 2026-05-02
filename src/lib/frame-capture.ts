@@ -382,13 +382,14 @@ export function startLiveCapture(
     }
   };
 
-  // ---- Self-rescheduling loop (supports adaptive interval) ----
+  // ---- Self-rescheduling loop (supports adaptive interval + boost) ----
   const scheduleNext = () => {
     if (stopped) return;
+    const intervalSec = boostActive ? boostIntervalSec : currentIntervalSec;
     captureTimer = setTimeout(async () => {
       await capture();
       scheduleNext();
-    }, currentIntervalSec * 1000);
+    }, intervalSec * 1000);
   };
 
   // Kick off
