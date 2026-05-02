@@ -26,14 +26,16 @@ Gib NUR ein JSON-Array zurück mit Objekten der Form:
   "team": "home" | "away",
   "player_name": "<Name wenn erkennbar>",
   "related_player_name": "<Bei Auswechslung: eingewechselter Spieler>",
-  "notes": "<Zusatzinfo>"
+  "notes": "<Zusatzinfo>",
+  "confidence": <Zahl 0..1, wie sicher du dir bei diesem Event bist>
 }
 
 Regeln:
 - Nur Events extrahieren die klar erkennbar sind
 - Bei Auswechslungen: player_name = raus, related_player_name = rein
-- Wenn Team nicht klar: "home" als Default
+- Wenn Team nicht klar: "home" als Default und confidence <= 0.5
 - Minute muss eine Zahl sein
+- confidence: 1.0 = absolut sicher, 0.7-0.9 = sicher, 0.5-0.7 = unsicher (Name oder Team unklar), <0.5 = nur raten
 - Antworte NUR mit dem JSON-Array, kein anderer Text`;
 
     const response = await fetch(
