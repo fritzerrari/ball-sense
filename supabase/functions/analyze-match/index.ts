@@ -584,7 +584,13 @@ WICHTIGE REGELN ZUR SPIELERERKENNUNG:
 KAMERA-PERSPEKTIVE ERKENNEN:
 - Bestimme die Kameraausrichtung: QUER (Seitenansicht von der Mittellinie), LÄNGS (hinter dem Tor), SCHRÄG (von der Eckfahne oder diagonal), TEILAUSSCHNITT (nur ein Bereich des Feldes sichtbar).
 - Die Perspektive beeinflusst massiv, wie x/y Koordinaten zu interpretieren sind.
-- Melde die erkannte Perspektive im Feld camera_perspective.`,
+- Melde die erkannte Perspektive im Feld camera_perspective.
+
+UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
+- Wenn du eine Spielerposition NICHT klar erkennen kannst (verdeckt, Nahaufnahme, Bildunschärfe): markiere "estimated": true.
+- Wenn du dir bei einer ZUORDNUNG (Team, Trikotnummer) unsicher bist: gib NULL zurück statt zu raten. Falsche Zuordnungen verschlechtern die Heatmaps stärker als fehlende Werte.
+- Wenn ein ganzer Frame unbrauchbar ist (Kamera bewegt, schwarz, totale Nahaufnahme ohne Kontext): markiere "unusable": true und liefere KEINE Spielerpositionen für diesen Frame.
+- Beispiel Schiri-Ausschluss: Eine Person in schwarzem Trikot, die zwischen den Teams alleine läuft → Schiedsrichter, NICHT in players[]. Eine Person in dunklem Trikot, die mit anderen Spielern interagiert und sich zur Spielform passend bewegt → Spieler.`,
           },
           { role: "user", content: userContent },
         ],
