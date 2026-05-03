@@ -188,6 +188,8 @@ export default function Onboarding() {
     if (city.trim()) updates.city = city.trim();
     if (league.trim()) updates.league = league.trim();
     if (newClubName.trim() && newClubName.trim() !== clubName) updates.name = newClubName.trim();
+    if (primaryColor) updates.primary_color = primaryColor;
+    if (secondaryColor) updates.secondary_color = secondaryColor;
 
     // Upload logo if selected
     if (logoFile) {
