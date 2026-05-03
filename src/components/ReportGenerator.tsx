@@ -8,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { openWhatsAppShare } from "@/lib/share-whatsapp";
 
 const REPORT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-report`;
 

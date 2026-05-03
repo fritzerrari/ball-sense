@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
+import { openWhatsAppShare } from "@/lib/share-whatsapp";
 
 interface CameraCodeShareProps {
   matchId: string;
