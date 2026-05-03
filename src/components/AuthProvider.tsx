@@ -11,6 +11,8 @@ interface AuthContextType {
   clubName: string | null;
   clubPlan: string | null;
   clubLogoUrl: string | null;
+  clubPrimaryColor: string | null;
+  clubSecondaryColor: string | null;
   isAdmin: boolean;
   isSuperAdmin: boolean;
   signOut: () => Promise<void>;
