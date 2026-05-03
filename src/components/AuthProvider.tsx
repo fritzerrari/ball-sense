@@ -69,19 +69,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClubId(profile.club_id);
       const { data: club } = await supabase
         .from("clubs")
-        .select("name, plan, logo_url")
+        .select("name, plan, logo_url, primary_color, secondary_color")
         .eq("id", profile.club_id)
         .single();
       if (club) {
         setClubName(club.name);
         setClubPlan(club.plan);
         setClubLogoUrl((club as any).logo_url ?? null);
+        setClubPrimaryColor((club as any).primary_color ?? null);
+        setClubSecondaryColor((club as any).secondary_color ?? null);
       }
     } else {
       setClubId(null);
       setClubName(null);
       setClubPlan(null);
       setClubLogoUrl(null);
+      setClubPrimaryColor(null);
+      setClubSecondaryColor(null);
     }
   };
 
