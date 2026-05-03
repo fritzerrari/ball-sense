@@ -306,6 +306,8 @@ export function startLiveCapture(
 
   let boostActive = false;
   let boostIntervalSec = BOOST_INTERVAL_SEC;
+  // Last observed motion (mean abs pixel diff). Drives dynamic JPEG quality.
+  let lastMeanDiff = 0;
 
   // ---- Motion probe (drives adaptive interval + boost detection) ----
   const probe = () => {
