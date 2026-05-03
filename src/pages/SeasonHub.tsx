@@ -311,6 +311,58 @@ export default function SeasonHub() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {/* News from club website */}
+              <TabsContent value="news" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Sparkles className="h-4 w-4 text-primary" /> Vereins-News
+                      {payload.club_website_url && (
+                        <a
+                          href={payload.club_website_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-auto text-xs font-normal text-muted-foreground hover:text-primary"
+                        >
+                          zur Vereinsseite ↗
+                        </a>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(payload.club_news ?? []).length === 0 ? (
+                      <EmptyState text="Keine News gefunden. Hinterlege im Admin eine Vereinsseiten-URL." />
+                    ) : (
+                      <div className="space-y-3">
+                        {payload.club_news!.map((n, i) => (
+                          <div key={i} className="rounded-lg border border-border/50 p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium text-sm">{n.title}</p>
+                              {n.date && (
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                  {new Date(n.date).toLocaleDateString("de-DE")}
+                                </span>
+                              )}
+                            </div>
+                            {n.summary && <p className="mt-1 text-sm text-muted-foreground">{n.summary}</p>}
+                            {n.url && (
+                              <a
+                                href={n.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                Mehr lesen <ArrowRight className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </>
         )}
