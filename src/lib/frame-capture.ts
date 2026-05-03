@@ -373,7 +373,11 @@ export function startLiveCapture(
     const q = assessFrameQuality(ctx, canvas.width, canvas.height, lastHash);
     if (q.usable) {
       try {
-        const base64 = await encodeJpeg(canvas);
+        // Phase B: dynamic JPEG quality based on observed motion + boost-takt
+        const dynQuality = (boostActive || lastMeanDiff > MOTION_HIGH_THRESHOLD)
+          ? JPEG_QUALITY_HIGH
+          : (lastMeanDiff < MOTION_LOW_THRESHOLD ? JPEG_QUALITY_LOW : JPEG_QUALITY);
+        const base64 = await encodeJpeg(canvas, dynQuality);
         if (stopped) return;
         frames.push(base64);
         timestamps.push(Date.now());
