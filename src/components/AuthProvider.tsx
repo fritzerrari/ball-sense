@@ -138,6 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setClubName(null);
     setClubPlan(null);
     setClubLogoUrl(null);
+    setClubPrimaryColor(null);
+    setClubSecondaryColor(null);
     setIsAdmin(false);
     setIsSuperAdmin(false);
   };
@@ -147,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, isAdmin, isSuperAdmin, signOut, refreshClubData }}>
+    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, clubPrimaryColor, clubSecondaryColor, isAdmin, isSuperAdmin, signOut, refreshClubData }}>
       {children}
     </AuthContext.Provider>
   );
