@@ -335,6 +335,7 @@ export function startLiveCapture(
         const asymmetry = (leftDiff + rightDiff) > 0
           ? Math.abs(leftDiff - rightDiff) / (leftDiff + rightDiff)
           : 0;
+        lastMeanDiff = meanDiff;
 
         // Boost-Takt: strong one-sided motion → likely attack near the box
         if (ENABLE_BOOST_CAPTURE
