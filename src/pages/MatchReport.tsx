@@ -5,7 +5,7 @@ import {
   ArrowLeft, Brain, Lightbulb, Target, Shield, Zap,
   ClipboardList, AlertTriangle, TrendingUp, Calendar,
   Loader2, RefreshCw, ChevronRight, Swords, Users, Dumbbell,
-  Download,
+  Download, Newspaper,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,6 +47,7 @@ import SetPieceBreakdown from "@/components/SetPieceBreakdown";
 import HighlightReelGenerator from "@/components/HighlightReelGenerator";
 import FoulProbabilityPanel from "@/components/FoulProbabilityPanel";
 import LiveCoachingPanel from "@/components/LiveCoachingPanel";
+import PressReleaseGenerator from "@/components/PressReleaseGenerator";
 
 // Lazy-loaded analysis components
 const CoachingCockpit = lazy(() => import("@/components/CoachingCockpit"));
@@ -388,7 +389,7 @@ export default function MatchReport() {
 
             {/* TAB NAVIGATION */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 h-auto sm:h-11">
+              <TabsList className="w-full grid grid-cols-3 sm:grid-cols-7 h-auto sm:h-11">
                 <TabsTrigger value="cockpit" className="gap-1.5 text-xs sm:text-sm">
                   <Brain className="h-3.5 w-3.5 hidden sm:block" />
                   Cockpit
@@ -412,6 +413,10 @@ export default function MatchReport() {
                 <TabsTrigger value="training" className="gap-1.5 text-xs sm:text-sm">
                   <Dumbbell className="h-3.5 w-3.5 hidden sm:block" />
                   Training
+                </TabsTrigger>
+                <TabsTrigger value="press" className="gap-1.5 text-xs sm:text-sm">
+                  <Newspaper className="h-3.5 w-3.5 hidden sm:block" />
+                  Presse
                 </TabsTrigger>
               </TabsList>
 
@@ -833,6 +838,18 @@ export default function MatchReport() {
                   <div className="py-12 text-center text-muted-foreground text-sm">
                     Keine Trainingsempfehlungen verfügbar.
                   </div>
+                )}
+              </TabsContent>
+
+              {/* ═══ PRESS TAB — Vor- & Nachbericht ═══ */}
+              <TabsContent value="press" className="space-y-4">
+                {id && (
+                  <PressReleaseGenerator
+                    matchId={id}
+                    matchStatus={match?.status ?? "setup"}
+                    homeTeam={(match as any)?.home_club?.name}
+                    awayTeam={match?.away_club_name ?? undefined}
+                  />
                 )}
               </TabsContent>
             </Tabs>
