@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { applyClubTheme } from "@/lib/club-theme";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
@@ -10,6 +11,8 @@ interface AuthContextType {
   clubName: string | null;
   clubPlan: string | null;
   clubLogoUrl: string | null;
+  clubPrimaryColor: string | null;
+  clubSecondaryColor: string | null;
   isAdmin: boolean;
   isSuperAdmin: boolean;
   signOut: () => Promise<void>;
@@ -24,6 +27,8 @@ const AuthContext = createContext<AuthContextType>({
   clubName: null,
   clubPlan: null,
   clubLogoUrl: null,
+  clubPrimaryColor: null,
+  clubSecondaryColor: null,
   isAdmin: false,
   isSuperAdmin: false,
   signOut: async () => {},
@@ -40,8 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [clubName, setClubName] = useState<string | null>(null);
   const [clubPlan, setClubPlan] = useState<string | null>(null);
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+  const [clubPrimaryColor, setClubPrimaryColor] = useState<string | null>(null);
+  const [clubSecondaryColor, setClubSecondaryColor] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Apply / clear club brand theme whenever colors change
+  useEffect(() => {
+    applyClubTheme(clubPrimaryColor, clubSecondaryColor);
+  }, [clubPrimaryColor, clubSecondaryColor]);
 
   const fetchClubData = async (userId: string) => {
     const [{ data: profile }, { data: adminRole }, { data: superAdminRole }] = await Promise.all([
@@ -57,19 +69,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClubId(profile.club_id);
       const { data: club } = await supabase
         .from("clubs")
-        .select("name, plan, logo_url")
+        .select("name, plan, logo_url, primary_color, secondary_color")
         .eq("id", profile.club_id)
         .single();
       if (club) {
         setClubName(club.name);
         setClubPlan(club.plan);
         setClubLogoUrl((club as any).logo_url ?? null);
+        setClubPrimaryColor((club as any).primary_color ?? null);
+        setClubSecondaryColor((club as any).secondary_color ?? null);
       }
     } else {
       setClubId(null);
       setClubName(null);
       setClubPlan(null);
       setClubLogoUrl(null);
+      setClubPrimaryColor(null);
+      setClubSecondaryColor(null);
     }
   };
 
@@ -92,6 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setClubName(null);
           setClubPlan(null);
           setClubLogoUrl(null);
+          setClubPrimaryColor(null);
+          setClubSecondaryColor(null);
           setIsAdmin(false);
           setIsSuperAdmin(false);
           setLoading(false);
@@ -120,6 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setClubName(null);
     setClubPlan(null);
     setClubLogoUrl(null);
+    setClubPrimaryColor(null);
+    setClubSecondaryColor(null);
     setIsAdmin(false);
     setIsSuperAdmin(false);
   };
@@ -129,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, isAdmin, isSuperAdmin, signOut, refreshClubData }}>
+    <AuthContext.Provider value={{ user, session, loading, clubId, clubName, clubPlan, clubLogoUrl, clubPrimaryColor, clubSecondaryColor, isAdmin, isSuperAdmin, signOut, refreshClubData }}>
       {children}
     </AuthContext.Provider>
   );
