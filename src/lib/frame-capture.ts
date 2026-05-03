@@ -20,6 +20,9 @@ const FRAME_INTERVAL_SEC = 30;
 const MAX_FRAMES = 9999;
 const CAPTURE_WIDTH = 640;
 const JPEG_QUALITY = 0.6;
+// Dynamic JPEG quality (Phase B): low motion → smaller files, high motion → sharper
+const JPEG_QUALITY_LOW = 0.5;
+const JPEG_QUALITY_HIGH = 0.7;
 
 // ===== Quick Win #1 — Adaptive capture =====
 const ENABLE_ADAPTIVE_CAPTURE = true;
