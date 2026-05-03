@@ -740,6 +740,8 @@ export type Database = {
           logo_url: string | null
           name: string
           plan: string
+          primary_color: string | null
+          secondary_color: string | null
         }
         Insert: {
           city?: string | null
@@ -749,6 +751,8 @@ export type Database = {
           logo_url?: string | null
           name: string
           plan?: string
+          primary_color?: string | null
+          secondary_color?: string | null
         }
         Update: {
           city?: string | null
@@ -758,6 +762,8 @@ export type Database = {
           logo_url?: string | null
           name?: string
           plan?: string
+          primary_color?: string | null
+          secondary_color?: string | null
         }
         Relationships: []
       }

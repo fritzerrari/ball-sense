@@ -7,10 +7,11 @@ import { useCreatePlayer } from "@/hooks/use-players";
 import { useCreateField } from "@/hooks/use-fields";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { extractLogoColors } from "@/lib/extract-logo-colors";
 import {
   Building2, Users, Map, Download, CheckCircle2,
   Plus, Trash2, ChevronRight, ChevronLeft, Loader2, Smartphone,
-  Camera, X, ImageIcon, BrainCircuit, Wifi, HardDrive,
+  Camera, X, ImageIcon, BrainCircuit, Wifi, HardDrive, Palette, Check,
 } from "lucide-react";
 
 const POSITIONS = ["TW", "IV", "LV", "RV", "ZM", "ZDM", "ZOM", "LA", "RA", "ST"];
@@ -45,6 +46,10 @@ export default function Onboarding() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [suggestedColors, setSuggestedColors] = useState<string[]>([]);
+  const [extractingColors, setExtractingColors] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState<string | null>(null);
+  const [secondaryColor, setSecondaryColor] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Step 1 — players
@@ -93,13 +98,31 @@ export default function Onboarding() {
     }
     setLogoFile(file);
     const reader = new FileReader();
-    reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setLogoPreview(dataUrl);
+      // Extract dominant colors from the logo
+      setExtractingColors(true);
+      try {
+        const colors = await extractLogoColors(dataUrl, 5);
+        setSuggestedColors(colors);
+        if (colors[0] && !primaryColor) setPrimaryColor(colors[0]);
+        if (colors[1] && !secondaryColor) setSecondaryColor(colors[1]);
+      } catch {
+        // silent — colors are optional
+      } finally {
+        setExtractingColors(false);
+      }
+    };
     reader.readAsDataURL(file);
   };
 
   const removeLogo = () => {
     setLogoFile(null);
     setLogoPreview(null);
+    setSuggestedColors([]);
+    setPrimaryColor(null);
+    setSecondaryColor(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -165,6 +188,8 @@ export default function Onboarding() {
     if (city.trim()) updates.city = city.trim();
     if (league.trim()) updates.league = league.trim();
     if (newClubName.trim() && newClubName.trim() !== clubName) updates.name = newClubName.trim();
+    if (primaryColor) updates.primary_color = primaryColor;
+    if (secondaryColor) updates.secondary_color = secondaryColor;
 
     // Upload logo if selected
     if (logoFile) {
@@ -356,6 +381,79 @@ export default function Onboarding() {
                     </button>
                   )}
                 </div>
+
+                {/* Color suggestions from logo */}
+                {(extractingColors || suggestedColors.length > 0) && (
+                  <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Palette className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-semibold">Vereinsfarben aus Logo</p>
+                      {extractingColors && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-auto" />
+                      )}
+                    </div>
+                    {!extractingColors && (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          Klicke auf eine Farbe, um sie als <strong>Primär</strong>- oder <strong>Sekundär</strong>farbe zu setzen.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {suggestedColors.map((hex) => {
+                            const isPrimary = primaryColor === hex;
+                            const isSecondary = secondaryColor === hex;
+                            return (
+                              <button
+                                key={hex}
+                                type="button"
+                                onClick={() => {
+                                  if (isPrimary) {
+                                    // already primary → make secondary
+                                    setPrimaryColor(null);
+                                    setSecondaryColor(hex);
+                                  } else if (isSecondary) {
+                                    setSecondaryColor(null);
+                                  } else if (!primaryColor) {
+                                    setPrimaryColor(hex);
+                                  } else if (!secondaryColor) {
+                                    setSecondaryColor(hex);
+                                  } else {
+                                    // both set → replace primary
+                                    setPrimaryColor(hex);
+                                  }
+                                }}
+                                className="group relative w-12 h-12 rounded-xl border-2 border-border shadow-sm hover:scale-110 transition-transform"
+                                style={{ backgroundColor: hex }}
+                                title={hex}
+                              >
+                                {(isPrimary || isSecondary) && (
+                                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-foreground text-background text-[9px] font-black flex items-center justify-center shadow">
+                                    {isPrimary ? "1" : "2"}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <div className="flex items-center gap-2 rounded-lg bg-card/50 px-2.5 py-1.5">
+                            <div className="w-5 h-5 rounded shadow-sm" style={{ backgroundColor: primaryColor || "transparent", border: primaryColor ? "none" : "1px dashed hsl(var(--border))" }} />
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Primär</p>
+                              <p className="text-xs font-mono truncate">{primaryColor || "—"}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 rounded-lg bg-card/50 px-2.5 py-1.5">
+                            <div className="w-5 h-5 rounded shadow-sm" style={{ backgroundColor: secondaryColor || "transparent", border: secondaryColor ? "none" : "1px dashed hsl(var(--border))" }} />
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sekundär</p>
+                              <p className="text-xs font-mono truncate">{secondaryColor || "—"}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="text-sm text-muted-foreground block mb-1">Vereinsname *</label>
