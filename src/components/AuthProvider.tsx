@@ -108,6 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setClubName(null);
           setClubPlan(null);
           setClubLogoUrl(null);
+          setClubPrimaryColor(null);
+          setClubSecondaryColor(null);
           setIsAdmin(false);
           setIsSuperAdmin(false);
           setLoading(false);
