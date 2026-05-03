@@ -107,11 +107,13 @@ export default function SeasonHub() {
   const sourceLabel =
     source === "api-football"
       ? "API-Football (live)"
-      : source === "openligadb"
-        ? "OpenLigaDB"
-        : source === "own-history"
-          ? "Eigene Match-Historie + KI"
-          : "Unbekannt";
+      : source === "fussball-de"
+        ? "fussball.de (Scraping)"
+        : source === "openligadb"
+          ? "OpenLigaDB"
+          : source === "own-history"
+            ? "Eigene Match-Historie + KI"
+            : "Unbekannt";
 
   return (
     <AppLayout>
