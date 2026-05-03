@@ -618,7 +618,7 @@ Kontext:
 - Datum: ${match?.date ?? "unbekannt"}
 - Platzgröße: ${match?.fields?.width_m ?? 105}x${match?.fields?.height_m ?? 68}m
 - Feldtyp: ${fieldType !== "unknown" ? fieldType : "Standard-Großfeld"}
-- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten${calibrationNote}${jerseyNote}${buildQualityHint(frameTelemetry)}
+- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten${calibrationNote}${jerseyNote}${buildQualityHint(frameTelemetry)}${burstNote}
 
 Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Spielerverteilung und Formationen
