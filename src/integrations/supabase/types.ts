@@ -173,9 +173,13 @@ export type Database = {
           api_season: number | null
           api_team_id: number | null
           club_id: string
+          club_website_url: string | null
           created_at: string
+          fussball_de_staffel_id: string | null
+          fussball_de_url: string | null
           id: string
           last_sync_at: string | null
+          scrape_enabled: boolean
           sync_enabled: boolean
         }
         Insert: {
@@ -183,9 +187,13 @@ export type Database = {
           api_season?: number | null
           api_team_id?: number | null
           club_id: string
+          club_website_url?: string | null
           created_at?: string
+          fussball_de_staffel_id?: string | null
+          fussball_de_url?: string | null
           id?: string
           last_sync_at?: string | null
+          scrape_enabled?: boolean
           sync_enabled?: boolean
         }
         Update: {
@@ -193,9 +201,13 @@ export type Database = {
           api_season?: number | null
           api_team_id?: number | null
           club_id?: string
+          club_website_url?: string | null
           created_at?: string
+          fussball_de_staffel_id?: string | null
+          fussball_de_url?: string | null
           id?: string
           last_sync_at?: string | null
+          scrape_enabled?: boolean
           sync_enabled?: boolean
         }
         Relationships: [

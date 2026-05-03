@@ -78,11 +78,12 @@ Deno.serve(async (req) => {
     // Check API-Football config
     const { data: apiCfg } = await supabase
       .from("api_football_config")
-      .select("api_team_id, api_league_id, api_season")
+      .select("api_team_id, api_league_id, api_season, fussball_de_staffel_id, fussball_de_url, club_website_url, scrape_enabled")
       .eq("club_id", clubId)
       .maybeSingle();
 
     const API_KEY = Deno.env.get("API_FOOTBALL_KEY");
+    const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
     let result: any = { club, source: "none", generated_at: new Date().toISOString() };
 
     // ── STRATEGY 1: API-Football (if configured) ──
@@ -95,7 +96,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── STRATEGY 2: OpenLigaDB (German leagues, no key needed) ──
+    // ── STRATEGY 2: fussball.de Scraping (Amateur/Jugend) ──
+    if (result.source === "none" && apiCfg?.scrape_enabled && (apiCfg?.fussball_de_url || apiCfg?.fussball_de_staffel_id) && FIRECRAWL_API_KEY) {
+      try {
+        result = await fetchFromFussballDe(FIRECRAWL_API_KEY, club, apiCfg);
+        result.source = "fussball-de";
+      } catch (e) {
+        console.warn("fussball.de scrape failed:", e);
+      }
+    }
+
+    // ── STRATEGY 3: OpenLigaDB (German leagues, no key needed) ──
     if (result.source === "none") {
       const shortcut = mapToOpenligaShortcut(club.league);
       if (shortcut) {
@@ -108,10 +119,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── STRATEGY 3: Own match history fallback ──
+    // ── STRATEGY 4: Own match history fallback ──
     if (result.source === "none") {
       result = await fetchFromOwnHistory(supabase, club);
       result.source = "own-history";
+    }
+
+    // ── ENRICHMENT: Vereinsseite scraping for News (optional, additive) ──
+    if (apiCfg?.club_website_url && FIRECRAWL_API_KEY) {
+      try {
+        const news = await scrapeClubNews(FIRECRAWL_API_KEY, apiCfg.club_website_url);
+        if (news && news.length > 0) {
+          result.club_news = news;
+          result.club_website_url = apiCfg.club_website_url;
+        }
+      } catch (e) {
+        console.warn("Club website scrape failed:", e);
+      }
     }
 
     // ── ENRICHMENT: AI match plan for next opponent ──
@@ -425,4 +449,149 @@ async function fetchFromOwnHistory(supabase: any, club: any) {
     note: "Keine externe Liga-API verbunden. Daten basieren auf eigener Match-Historie.",
     generated_at: new Date().toISOString(),
   };
+}
+
+// ────────────────────────────────────────────
+// fussball.de Scraping via Firecrawl + Gemini extraction
+// ────────────────────────────────────────────
+async function fetchFromFussballDe(firecrawlKey: string, club: any, cfg: any) {
+  const baseUrl = cfg.fussball_de_url
+    || `https://www.fussball.de/spieltag/-/staffel/${cfg.fussball_de_staffel_id}`;
+
+  // Derive table URL (replace /spieltag/ -> /spielplan/ for full schedule when not present)
+  const scheduleUrl = baseUrl.replace("/spieltag/", "/spielplan/");
+
+  // 1. Scrape table + spieltag page (markdown is enough — Gemini parses)
+  const [tablePage, schedulePage] = await Promise.all([
+    firecrawlScrape(firecrawlKey, baseUrl),
+    firecrawlScrape(firecrawlKey, scheduleUrl).catch(() => null),
+  ]);
+
+  const combinedMd = [
+    tablePage?.markdown ?? "",
+    schedulePage?.markdown ?? "",
+  ].join("\n\n---\n\n").slice(0, 50000); // safety limit
+
+  if (!combinedMd.trim()) throw new Error("fussball.de returned empty content");
+
+  // 2. Use Gemini to extract structured data
+  const LOVABLE_AI_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_AI_KEY) throw new Error("LOVABLE_API_KEY missing for AI extraction");
+
+  const prompt = `Extrahiere aus dem fussball.de-Markdown unten die Tabelle und den Spielplan. Eigenes Team: "${club.name}".
+
+Liefere VALID JSON in genau diesem Schema (keine Erklärungen, kein Markdown):
+{
+  "standings": [{"rank": 1, "team_name": "...", "matches": 10, "won": 7, "draw": 2, "lost": 1, "goals_for": 25, "goals_against": 8, "goal_diff": 17, "points": 23}],
+  "last_results": [{"date": "2026-03-01", "is_home": true, "opponent": "...", "our_goals": 2, "their_goals": 1, "result": "W", "matchday": 18}],
+  "upcoming": [{"date": "2026-03-08", "is_home": false, "opponent": "...", "matchday": 19}]
+}
+
+Markiere unser Team in standings durch Vergleich mit "${club.name}" (case-insensitive, ignoriere Sonderzeichen). Maximal 5 last_results und 5 upcoming.
+
+MARKDOWN:
+${combinedMd}`;
+
+  const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_AI_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!aiResp.ok) throw new Error(`AI extraction failed: ${aiResp.status}`);
+  const aiData = await aiResp.json();
+  const content = aiData?.choices?.[0]?.message?.content ?? "{}";
+  const extracted = JSON.parse(content);
+
+  // Mark our team in standings
+  const norm = (s: string) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const ourNorm = norm(club.name);
+  const standings = (extracted.standings ?? []).map((row: any) => ({
+    ...row,
+    is_us: norm(row.team_name).includes(ourNorm) || ourNorm.includes(norm(row.team_name)),
+  }));
+  const our_rank = standings.find((s: any) => s.is_us) ?? null;
+  const upcoming = extracted.upcoming ?? [];
+
+  return {
+    club,
+    season: CURRENT_SEASON,
+    standings,
+    our_rank,
+    last_results: extracted.last_results ?? [],
+    upcoming,
+    next_match: upcoming[0] ?? null,
+    top_scorers: [],
+    injuries: [],
+    source_url: baseUrl,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+async function firecrawlScrape(apiKey: string, url: string) {
+  const r = await fetch("https://api.firecrawl.dev/v2/scrape", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["markdown"],
+      onlyMainContent: true,
+      waitFor: 2500,
+    }),
+  });
+  if (!r.ok) throw new Error(`Firecrawl ${r.status}: ${await r.text()}`);
+  const data = await r.json();
+  // v2 may return { data: { markdown } } or top-level markdown
+  return data?.data ?? data;
+}
+
+// ────────────────────────────────────────────
+// Vereinsseite News Scraping
+// ────────────────────────────────────────────
+async function scrapeClubNews(firecrawlKey: string, url: string) {
+  try {
+    const page = await firecrawlScrape(firecrawlKey, url);
+    const md = (page?.markdown ?? "").slice(0, 30000);
+    if (!md.trim()) return [];
+
+    const LOVABLE_AI_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_AI_KEY) return [];
+
+    const prompt = `Extrahiere die letzten 5 News-Einträge / Spielberichte / Ankündigungen aus dem Markdown.
+Liefere VALID JSON: {"news": [{"title": "...", "date": "YYYY-MM-DD oder null", "summary": "max 2 Sätze", "url": "absolute URL falls erkennbar, sonst null"}]}.
+Keine Werbung, keine Spielerkader-Listen, keine Navigationselemente.
+
+MARKDOWN:
+${md}`;
+
+    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_AI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!aiResp.ok) return [];
+    const aiData = await aiResp.json();
+    const parsed = JSON.parse(aiData?.choices?.[0]?.message?.content ?? "{}");
+    return Array.isArray(parsed.news) ? parsed.news.slice(0, 5) : [];
+  } catch (e) {
+    console.warn("scrapeClubNews error:", e);
+    return [];
+  }
 }
