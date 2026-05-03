@@ -214,6 +214,36 @@ export default function Onboarding() {
     }
   };
 
+  const handleSkip = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      // Ensure a club exists so ProtectedRoute lets us through
+      if (!clubId) {
+        const name = newClubName.trim() || "Mein Verein";
+        const { data: club, error: clubError } = await supabase
+          .from("clubs")
+          .insert({ name })
+          .select("id")
+          .single();
+        if (clubError || !club) throw clubError;
+        if (user) {
+          await supabase
+            .from("profiles")
+            .update({ club_id: club.id })
+            .eq("user_id", user.id);
+        }
+        await refreshClubData();
+      }
+      toast.success("Einrichtung übersprungen – du kannst alles später ergänzen.");
+      navigate("/dashboard");
+    } catch {
+      toast.error("Konnte Einrichtung nicht überspringen. Bitte erneut versuchen.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -230,31 +260,44 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-primary/5 to-accent/10 relative">
+      {/* Decorative blobs */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-0">
+        <div className="absolute -top-32 -left-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl" />
+        <div className="absolute top-1/3 -right-32 w-[28rem] h-[28rem] rounded-full bg-accent/15 blur-3xl" />
+      </div>
+
       {/* Progress header */}
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="relative z-10 border-b border-primary/10 bg-card/70 backdrop-blur-xl sticky top-0">
         <div className="max-w-lg mx-auto px-4 py-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className="w-7 h-7 rounded bg-primary flex items-center justify-center text-primary-foreground text-sm font-black">F</span>
+            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground text-sm font-black shadow-md shadow-primary/30">F</span>
             <span className="font-display font-bold text-foreground">Field</span>
-            <span className="font-display font-bold text-primary">IQ</span>
-            <span className="ml-auto text-xs text-muted-foreground">
+            <span className="font-display font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">IQ</span>
+            <span className="ml-auto text-xs font-medium text-muted-foreground">
               Schritt {step + 1} von {STEPS.length}
             </span>
           </div>
           <Progress value={progress} className="h-2" />
-          <div className="flex justify-between mt-2">
-            {STEPS.map((s, i) => (
-              <div
-                key={s.label}
-                className={`flex flex-col items-center gap-1 ${
-                  i <= step ? "text-primary" : "text-muted-foreground/40"
-                }`}
-              >
-                <s.icon className="h-4 w-4" />
-                <span className="text-[10px] hidden sm:block">{s.label}</span>
-              </div>
-            ))}
+          <div className="flex justify-between mt-2.5">
+            {STEPS.map((s, i) => {
+              const active = i <= step;
+              return (
+                <div
+                  key={s.label}
+                  className={`flex flex-col items-center gap-1 transition-colors ${
+                    active ? "text-primary" : "text-muted-foreground/40"
+                  }`}
+                >
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                    active ? "bg-primary/15 ring-1 ring-primary/30" : "bg-muted/40"
+                  }`}>
+                    <s.icon className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-[10px] hidden sm:block font-medium">{s.label}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -620,10 +663,11 @@ export default function Onboarding() {
           {/* Skip link */}
           {step < 4 && (
             <button
-              onClick={() => navigate("/dashboard")}
-              className="block mx-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={handleSkip}
+              disabled={saving}
+              className="block mx-auto text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
             >
-              Einrichtung überspringen →
+              {saving ? "Wird übersprungen…" : "Einrichtung überspringen →"}
             </button>
           )}
         </div>
