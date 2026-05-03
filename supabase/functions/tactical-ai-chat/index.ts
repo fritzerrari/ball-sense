@@ -1,4 +1,4 @@
-// @ts-nocheck
+// Tactical AI chat — streams Gemini responses for in-report coaching Q&A.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -40,10 +40,10 @@ Deno.serve(async (req) => {
     const stats = statsRes.data ?? [];
     const sections = sectionsRes.data ?? [];
 
-    const home = stats.filter((s) => s.team === "home");
-    const away = stats.filter((s) => s.team === "away");
+    const home = stats.filter((s: { team?: string }) => s.team === "home");
+    const away = stats.filter((s: { team?: string }) => s.team === "away");
 
-    const sumNum = (arr: any[], key: string) =>
+    const sumNum = (arr: Array<Record<string, unknown>>, key: string) =>
       arr.reduce((acc, x) => acc + (Number(x[key]) || 0), 0);
 
     const ctx = {
@@ -51,7 +51,9 @@ Deno.serve(async (req) => {
       formation_home: match?.home_formation ?? "?",
       formation_away: match?.away_formation ?? "?",
       events_count: events.length,
-      goals: events.filter((e) => e.event_type === "goal").map((e) => `${e.minute}' ${e.team} ${e.event_cause ?? ""}`),
+      goals: events
+        .filter((e: { event_type?: string }) => e.event_type === "goal")
+        .map((e: { minute?: number; team?: string; event_cause?: string | null }) => `${e.minute}' ${e.team} ${e.event_cause ?? ""}`),
       home_totals: {
         goals: sumNum(home, "goals"),
         shots: sumNum(home, "shots_total"),
@@ -70,7 +72,7 @@ Deno.serve(async (req) => {
         duels_total: sumNum(away, "duels_total"),
         distance_km: sumNum(away, "distance_km"),
       },
-      report_excerpts: sections.slice(0, 4).map((s) => `${s.title}: ${(s.content ?? "").slice(0, 280)}`),
+      report_excerpts: sections.slice(0, 4).map((s: { title?: string; content?: string | null }) => `${s.title}: ${(s.content ?? "").slice(0, 280)}`),
     };
 
     const systemPrompt = `Du bist ein erfahrener Fußball-Co-Trainer und Datenanalyst. Antworte kurz, konkret und datenbasiert auf Deutsch (max. 6 Sätze pro Antwort).
@@ -85,9 +87,10 @@ REGELN:
 - Bei "Was wäre wenn"-Fragen: simuliere kurz, nenne 1-2 Konsequenzen
 - Keine Floskeln, keine Disclaimer, keine Wiederholung der Frage`;
 
-    const aiMessages = [
+    type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
+    const aiMessages: ChatMsg[] = [
       { role: "system", content: systemPrompt },
-      ...messages.map((m: any) => ({ role: m.role, content: m.content })),
+      ...messages.map((m: ChatMsg) => ({ role: m.role, content: m.content })),
     ];
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

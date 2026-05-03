@@ -40,7 +40,20 @@ function mergeTelemetry(target: FrameTelemetry, raw: any): void {
   }
 }
 
-async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ frames: string[]; duration_sec: number; telemetry: FrameTelemetry } | null> {
+/**
+ * Per-frame provenance metadata. Aligned 1:1 with the returned `frames` array.
+ * - cam: original camera index (0=trainer, 1+=helper). -1 = legacy/unknown.
+ * - ts:  unix-millis timestamp from the recording client (best-effort).
+ */
+export interface FrameMeta {
+  cam: number;
+  ts: number;
+}
+
+async function loadFramesFromStorage(
+  supabase: any,
+  matchId: string,
+): Promise<{ frames: string[]; meta: FrameMeta[]; duration_sec: number; telemetry: FrameTelemetry } | null> {
   const listChunkFiles = async (prefix: string): Promise<string[]> => {
     const { data } = await supabase.storage.from("match-frames").list("", {
       limit: 500,
@@ -53,18 +66,25 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
 
   const telemetry = emptyTelemetry();
 
-  // 1. Try canonical file (already time-merged across all cameras by camera-ops)
+  // 1. Try canonical file (already time-merged across all cameras by camera-ops).
+  //    The canonical file does not carry per-frame cam ids — fall back to cam=-1.
   const { data: mainFile } = await supabase.storage.from("match-frames").download(`${matchId}.json`);
   if (mainFile) {
     try {
       const parsed = JSON.parse(await mainFile.text());
       mergeTelemetry(telemetry, parsed.telemetry);
-      if (parsed.frames?.length) return { frames: parsed.frames, duration_sec: parsed.duration_sec ?? 0, telemetry };
+      if (parsed.frames?.length) {
+        const meta: FrameMeta[] = parsed.frames.map((_: string, i: number) => ({
+          cam: typeof parsed.cams?.[i] === "number" ? parsed.cams[i] : -1,
+          ts: typeof parsed.timestamps?.[i] === "number" ? parsed.timestamps[i] : i * 30_000,
+        }));
+        return { frames: parsed.frames, meta, duration_sec: parsed.duration_sec ?? 0, telemetry };
+      }
     } catch { /* corrupt */ }
   }
 
   // 2. Re-merge camera-specific canonical files (cam0-3) by timestamp.
-  type Tagged = { frame: string; ts: number };
+  type Tagged = { frame: string; ts: number; cam: number };
   const taggedCam: Tagged[] = [];
   let camDuration = 0;
   for (let cam = 0; cam < 4; cam++) {
@@ -77,17 +97,22 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       const ts: number[] = parsed.timestamps ?? [];
       camDuration += parsed.duration_sec ?? 0;
       for (let i = 0; i < fr.length; i++) {
-        taggedCam.push({ frame: fr[i], ts: ts[i] ?? i * 30_000 + cam * 1_000 });
+        taggedCam.push({ frame: fr[i], ts: ts[i] ?? i * 30_000 + cam * 1_000, cam });
       }
     } catch { /* skip */ }
   }
   if (taggedCam.length > 0) {
     taggedCam.sort((a, b) => a.ts - b.ts);
-    return { frames: taggedCam.map((t) => t.frame), duration_sec: camDuration, telemetry };
+    return {
+      frames: taggedCam.map((t) => t.frame),
+      meta: taggedCam.map((t) => ({ cam: t.cam, ts: t.ts })),
+      duration_sec: camDuration,
+      telemetry,
+    };
   }
 
-  // 3. Try half files (_h1 + _h2) — these are trainer self-recording snapshots.
-  const allHalfFrames: string[] = [];
+  // 3. Try half files (_h1 + _h2) — trainer self-recording (cam=0).
+  const halfTagged: Tagged[] = [];
   let totalDuration = 0;
   for (const suffix of ["_h1", "_h2"]) {
     const { data: halfFile } = await supabase.storage.from("match-frames").download(`${matchId}${suffix}.json`);
@@ -95,14 +120,25 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       try {
         const parsed = JSON.parse(await halfFile.text());
         mergeTelemetry(telemetry, parsed.telemetry);
-        if (parsed.frames?.length) {
-          allHalfFrames.push(...parsed.frames);
+        const fr: string[] = parsed.frames ?? [];
+        const ts: number[] = parsed.timestamps ?? [];
+        if (fr.length) {
+          for (let i = 0; i < fr.length; i++) {
+            halfTagged.push({ frame: fr[i], ts: ts[i] ?? i * 30_000, cam: 0 });
+          }
           totalDuration += parsed.duration_sec ?? 0;
         }
       } catch { /* skip */ }
     }
   }
-  if (allHalfFrames.length > 0) return { frames: allHalfFrames, duration_sec: totalDuration, telemetry };
+  if (halfTagged.length > 0) {
+    return {
+      frames: halfTagged.map((t) => t.frame),
+      meta: halfTagged.map((t) => ({ cam: t.cam, ts: t.ts })),
+      duration_sec: totalDuration,
+      telemetry,
+    };
+  }
 
   // 4. Try chunk files (camera-specific first, then legacy) — also time-merge if timestamps present.
   const taggedChunks: Tagged[] = [];
@@ -123,12 +159,12 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
         const ts: number[] = parsed.timestamps ?? [];
         const chunkIndex = Number(chunkName.match(/_chunk_(\d+)\.json$/)?.[1] ?? 0);
         for (let j = 0; j < fr.length; j++) {
-          taggedChunks.push({ frame: fr[j], ts: ts[j] ?? (chunkIndex * 100 + j) * 30_000 + cam * 1_000 });
+          taggedChunks.push({ frame: fr[j], ts: ts[j] ?? (chunkIndex * 100 + j) * 30_000 + cam * 1_000, cam });
         }
       } catch { /* skip corrupt */ }
     }
   }
-  // Then try legacy non-camera chunks
+  // Then try legacy non-camera chunks (cam=-1 → unknown)
   const legacyChunkNames = (await listChunkFiles(`${matchId}_chunk_`))
     .sort((a: string, b: string) => {
       const aIdx = Number(a.match(/_chunk_(\d+)\.json$/)?.[1] ?? -1);
@@ -144,17 +180,60 @@ async function loadFramesFromStorage(supabase: any, matchId: string): Promise<{ 
       const fr: string[] = parsed.frames ?? [];
       const chunkIndex = Number(chunkName.match(/_chunk_(\d+)\.json$/)?.[1] ?? 0);
       for (let j = 0; j < fr.length; j++) {
-        taggedChunks.push({ frame: fr[j], ts: (chunkIndex * 100 + j) * 30_000 });
+        taggedChunks.push({ frame: fr[j], ts: (chunkIndex * 100 + j) * 30_000, cam: -1 });
       }
     } catch { /* skip corrupt */ }
   }
   if (taggedChunks.length > 0) {
     taggedChunks.sort((a, b) => a.ts - b.ts);
-    return { frames: taggedChunks.map((t) => t.frame), duration_sec: taggedChunks.length * 30, telemetry };
+    return {
+      frames: taggedChunks.map((t) => t.frame),
+      meta: taggedChunks.map((t) => ({ cam: t.cam, ts: t.ts })),
+      duration_sec: taggedChunks.length * 30,
+      telemetry,
+    };
   }
 
   return null;
 }
+
+/**
+ * Sync-Burst Fusion: groups frames captured by different cameras within a small
+ * time window into "bursts". A burst represents the same on-pitch moment seen
+ * from multiple angles — Gemini receives them together with a hint to fuse them
+ * into ONE scene description (avoids double-counting players).
+ *
+ * Returns a parallel `bursts` array with the same length as the input,
+ * where bursts[i] is the burst id (>=0) of frame i, or -1 if the frame is alone.
+ *
+ * Bursts only form when 2+ DIFFERENT cameras contribute within `windowMs`.
+ */
+function detectSyncBursts(meta: FrameMeta[], windowMs = 5000): { bursts: number[]; burstCount: number } {
+  const bursts = new Array(meta.length).fill(-1);
+  if (meta.length < 2) return { bursts, burstCount: 0 };
+
+  let burstId = 0;
+  let i = 0;
+  while (i < meta.length) {
+    const t0 = meta[i].ts;
+    const cam0 = meta[i].cam;
+    let j = i + 1;
+    const camsInWindow = new Set<number>([cam0]);
+    while (j < meta.length && meta[j].ts - t0 <= windowMs) {
+      camsInWindow.add(meta[j].cam);
+      j++;
+    }
+    // Burst only if 2+ distinct REAL cameras (-1 = unknown excluded)
+    const realCams = [...camsInWindow].filter((c) => c >= 0);
+    if (realCams.length >= 2) {
+      for (let k = i; k < j; k++) bursts[k] = burstId;
+      burstId++;
+    }
+    i = j;
+  }
+  return { bursts, burstCount: burstId };
+}
+
 
 /** Numeric clamp helper. */
 function clamp(n: number, min: number, max: number): number {
@@ -430,6 +509,7 @@ serve(async (req) => {
     }
 
     let frames = inlineFrames as string[] | undefined;
+    let frameMeta: FrameMeta[] | undefined;
     let duration_sec = inlineDuration as number | undefined;
     let frameTelemetry: FrameTelemetry | undefined;
     const isLivePartial = phase === "live_partial";
@@ -450,6 +530,7 @@ serve(async (req) => {
       }
 
       frames = storageResult.frames;
+      frameMeta = storageResult.meta;
       duration_sec = storageResult.duration_sec;
       frameTelemetry = storageResult.telemetry;
     }
@@ -504,15 +585,25 @@ serve(async (req) => {
       });
     }
 
-    // Select subset of frames (max ~20)
+    // Select subset of frames (max ~20). Keep meta in sync so we know which
+    // camera + burst each selected frame belongs to.
     const maxFrames = 20;
     let selectedFrames = frames!;
+    let selectedMeta: FrameMeta[] = frameMeta ?? frames!.map((_, i) => ({ cam: -1, ts: i * 30_000 }));
     if (selectedFrames.length > maxFrames) {
       const step = selectedFrames.length / maxFrames;
-      selectedFrames = Array.from({ length: maxFrames }, (_, i) =>
-        frames![Math.min(Math.floor(i * step), frames!.length - 1)]
+      const indices = Array.from({ length: maxFrames }, (_, i) =>
+        Math.min(Math.floor(i * step), frames!.length - 1),
       );
+      selectedFrames = indices.map((i) => frames![i]);
+      selectedMeta = indices.map((i) => selectedMeta[i] ?? { cam: -1, ts: i * 30_000 });
     }
+
+    // Detect sync-bursts among the selected frames
+    const burstResult = detectSyncBursts(selectedMeta, 5_000);
+    const burstNote = burstResult.burstCount > 0
+      ? `\n\nMULTI-KAMERA SYNC-BURSTS: ${burstResult.burstCount} Burst(s) erkannt. Mehrere Frames zeigen denselben Spielmoment aus unterschiedlichen Winkeln. Frame-Index-Zuordnung:\n${selectedMeta.map((m, i) => `  Frame ${i}: cam=${m.cam}${burstResult.bursts[i] >= 0 ? ` burst=${burstResult.bursts[i]}` : ""}`).join("\n")}\n\nWICHTIG: Frames aus demselben Burst NICHT als separate Spielmomente werten — fasse Spieler-Positionen zu EINEM Frame zusammen, nutze beide Winkel zur Plausibilitätsprüfung.`
+      : "";
 
     await supabase.from("analysis_jobs").update({ progress: 25 }).eq("id", job_id);
 
@@ -527,7 +618,7 @@ Kontext:
 - Datum: ${match?.date ?? "unbekannt"}
 - Platzgröße: ${match?.fields?.width_m ?? 105}x${match?.fields?.height_m ?? 68}m
 - Feldtyp: ${fieldType !== "unknown" ? fieldType : "Standard-Großfeld"}
-- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten${calibrationNote}${jerseyNote}${buildQualityHint(frameTelemetry)}
+- Gesamtdauer: ca. ${duration_sec ? Math.round(duration_sec / 60) : "?"} Minuten${calibrationNote}${jerseyNote}${buildQualityHint(frameTelemetry)}${burstNote}
 
 Analysiere was du auf den Bildern TATSÄCHLICH siehst:
 - Spielerverteilung und Formationen
@@ -886,6 +977,21 @@ UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
     if (!toolCall) throw new Error("No tool call response from AI");
 
     const analysis = JSON.parse(toolCall.function.arguments);
+
+    // ── Multi-Camera provenance: stamp every frame_position with its source cam + burst id.
+    // Allows downstream consumers (CameraCoverageMap, Truth Mode, Admin telemetry) to
+    // attribute detections back to a specific camera and detect burst-fused scenes.
+    if (Array.isArray(analysis.frame_positions)) {
+      for (const fr of analysis.frame_positions) {
+        const idx = typeof fr.frame_index === "number" ? fr.frame_index : -1;
+        if (idx >= 0 && idx < selectedMeta.length) {
+          fr.camera_index = selectedMeta[idx].cam;
+          fr.frame_ts = selectedMeta[idx].ts;
+          if (burstResult.bursts[idx] >= 0) fr.burst_id = burstResult.bursts[idx];
+        }
+      }
+    }
+
     await supabase.from("analysis_jobs").update({ progress: 70 }).eq("id", job_id);
 
     // ── H2 side-swap normalization ──
@@ -1007,6 +1113,8 @@ UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
         ai_tokens_completion: usage.completion_tokens ?? null,
         analysis_confidence: analysis.confidence ?? null,
         h2_simulated: shouldSimulateH2,
+        sync_bursts_detected: burstResult.burstCount,
+        cameras_active: Array.from(new Set(selectedMeta.map((m) => m.cam).filter((c) => c >= 0))).length,
         updated_at: new Date().toISOString(),
       };
       await supabase.from("matches").update({ tracking_telemetry: telemetryPayload }).eq("id", match_id);
