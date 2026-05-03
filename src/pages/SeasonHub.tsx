@@ -207,12 +207,13 @@ export default function SeasonHub() {
             </div>
 
             <Tabs defaultValue="next" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+              <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
                 <TabsTrigger value="next">Nächster Gegner</TabsTrigger>
                 <TabsTrigger value="standings">Tabelle</TabsTrigger>
                 <TabsTrigger value="schedule">Spielplan</TabsTrigger>
                 <TabsTrigger value="form">Form</TabsTrigger>
                 <TabsTrigger value="stats">Stats</TabsTrigger>
+                <TabsTrigger value="news">News</TabsTrigger>
               </TabsList>
 
               {/* Next Opponent */}
