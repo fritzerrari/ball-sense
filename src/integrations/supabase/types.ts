@@ -1060,6 +1060,8 @@ export type Database = {
       match_events: {
         Row: {
           affected_line: string | null
+          auto_detected: boolean
+          confidence: number | null
           created_at: string
           event_cause: string | null
           event_pattern: string | null
@@ -1076,9 +1078,12 @@ export type Database = {
           related_player_name: string | null
           severity: number | null
           team: string
+          verified: boolean
         }
         Insert: {
           affected_line?: string | null
+          auto_detected?: boolean
+          confidence?: number | null
           created_at?: string
           event_cause?: string | null
           event_pattern?: string | null
@@ -1095,9 +1100,12 @@ export type Database = {
           related_player_name?: string | null
           severity?: number | null
           team: string
+          verified?: boolean
         }
         Update: {
           affected_line?: string | null
+          auto_detected?: boolean
+          confidence?: number | null
           created_at?: string
           event_cause?: string | null
           event_pattern?: string | null
@@ -1114,6 +1122,7 @@ export type Database = {
           related_player_name?: string | null
           severity?: number | null
           team?: string
+          verified?: boolean
         }
         Relationships: [
           {
@@ -1753,6 +1762,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      press_releases: {
+        Row: {
+          body_html: string
+          club_id: string
+          created_by: string | null
+          generated_at: string
+          generated_by_ai: boolean
+          headline: string
+          id: string
+          kind: string
+          language: string
+          lead: string
+          length: string
+          manually_edited: boolean
+          match_id: string
+          quotes: Json
+          status: string
+          tone: string
+          updated_at: string
+        }
+        Insert: {
+          body_html?: string
+          club_id: string
+          created_by?: string | null
+          generated_at?: string
+          generated_by_ai?: boolean
+          headline?: string
+          id?: string
+          kind: string
+          language?: string
+          lead?: string
+          length?: string
+          manually_edited?: boolean
+          match_id: string
+          quotes?: Json
+          status?: string
+          tone?: string
+          updated_at?: string
+        }
+        Update: {
+          body_html?: string
+          club_id?: string
+          created_by?: string | null
+          generated_at?: string
+          generated_by_ai?: boolean
+          headline?: string
+          id?: string
+          kind?: string
+          language?: string
+          lead?: string
+          length?: string
+          manually_edited?: boolean
+          match_id?: string
+          quotes?: Json
+          status?: string
+          tone?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {

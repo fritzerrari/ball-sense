@@ -1,95 +1,138 @@
-# Review: Tracking-Optimierungs-Prompt
+# Plan: Erweiterte Spielerkennung + Season Hub Integration + Presse-Berichte
 
-Ich habe den Prompt gegen den aktuellen Code abgeglichen. Ergebnis: **~60 % davon ist bereits gebaut**, ~25 % sinnvoll als Ergänzung, ~15 % entweder redundant oder riskant.
+## Teil A — Bessere automatische Spielerkennung (Live & Post-Match)
 
----
+### A1. Erweiterte Event-Erkennung im AI-Prompt
+Die bestehende `analyze-match` Edge Function mit Gemini 2.5 Flash erkennt aktuell Spielerpositionen + grobe Szenen. Ausbau um spezifische Event-Klassen:
 
-## Punkt-für-Punkt-Bewertung
+**Neue erkannte Events (über Gemini Vision Multi-Frame-Analyse):**
+- **Tor-Erkennung** (verfeinert): Ball-im-Tor + Jubel-Cluster + Spielfluss-Stop als Trigger → Confidence-Score
+- **Ecke**: Ball verlässt Grundlinie + Spieler-Cluster an Eckfahne
+- **Einwurf** / **Freistoß** / **Elfmeter**: Ball ruht + Spieler-Formation
+- **Kopfball-Duell**: Zwei Spieler springen gleichzeitig + Ball auf Kopfhöhe
+- **Schuss aufs Tor**: Schnelle Ballbewegung Richtung Tor (>40 km/h Ballspeed)
+- **Großchance**: Schuss aus Strafraum + freie Schussbahn
+- **Fehlpass**: Ball wechselt Teambesitz binnen <3s ohne Defensiv-Aktion
+- **Zweikampf gewonnen/verloren**: Ball-Possession-Wechsel im 1v1-Cluster
+- **Pressing-Aktion**: ≥3 eigene Spieler in 15m-Radius um ballführenden Gegner
 
-### 1. Frame-Qualität vor Upload — ⚠️ Größtenteils schon da
-**Status: bereits implementiert in `frame-capture.ts`**
-- Sharpness-Check via Sobel (`MIN_SHARPNESS = 6`) ✅
-- Brightness + Variance-Check ✅
-- dHash-Duplicate-Detection ✅
-- **Nicht da:** dynamische JPEG-Quality (aktuell fix `0.6`) und adaptive `CAPTURE_WIDTH` (fix `640px`)
+### A2. Live-Event-Stream (während des Spiels)
+Neuer Mechanismus `live-event-detector` Edge Function:
+- Wird alle 30s vom Tracking-Client getriggert
+- Holt die letzten 4–6 Frames aus Storage
+- Sendet Mini-Prompt an Gemini Flash-Lite (schnell, billig)
+- Schreibt erkannte Events sofort in `match_events` mit `auto_detected: true` und `confidence`
+- Frontend `LiveEventTicker` zeigt sie in Echtzeit (existiert bereits)
 
-**Empfehlung:** Nur die zwei fehlenden Mini-Punkte ergänzen — Quality `0.5/0.7` je nach `meanDiff` aus dem Motion-Probe. Adaptive Width überspringen (640 ist bewusster Kompromiss für AI-Token-Kosten, höher bringt Gemini Vision wenig).
+### A3. Spielerstärken-Profil
+Neue Berechnung in `analyze-performance`:
+- **Top-Speed**: Bereits vorhanden (`top_speed_kmh`)
+- **Sprint-Profil**: Anzahl Sprints + Gesamtsprintdistanz pro Spieler
+- **Zweikampf-Rate**: gewonnene / total (aus Event-Clustern)
+- **Pass-Genauigkeit**: completed / total (aus Ballbesitz-Wechseln)
+- **Schuss-Effizienz**: shots_on_target / shots_total
+- **Kopfball-Stärke**: aerial_won / aerial_total
+- **Defensiv-Aktionen**: tackles + interceptions + ball_recoveries
+Ausgegeben als **5-Achsen-Radar** im Spielerprofil und MatchReport.
 
-### 2. Smartes Sampling — ✅ Komplett vorhanden
-**Status: bereits implementiert**
-- Adaptive 15–60s Intervall basierend auf `meanDiff` ✅
-- Boost-Takt 5s bei Asymmetrie (Tornähe) ✅ (gerade letzte Woche gebaut)
-- Smart-Selection: Best-N pro 90s-Window ✅
+### A4. Schwächen-Heatmap
+Neue Auswertung pro Spieler in PDF-Report:
+- Zonen mit überdurchschnittlich vielen Fehlpässen → rot eingefärbt
+- Zweikampf-Verlust-Hotspots auf der Heatmap
+- "Stille Zonen" (Spieler nie dort gewesen, obwohl Position es erwartet)
 
-**Empfehlung:** Nichts tun. Der Prompt-Vorschlag (20s/60s) ist gröber als unsere aktuelle Implementierung.
+### A5. Tabelle für ungeprüfte Auto-Events
+Migration: `match_events` bekommt zwei neue Felder:
+- `auto_detected boolean DEFAULT false`
+- `confidence numeric` (0–1)
+- `verified boolean DEFAULT false` (Ground-Truth-Flag nach manuellem Review)
 
-### 3. Gemini-Prompt-Tuning — ✅ Tool-Calling läuft, Trikotfarben da
-**Status: tool_calls bereits aktiv** (Zeile 591 + 879 in `analyze-match`), Jersey-Color-Prompting ebenfalls live.
+Bei `confidence < 0.7` zeigt der Live-Ticker einen "Bitte prüfen"-Badge. Im `PostMatchEventEditor` werden diese Events priorisiert angezeigt.
 
-**Sinnvoll zu ergänzen:**
-- Explizites *"lieber `null` als geraten"* im System-Prompt schärfen
-- Few-Shot-Beispiel für Schiri-Ausschluss (auch wenn Officials bereits gefiltert werden)
+## Teil B — Season Hub im Trainer-Menü & PDF-Report
 
-**Empfehlung:** 1 kleines Prompt-Update, ~10 Zeilen.
+### B1. Bereits in Sidebar — jetzt auch ins Mobile-Menü
+- **Mobile Bottom-Nav** bekommt 5. Tab "Season" (Trophy-Icon) statt nur über "Mehr" erreichbar
+- **Dashboard** bekommt Quick-Card "Season Hub öffnen" mit Live-Tabellenplatz + nächstem Gegner
 
-### 4. Multi-Frame-Konsistenz — ✅ Komplett vorhanden
-**Status: bereits implementiert**
-- Kalman-1D-Smoothing für Spieler X/Y und Ball (Zeile 311–387) ✅
-- Server-seitig in `analyze-match`
+### B2. Season-Daten in PDF-Report
+Erweiterung von `generate-pdf-report`:
+- **Neue PDF-Seite** "Saison-Kontext" zwischen Deckblatt und Match-Analyse:
+  - Aktueller Tabellenplatz + Punktekonto
+  - Letzte 5 Ergebnisse als Form-Strip (W/D/L Badges)
+  - Restspielplan kompakt (nächste 3 Spiele)
+  - Vergleich: Eigene Tore/Spiel vs. Liga-Schnitt
+- Daten kommen aus `season_hub_cache` (72h TTL bereits vorhanden)
+- Falls kein Cache: Fallback zur bestehenden eigenen Match-Historie
 
-**Empfehlung:** Nichts tun. Median-Filter wäre sogar ein Rückschritt gegenüber Kalman.
+## Teil C — Presse-Berichte (Vor- & Nach-Spiel)
 
-### 5. Modell-Routing — ✅ Bereits aktiv
-**Status: bereits implementiert** (Zeile 566)
-```ts
-const modelName = isLightweight ? "google/gemini-2.5-flash-lite" : "google/gemini-2.5-flash";
-```
-Live/wenige Frames → Lite, Final → Flash.
+### C1. Datenbank
+Neue Tabelle `press_releases`:
+- `match_id` (FK auf matches)
+- `kind` enum: `pre_match` | `post_match`
+- `language` text default `'de'`
+- `headline`, `lead`, `body_html`, `quotes_jsonb`
+- `tone` enum: `neutral` | `enthusiastic` | `analytical`
+- `length` enum: `short` (300W) | `medium` (600W) | `long` (1200W)
+- `status`: `draft` | `approved` | `published`
+- `generated_by_ai boolean`, `manually_edited boolean`
+- RLS: nur Vereinsmitglieder
 
-**Empfehlung:** Nichts tun. ENV-Variable für A/B-Test ist Overhead ohne klaren Mehrwert.
+### C2. Edge Function `generate-press-release`
+- Eingabe: `match_id`, `kind`, `tone`, `length`, optional `quotes` (Trainer-O-Töne)
+- **Pre-Match**: Holt aus `season_hub_cache` (Tabellenplatz, Form, Gegner-Form, Bilanz), historische Begegnungen aus eigener Match-DB, Vorschau-Tonalität
+- **Post-Match**: Holt finale Stats (`team_match_stats`, `match_events`, `player_match_stats`), Highlights + KI-Matchplan-Rückblick
+- Gemini 2.5 Flash erstellt: Headline + Lead + Body in Pressetext-Stil (Konjunktiv für Zitate, Aktiv-Formulierung, Vereinsperspektive)
+- Speichert in `press_releases`, gibt JSON zurück
 
-### 6. Telemetrie — ⚠️ Teilweise da, Admin-Panel fehlt
-**Status:** `FrameTelemetry` wird durch die Pipeline gemerged (Zeile 10–62 in `analyze-match`), aber **nicht persistiert pro Match** für Trend-Vergleiche. Skip-Reasons + Quality-Scores existieren clientseitig.
+### C3. UI `PressReleaseGenerator` Komponente
+Eingebettet in `MatchReport` Seite (neuer Tab "Presse"):
+- Zwei Buttons: **Vorbericht erstellen** / **Spielbericht erstellen** (letzterer aktiv erst wenn Match-Status = `final`)
+- Form: Tonalität (Dropdown), Länge (Dropdown), optional Trainer-Zitate (2 Textfelder)
+- Generieren-Button → ruft Edge Function
+- Vorschau im Rich-Text-Editor (Tiptap-light, plain HTML reicht)
+- Aktionen:
+  - **Bearbeiten** (markiert `manually_edited = true`)
+  - **Kopieren** (Plaintext für E-Mail)
+  - **Als PDF speichern** (window.print mit Press-Stylesheet)
+  - **Per WhatsApp teilen** (über bestehenden `share-whatsapp.ts`)
+  - **An Verteiler senden** (mailto: mit Pressetext im Body)
 
-**Sinnvoll zu bauen:**
-- Spalte `tracking_telemetry jsonb` auf `matches` (oder neue Tabelle `match_tracking_telemetry`)
-- Beim Final-Job die aggregierten Werte schreiben: `frames_total`, `frames_skipped_quality`, `avg_players_detected`, `ai_tokens_used`, `boost_active_pct`
-- Admin-Panel "Tracking-Qualität letzte 10 Matches" in `src/pages/Admin.tsx`
+### C4. Pre-Match-Bericht-Quelle (Vor dem Spiel)
+Bereits via `season-hub` + `match-preparation` vorhanden — wird wiederverwendet:
+- Gegner-DNA aus eigener Match-Historie
+- Aktuelle Form beider Mannschaften
+- Letzte direkte Begegnungen
+- Coach-Statement-Vorschlag (KI-generiert, austauschbar)
 
----
+## Technischer Bereich
 
-## Was ich umsetzen würde (klein & messbar)
+**Neue / geänderte Dateien:**
+- Migration: `match_events` + `auto_detected`, `confidence`, `verified` Spalten
+- Migration: `press_releases` Tabelle + RLS
+- Edge Function (neu): `live-event-detector/index.ts` (30s-Trigger)
+- Edge Function (neu): `generate-press-release/index.ts`
+- Edge Function (geändert): `analyze-match/index.ts` — erweiterter Prompt + Event-Klassen
+- Edge Function (geändert): `analyze-performance/index.ts` — Spieler-Stärken-Profil
+- Edge Function (geändert): `generate-pdf-report/index.ts` — Saison-Seite
+- Frontend: `src/pages/MatchReport.tsx` — neuer Tab "Presse"
+- Frontend (neu): `src/components/PressReleaseGenerator.tsx`
+- Frontend (neu): `src/components/PlayerStrengthRadar.tsx`
+- Frontend (neu): `src/components/PlayerWeaknessHeatmap.tsx`
+- Frontend (geändert): `src/components/AppLayout.tsx` — Season-Tab ins Mobile-Bottom
+- Frontend (geändert): `src/pages/Dashboard.tsx` — Season-Hub Quick-Card
+- Frontend (geändert): `src/components/PostMatchEventEditor.tsx` — Filter "Nur ungeprüfte (auto)"
+- Frontend (geändert): `src/components/LiveEventTicker.tsx` — Confidence-Badge
 
-**Phase A — Telemetrie-Persistenz (Pflicht, sonst sind alle weiteren Änderungen blind):**
-1. Migration: `matches.tracking_telemetry jsonb`
-2. `analyze-match` schreibt am Ende des Final-Jobs die Aggregate
-3. Admin-Panel-Tab "Tracking-Qualität" mit Trend über letzte 10 Matches
+**Memories anlegen:**
+- `architecture/live-event-detection` — 30s-Trigger, Confidence-Schema, Auto vs Verified
+- `features/press-release-system` — Tonalitäten, Längen, Datenquellen
+- `features/player-strength-profile` — 5-Achsen-Radar Berechnung
 
-**Phase B — Mikro-Optimierungen am Capture (kein Risiko):**
-4. Dynamische JPEG-Quality (`0.5` low motion / `0.7` high motion) in `frame-capture.ts`
-
-**Phase C — Prompt-Schärfung:**
-5. System-Prompt in `analyze-match` ergänzen: *"Wenn unsicher → null statt geraten"* + 1 Few-Shot für Schiri/Linienrichter-Ausschluss
-
----
-
-## Was ich NICHT umsetzen würde
-
-| Vorschlag | Grund |
-|---|---|
-| Adaptive `CAPTURE_WIDTH` | 640px ist bewusst gewählt für Token-Kosten; höher bringt Gemini Vision <5 % Genauigkeit, kostet aber 30–50 % mehr Tokens |
-| Median-Filter über 3 Frames | Wir haben Kalman — strikt besser |
-| ENV-konfigurierbares A/B-Routing | Overhead ohne Nutzen, Routing läuft bereits sinnvoll |
-| Punkte 1, 2, 4, 5 (komplett) | Bereits implementiert |
-
----
-
-## Erwarteter Effekt der drei Mini-Schritte
-
-- **Phase A** macht überhaupt erst messbar, ob künftige Änderungen wirken
-- **Phase B** spart geschätzt 10–15 % Bandbreite (wichtig für 4G-Helfer)
-- **Phase C** reduziert AI-Halluzinationen bei unklaren Frames um geschätzt 5–10 %
-
-**Keine** der Änderungen berührt iOS-Safari-Stabilität, Halftime-Side-Swap oder Recording-Modi.
-
-**Soll ich Phase A + B + C so umsetzen?**
+**Reihenfolge der Implementierung:**
+1. Migrationen (match_events Felder + press_releases Tabelle)
+2. Backend: erweiterte analyze-match + neuer live-event-detector
+3. Backend: generate-press-release + PDF-Report Saison-Seite
+4. Frontend: Presse-Tab + Strengths-Radar + Mobile-Nav-Update
+5. Memory-Dateien + Index-Update
