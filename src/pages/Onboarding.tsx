@@ -184,12 +184,13 @@ export default function Onboarding() {
     }
 
     // Update club details
-    const updates: Record<string, string> = {};
+    const updates: Record<string, string | null> = {};
     if (city.trim()) updates.city = city.trim();
     if (league.trim()) updates.league = league.trim();
     if (newClubName.trim() && newClubName.trim() !== clubName) updates.name = newClubName.trim();
-    if (primaryColor) updates.primary_color = primaryColor;
-    if (secondaryColor) updates.secondary_color = secondaryColor;
+    // Always sync color choice (null = reset to default theme)
+    updates.primary_color = primaryColor;
+    updates.secondary_color = secondaryColor;
 
     // Upload logo if selected
     if (logoFile) {
@@ -450,6 +451,14 @@ export default function Onboarding() {
                             </div>
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => { setPrimaryColor(null); setSecondaryColor(null); }}
+                          disabled={!primaryColor && !secondaryColor}
+                          className="text-[11px] font-medium text-muted-foreground hover:text-primary disabled:opacity-40 disabled:hover:text-muted-foreground transition-colors underline-offset-2 hover:underline"
+                        >
+                          ↺ Standard-Farben wiederherstellen
+                        </button>
                       </>
                     )}
                   </div>

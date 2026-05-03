@@ -16,35 +16,35 @@
     --popover: 0 0% 100%;
     --popover-foreground: 160 20% 10%;
 
-    --primary: 160 84% 32%;
+    --primary: 158 89% 38%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 160 12% 94%;
-    --secondary-foreground: 160 20% 20%;
+    --secondary: 175 60% 94%;
+    --secondary-foreground: 175 40% 18%;
 
-    --muted: 160 8% 95%;
-    --muted-foreground: 160 5% 42%;
+    --muted: 170 25% 95%;
+    --muted-foreground: 170 8% 42%;
 
-    --accent: 160 84% 32%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 188 92% 46%;
+    --accent-foreground: 200 40% 8%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 160 8% 89%;
     --input: 160 8% 89%;
-    --ring: 160 84% 32%;
+    --ring: 158 89% 38%;
 
-    --radius: 0.75rem;
+    --radius: 0.85rem;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 160 20% 20%;
-    --sidebar-primary: 160 84% 32%;
+    --sidebar-foreground: 175 25% 22%;
+    --sidebar-primary: 158 89% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 160 12% 95%;
-    --sidebar-accent-foreground: 160 20% 10%;
-    --sidebar-border: 160 8% 90%;
-    --sidebar-ring: 160 84% 32%;
+    --sidebar-accent: 175 50% 95%;
+    --sidebar-accent-foreground: 175 30% 14%;
+    --sidebar-border: 170 20% 90%;
+    --sidebar-ring: 158 89% 38%;
 
     /* Football tokens */
     --pitch: 160 70% 38%;
@@ -53,10 +53,10 @@
     --success: 160 84% 36%;
     --warning: 38 92% 50%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(160 84% 32%), hsl(168 70% 38%));
-    --gradient-hero: linear-gradient(180deg, hsl(0 0% 99%) 0%, hsl(160 12% 96%) 100%);
-    --shadow-glow: 0 0 30px hsl(160 84% 32% / 0.12);
-    --shadow-card: 0 2px 12px hsl(160 20% 10% / 0.05);
+    --gradient-primary: linear-gradient(135deg, hsl(158 89% 38%) 0%, hsl(178 85% 42%) 50%, hsl(195 95% 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 99%) 0%, hsl(175 50% 96%) 100%);
+    --shadow-glow: 0 0 40px hsl(178 85% 42% / 0.18);
+    --shadow-card: 0 4px 18px hsl(175 30% 14% / 0.06);
 
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
@@ -72,33 +72,33 @@
     --popover: 165 16% 8%;
     --popover-foreground: 160 10% 93%;
 
-    --primary: 160 80% 42%;
+    --primary: 158 88% 48%;
     --primary-foreground: 168 18% 5%;
 
-    --secondary: 165 14% 13%;
-    --secondary-foreground: 160 10% 86%;
+    --secondary: 178 30% 13%;
+    --secondary-foreground: 175 25% 88%;
 
-    --muted: 165 12% 11%;
-    --muted-foreground: 160 8% 48%;
+    --muted: 175 20% 11%;
+    --muted-foreground: 175 12% 55%;
 
-    --accent: 160 80% 42%;
-    --accent-foreground: 168 18% 5%;
+    --accent: 188 92% 56%;
+    --accent-foreground: 200 50% 6%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
     --border: 165 12% 16%;
     --input: 165 12% 16%;
-    --ring: 160 80% 42%;
+    --ring: 158 88% 48%;
 
-    --sidebar-background: 168 16% 6%;
-    --sidebar-foreground: 160 10% 86%;
-    --sidebar-primary: 160 80% 42%;
+    --sidebar-background: 175 25% 6%;
+    --sidebar-foreground: 175 20% 86%;
+    --sidebar-primary: 158 88% 48%;
     --sidebar-primary-foreground: 168 18% 5%;
-    --sidebar-accent: 165 14% 11%;
-    --sidebar-accent-foreground: 160 10% 93%;
-    --sidebar-border: 165 12% 14%;
-    --sidebar-ring: 160 80% 42%;
+    --sidebar-accent: 178 25% 11%;
+    --sidebar-accent-foreground: 175 20% 93%;
+    --sidebar-border: 178 22% 14%;
+    --sidebar-ring: 158 88% 48%;
 
     --pitch: 160 60% 30%;
     --pitch-line: 0 0% 90%;
@@ -106,10 +106,10 @@
     --success: 160 80% 38%;
     --warning: 38 92% 50%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(160 80% 42%), hsl(168 70% 46%));
-    --gradient-hero: linear-gradient(180deg, hsl(168 18% 5%) 0%, hsl(165 16% 9%) 100%);
-    --shadow-glow: 0 0 30px hsl(160 80% 42% / 0.15);
-    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.3);
+    --gradient-primary: linear-gradient(135deg, hsl(158 88% 48%) 0%, hsl(178 85% 50%) 50%, hsl(195 95% 56%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(175 25% 5%) 0%, hsl(178 22% 9%) 100%);
+    --shadow-glow: 0 0 40px hsl(178 85% 50% / 0.22);
+    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.35);
   }
 }
 
