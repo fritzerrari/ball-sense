@@ -509,6 +509,7 @@ serve(async (req) => {
     }
 
     let frames = inlineFrames as string[] | undefined;
+    let frameMeta: FrameMeta[] | undefined;
     let duration_sec = inlineDuration as number | undefined;
     let frameTelemetry: FrameTelemetry | undefined;
     const isLivePartial = phase === "live_partial";
@@ -529,6 +530,7 @@ serve(async (req) => {
       }
 
       frames = storageResult.frames;
+      frameMeta = storageResult.meta;
       duration_sec = storageResult.duration_sec;
       frameTelemetry = storageResult.telemetry;
     }
@@ -583,15 +585,25 @@ serve(async (req) => {
       });
     }
 
-    // Select subset of frames (max ~20)
+    // Select subset of frames (max ~20). Keep meta in sync so we know which
+    // camera + burst each selected frame belongs to.
     const maxFrames = 20;
     let selectedFrames = frames!;
+    let selectedMeta: FrameMeta[] = frameMeta ?? frames!.map((_, i) => ({ cam: -1, ts: i * 30_000 }));
     if (selectedFrames.length > maxFrames) {
       const step = selectedFrames.length / maxFrames;
-      selectedFrames = Array.from({ length: maxFrames }, (_, i) =>
-        frames![Math.min(Math.floor(i * step), frames!.length - 1)]
+      const indices = Array.from({ length: maxFrames }, (_, i) =>
+        Math.min(Math.floor(i * step), frames!.length - 1),
       );
+      selectedFrames = indices.map((i) => frames![i]);
+      selectedMeta = indices.map((i) => selectedMeta[i] ?? { cam: -1, ts: i * 30_000 });
     }
+
+    // Detect sync-bursts among the selected frames
+    const burstResult = detectSyncBursts(selectedMeta, 5_000);
+    const burstNote = burstResult.burstCount > 0
+      ? `\n\nMULTI-KAMERA SYNC-BURSTS: ${burstResult.burstCount} Burst(s) erkannt. Mehrere Frames zeigen denselben Spielmoment aus unterschiedlichen Winkeln. Frame-Index-Zuordnung:\n${selectedMeta.map((m, i) => `  Frame ${i}: cam=${m.cam}${burstResult.bursts[i] >= 0 ? ` burst=${burstResult.bursts[i]}` : ""}`).join("\n")}\n\nWICHTIG: Frames aus demselben Burst NICHT als separate Spielmomente werten — fasse Spieler-Positionen zu EINEM Frame zusammen, nutze beide Winkel zur Plausibilitätsprüfung.`
+      : "";
 
     await supabase.from("analysis_jobs").update({ progress: 25 }).eq("id", job_id);
 
