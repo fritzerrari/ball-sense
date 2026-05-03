@@ -382,6 +382,79 @@ export default function Onboarding() {
                   )}
                 </div>
 
+                {/* Color suggestions from logo */}
+                {(extractingColors || suggestedColors.length > 0) && (
+                  <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Palette className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-semibold">Vereinsfarben aus Logo</p>
+                      {extractingColors && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-auto" />
+                      )}
+                    </div>
+                    {!extractingColors && (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          Klicke auf eine Farbe, um sie als <strong>Primär</strong>- oder <strong>Sekundär</strong>farbe zu setzen.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {suggestedColors.map((hex) => {
+                            const isPrimary = primaryColor === hex;
+                            const isSecondary = secondaryColor === hex;
+                            return (
+                              <button
+                                key={hex}
+                                type="button"
+                                onClick={() => {
+                                  if (isPrimary) {
+                                    // already primary → make secondary
+                                    setPrimaryColor(null);
+                                    setSecondaryColor(hex);
+                                  } else if (isSecondary) {
+                                    setSecondaryColor(null);
+                                  } else if (!primaryColor) {
+                                    setPrimaryColor(hex);
+                                  } else if (!secondaryColor) {
+                                    setSecondaryColor(hex);
+                                  } else {
+                                    // both set → replace primary
+                                    setPrimaryColor(hex);
+                                  }
+                                }}
+                                className="group relative w-12 h-12 rounded-xl border-2 border-border shadow-sm hover:scale-110 transition-transform"
+                                style={{ backgroundColor: hex }}
+                                title={hex}
+                              >
+                                {(isPrimary || isSecondary) && (
+                                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-foreground text-background text-[9px] font-black flex items-center justify-center shadow">
+                                    {isPrimary ? "1" : "2"}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <div className="flex items-center gap-2 rounded-lg bg-card/50 px-2.5 py-1.5">
+                            <div className="w-5 h-5 rounded shadow-sm" style={{ backgroundColor: primaryColor || "transparent", border: primaryColor ? "none" : "1px dashed hsl(var(--border))" }} />
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Primär</p>
+                              <p className="text-xs font-mono truncate">{primaryColor || "—"}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 rounded-lg bg-card/50 px-2.5 py-1.5">
+                            <div className="w-5 h-5 rounded shadow-sm" style={{ backgroundColor: secondaryColor || "transparent", border: secondaryColor ? "none" : "1px dashed hsl(var(--border))" }} />
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sekundär</p>
+                              <p className="text-xs font-mono truncate">{secondaryColor || "—"}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <label className="text-sm text-muted-foreground block mb-1">Vereinsname *</label>
                   <input
