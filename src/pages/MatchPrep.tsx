@@ -16,6 +16,7 @@ import { Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import PreMatchBriefing from "@/components/PreMatchBriefing";
 
 interface Preparation {
   id: string;
