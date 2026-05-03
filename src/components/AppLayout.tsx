@@ -14,6 +14,7 @@ import {
   Users,
   Swords,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,6 +55,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.squad"), icon: Users, href: "/players" },
     { label: t("nav.trends"), icon: TrendingUp, href: "/trends" },
     { label: t("nav.matchPrep") ?? "Spielvorbereitung", icon: Brain, href: "/match-prep" },
+    { label: "Season Hub", icon: Trophy, href: "/season" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
   ];
 
