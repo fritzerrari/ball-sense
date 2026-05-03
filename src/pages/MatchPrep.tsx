@@ -156,6 +156,9 @@ export default function MatchPrep() {
         {/* Active Preparation */}
         {prep && activePrep && (
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            {/* Pre-Match Briefing — KI-generiertes 3-Seiten-Briefing */}
+            {activePrep.match_id && <PreMatchBriefing matchId={activePrep.match_id} />}
+
             {/* PDF Export Button */}
             <div className="flex justify-end">
               <Button
