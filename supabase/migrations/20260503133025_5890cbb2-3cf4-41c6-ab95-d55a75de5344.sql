@@ -1,0 +1,1 @@
+DELETE FROM public.season_hub_cache WHERE club_id = '3170935c-baa8-4542-8198-8e0b4d32dcd8';
