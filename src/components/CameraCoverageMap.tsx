@@ -6,8 +6,9 @@ import { fetchCameraCoverage, cameraLabel, type CameraCoverageResult } from "@/l
 
 interface FramePos {
   frame_index?: number;
+  camera_index?: number; // P1: per-frame source camera
   visible_area?: { description?: string; estimated_coverage_pct?: number };
-  players?: Array<{ team?: "home" | "away"; x?: number; y?: number; estimated?: boolean }>;
+  players?: Array<{ team?: "home" | "away"; x?: number; y?: number; estimated?: boolean; camera_index?: number }>;
   ball?: { x?: number; y?: number };
 }
 
@@ -97,24 +98,60 @@ export default function CameraCoverageMap({ matchId, framePositions }: Props) {
     return m;
   }, [grid]);
 
-  // Compute per-camera approx. visible rect from sample frames
+  // Compute per-camera visible rectangle from REAL observed positions
+  // (5th–95th percentile bounding box per camera_index). Falls back to
+  // verbal-description heuristic only when geometric data is missing.
   const camRects = useMemo(() => {
     if (!coverage || !Array.isArray(framePositions) || framePositions.length === 0) return [];
-    // Distribute frames evenly across cameras (we don't have per-frame cam id post-merge)
     const cams = coverage.cameras.slice().sort((a, b) => a.camera_index - b.camera_index);
+
+    // Bucket observed positions per camera_index
+    const buckets = new Map<number, { xs: number[]; ys: number[] }>();
+    for (const fr of framePositions) {
+      if (!Array.isArray(fr?.players)) continue;
+      for (const p of fr.players) {
+        if (p.estimated) continue;
+        const cam = typeof p.camera_index === "number"
+          ? p.camera_index
+          : (typeof fr.camera_index === "number" ? fr.camera_index : -1);
+        if (cam < 0) continue;
+        const x = typeof p.x === "number" ? p.x : -1;
+        const y = typeof p.y === "number" ? p.y : -1;
+        if (x < 0 || x > 100 || y < 0 || y > 100) continue;
+        if (!buckets.has(cam)) buckets.set(cam, { xs: [], ys: [] });
+        const b = buckets.get(cam)!;
+        b.xs.push(x); b.ys.push(y);
+      }
+    }
+
     const totalFrames = cams.reduce((s, c) => s + (c.frame_count || 0), 0) || 1;
-    const rects: Array<{ cam: number; rect: ReturnType<typeof inferRectFromDescription>; share: number; descSample: string }> = [];
-    let cursor = 0;
+    const pct = (arr: number[], q: number) => {
+      const s = arr.slice().sort((a, b) => a - b);
+      const i = Math.max(0, Math.min(s.length - 1, Math.floor(q * (s.length - 1))));
+      return s[i];
+    };
+
+    const rects: Array<{ cam: number; rect: { x: number; y: number; w: number; h: number }; share: number; descSample: string; geometric: boolean }> = [];
     for (const cam of cams) {
       const share = (cam.frame_count || 0) / totalFrames;
-      const span = Math.max(1, Math.round(framePositions.length * share));
-      const slice = framePositions.slice(cursor, cursor + span);
-      cursor += span;
-      // Aggregate visible-area description (most frequent keyword)
-      const descs = slice.map((f) => f.visible_area?.description ?? "").filter(Boolean);
-      const descSample = descs[0] ?? "Full pitch";
-      const avgCov = slice.reduce((s, f) => s + (f.visible_area?.estimated_coverage_pct ?? 60), 0) / Math.max(1, slice.length);
-      rects.push({ cam: cam.camera_index, rect: inferRectFromDescription(descSample, avgCov), share, descSample });
+      const b = buckets.get(cam.camera_index);
+      if (b && b.xs.length >= 8) {
+        // Geometric (real) FOV from observed positions
+        const x0 = Math.max(0, pct(b.xs, 0.05) - 2);
+        const x1 = Math.min(100, pct(b.xs, 0.95) + 2);
+        const y0 = Math.max(0, pct(b.ys, 0.05) - 2);
+        const y1 = Math.min(100, pct(b.ys, 0.95) + 2);
+        rects.push({
+          cam: cam.camera_index,
+          rect: { x: x0, y: y0, w: Math.max(5, x1 - x0), h: Math.max(5, y1 - y0) },
+          share, descSample: `${b.xs.length} Detections`, geometric: true,
+        });
+      } else {
+        // Fallback: verbal heuristic
+        const descSample = framePositions.find((f) => f.visible_area?.description)?.visible_area?.description ?? "Full pitch";
+        const avgCov = framePositions.reduce((s, f) => s + (f.visible_area?.estimated_coverage_pct ?? 60), 0) / framePositions.length;
+        rects.push({ cam: cam.camera_index, rect: inferRectFromDescription(descSample, avgCov), share, descSample, geometric: false });
+      }
     }
     return rects;
   }, [coverage, framePositions]);
@@ -333,7 +370,8 @@ export default function CameraCoverageMap({ matchId, framePositions }: Props) {
         )}
 
         <p className="text-[10px] text-muted-foreground italic">
-          Heatmap basiert auf real beobachteten Spielerpositionen (KI-Schätzungen ausgeschlossen). Kamera-Boxen sind Annäherungen aus der KI-Beschreibung des Sichtfelds.
+          Heatmap basiert auf real beobachteten Spielerpositionen (KI-Schätzungen ausgeschlossen).
+          Kamera-Sichtfelder werden — wo möglich — geometrisch aus den tatsächlichen Detections pro Kamera berechnet (5./95. Perzentil), sonst aus der KI-Beschreibung approximiert.
         </p>
       </CardContent>
     </Card>

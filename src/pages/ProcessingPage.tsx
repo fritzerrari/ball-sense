@@ -27,6 +27,9 @@ export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [frameDiagnostics, setFrameDiagnostics] = useState<{
+    total: number; cameras: number; recordingMin: number | null;
+  } | null>(null);
 
   // Poll-only: no client-side triggering of generate-insights (server handles it)
   useEffect(() => {
@@ -51,6 +54,42 @@ export default function ProcessingPage() {
     }, 2000);
     return () => clearInterval(interval);
   }, [id]);
+
+  // Load frame diagnostics when analysis fails so the user gets a meaningful explanation
+  useEffect(() => {
+    if (status !== "failed" || !id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ action: "list-coverage", match_id: id }),
+          },
+        );
+        if (!res.ok) return;
+        const cov = await res.json();
+        if (cancelled) return;
+        const cams = Array.isArray(cov?.cameras) ? cov.cameras : [];
+        const total = cams.reduce((s: number, c: { frame_count?: number }) => s + (c.frame_count ?? 0), 0);
+        let recordingMin: number | null = null;
+        if (cov?.recording_started_at && cov?.recording_ended_at) {
+          const ms = new Date(cov.recording_ended_at).getTime() - new Date(cov.recording_started_at).getTime();
+          if (ms > 0) recordingMin = Math.round(ms / 60000);
+        }
+        setFrameDiagnostics({ total, cameras: cams.length, recordingMin });
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [status, id]);
 
   const handleRetry = async () => {
     if (!id) return;
@@ -152,14 +191,48 @@ export default function ProcessingPage() {
 
             {isFailed && (
               <div className="space-y-3">
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-center">
-                  <p className="text-sm text-destructive font-medium">
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                  <p className="text-sm text-destructive font-medium text-center">
                     {errorMessage || "Analyse fehlgeschlagen. Bitte versuche es erneut."}
                   </p>
                 </div>
+
+                {frameDiagnostics && (
+                  <div className="rounded-lg bg-muted/40 border border-border p-4 space-y-2">
+                    <p className="text-xs font-semibold text-foreground">Diagnose</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <div className="text-muted-foreground">Frames</div>
+                        <div className="font-semibold">{frameDiagnostics.total}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Kameras</div>
+                        <div className="font-semibold">{frameDiagnostics.cameras}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Aufnahme</div>
+                        <div className="font-semibold">{frameDiagnostics.recordingMin != null ? `${frameDiagnostics.recordingMin} min` : "—"}</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+                      {(() => {
+                        const { total, cameras, recordingMin } = frameDiagnostics;
+                        if (total === 0) return "Keine Frames empfangen — die Kamera hat vermutlich keine Daten hochgeladen. Prüfe Internetverbindung & Kamera-Setup.";
+                        if (total < 15) return `Zu wenige Frames (${total}) für eine zuverlässige Analyse. Empfohlen: mindestens 15 Frames pro Halbzeit. Bitte länger aufnehmen oder Kamera-Setup prüfen.`;
+                        if (cameras === 0) return "Keine aktive Kamera erkannt. Stelle sicher, dass mindestens ein Gerät während des Spiels aufgenommen hat.";
+                        if (recordingMin != null && recordingMin < 5) return `Aufnahmedauer (${recordingMin} min) zu kurz für eine vollständige Spielanalyse.`;
+                        return "Daten sind vorhanden — der Fehler liegt wahrscheinlich an einem temporären KI-Gateway-Problem. Erneut versuchen sollte funktionieren.";
+                      })()}
+                    </p>
+                  </div>
+                )}
+
                 <Button onClick={handleRetry} disabled={retrying} variant="outline" className="w-full gap-2">
                   {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   Erneut versuchen
+                </Button>
+                <Button onClick={() => navigate(`/matches/${id}`)} variant="ghost" className="w-full text-xs">
+                  Zum Match-Bericht (manuell prüfen)
                 </Button>
               </div>
             )}
