@@ -25,6 +25,7 @@ import AdminUploads from "@/components/AdminUploads";
 import AdminGuides from "@/components/AdminGuides";
 import AdminApiFootball from "@/components/AdminApiFootball";
 import AdminPlayerConsents from "@/components/AdminPlayerConsents";
+import { AdminTrackingQuality } from "@/components/AdminTrackingQuality";
 
 function useAdminClubs() {
   return useQuery({
@@ -206,6 +207,7 @@ export default function Admin() {
             <TabsTrigger value="logs" className="rounded-lg text-xs"><ScrollText className="h-4 w-4 mr-1.5" /> Protokolle</TabsTrigger>
             <TabsTrigger value="guides" className="rounded-lg text-xs"><BookOpen className="h-4 w-4 mr-1.5" /> Anleitungen</TabsTrigger>
             <TabsTrigger value="api-football" className="rounded-lg text-xs"><Globe className="h-4 w-4 mr-1.5" /> API-Football</TabsTrigger>
+            <TabsTrigger value="tracking-quality" className="rounded-lg text-xs"><Activity className="h-4 w-4 mr-1.5" /> Tracking-Qualität</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users"><AdminUsers /></TabsContent>
@@ -232,6 +234,7 @@ export default function Admin() {
           <TabsContent value="logs"><AdminLogs /></TabsContent>
           <TabsContent value="guides"><AdminGuides /></TabsContent>
           <TabsContent value="api-football"><AdminApiFootball /></TabsContent>
+          <TabsContent value="tracking-quality"><AdminTrackingQuality /></TabsContent>
         </Tabs>
 
         <ConfirmDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }} title={`${deleteTarget?.type === "match" ? "Spiel" : "Feld"} löschen?`} description={`„${deleteTarget?.label}" wird unwiderruflich gelöscht.`} onConfirm={() => { if (deleteTarget) deleteEntity.mutate({ type: deleteTarget.type, id: deleteTarget.id }); }} />

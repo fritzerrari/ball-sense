@@ -584,7 +584,13 @@ WICHTIGE REGELN ZUR SPIELERERKENNUNG:
 KAMERA-PERSPEKTIVE ERKENNEN:
 - Bestimme die Kameraausrichtung: QUER (Seitenansicht von der Mittellinie), LÄNGS (hinter dem Tor), SCHRÄG (von der Eckfahne oder diagonal), TEILAUSSCHNITT (nur ein Bereich des Feldes sichtbar).
 - Die Perspektive beeinflusst massiv, wie x/y Koordinaten zu interpretieren sind.
-- Melde die erkannte Perspektive im Feld camera_perspective.`,
+- Melde die erkannte Perspektive im Feld camera_perspective.
+
+UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
+- Wenn du eine Spielerposition NICHT klar erkennen kannst (verdeckt, Nahaufnahme, Bildunschärfe): markiere "estimated": true.
+- Wenn du dir bei einer ZUORDNUNG (Team, Trikotnummer) unsicher bist: gib NULL zurück statt zu raten. Falsche Zuordnungen verschlechtern die Heatmaps stärker als fehlende Werte.
+- Wenn ein ganzer Frame unbrauchbar ist (Kamera bewegt, schwarz, totale Nahaufnahme ohne Kontext): markiere "unusable": true und liefere KEINE Spielerpositionen für diesen Frame.
+- Beispiel Schiri-Ausschluss: Eine Person in schwarzem Trikot, die zwischen den Teams alleine läuft → Schiedsrichter, NICHT in players[]. Eine Person in dunklem Trikot, die mit anderen Spielern interagiert und sich zur Spielform passend bewegt → Spieler.`,
           },
           { role: "user", content: userContent },
         ],
@@ -973,7 +979,42 @@ KAMERA-PERSPEKTIVE ERKENNEN:
       });
     }
 
-    // Set status to interpreting and trigger generate-insights SERVER-SIDE
+    // ── Persist tracking telemetry on the match (Phase A) ──
+    // Aggregate per-frame player detections + AI token usage for trend analysis
+    try {
+      let totalDetected = 0;
+      let frameCount = 0;
+      if (Array.isArray(analysis.frame_positions)) {
+        for (const fr of analysis.frame_positions) {
+          if (Array.isArray(fr.players)) {
+            totalDetected += fr.players.length;
+            frameCount++;
+          }
+        }
+      }
+      const usage = aiResult.usage ?? {};
+      const telemetryPayload = {
+        frames_total: selectedFrames.length,
+        frames_skipped_quality: frameTelemetry.total_skipped,
+        skipped_reasons: frameTelemetry.skipped_reasons,
+        avg_players_detected: frameCount > 0 ? Math.round((totalDetected / frameCount) * 10) / 10 : null,
+        avg_adaptive_interval_sec: frameTelemetry.adaptive_intervals_seen.length
+          ? Math.round(frameTelemetry.adaptive_intervals_seen.reduce((a, b) => a + b, 0) / frameTelemetry.adaptive_intervals_seen.length)
+          : null,
+        ai_model: modelName,
+        ai_tokens_total: usage.total_tokens ?? null,
+        ai_tokens_prompt: usage.prompt_tokens ?? null,
+        ai_tokens_completion: usage.completion_tokens ?? null,
+        analysis_confidence: analysis.confidence ?? null,
+        h2_simulated: shouldSimulateH2,
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from("matches").update({ tracking_telemetry: telemetryPayload }).eq("id", match_id);
+    } catch (err) {
+      console.warn("[telemetry] failed to persist tracking_telemetry:", err);
+    }
+
+
     await supabase.from("analysis_jobs").update({ progress: 85, status: "interpreting" }).eq("id", job_id);
 
     // Fire-and-forget: trigger generate-insights from server (no client dependency)

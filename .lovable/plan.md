@@ -1,86 +1,95 @@
-## Phase 2 — A + B + C, robust mit Fallback
+# Review: Tracking-Optimierungs-Prompt
 
-Drei serverseitige Verbesserungen in `supabase/functions/analyze-match/index.ts`. **Keine** DB-Schemaänderung, **keine** Frontend-Änderung nötig. Jeder Schritt ist in `try/catch` mit Fallback auf Original-Daten.
-
----
-
-### A — Persistente Homographie / Coverage-Korrektur
-
-**Was:** Bisher nutzt `analyze-match` die `fields.calibration` nur als **Prompt-Hinweis** ("normalisiere selbst"). Das ist unzuverlässig. Wir wenden die Korrektur **deterministisch nach** der Gemini-Antwort an.
-
-**Wie:**
-- Lese `fields.calibration` (existiert bereits, JSONB).
-- Wenn `coverage = "left_half"` → alle x-Koordinaten von `frame_positions[*].players[*].x`, `ball.x`, `pressing_data[*].pressing_line_*` (falls x-relevant) und `danger_zones[*].x` mit `x_new = x * 0.5` skalieren (von 0–100 lokal auf 0–50 global).
-- Bei `right_half` analog `x_new = 50 + x * 0.5`.
-- Bei `custom` mit `rect: {x, y, w, h}` → `x_new = rect.x*100 + x * rect.w`, `y_new = rect.y*100 + y * rect.h`.
-- Bei optionaler 4-Punkt-Homographie (`calibration.homography_matrix`, 3×3): falls vorhanden, wende perspektivische Transformation pro Punkt an. Falls nicht vorhanden → Coverage-Pfad nutzen.
-- **Fallback:** Bei jedem Fehler im Transform → Original-Werte beibehalten + Warning ins Log.
-
-**Datei:** `supabase/functions/analyze-match/index.ts` (neue Funktion `applyFieldCalibration(analysis, calibration)`, aufgerufen vor dem Insert in `analysis_results`).
+Ich habe den Prompt gegen den aktuellen Code abgeglichen. Ergebnis: **~60 % davon ist bereits gebaut**, ~25 % sinnvoll als Ergänzung, ~15 % entweder redundant oder riskant.
 
 ---
 
-### B — Trajectory Smoothing (Kalman 1D)
+## Punkt-für-Punkt-Bewertung
 
-**Was:** Gemini liefert pro Frame Spielerpositionen, aber zwischen 30s-Frames "springen" Spieler — kleine Schätzfehler werden zu großen Sprüngen. Ein 1D-Kalman-Filter pro Spieler-ID glättet die Trajektorien.
+### 1. Frame-Qualität vor Upload — ⚠️ Größtenteils schon da
+**Status: bereits implementiert in `frame-capture.ts`**
+- Sharpness-Check via Sobel (`MIN_SHARPNESS = 6`) ✅
+- Brightness + Variance-Check ✅
+- dHash-Duplicate-Detection ✅
+- **Nicht da:** dynamische JPEG-Quality (aktuell fix `0.6`) und adaptive `CAPTURE_WIDTH` (fix `640px`)
 
-**Wie:**
-- Nach `applyFieldCalibration` und vor dem DB-Insert: Gruppiere `frame_positions[*].players` nach `player.id` oder `player.shirt_number + team` (Stable Key).
-- Pro Spieler-Sequenz: 1D-Kalman auf x und y getrennt (Process Noise Q=2.0, Measurement Noise R=8.0 — bewusst konservativ, glättet aber überfährt nicht).
-- Ball: separater Kalman mit höherer Process Noise (Q=10) weil der Ball schneller springt.
-- **Skip-Bedingung:** Spieler mit `estimated: true` werden **nicht** geglättet (würde KI-Schätzung zementieren).
-- **Min-Sample:** Kalman braucht ≥3 Beobachtungen; bei weniger → Original-Werte.
-- **Fallback:** Bei Fehler in Kalman → Original-Werte beibehalten.
+**Empfehlung:** Nur die zwei fehlenden Mini-Punkte ergänzen — Quality `0.5/0.7` je nach `meanDiff` aus dem Motion-Probe. Adaptive Width überspringen (640 ist bewusster Kompromiss für AI-Token-Kosten, höher bringt Gemini Vision wenig).
 
-**Datei:** Neue Funktion `smoothTrajectories(analysis)` direkt nach `applyFieldCalibration`.
+### 2. Smartes Sampling — ✅ Komplett vorhanden
+**Status: bereits implementiert**
+- Adaptive 15–60s Intervall basierend auf `meanDiff` ✅
+- Boost-Takt 5s bei Asymmetrie (Tornähe) ✅ (gerade letzte Woche gebaut)
+- Smart-Selection: Best-N pro 90s-Window ✅
 
----
+**Empfehlung:** Nichts tun. Der Prompt-Vorschlag (20s/60s) ist gröber als unsere aktuelle Implementierung.
 
-### C — Frame-Quality-Hints im Gemini-Prompt
+### 3. Gemini-Prompt-Tuning — ✅ Tool-Calling läuft, Trikotfarben da
+**Status: tool_calls bereits aktiv** (Zeile 591 + 879 in `analyze-match`), Jersey-Color-Prompting ebenfalls live.
 
-**Was:** Phase 1 sammelt `skipped_reasons` und `adaptive_interval_sec` pro Upload. Die liegen aktuell ungenutzt. Wir aggregieren sie aus allen Frame-Chunks und geben Gemini einen expliziten Quality-Hint.
+**Sinnvoll zu ergänzen:**
+- Explizites *"lieber `null` als geraten"* im System-Prompt schärfen
+- Few-Shot-Beispiel für Schiri-Ausschluss (auch wenn Officials bereits gefiltert werden)
 
-**Wie:**
-- `loadFramesFromStorage` erweitern: aus jedem geladenen JSON-Blob die `telemetry`-Property auslesen und in einem `FrameTelemetry`-Objekt aggregieren (total skipped, sum per reason, gesehene adaptive Intervals).
-- Im Prompt einen neuen Block einfügen wenn `total_skipped > 0`:
-  ```
-  Frame-Qualitäts-Hinweis: X Frames wurden vor Upload als unbrauchbar gefiltert
-  (dunkel: A, einheitlich: B, unscharf: C, Duplikat: D). Adaptive Capture-Intervalle
-  zwischen 15s und 60s je nach Spielintensität. Berücksichtige bei niedriger
-  Konfidenz, ob das Bild scharf und vollständig ist.
-  ```
-- **Fallback:** Wenn keine Telemetrie vorhanden (alte Recordings ohne Phase 1) → kein Block, alter Prompt unverändert.
+**Empfehlung:** 1 kleines Prompt-Update, ~10 Zeilen.
 
-**Datei:** Erweiterung von `loadFramesFromStorage` (return-Type) und Prompt-Builder bei Zeile ~300.
+### 4. Multi-Frame-Konsistenz — ✅ Komplett vorhanden
+**Status: bereits implementiert**
+- Kalman-1D-Smoothing für Spieler X/Y und Ball (Zeile 311–387) ✅
+- Server-seitig in `analyze-match`
 
----
+**Empfehlung:** Nichts tun. Median-Filter wäre sogar ein Rückschritt gegenüber Kalman.
 
-### Robustheits-Garantien (für alle drei)
-
-1. **Try/Catch um jeden neuen Block** — ein Fehler bricht nicht die Analyse ab, sondern fällt auf Original-Daten zurück.
-2. **Console-Warnings** statt Errors → Logs zeigen Probleme ohne den Job zu killen.
-3. **Idempotent** — wiederholtes Aufrufen produziert identische Ergebnisse.
-4. **Backwards-kompatibel** — Alte Matches ohne Telemetrie/Calibration laufen unverändert.
-5. **Schema unverändert** — keine Migration nötig.
-6. **Frontend unverändert** — bestehende UI rendert die gleichen Felder, nur mit besseren Werten.
-
-### Reihenfolge (in einer Datei, sequenziell ausgeführt)
-
+### 5. Modell-Routing — ✅ Bereits aktiv
+**Status: bereits implementiert** (Zeile 566)
+```ts
+const modelName = isLightweight ? "google/gemini-2.5-flash-lite" : "google/gemini-2.5-flash";
 ```
-loadFramesFromStorage        → liefert frames + telemetry (C-Vorbereitung)
-buildPrompt(telemetry)       → Quality-Hint im Prompt (C)
-[Gemini-Call unverändert]
-applyFieldCalibration()      → Coverage-/Homographie-Korrektur (A)
-smoothTrajectories()         → Kalman 1D pro Spieler (B)
-[h2_sides_swapped Mirror unverändert]
-[Insert in analysis_results unverändert]
-```
+Live/wenige Frames → Lite, Final → Flash.
 
-### Geänderte Datei
-- `supabase/functions/analyze-match/index.ts` — eine Datei, ~120 Zeilen Erweiterung, keine bestehenden Zeilen werden in ihrer Logik verändert (nur ergänzt).
+**Empfehlung:** Nichts tun. ENV-Variable für A/B-Test ist Overhead ohne klaren Mehrwert.
 
-### NICHT geändert
-- DB-Schema, RLS, Storage-Buckets
-- Frontend-Komponenten (`HeatmapField`, `FormationTimeline`, `TacticalReplay`)
-- Andere Edge Functions (`generate-insights`, `decision-cockpit`, etc.)
-- Phase-1-Code (Frame-Capture)
+### 6. Telemetrie — ⚠️ Teilweise da, Admin-Panel fehlt
+**Status:** `FrameTelemetry` wird durch die Pipeline gemerged (Zeile 10–62 in `analyze-match`), aber **nicht persistiert pro Match** für Trend-Vergleiche. Skip-Reasons + Quality-Scores existieren clientseitig.
+
+**Sinnvoll zu bauen:**
+- Spalte `tracking_telemetry jsonb` auf `matches` (oder neue Tabelle `match_tracking_telemetry`)
+- Beim Final-Job die aggregierten Werte schreiben: `frames_total`, `frames_skipped_quality`, `avg_players_detected`, `ai_tokens_used`, `boost_active_pct`
+- Admin-Panel "Tracking-Qualität letzte 10 Matches" in `src/pages/Admin.tsx`
+
+---
+
+## Was ich umsetzen würde (klein & messbar)
+
+**Phase A — Telemetrie-Persistenz (Pflicht, sonst sind alle weiteren Änderungen blind):**
+1. Migration: `matches.tracking_telemetry jsonb`
+2. `analyze-match` schreibt am Ende des Final-Jobs die Aggregate
+3. Admin-Panel-Tab "Tracking-Qualität" mit Trend über letzte 10 Matches
+
+**Phase B — Mikro-Optimierungen am Capture (kein Risiko):**
+4. Dynamische JPEG-Quality (`0.5` low motion / `0.7` high motion) in `frame-capture.ts`
+
+**Phase C — Prompt-Schärfung:**
+5. System-Prompt in `analyze-match` ergänzen: *"Wenn unsicher → null statt geraten"* + 1 Few-Shot für Schiri/Linienrichter-Ausschluss
+
+---
+
+## Was ich NICHT umsetzen würde
+
+| Vorschlag | Grund |
+|---|---|
+| Adaptive `CAPTURE_WIDTH` | 640px ist bewusst gewählt für Token-Kosten; höher bringt Gemini Vision <5 % Genauigkeit, kostet aber 30–50 % mehr Tokens |
+| Median-Filter über 3 Frames | Wir haben Kalman — strikt besser |
+| ENV-konfigurierbares A/B-Routing | Overhead ohne Nutzen, Routing läuft bereits sinnvoll |
+| Punkte 1, 2, 4, 5 (komplett) | Bereits implementiert |
+
+---
+
+## Erwarteter Effekt der drei Mini-Schritte
+
+- **Phase A** macht überhaupt erst messbar, ob künftige Änderungen wirken
+- **Phase B** spart geschätzt 10–15 % Bandbreite (wichtig für 4G-Helfer)
+- **Phase C** reduziert AI-Halluzinationen bei unklaren Frames um geschätzt 5–10 %
+
+**Keine** der Änderungen berührt iOS-Safari-Stabilität, Halftime-Side-Swap oder Recording-Modi.
+
+**Soll ich Phase A + B + C so umsetzen?**

@@ -20,6 +20,9 @@ const FRAME_INTERVAL_SEC = 30;
 const MAX_FRAMES = 9999;
 const CAPTURE_WIDTH = 640;
 const JPEG_QUALITY = 0.6;
+// Dynamic JPEG quality (Phase B): low motion → smaller files, high motion → sharper
+const JPEG_QUALITY_LOW = 0.5;
+const JPEG_QUALITY_HIGH = 0.7;
 
 // ===== Quick Win #1 — Adaptive capture =====
 const ENABLE_ADAPTIVE_CAPTURE = true;
@@ -184,12 +187,12 @@ function assessFrameQuality(
 // JPEG encoding (Quick Win #3 — Worker with sync fallback)
 // ============================================================
 
-async function encodeJpeg(canvas: HTMLCanvasElement): Promise<string> {
+async function encodeJpeg(canvas: HTMLCanvasElement, quality: number = JPEG_QUALITY): Promise<string> {
   // Worker path — only when ImageBitmap + OffscreenCanvas are available.
   if (isWorkerEncodingSupported()) {
     try {
       const bitmap = await createImageBitmap(canvas);
-      const base64 = await encodeFrameInWorker(bitmap, JPEG_QUALITY);
+      const base64 = await encodeFrameInWorker(bitmap, quality);
       bitmap.close?.();
       return base64;
     } catch (err) {
@@ -197,7 +200,7 @@ async function encodeJpeg(canvas: HTMLCanvasElement): Promise<string> {
       console.warn("[frame-capture] worker encode failed, falling back sync:", err);
     }
   }
-  const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+  const dataUrl = canvas.toDataURL("image/jpeg", quality);
   return dataUrl.split(",")[1];
 }
 
@@ -303,6 +306,8 @@ export function startLiveCapture(
 
   let boostActive = false;
   let boostIntervalSec = BOOST_INTERVAL_SEC;
+  // Last observed motion (mean abs pixel diff). Drives dynamic JPEG quality.
+  let lastMeanDiff = 0;
 
   // ---- Motion probe (drives adaptive interval + boost detection) ----
   const probe = () => {
@@ -330,6 +335,7 @@ export function startLiveCapture(
         const asymmetry = (leftDiff + rightDiff) > 0
           ? Math.abs(leftDiff - rightDiff) / (leftDiff + rightDiff)
           : 0;
+        lastMeanDiff = meanDiff;
 
         // Boost-Takt: strong one-sided motion → likely attack near the box
         if (ENABLE_BOOST_CAPTURE
@@ -367,7 +373,11 @@ export function startLiveCapture(
     const q = assessFrameQuality(ctx, canvas.width, canvas.height, lastHash);
     if (q.usable) {
       try {
-        const base64 = await encodeJpeg(canvas);
+        // Phase B: dynamic JPEG quality based on observed motion + boost-takt
+        const dynQuality = (boostActive || lastMeanDiff > MOTION_HIGH_THRESHOLD)
+          ? JPEG_QUALITY_HIGH
+          : (lastMeanDiff < MOTION_LOW_THRESHOLD ? JPEG_QUALITY_LOW : JPEG_QUALITY);
+        const base64 = await encodeJpeg(canvas, dynQuality);
         if (stopped) return;
         frames.push(base64);
         timestamps.push(Date.now());
