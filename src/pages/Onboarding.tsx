@@ -7,10 +7,11 @@ import { useCreatePlayer } from "@/hooks/use-players";
 import { useCreateField } from "@/hooks/use-fields";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { extractLogoColors } from "@/lib/extract-logo-colors";
 import {
   Building2, Users, Map, Download, CheckCircle2,
   Plus, Trash2, ChevronRight, ChevronLeft, Loader2, Smartphone,
-  Camera, X, ImageIcon, BrainCircuit, Wifi, HardDrive,
+  Camera, X, ImageIcon, BrainCircuit, Wifi, HardDrive, Palette, Check,
 } from "lucide-react";
 
 const POSITIONS = ["TW", "IV", "LV", "RV", "ZM", "ZDM", "ZOM", "LA", "RA", "ST"];
