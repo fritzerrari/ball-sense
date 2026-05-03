@@ -191,14 +191,48 @@ export default function ProcessingPage() {
 
             {isFailed && (
               <div className="space-y-3">
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-center">
-                  <p className="text-sm text-destructive font-medium">
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                  <p className="text-sm text-destructive font-medium text-center">
                     {errorMessage || "Analyse fehlgeschlagen. Bitte versuche es erneut."}
                   </p>
                 </div>
+
+                {frameDiagnostics && (
+                  <div className="rounded-lg bg-muted/40 border border-border p-4 space-y-2">
+                    <p className="text-xs font-semibold text-foreground">Diagnose</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <div className="text-muted-foreground">Frames</div>
+                        <div className="font-semibold">{frameDiagnostics.total}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Kameras</div>
+                        <div className="font-semibold">{frameDiagnostics.cameras}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Aufnahme</div>
+                        <div className="font-semibold">{frameDiagnostics.recordingMin != null ? `${frameDiagnostics.recordingMin} min` : "—"}</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+                      {(() => {
+                        const { total, cameras, recordingMin } = frameDiagnostics;
+                        if (total === 0) return "Keine Frames empfangen — die Kamera hat vermutlich keine Daten hochgeladen. Prüfe Internetverbindung & Kamera-Setup.";
+                        if (total < 15) return `Zu wenige Frames (${total}) für eine zuverlässige Analyse. Empfohlen: mindestens 15 Frames pro Halbzeit. Bitte länger aufnehmen oder Kamera-Setup prüfen.`;
+                        if (cameras === 0) return "Keine aktive Kamera erkannt. Stelle sicher, dass mindestens ein Gerät während des Spiels aufgenommen hat.";
+                        if (recordingMin != null && recordingMin < 5) return `Aufnahmedauer (${recordingMin} min) zu kurz für eine vollständige Spielanalyse.`;
+                        return "Daten sind vorhanden — der Fehler liegt wahrscheinlich an einem temporären KI-Gateway-Problem. Erneut versuchen sollte funktionieren.";
+                      })()}
+                    </p>
+                  </div>
+                )}
+
                 <Button onClick={handleRetry} disabled={retrying} variant="outline" className="w-full gap-2">
                   {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   Erneut versuchen
+                </Button>
+                <Button onClick={() => navigate(`/matches/${id}`)} variant="ghost" className="w-full text-xs">
+                  Zum Match-Bericht (manuell prüfen)
                 </Button>
               </div>
             )}
