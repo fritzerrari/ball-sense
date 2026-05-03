@@ -1,4 +1,4 @@
-// @ts-nocheck
+// Highlight story — generates narrated 6-scene reel script via Gemini tool-calling.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -47,7 +47,7 @@ REGELN:
     const userPrompt = `SPIEL: ${match?.home_score ?? 0}:${match?.away_score ?? 0} vs. ${match?.away_club_name ?? "Gegner"}
 FORMATIONEN: ${match?.home_formation ?? "?"} vs. ${match?.away_formation ?? "?"}
 EVENTS:
-${events.map((e) => `${e.minute}' [${e.team}] ${e.event_type} ${e.player_name ?? ""} ${e.event_cause ?? ""} ${e.event_zone ?? ""}`).join("\n")}`;
+${events.map((e: { minute?: number; team?: string; event_type?: string; player_name?: string | null; event_cause?: string | null; event_zone?: string | null }) => `${e.minute}' [${e.team}] ${e.event_type} ${e.player_name ?? ""} ${e.event_cause ?? ""} ${e.event_zone ?? ""}`).join("\n")}`;
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
