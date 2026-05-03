@@ -469,6 +469,172 @@ function NextOpponentCard({ match }: { match: FixtureRow & { ai_briefing?: any }
   );
 }
 
+// Renders the AI match plan / opponent DNA in a friendly card layout
+function BriefingView({ briefing }: { briefing: any }) {
+  // Support both shapes: raw object OR { success, preparation: { preparation_data } }
+  const data =
+    briefing?.preparation?.preparation_data ??
+    briefing?.preparation_data ??
+    briefing;
+
+  if (typeof data === "string") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-primary" /> KI-Matchplan & Gegner-DNA
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{data}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data || typeof data !== "object") return null;
+
+  const sevColor = (sev?: string) =>
+    sev === "high"
+      ? "destructive"
+      : sev === "medium"
+        ? "default"
+        : "secondary";
+
+  return (
+    <div className="space-y-3">
+      {/* Header card with set-piece plan + confidence */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-primary" /> KI-Matchplan & Gegner-DNA
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {data.recommended_formation && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Empfohlene Formation:</span>
+              <Badge variant="default" className="text-sm">{data.recommended_formation}</Badge>
+            </div>
+          )}
+          {data.set_piece_plan && (
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Standards & Plan</p>
+              <p className="leading-relaxed">{data.set_piece_plan}</p>
+            </div>
+          )}
+          {data.confidence_note && (
+            <div className="rounded-lg bg-muted/40 p-3 text-xs italic text-muted-foreground">
+              {data.confidence_note}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Opponent warnings */}
+      {Array.isArray(data.opponent_warnings) && data.opponent_warnings.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-orange-500" /> Gegner-Warnungen
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.opponent_warnings.map((w: any, i: number) => (
+              <div key={i} className="rounded-lg border border-border bg-card p-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="font-semibold text-sm">{w.title}</span>
+                  {w.severity && (
+                    <Badge variant={sevColor(w.severity) as any} className="text-[10px] uppercase">
+                      {w.severity}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{w.description}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Own risk factors */}
+      {Array.isArray(data.own_risk_factors) && data.own_risk_factors.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Target className="h-4 w-4 text-primary" /> Eigene Risikofaktoren
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.own_risk_factors.map((r: any, i: number) => (
+              <div key={i} className="rounded-lg border border-border bg-card p-3">
+                <p className="mb-1 font-semibold text-sm">{r.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{r.description}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Lineup suggestions */}
+      {Array.isArray(data.lineup_suggestions) && data.lineup_suggestions.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Award className="h-4 w-4 text-primary" /> Aufstellungs-Empfehlungen
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.lineup_suggestions.map((l: any, i: number) => (
+              <div key={i} className="rounded-lg border border-border bg-card p-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="font-semibold text-sm">{l.player_name}</span>
+                  {l.recommendation && (
+                    <Badge
+                      variant={l.recommendation === "start" ? "default" : "secondary"}
+                      className="text-[10px] uppercase"
+                    >
+                      {l.recommendation === "start" ? "Startelf" : l.recommendation === "bench" ? "Bank" : l.recommendation}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{l.reasoning}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Catch-all: render any other string fields nicely */}
+      {Object.entries(data)
+        .filter(
+          ([k, v]) =>
+            ![
+              "set_piece_plan",
+              "confidence_note",
+              "own_risk_factors",
+              "opponent_warnings",
+              "lineup_suggestions",
+              "recommended_formation",
+              "id",
+              "club_id",
+              "opponent_name",
+            ].includes(k) && typeof v === "string" && (v as string).length > 0,
+        )
+        .map(([k, v]) => (
+          <Card key={k}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm capitalize">{k.replace(/_/g, " ")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{v as string}</p>
+            </CardContent>
+          </Card>
+        ))}
+    </div>
+  );
+}
+
 function EmptyState({ text }: { text: string }) {
   return <p className="py-8 text-center text-sm text-muted-foreground">{text}</p>;
 }
