@@ -877,6 +877,94 @@ export type Database = {
           },
         ]
       }
+      foul_probability_events: {
+        Row: {
+          created_at: string
+          description: string | null
+          frame_ts: number | null
+          id: string
+          match_id: string
+          minute: number
+          probability: number
+          severity: string | null
+          team: string | null
+          zone: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          frame_ts?: number | null
+          id?: string
+          match_id: string
+          minute: number
+          probability: number
+          severity?: string | null
+          team?: string | null
+          zone?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          frame_ts?: number | null
+          id?: string
+          match_id?: string
+          minute?: number
+          probability?: number
+          severity?: string | null
+          team?: string | null
+          zone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foul_probability_events_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      highlight_reels: {
+        Row: {
+          created_at: string
+          duration_sec: number
+          format: string
+          id: string
+          match_id: string
+          share_url: string | null
+          status: string
+          storyboard: Json
+        }
+        Insert: {
+          created_at?: string
+          duration_sec?: number
+          format?: string
+          id?: string
+          match_id: string
+          share_url?: string | null
+          status?: string
+          storyboard: Json
+        }
+        Update: {
+          created_at?: string
+          duration_sec?: number
+          format?: string
+          id?: string
+          match_id?: string
+          share_url?: string | null
+          status?: string
+          storyboard?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "highlight_reels_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       legal_documents: {
         Row: {
           active: boolean
@@ -918,6 +1006,50 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      live_coaching_advice: {
+        Row: {
+          created_at: string
+          half: number
+          headline: string
+          id: string
+          match_id: string
+          minute: number
+          reasoning: string | null
+          recommendations: Json
+          urgency: string
+        }
+        Insert: {
+          created_at?: string
+          half?: number
+          headline: string
+          id?: string
+          match_id: string
+          minute: number
+          reasoning?: string | null
+          recommendations?: Json
+          urgency?: string
+        }
+        Update: {
+          created_at?: string
+          half?: number
+          headline?: string
+          id?: string
+          match_id?: string
+          minute?: number
+          reasoning?: string | null
+          recommendations?: Json
+          urgency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_coaching_advice_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       match_events: {
         Row: {
@@ -1182,7 +1314,10 @@ export type Database = {
           id: string
           kickoff: string | null
           match_type: string
+          opponent_api_team_id: number | null
           opponent_consent_confirmed: boolean
+          opponent_logo_url: string | null
+          opponent_recent_form: Json | null
           processing_progress: Json | null
           recording_ended_at: string | null
           recording_started_at: string | null
@@ -1218,7 +1353,10 @@ export type Database = {
           id?: string
           kickoff?: string | null
           match_type?: string
+          opponent_api_team_id?: number | null
           opponent_consent_confirmed?: boolean
+          opponent_logo_url?: string | null
+          opponent_recent_form?: Json | null
           processing_progress?: Json | null
           recording_ended_at?: string | null
           recording_started_at?: string | null
@@ -1254,7 +1392,10 @@ export type Database = {
           id?: string
           kickoff?: string | null
           match_type?: string
+          opponent_api_team_id?: number | null
           opponent_consent_confirmed?: boolean
+          opponent_logo_url?: string | null
+          opponent_recent_form?: Json | null
           processing_progress?: Json | null
           recording_ended_at?: string | null
           recording_started_at?: string | null
@@ -1571,6 +1712,38 @@ export type Database = {
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prematch_briefings: {
+        Row: {
+          briefing: Json
+          generated_at: string
+          id: string
+          match_id: string
+          pdf_url: string | null
+        }
+        Insert: {
+          briefing: Json
+          generated_at?: string
+          id?: string
+          match_id: string
+          pdf_url?: string | null
+        }
+        Update: {
+          briefing?: Json
+          generated_at?: string
+          id?: string
+          match_id?: string
+          pdf_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prematch_briefings_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
             referencedColumns: ["id"]
           },
         ]

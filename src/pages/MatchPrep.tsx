@@ -16,6 +16,7 @@ import { Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import PreMatchBriefing from "@/components/PreMatchBriefing";
 
 interface Preparation {
   id: string;
@@ -151,6 +152,11 @@ export default function MatchPrep() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pre-Match Briefing — sichtbar wenn ein konkretes Spiel verknüpft wurde (?match=<id>) */}
+        {searchParams.get("match") && (
+          <PreMatchBriefing matchId={searchParams.get("match")!} />
+        )}
 
         {/* Active Preparation */}
         {prep && activePrep && (
