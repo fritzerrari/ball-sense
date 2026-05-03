@@ -244,13 +244,48 @@ export default function NewMatch() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm text-muted-foreground">Gegner (optional)</label>
-                <input
-                  type="text"
-                  value={awayName}
-                  onChange={(e) => setAwayName(e.target.value)}
-                  placeholder="z.B. FC Musterstadt"
-                  className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 h-12 text-sm text-foreground placeholder:text-muted-foreground/50"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={awayName}
+                    onChange={(e) => { setAwayName(e.target.value); setSelectedOpp(null); }}
+                    onBlur={() => awayName.length >= 3 && !selectedOpp && searchOpponent()}
+                    placeholder="z.B. FC Musterstadt"
+                    className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 h-12 pr-10 text-sm text-foreground placeholder:text-muted-foreground/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={searchOpponent}
+                    disabled={oppSuggesting || awayName.length < 3}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 hover:bg-primary/10 disabled:opacity-30"
+                    aria-label="Gegner suchen"
+                  >
+                    {oppSuggesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </button>
+                </div>
+                {selectedOpp && (
+                  <div className="mt-2 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2 py-1.5 text-xs">
+                    {selectedOpp.logo && <img src={selectedOpp.logo} alt="" className="h-5 w-5 object-contain" />}
+                    <span className="font-medium">{selectedOpp.name}</span>
+                    <CheckCircle2 className="h-3.5 w-3.5 ml-auto text-primary" />
+                  </div>
+                )}
+                {oppSuggestions.length > 0 && !selectedOpp && (
+                  <div className="mt-2 space-y-1 rounded-lg border border-border bg-card p-1 max-h-44 overflow-auto">
+                    {oppSuggestions.map((t: any) => (
+                      <button
+                        key={t.team?.id}
+                        type="button"
+                        onClick={() => pickOpponent(t)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-primary/10"
+                      >
+                        {t.team?.logo && <img src={t.team.logo} alt="" className="h-5 w-5 object-contain" />}
+                        <span className="font-medium">{t.team?.name}</span>
+                        <span className="ml-auto text-muted-foreground">{t.team?.country}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="mb-1 block text-sm text-muted-foreground">Datum *</label>
