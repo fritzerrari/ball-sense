@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Building2, CreditCard, Save, Loader2, Check, KeyRound, Copy, ShieldCheck, Trash2, Power, BarChart3, Camera } from "lucide-react";
+import { Building2, CreditCard, Save, Loader2, Check, KeyRound, Copy, ShieldCheck, Trash2, Power, BarChart3, Camera, Palette } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
@@ -10,6 +10,7 @@ import type { PlanType } from "@/lib/types";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { useMonthlyMatchCount } from "@/hooks/use-match-stats";
 import { ClubLogoUpload } from "@/components/ClubLogoUpload";
+import { ClubColorEditor } from "@/components/ClubColorEditor";
 import { useTranslation } from "@/lib/i18n";
 import { Switch } from "@/components/ui/switch";
 import { useBenchmarkOptIn } from "@/hooks/use-benchmark";
@@ -181,6 +182,12 @@ export default function SettingsPage() {
           <div>
             <label className="mb-2 block text-sm text-muted-foreground">{t("settings.logo")}</label>
             <ClubLogoUpload />
+          </div>
+          <div className="border-t border-border pt-4">
+            <label className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <Palette className="h-4 w-4" /> Vereinsfarben
+            </label>
+            <ClubColorEditor />
           </div>
           <Button variant="hero" size="sm" onClick={handleSave} disabled={saving || !name.trim()}>
             {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
