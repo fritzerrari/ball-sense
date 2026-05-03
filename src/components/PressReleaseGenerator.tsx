@@ -83,7 +83,7 @@ export default function PressReleaseGenerator({ matchId, matchStatus, homeTeam, 
         .eq("match_id", matchId)
         .order("generated_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as PressRelease[];
+      return ((data ?? []) as unknown) as PressRelease[];
     },
   });
 
