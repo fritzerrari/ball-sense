@@ -227,7 +227,7 @@ export default function SeasonHub() {
 
               {/* Standings */}
               <TabsContent value="standings" className="mt-4">
-                <StandingsTable standings={payload.standings} />
+                <StandingsTable standings={payload.standings} source={payload.source} sourceUrl={(payload as any).source_url} />
               </TabsContent>
 
               {/* Schedule */}
