@@ -6,8 +6,9 @@ import { fetchCameraCoverage, cameraLabel, type CameraCoverageResult } from "@/l
 
 interface FramePos {
   frame_index?: number;
+  camera_index?: number; // P1: per-frame source camera
   visible_area?: { description?: string; estimated_coverage_pct?: number };
-  players?: Array<{ team?: "home" | "away"; x?: number; y?: number; estimated?: boolean }>;
+  players?: Array<{ team?: "home" | "away"; x?: number; y?: number; estimated?: boolean; camera_index?: number }>;
   ball?: { x?: number; y?: number };
 }
 
