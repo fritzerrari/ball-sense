@@ -220,6 +220,17 @@ export default function SeasonHub() {
               <TabsContent value="next" className="mt-4 space-y-4">
                 {payload.next_match ? (
                   <NextOpponentCard match={payload.next_match} />
+                ) : payload.last_results.length > 0 ? (
+                  <Card className="p-4">
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      Aktuell kein nächstes Spiel terminiert. Hier sind eure letzten Ergebnisse:
+                    </p>
+                    <div className="space-y-2">
+                      {payload.last_results.slice(0, 5).map((m, i) => (
+                        <FixtureRow key={i} fixture={m} showResult />
+                      ))}
+                    </div>
+                  </Card>
                 ) : (
                   <EmptyState text="Kein bevorstehendes Spiel gefunden." />
                 )}
