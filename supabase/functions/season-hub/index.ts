@@ -458,22 +458,31 @@ async function fetchFromOwnHistory(supabase: any, club: any) {
 // fussball.de Scraping via Firecrawl + Gemini extraction
 // ────────────────────────────────────────────
 async function fetchFromFussballDe(firecrawlKey: string, club: any, cfg: any) {
+  const staffelId = cfg.fussball_de_staffel_id;
   const baseUrl = cfg.fussball_de_url
-    || `https://www.fussball.de/spieltag/-/staffel/${cfg.fussball_de_staffel_id}`;
+    || (staffelId ? `https://www.fussball.de/spieltag/-/staffel/${staffelId}` : null);
+  if (!baseUrl) throw new Error("Keine fussball.de URL konfiguriert");
 
-  // Derive table URL (replace /spieltag/ -> /spielplan/ for full schedule when not present)
-  const scheduleUrl = baseUrl.replace("/spieltag/", "/spielplan/");
+  // fussball.de hat 3 relevante Seiten pro Staffel:
+  // - /spieltag/  (aktueller Spieltag mit Begegnungen)
+  // - /spielplan/ (kompletter Saisonplan)
+  // - /tabelle/   (Tabelle)
+  const spieltagUrl = baseUrl.includes("/spieltag/") ? baseUrl : baseUrl.replace(/\/(spielplan|tabelle)\//, "/spieltag/");
+  const spielplanUrl = spieltagUrl.replace("/spieltag/", "/spielplan/");
+  const tabelleUrl = spieltagUrl.replace("/spieltag/", "/tabelle/");
 
-  // 1. Scrape table + spieltag page (markdown is enough — Gemini parses)
-  const [tablePage, schedulePage] = await Promise.all([
-    firecrawlScrape(firecrawlKey, baseUrl),
-    firecrawlScrape(firecrawlKey, scheduleUrl).catch(() => null),
+  // 1. Scrape alle 3 Seiten parallel (Tabelle ist wichtigste Quelle)
+  const [tablePage, schedulePage, spieltagPage] = await Promise.all([
+    firecrawlScrape(firecrawlKey, tabelleUrl).catch((e) => { console.warn("tabelle scrape:", e.message); return null; }),
+    firecrawlScrape(firecrawlKey, spielplanUrl).catch((e) => { console.warn("spielplan scrape:", e.message); return null; }),
+    firecrawlScrape(firecrawlKey, spieltagUrl).catch((e) => { console.warn("spieltag scrape:", e.message); return null; }),
   ]);
 
   const combinedMd = [
-    tablePage?.markdown ?? "",
-    schedulePage?.markdown ?? "",
-  ].join("\n\n---\n\n").slice(0, 50000); // safety limit
+    tablePage?.markdown ? `# TABELLE\n${tablePage.markdown}` : "",
+    schedulePage?.markdown ? `# SPIELPLAN\n${schedulePage.markdown}` : "",
+    spieltagPage?.markdown ? `# AKTUELLER SPIELTAG\n${spieltagPage.markdown}` : "",
+  ].filter(Boolean).join("\n\n---\n\n").slice(0, 80000);
 
   if (!combinedMd.trim()) throw new Error("fussball.de returned empty content");
 
