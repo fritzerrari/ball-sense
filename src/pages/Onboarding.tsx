@@ -214,6 +214,36 @@ export default function Onboarding() {
     }
   };
 
+  const handleSkip = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      // Ensure a club exists so ProtectedRoute lets us through
+      if (!clubId) {
+        const name = newClubName.trim() || "Mein Verein";
+        const { data: club, error: clubError } = await supabase
+          .from("clubs")
+          .insert({ name })
+          .select("id")
+          .single();
+        if (clubError || !club) throw clubError;
+        if (user) {
+          await supabase
+            .from("profiles")
+            .update({ club_id: club.id })
+            .eq("user_id", user.id);
+        }
+        await refreshClubData();
+      }
+      toast.success("Einrichtung übersprungen – du kannst alles später ergänzen.");
+      navigate("/dashboard");
+    } catch {
+      toast.error("Konnte Einrichtung nicht überspringen. Bitte erneut versuchen.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
