@@ -146,8 +146,7 @@ export default function ReportGenerator({ matchId, matchStatus, clubName, awayCl
   };
 
   const shareWhatsApp = () => {
-    const text = encodeURIComponent(`${getTitle()}\n\n${report.substring(0, 1000)}...`);
-    window.open(`https://wa.me/?text=${text}`, "_blank");
+    openWhatsAppShare(`${getTitle()}\n\n${report.substring(0, 1000)}...`);
   };
 
   const shareTwitter = () => {
