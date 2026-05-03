@@ -464,24 +464,7 @@ function NextOpponentCard({ match }: { match: FixtureRow & { ai_briefing?: any }
         </CardContent>
       </Card>
 
-      {briefing && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4 text-primary" /> KI-Matchplan & Gegner-DNA
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {typeof briefing === "string" ? (
-              <p className="whitespace-pre-wrap">{briefing}</p>
-            ) : (
-              <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-muted/40 p-3 font-sans text-xs">
-                {JSON.stringify(briefing, null, 2)}
-              </pre>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {briefing && <BriefingView briefing={briefing} />}
     </div>
   );
 }
