@@ -60,3 +60,10 @@ verify_jwt = false
 
 [functions.season-hub]
 verify_jwt = false
+
+[functions.generate-press-release]
+verify_jwt = false
+
+[functions.live-event-detector]
+verify_jwt = false
+
