@@ -63,6 +63,9 @@ type SeasonData = {
   next_match?: (FixtureRow & { ai_briefing?: any }) | null;
   top_scorers?: Array<{ name: string; team?: string; goals?: number; assists?: number; photo?: string }>;
   injuries?: Array<{ player: string; type?: string; reason?: string }>;
+  club_news?: Array<{ title: string; date?: string | null; summary?: string; url?: string | null }>;
+  club_website_url?: string;
+  source_url?: string;
   note?: string;
   generated_at?: string;
 };
