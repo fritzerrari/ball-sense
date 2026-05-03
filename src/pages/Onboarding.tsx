@@ -663,10 +663,11 @@ export default function Onboarding() {
           {/* Skip link */}
           {step < 4 && (
             <button
-              onClick={() => navigate("/dashboard")}
-              className="block mx-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={handleSkip}
+              disabled={saving}
+              className="block mx-auto text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
             >
-              Einrichtung überspringen →
+              {saving ? "Wird übersprungen…" : "Einrichtung überspringen →"}
             </button>
           )}
         </div>
