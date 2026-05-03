@@ -27,6 +27,9 @@ export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [frameDiagnostics, setFrameDiagnostics] = useState<{
+    total: number; cameras: number; recordingMin: number | null;
+  } | null>(null);
 
   // Poll-only: no client-side triggering of generate-insights (server handles it)
   useEffect(() => {
@@ -51,6 +54,42 @@ export default function ProcessingPage() {
     }, 2000);
     return () => clearInterval(interval);
   }, [id]);
+
+  // Load frame diagnostics when analysis fails so the user gets a meaningful explanation
+  useEffect(() => {
+    if (status !== "failed" || !id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/camera-ops`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ action: "list-coverage", match_id: id }),
+          },
+        );
+        if (!res.ok) return;
+        const cov = await res.json();
+        if (cancelled) return;
+        const cams = Array.isArray(cov?.cameras) ? cov.cameras : [];
+        const total = cams.reduce((s: number, c: { frame_count?: number }) => s + (c.frame_count ?? 0), 0);
+        let recordingMin: number | null = null;
+        if (cov?.recording_started_at && cov?.recording_ended_at) {
+          const ms = new Date(cov.recording_ended_at).getTime() - new Date(cov.recording_started_at).getTime();
+          if (ms > 0) recordingMin = Math.round(ms / 60000);
+        }
+        setFrameDiagnostics({ total, cameras: cams.length, recordingMin });
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [status, id]);
 
   const handleRetry = async () => {
     if (!id) return;
