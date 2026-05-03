@@ -977,6 +977,21 @@ UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
     if (!toolCall) throw new Error("No tool call response from AI");
 
     const analysis = JSON.parse(toolCall.function.arguments);
+
+    // ── Multi-Camera provenance: stamp every frame_position with its source cam + burst id.
+    // Allows downstream consumers (CameraCoverageMap, Truth Mode, Admin telemetry) to
+    // attribute detections back to a specific camera and detect burst-fused scenes.
+    if (Array.isArray(analysis.frame_positions)) {
+      for (const fr of analysis.frame_positions) {
+        const idx = typeof fr.frame_index === "number" ? fr.frame_index : -1;
+        if (idx >= 0 && idx < selectedMeta.length) {
+          fr.camera_index = selectedMeta[idx].cam;
+          fr.frame_ts = selectedMeta[idx].ts;
+          if (burstResult.bursts[idx] >= 0) fr.burst_id = burstResult.bursts[idx];
+        }
+      }
+    }
+
     await supabase.from("analysis_jobs").update({ progress: 70 }).eq("id", job_id);
 
     // ── H2 side-swap normalization ──
