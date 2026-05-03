@@ -206,7 +206,7 @@ export default function SeasonHub() {
               />
             </div>
 
-            <Tabs defaultValue="next" className="w-full">
+            <Tabs defaultValue={payload.next_match ? "next" : (payload.last_results.length > 0 ? "schedule" : "next")} className="w-full">
               <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
                 <TabsTrigger value="next">Nächster Gegner</TabsTrigger>
                 <TabsTrigger value="standings">Tabelle</TabsTrigger>
