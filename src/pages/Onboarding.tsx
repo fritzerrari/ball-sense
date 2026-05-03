@@ -98,13 +98,31 @@ export default function Onboarding() {
     }
     setLogoFile(file);
     const reader = new FileReader();
-    reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setLogoPreview(dataUrl);
+      // Extract dominant colors from the logo
+      setExtractingColors(true);
+      try {
+        const colors = await extractLogoColors(dataUrl, 5);
+        setSuggestedColors(colors);
+        if (colors[0] && !primaryColor) setPrimaryColor(colors[0]);
+        if (colors[1] && !secondaryColor) setSecondaryColor(colors[1]);
+      } catch {
+        // silent — colors are optional
+      } finally {
+        setExtractingColors(false);
+      }
+    };
     reader.readAsDataURL(file);
   };
 
   const removeLogo = () => {
     setLogoFile(null);
     setLogoPreview(null);
+    setSuggestedColors([]);
+    setPrimaryColor(null);
+    setSecondaryColor(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
