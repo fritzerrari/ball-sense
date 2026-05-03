@@ -78,11 +78,12 @@ Deno.serve(async (req) => {
     // Check API-Football config
     const { data: apiCfg } = await supabase
       .from("api_football_config")
-      .select("api_team_id, api_league_id, api_season")
+      .select("api_team_id, api_league_id, api_season, fussball_de_staffel_id, fussball_de_url, club_website_url, scrape_enabled")
       .eq("club_id", clubId)
       .maybeSingle();
 
     const API_KEY = Deno.env.get("API_FOOTBALL_KEY");
+    const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
     let result: any = { club, source: "none", generated_at: new Date().toISOString() };
 
     // ── STRATEGY 1: API-Football (if configured) ──
@@ -95,7 +96,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── STRATEGY 2: OpenLigaDB (German leagues, no key needed) ──
+    // ── STRATEGY 2: fussball.de Scraping (Amateur/Jugend) ──
+    if (result.source === "none" && apiCfg?.scrape_enabled && (apiCfg?.fussball_de_url || apiCfg?.fussball_de_staffel_id) && FIRECRAWL_API_KEY) {
+      try {
+        result = await fetchFromFussballDe(FIRECRAWL_API_KEY, club, apiCfg);
+        result.source = "fussball-de";
+      } catch (e) {
+        console.warn("fussball.de scrape failed:", e);
+      }
+    }
+
+    // ── STRATEGY 3: OpenLigaDB (German leagues, no key needed) ──
     if (result.source === "none") {
       const shortcut = mapToOpenligaShortcut(club.league);
       if (shortcut) {
@@ -108,10 +119,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── STRATEGY 3: Own match history fallback ──
+    // ── STRATEGY 4: Own match history fallback ──
     if (result.source === "none") {
       result = await fetchFromOwnHistory(supabase, club);
       result.source = "own-history";
+    }
+
+    // ── ENRICHMENT: Vereinsseite scraping for News (optional, additive) ──
+    if (apiCfg?.club_website_url && FIRECRAWL_API_KEY) {
+      try {
+        const news = await scrapeClubNews(FIRECRAWL_API_KEY, apiCfg.club_website_url);
+        if (news && news.length > 0) {
+          result.club_news = news;
+          result.club_website_url = apiCfg.club_website_url;
+        }
+      } catch (e) {
+        console.warn("Club website scrape failed:", e);
+      }
     }
 
     // ── ENRICHMENT: AI match plan for next opponent ──
