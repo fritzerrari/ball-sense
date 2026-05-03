@@ -46,6 +46,10 @@ export default function Onboarding() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [suggestedColors, setSuggestedColors] = useState<string[]>([]);
+  const [extractingColors, setExtractingColors] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState<string | null>(null);
+  const [secondaryColor, setSecondaryColor] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Step 1 — players
