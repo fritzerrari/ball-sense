@@ -162,14 +162,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Persist cache
+    // Persist cache — short TTL if essential data missing
+    const hasStandings = Array.isArray(result.standings) && result.standings.length > 0;
+    const hasUpcoming = Array.isArray(result.upcoming) && result.upcoming.length > 0;
+    const ttlMs = (hasStandings && hasUpcoming) ? 72 * 60 * 60 * 1000 : 15 * 60 * 1000;
     await supabase.from("season_hub_cache").upsert(
       {
         club_id: clubId,
         data: result,
         source: result.source,
         fetched_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+        expires_at: new Date(Date.now() + ttlMs).toISOString(),
       },
       { onConflict: "club_id" }
     );
