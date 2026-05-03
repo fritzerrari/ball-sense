@@ -370,7 +370,8 @@ export default function CameraCoverageMap({ matchId, framePositions }: Props) {
         )}
 
         <p className="text-[10px] text-muted-foreground italic">
-          Heatmap basiert auf real beobachteten Spielerpositionen (KI-Schätzungen ausgeschlossen). Kamera-Boxen sind Annäherungen aus der KI-Beschreibung des Sichtfelds.
+          Heatmap basiert auf real beobachteten Spielerpositionen (KI-Schätzungen ausgeschlossen).
+          Kamera-Sichtfelder werden — wo möglich — geometrisch aus den tatsächlichen Detections pro Kamera berechnet (5./95. Perzentil), sonst aus der KI-Beschreibung approximiert.
         </p>
       </CardContent>
     </Card>
