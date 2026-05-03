@@ -8,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { openWhatsAppShare } from "@/lib/share-whatsapp";
 
 const REPORT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-report`;
 
@@ -146,8 +147,7 @@ export default function ReportGenerator({ matchId, matchStatus, clubName, awayCl
   };
 
   const shareWhatsApp = () => {
-    const text = encodeURIComponent(`${getTitle()}\n\n${report.substring(0, 1000)}...`);
-    window.open(`https://wa.me/?text=${text}`, "_blank");
+    openWhatsAppShare(`${getTitle()}\n\n${report.substring(0, 1000)}...`);
   };
 
   const shareTwitter = () => {
