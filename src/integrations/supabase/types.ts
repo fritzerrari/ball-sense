@@ -1189,6 +1189,7 @@ export type Database = {
           status: string
           team_identity: string | null
           track_opponent: boolean
+          tracking_telemetry: Json | null
         }
         Insert: {
           away_club_id?: string | null
@@ -1224,6 +1225,7 @@ export type Database = {
           status?: string
           team_identity?: string | null
           track_opponent?: boolean
+          tracking_telemetry?: Json | null
         }
         Update: {
           away_club_id?: string | null
@@ -1259,6 +1261,7 @@ export type Database = {
           status?: string
           team_identity?: string | null
           track_opponent?: boolean
+          tracking_telemetry?: Json | null
         }
         Relationships: [
           {
