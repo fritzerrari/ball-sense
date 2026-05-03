@@ -1866,6 +1866,39 @@ export type Database = {
           },
         ]
       }
+      season_hub_cache: {
+        Row: {
+          club_id: string
+          created_at: string
+          data: Json
+          expires_at: string
+          fetched_at: string
+          id: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          data?: Json
+          expires_at?: string
+          fetched_at?: string
+          id?: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          data?: Json
+          expires_at?: string
+          fetched_at?: string
+          id?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       super_admins: {
         Row: {
           active: boolean

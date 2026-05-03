@@ -35,6 +35,7 @@ const PlayerCompare = lazy(() => import("./pages/PlayerCompare"));
 const ComparePage = lazy(() => import("./pages/ComparePage"));
 const MatchPrep = lazy(() => import("./pages/MatchPrep"));
 const TutorialPage = lazy(() => import("./pages/TutorialPage"));
+const SeasonHub = lazy(() => import("./pages/SeasonHub"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,7 @@ const App = () => (
                 <Route path="/trends" element={<ProtectedRoute><TrendDashboard /></ProtectedRoute>} />
                 <Route path="/players/compare" element={<ProtectedRoute><PlayerCompare /></ProtectedRoute>} />
                 <Route path="/match-prep" element={<ProtectedRoute><MatchPrep /></ProtectedRoute>} />
+                <Route path="/season" element={<ProtectedRoute><SeasonHub /></ProtectedRoute>} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

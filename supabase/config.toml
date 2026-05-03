@@ -57,3 +57,6 @@ verify_jwt = false
 
 [functions.auto-clip-detector]
 verify_jwt = false
+
+[functions.season-hub]
+verify_jwt = false
