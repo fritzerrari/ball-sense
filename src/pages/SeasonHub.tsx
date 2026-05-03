@@ -206,7 +206,7 @@ export default function SeasonHub() {
               />
             </div>
 
-            <Tabs defaultValue="next" className="w-full">
+            <Tabs defaultValue={payload.next_match ? "next" : (payload.last_results.length > 0 ? "schedule" : "next")} className="w-full">
               <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
                 <TabsTrigger value="next">Nächster Gegner</TabsTrigger>
                 <TabsTrigger value="standings">Tabelle</TabsTrigger>
@@ -220,6 +220,17 @@ export default function SeasonHub() {
               <TabsContent value="next" className="mt-4 space-y-4">
                 {payload.next_match ? (
                   <NextOpponentCard match={payload.next_match} />
+                ) : payload.last_results.length > 0 ? (
+                  <Card className="p-4">
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      Aktuell kein nächstes Spiel terminiert. Hier sind eure letzten Ergebnisse:
+                    </p>
+                    <div className="space-y-2">
+                      {payload.last_results.slice(0, 5).map((m, i) => (
+                        <FixtureRow key={i} fixture={m} showResult />
+                      ))}
+                    </div>
+                  </Card>
                 ) : (
                   <EmptyState text="Kein bevorstehendes Spiel gefunden." />
                 )}
@@ -227,7 +238,7 @@ export default function SeasonHub() {
 
               {/* Standings */}
               <TabsContent value="standings" className="mt-4">
-                <StandingsTable standings={payload.standings} />
+                <StandingsTable standings={payload.standings} source={payload.source} sourceUrl={(payload as any).source_url} />
               </TabsContent>
 
               {/* Schedule */}
@@ -426,9 +437,41 @@ function ResultBadge({ result }: { result?: "W" | "D" | "L" | null }) {
   return <span className={`flex h-6 w-6 items-center justify-center rounded text-xs font-bold ${colors[result]}`}>{result}</span>;
 }
 
-function StandingsTable({ standings }: { standings: StandingRow[] }) {
+function StandingsTable({ standings, source, sourceUrl }: { standings: StandingRow[]; source?: string; sourceUrl?: string }) {
   if (!standings || standings.length === 0) {
-    return <EmptyState text="Keine Tabelle verfügbar. Verbinde API-Football oder wähle eine deutsche Profi-Liga." />;
+    const isFussballDe = source === "fussball-de";
+    return (
+      <Card className="border-dashed p-6 text-center">
+        <div className="mx-auto max-w-md space-y-3">
+          <p className="text-sm font-medium text-muted-foreground">
+            {isFussballDe
+              ? "Tabelle konnte aktuell nicht von fussball.de geladen werden."
+              : "Keine Tabelle verfügbar."}
+          </p>
+          {isFussballDe ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                fussball.de rendert Tabellen in einem geschützten Widget, das nicht öffentlich auslesbar ist. Letzte Ergebnisse werden trotzdem geladen.
+              </p>
+              {sourceUrl && (
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  → Liga direkt auf fussball.de ansehen
+                </a>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Verbinde API-Football oder eine fussball.de Staffel-ID in den Einstellungen.
+            </p>
+          )}
+        </div>
+      </Card>
+    );
   }
   return (
     <Card className="overflow-hidden">
