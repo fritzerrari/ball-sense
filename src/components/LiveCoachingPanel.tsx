@@ -51,7 +51,7 @@ export default function LiveCoachingPanel({ matchId, currentMinute, half = 1 }: 
       .eq("match_id", matchId)
       .order("minute", { ascending: false })
       .limit(10);
-    setHistory((data ?? []) as Advice[]);
+    setHistory(((data ?? []) as unknown) as Advice[]);
     setLoading(false);
   };
 
