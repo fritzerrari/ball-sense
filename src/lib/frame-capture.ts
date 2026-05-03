@@ -187,12 +187,12 @@ function assessFrameQuality(
 // JPEG encoding (Quick Win #3 — Worker with sync fallback)
 // ============================================================
 
-async function encodeJpeg(canvas: HTMLCanvasElement): Promise<string> {
+async function encodeJpeg(canvas: HTMLCanvasElement, quality: number = JPEG_QUALITY): Promise<string> {
   // Worker path — only when ImageBitmap + OffscreenCanvas are available.
   if (isWorkerEncodingSupported()) {
     try {
       const bitmap = await createImageBitmap(canvas);
-      const base64 = await encodeFrameInWorker(bitmap, JPEG_QUALITY);
+      const base64 = await encodeFrameInWorker(bitmap, quality);
       bitmap.close?.();
       return base64;
     } catch (err) {
@@ -200,7 +200,7 @@ async function encodeJpeg(canvas: HTMLCanvasElement): Promise<string> {
       console.warn("[frame-capture] worker encode failed, falling back sync:", err);
     }
   }
-  const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+  const dataUrl = canvas.toDataURL("image/jpeg", quality);
   return dataUrl.split(",")[1];
 }
 
