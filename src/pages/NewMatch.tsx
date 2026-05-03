@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft, Calendar, Upload, Video, Loader2,
-  Swords, ArrowRight, Sparkles, FileVideo, ImageIcon,
+  Swords, ArrowRight, Sparkles, FileVideo, ImageIcon, Search, CheckCircle2,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useFields } from "@/hooks/use-fields";
@@ -34,6 +34,33 @@ export default function NewMatch() {
 
   const [creating, setCreating] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
+
+  // Football-API opponent suggestion
+  const [oppSuggesting, setOppSuggesting] = useState(false);
+  const [oppSuggestions, setOppSuggestions] = useState<any[]>([]);
+  const [selectedOpp, setSelectedOpp] = useState<{ id: number; name: string; logo: string; form?: any } | null>(null);
+
+  const searchOpponent = useCallback(async () => {
+    if (!awayName || awayName.length < 3) return;
+    setOppSuggesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("api-football", {
+        body: { action: "search_team", query: awayName, country: "Germany", club_id: clubId },
+      });
+      if (error) throw error;
+      setOppSuggestions((data?.teams ?? []).slice(0, 5));
+    } catch {
+      setOppSuggestions([]);
+    } finally {
+      setOppSuggesting(false);
+    }
+  }, [awayName, clubId]);
+
+  const pickOpponent = (t: any) => {
+    setSelectedOpp({ id: t.team?.id, name: t.team?.name, logo: t.team?.logo });
+    setAwayName(t.team?.name ?? awayName);
+    setOppSuggestions([]);
+  };
 
   // Upload state
   const [uploading, setUploading] = useState(false);
