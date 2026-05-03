@@ -190,12 +190,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom navigation — clean 4-tab + more */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="grid grid-cols-5 px-1">
+        <div className="grid grid-cols-6 px-1">
           {[
             { label: t("nav.dashboard"), icon: Home, href: "/dashboard" },
             { label: t("nav.matches"), icon: Swords, href: "/matches" },
             { label: t("nav.squad"), icon: Users, href: "/players" },
             { label: t("nav.trends"), icon: TrendingUp, href: "/trends" },
+            { label: "Season", icon: Trophy, href: "/season" },
           ].map((item) => (
             <Link
               key={item.href}
