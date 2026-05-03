@@ -1113,6 +1113,8 @@ UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
         ai_tokens_completion: usage.completion_tokens ?? null,
         analysis_confidence: analysis.confidence ?? null,
         h2_simulated: shouldSimulateH2,
+        sync_bursts_detected: burstResult.burstCount,
+        cameras_active: Array.from(new Set(selectedMeta.map((m) => m.cam).filter((c) => c >= 0))).length,
         updated_at: new Date().toISOString(),
       };
       await supabase.from("matches").update({ tracking_telemetry: telemetryPayload }).eq("id", match_id);
