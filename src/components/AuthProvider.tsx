@@ -45,8 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [clubName, setClubName] = useState<string | null>(null);
   const [clubPlan, setClubPlan] = useState<string | null>(null);
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+  const [clubPrimaryColor, setClubPrimaryColor] = useState<string | null>(null);
+  const [clubSecondaryColor, setClubSecondaryColor] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Apply / clear club brand theme whenever colors change
+  useEffect(() => {
+    applyClubTheme(clubPrimaryColor, clubSecondaryColor);
+  }, [clubPrimaryColor, clubSecondaryColor]);
 
   const fetchClubData = async (userId: string) => {
     const [{ data: profile }, { data: adminRole }, { data: superAdminRole }] = await Promise.all([
