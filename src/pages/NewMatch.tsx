@@ -93,6 +93,8 @@ export default function NewMatch() {
           team_identity: teamIdentity || null,
           home_jersey_color: homeJerseyColor || null,
           away_jersey_color: awayJerseyColor || null,
+          opponent_logo_url: selectedOpp?.logo ?? null,
+          opponent_api_team_id: selectedOpp?.id ?? null,
         } as any)
         .select()
         .single();
