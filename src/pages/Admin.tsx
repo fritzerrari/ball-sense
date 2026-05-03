@@ -207,6 +207,7 @@ export default function Admin() {
             <TabsTrigger value="logs" className="rounded-lg text-xs"><ScrollText className="h-4 w-4 mr-1.5" /> Protokolle</TabsTrigger>
             <TabsTrigger value="guides" className="rounded-lg text-xs"><BookOpen className="h-4 w-4 mr-1.5" /> Anleitungen</TabsTrigger>
             <TabsTrigger value="api-football" className="rounded-lg text-xs"><Globe className="h-4 w-4 mr-1.5" /> API-Football</TabsTrigger>
+            <TabsTrigger value="tracking-quality" className="rounded-lg text-xs"><Activity className="h-4 w-4 mr-1.5" /> Tracking-Qualität</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users"><AdminUsers /></TabsContent>
