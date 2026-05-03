@@ -27,6 +27,8 @@ const AuthContext = createContext<AuthContextType>({
   clubName: null,
   clubPlan: null,
   clubLogoUrl: null,
+  clubPrimaryColor: null,
+  clubSecondaryColor: null,
   isAdmin: false,
   isSuperAdmin: false,
   signOut: async () => {},
