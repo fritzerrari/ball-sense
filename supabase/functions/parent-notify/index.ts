@@ -107,7 +107,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (logs.length > 0) await supabase.from("parent_notifications").insert(logs);
+    if (logs.length > 0) {
+      // Idempotent: ignore duplicates from unique index (subscription_id, match_id, title)
+      await supabase.from("parent_notifications").upsert(logs, {
+        onConflict: "subscription_id,match_id,title",
+        ignoreDuplicates: true,
+      });
+    }
     if (expiredIds.length > 0) {
       await supabase.from("parent_subscriptions").update({ active: false }).in("id", expiredIds);
     }
