@@ -50,6 +50,36 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Block E: Realtime Coach-Inbox toast
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
+    (async () => {
+      const { data: prof } = await supabase
+        .from("profiles").select("club_id").eq("user_id", user.id).maybeSingle();
+      const clubId = prof?.club_id;
+      if (!clubId || cancelled) return;
+      const { toast } = await import("sonner");
+      const channel = supabase
+        .channel(`coach-inbox-${clubId}`)
+        .on("postgres_changes",
+          { event: "INSERT", schema: "public", table: "coach_inbox_items", filter: `club_id=eq.${clubId}` },
+          (payload) => {
+            const item: any = payload.new;
+            const icons: Record<string, string> = { warning: "⚠️", praise: "🏆", tactic: "♟️", fitness: "💪", development: "📈", admin: "📋" };
+            toast(`${icons[item.category] ?? "💡"} ${item.title}`, {
+              description: item.body?.slice(0, 120),
+              action: { label: "Ansehen", onClick: () => navigate("/inbox") },
+              duration: 8000,
+            });
+          })
+        .subscribe();
+      cleanup = () => { supabase.removeChannel(channel); };
+    })();
+    return () => { cancelled = true; cleanup?.(); };
+  }, [user, navigate]);
+
   const NEW_BADGE = <span className="ml-auto inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Neu</span>;
 
   const mainItems = [
