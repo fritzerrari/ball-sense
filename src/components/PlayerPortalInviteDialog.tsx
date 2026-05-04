@@ -37,8 +37,14 @@ export default function PlayerPortalInviteDialog({
         body: { action: "create", player_id: playerId, email: email.trim() },
       });
       if (error) throw error;
-      toast.success(`Einladung an ${email} gesendet (${data?.auth_method ?? "E-Mail"})`);
-      if (data?.invite_warning) toast.warning(data.invite_warning);
+      const method = data?.auth_method;
+      if (data?.invite_warning) {
+        toast.warning(`E-Mail nicht zugestellt: ${data.invite_warning}`, { duration: 8000 });
+      } else if (method === "magiclink") {
+        toast.success(`Magic-Link an ${email} (bereits registriert)`);
+      } else {
+        toast.success(`Einladung an ${email} versendet`);
+      }
       setEmail("");
       const { data: refreshed } = await supabase
         .from("player_portal_invites").select("id, email, status, invited_at, accepted_at")
