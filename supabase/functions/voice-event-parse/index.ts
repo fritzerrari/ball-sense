@@ -102,14 +102,19 @@ Antworte NUR über das Tool extract_event. Wenn kein Event erkennbar ist, setze 
     });
 
     if (!aiResp.ok) {
-      if (aiResp.status === 429) return new Response(JSON.stringify({ error: "Rate-Limit erreicht." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (aiResp.status === 402) return new Response(JSON.stringify({ error: "AI-Guthaben aufgebraucht." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const t = await aiResp.text();
       console.error("voice-event AI error", aiResp.status, t);
+      const status = aiResp.status === 429 ? "rate_limit" : aiResp.status === 402 ? "out_of_credits" : "error";
+      await logAiUsage({ supabase, function_name: "voice-event-parse", model: MODEL, club_id: clubId, match_id, duration_ms: Date.now() - t0, status, error_message: `HTTP ${aiResp.status}` });
+      if (aiResp.status === 429) return new Response(JSON.stringify({ error: "Rate-Limit erreicht." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (aiResp.status === 402) return new Response(JSON.stringify({ error: "AI-Guthaben aufgebraucht." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ error: "AI-Gateway Fehler" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const data = await aiResp.json();
+    const usage = extractUsage(data);
+    await logAiUsage({ supabase, function_name: "voice-event-parse", model: MODEL, club_id: clubId, match_id, duration_ms: Date.now() - t0, status: "ok", ...usage });
+
     const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
       return new Response(JSON.stringify({ error: "Keine Erkennung" }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
