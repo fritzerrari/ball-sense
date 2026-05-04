@@ -315,7 +315,8 @@ export default function NewMatch() {
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
-
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">Gegner (optional)</label>
                 <div className="relative">
                   <input
                     type="text"
