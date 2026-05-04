@@ -9,58 +9,70 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: userData } = await userClient.auth.getUser();
-    if (!userData?.user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Two trigger modes:
+    //  A) User-initiated (UI) — uses Authorization header & profile club lookup
+    //  B) Server-initiated (post-analysis) — body contains { match_id, trigger:"post_analysis" }
+    let clubId: string | null = null;
+    let triggerMatchId: string | null = null;
 
-    const { data: profile } = await supabase.from("profiles").select("club_id").eq("user_id", userData.user.id).maybeSingle();
-    const clubId = profile?.club_id;
+    let body: any = null;
+    try { body = await req.json(); } catch { body = null; }
+
+    if (body?.trigger === "post_analysis" && body?.match_id) {
+      triggerMatchId = body.match_id;
+      const { data: m } = await supabase.from("matches").select("home_club_id").eq("id", triggerMatchId).maybeSingle();
+      clubId = m?.home_club_id ?? null;
+    } else {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: userData } = await userClient.auth.getUser();
+      if (!userData?.user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { data: profile } = await supabase.from("profiles").select("club_id").eq("user_id", userData.user.id).maybeSingle();
+      clubId = profile?.club_id ?? null;
+    }
+
     if (!clubId) return new Response(JSON.stringify({ error: "no_club" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // Letzte 5 finalisierte Matches mit Stats
+    // Last 5 completed matches (schema: away_club_name, date)
     const { data: matches } = await supabase
       .from("matches")
-      .select("id, opponent, match_date, home_score, away_score, ai_summary")
+      .select("id, away_club_name, date, home_score, away_score")
       .eq("home_club_id", clubId)
       .eq("status", "completed")
-      .order("match_date", { ascending: false })
+      .order("date", { ascending: false })
       .limit(5);
 
     if (!matches || matches.length === 0) {
       return new Response(JSON.stringify({ generated: 0, reason: "no_matches" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const matchIds = matches.map(m => m.id);
+    const matchIds = matches.map((m: any) => m.id);
     const { data: teamStats } = await supabase
       .from("team_match_stats")
       .select("match_id, team, possession_pct, total_distance_km, top_speed_kmh")
       .in("match_id", matchIds);
 
-    // Player-Trends (nur eigenes Team)
     const { data: playerStats } = await supabase
       .from("player_match_stats")
       .select("match_id, player_id, distance_km, top_speed_kmh, sprint_count")
       .in("match_id", matchIds);
 
     const summary = {
-      matches: matches.map(m => ({
+      matches: matches.map((m: any) => ({
         id: m.id,
-        opp: m.opponent,
-        date: m.match_date,
+        opp: m.away_club_name,
+        date: m.date,
         score: `${m.home_score ?? "?"}:${m.away_score ?? "?"}`,
-        ai: m.ai_summary?.slice(0, 200),
       })),
       team: teamStats ?? [],
       players: playerStats ?? [],
@@ -96,27 +108,27 @@ Daten: ${JSON.stringify(summary).slice(0, 8000)}`;
     try { recs = JSON.parse(cleaned); } catch { recs = []; }
     if (!Array.isArray(recs)) recs = [];
 
-    const inserts = recs.slice(0, 5).map(r => ({
+    const inserts = recs.slice(0, 5).map((r: any) => ({
       club_id: clubId,
-      match_id: r.match_id || null,
+      match_id: r.match_id || triggerMatchId || null,
       player_id: r.player_id || null,
-      category: ["praise","warning","tactic","fitness","development","admin"].includes(r.category) ? r.category : "tactic",
+      category: ["praise", "warning", "tactic", "fitness", "development", "admin"].includes(r.category) ? r.category : "tactic",
       title: String(r.title ?? "").slice(0, 200),
       body: String(r.body ?? "").slice(0, 1000),
-      priority: [1,2,3].includes(r.priority) ? r.priority : 2,
-      action_url: r.match_id ? `/matches/${r.match_id}` : null,
+      priority: [1, 2, 3].includes(r.priority) ? r.priority : 2,
+      action_url: (r.match_id || triggerMatchId) ? `/matches/${r.match_id || triggerMatchId}` : null,
       source: "ai",
-      metadata: { generated_at: new Date().toISOString() },
-    })).filter(i => i.title && i.body);
+      metadata: { generated_at: new Date().toISOString(), trigger: triggerMatchId ? "post_analysis" : "manual" },
+    })).filter((i: any) => i.title && i.body);
 
     if (inserts.length > 0) {
       await supabase.from("coach_inbox_items").insert(inserts);
     }
 
-    // Log AI usage
     try {
       await supabase.from("ai_usage_log").insert({
         club_id: clubId,
+        match_id: triggerMatchId,
         function_name: "coach-inbox-generate",
         model: "google/gemini-2.5-flash",
         prompt_tokens: aiJson?.usage?.prompt_tokens ?? null,
