@@ -1357,6 +1357,8 @@ UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
         h2_simulated: shouldSimulateH2,
         sync_bursts_detected: burstResult.burstCount,
         cameras_active: Array.from(new Set(selectedMeta.map((m) => m.cam).filter((c) => c >= 0))).length,
+        player_buckets_persisted: aggResult.inserted,
+        player_buckets_matched_to_roster: aggResult.matched,
         updated_at: new Date().toISOString(),
       };
       await supabase.from("matches").update({ tracking_telemetry: telemetryPayload }).eq("id", match_id);
