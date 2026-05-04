@@ -208,6 +208,15 @@ export default function ProcessingPage() {
               <Progress value={progress} className="mt-4" />
             )}
 
+            {showSlowBanner && !isFailed && (
+              <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
+                <p className="font-semibold text-amber-700 dark:text-amber-400">⏱ Etwas dauert länger als gewohnt…</p>
+                <p className="mt-1 text-muted-foreground">
+                  Die Analyse läuft seit über 5 Minuten ohne sichtbaren Fortschritt. Falls nach 30 Minuten nichts passiert ist, markiert das System den Job automatisch als fehlgeschlagen und du kannst neu starten.
+                </p>
+              </div>
+            )}
+
             {isFailed && (
               <div className="space-y-3">
                 <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
