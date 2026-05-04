@@ -39,6 +39,7 @@ const SeasonHub = lazy(() => import("./pages/SeasonHub"));
 const SeasonWrapped = lazy(() => import("./pages/SeasonWrapped"));
 const PlayerPortal = lazy(() => import("./pages/PlayerPortal"));
 const CoachInbox = lazy(() => import("./pages/CoachInbox"));
+const ParentManage = lazy(() => import("./pages/ParentManage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +78,7 @@ const App = () => (
               <Route path="/compare" element={<ComparePage />} />
               <Route path="/tutorial" element={<TutorialPage />} />
               <Route path="/player-portal" element={<ProtectedRoute><PlayerPortal /></ProtectedRoute>} />
+              <Route path="/parent/manage" element={<ParentManage />} />
 
               <Route element={<AuthAppShell />}>
                 <Route path="/login" element={<Login />} />
