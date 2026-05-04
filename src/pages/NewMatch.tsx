@@ -145,6 +145,9 @@ export default function NewMatch() {
         .single();
       if (error) throw error;
       setMatchId(newMatch.id);
+      if (nextFixture?.id) {
+        await supabase.from("team_fixtures").update({ used_for_match_id: newMatch.id }).eq("id", nextFixture.id);
+      }
       setStep("choice");
       toast.success("Spiel angelegt! Die Feldkalibrierung läuft automatisch beim Aufnahmestart.");
     } catch (err: any) {
