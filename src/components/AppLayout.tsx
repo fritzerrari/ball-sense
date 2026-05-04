@@ -50,6 +50,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const NEW_BADGE = <span className="ml-auto inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Neu</span>;
+
   const mainItems = [
     { label: t("nav.dashboard"), icon: Home, href: "/dashboard" },
     { label: t("nav.matches"), icon: Swords, href: "/matches" },
@@ -57,9 +59,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.trends"), icon: TrendingUp, href: "/trends" },
     { label: t("nav.matchPrep") ?? "Spielvorbereitung", icon: Brain, href: "/match-prep" },
     { label: "Season Hub", icon: Trophy, href: "/season" },
-    { label: "Saison-Wrapped", icon: Trophy, href: "/season/wrapped" },
+    { label: "Saison-Wrapped", icon: Trophy, href: "/season/wrapped", badge: NEW_BADGE },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
-    { label: "Coach-Inbox", icon: Inbox, href: "/inbox" },
+    { label: "Coach-Inbox", icon: Inbox, href: "/inbox", badge: NEW_BADGE },
   ];
 
   const manageItems = [
@@ -114,6 +116,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               >
                 <item.icon className="h-5 w-5 shrink-0" />
                 <span>{item.label}</span>
+                {(item as any).badge}
               </Link>
             ))}
           </nav>

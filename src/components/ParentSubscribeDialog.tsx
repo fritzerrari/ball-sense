@@ -27,12 +27,12 @@ export default function ParentSubscribeDialog({ open, onOpenChange, playerId, cl
     }
     setLoading(true);
     try {
-      const { error } = await supabase.from("parent_subscriptions").insert({
+      const { data, error } = await supabase.from("parent_subscriptions").insert({
         player_id: playerId,
         club_id: clubId,
         parent_email: email.toLowerCase().trim(),
         parent_name: name.trim() || null,
-      });
+      }).select("manage_token").maybeSingle();
       if (error) {
         if (error.code === "23505") {
           toast.info("Diese E-Mail ist bereits angemeldet");
@@ -40,7 +40,12 @@ export default function ParentSubscribeDialog({ open, onOpenChange, playerId, cl
           throw error;
         }
       } else {
-        toast.success("Eltern-Benachrichtigung aktiviert");
+        const link = `${window.location.origin}/parent/manage?token=${data?.manage_token}`;
+        try { await navigator.clipboard.writeText(link); } catch (_) {}
+        toast.success("Eltern-Benachrichtigung aktiviert", {
+          description: "Magic-Link zur Verwaltung wurde in die Zwischenablage kopiert.",
+          duration: 8000,
+        });
       }
       setEmail("");
       setName("");

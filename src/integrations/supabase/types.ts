@@ -2519,6 +2519,20 @@ export type Database = {
         Args: { _club_id: string; _league: string }
         Returns: Json
       }
+      get_parent_subscription_by_token: {
+        Args: { _token: string }
+        Returns: {
+          active: boolean
+          club_name: string
+          has_push: boolean
+          id: string
+          notify_on: Json
+          parent_email: string
+          parent_name: string
+          player_id: string
+          player_name: string
+        }[]
+      }
       get_user_club_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -2531,6 +2545,18 @@ export type Database = {
       recompute_match_scores: {
         Args: { _match_id: string }
         Returns: undefined
+      }
+      update_parent_subscription_by_token: {
+        Args: {
+          _active?: boolean
+          _notify_on?: Json
+          _parent_name?: string
+          _push_auth?: string
+          _push_endpoint?: string
+          _push_p256dh?: string
+          _token: string
+        }
+        Returns: boolean
       }
     }
     Enums: {

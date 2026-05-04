@@ -1,6 +1,6 @@
-// Sends parent push notifications via Web Push when a match is finalized.
-// Triggered manually after match completion or by scheduled job.
+// Sends parent push notifications via Web Push (VAPID/aes128gcm) when a match is finalized.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { sendWebPush } from "../_shared/web-push.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +26,6 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!match) return new Response(JSON.stringify({ error: "match not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // Players in this match
     const { data: lineup } = await supabase
       .from("match_lineups")
       .select("player_id")
@@ -36,13 +35,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ sent: 0, reason: "no_lineup" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Get player goals
     const { data: events } = await supabase
       .from("match_events")
       .select("player_id, event_type")
       .eq("match_id", match_id)
       .in("player_id", playerIds);
-
     const goalsByPlayer = new Map<string, number>();
     (events ?? []).forEach(e => {
       if (e.event_type === "goal" && e.player_id) {
@@ -50,13 +47,11 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Active subscriptions for these players
     const { data: subs } = await supabase
       .from("parent_subscriptions")
       .select("*")
       .in("player_id", playerIds)
       .eq("active", true);
-
     if (!subs || subs.length === 0) {
       return new Response(JSON.stringify({ sent: 0, reason: "no_subs" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -68,52 +63,58 @@ Deno.serve(async (req) => {
     const playerName = new Map((players ?? []).map(p => [p.id, p.name]));
 
     const score = `${match.home_score ?? 0}:${match.away_score ?? 0}`;
-    let sent = 0;
-    let logs: any[] = [];
+    let sent = 0, failed = 0;
+    const logs: any[] = [];
+    const expiredIds: string[] = [];
 
     for (const sub of subs) {
+      // Skip if this sub already got a notification for this match
+      const { count: dup } = await supabase
+        .from("parent_notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("subscription_id", sub.id)
+        .eq("match_id", match_id)
+        .eq("delivery_status", "sent");
+      if ((dup ?? 0) > 0) continue;
+
       const name = playerName.get(sub.player_id) ?? "Spieler";
       const goals = goalsByPlayer.get(sub.player_id) ?? 0;
-      const title = `⚽ ${name} – Spielende`;
+      const title = goals > 0 ? `⚽ ${name} – ${goals} Tor${goals > 1 ? "e" : ""}!` : `⚽ ${name} – Spielende`;
       const body = goals > 0
-        ? `${name} hat ${goals} Tor${goals > 1 ? "e" : ""} erzielt! Endstand vs ${match.opponent}: ${score}`
-        : `Spielende vs ${match.opponent}: ${score}. Vollständiger Bericht in der App.`;
+        ? `Endstand vs ${match.opponent}: ${score}. ${goals} Tor${goals > 1 ? "e" : ""} erzielt!`
+        : `Endstand vs ${match.opponent}: ${score}. Bericht in der App.`;
 
-      let status: "sent" | "failed" | "expired" = "sent";
+      let status: "sent" | "failed" | "expired" | "pending" = "pending";
       let error: string | null = null;
 
-      // Web Push delivery (only if endpoint set)
       if (sub.push_endpoint && sub.push_p256dh && sub.push_auth) {
         try {
-          // Note: full Web Push requires VAPID. For now we log; integration with web-push lib pending.
-          // In production, add VAPID keys + a proper push library here.
-          status = "pending" as any;
+          const res = await sendWebPush(
+            { endpoint: sub.push_endpoint, p256dh: sub.push_p256dh, auth: sub.push_auth },
+            { title, body, url: `/matches/${match_id}`, tag: `match-${match_id}-${sub.player_id}` },
+          );
+          if (res.ok) { status = "sent"; sent++; }
+          else if (res.expired) { status = "expired"; expiredIds.push(sub.id); }
+          else { status = "failed"; error = `${res.status}: ${res.error?.slice(0, 200) ?? ""}`; failed++; }
         } catch (e: any) {
-          status = "failed";
-          error = e?.message ?? "push_error";
+          status = "failed"; error = e?.message?.slice(0, 200) ?? "push_error"; failed++;
         }
-      } else {
-        status = "pending" as any; // No push endpoint = email-only mode (future)
       }
 
       logs.push({
-        subscription_id: sub.id,
-        player_id: sub.player_id,
-        match_id,
-        title,
-        body,
-        delivery_status: status,
-        error,
+        subscription_id: sub.id, player_id: sub.player_id, match_id,
+        title, body, delivery_status: status, error,
       });
-      sent++;
     }
 
-    if (logs.length > 0) {
-      await supabase.from("parent_notifications").insert(logs);
+    if (logs.length > 0) await supabase.from("parent_notifications").insert(logs);
+    if (expiredIds.length > 0) {
+      await supabase.from("parent_subscriptions").update({ active: false }).in("id", expiredIds);
     }
 
-    return new Response(JSON.stringify({ sent, total_subs: subs.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ sent, failed, expired: expiredIds.length, total_subs: subs.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
+    console.error("parent-notify error", e);
     return new Response(JSON.stringify({ error: e?.message ?? "error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
