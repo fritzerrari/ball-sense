@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -116,7 +116,75 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
   const [notes, setNotes] = useState("");
   const [zone, setZone] = useState("");
   const [saving, setSaving] = useState(false);
-  const [recentEvents, setRecentEvents] = useState<Array<{ type: string; label: string; minute: number; team: string }>>([]);
+  const [recentEvents, setRecentEvents] = useState<Array<{ id?: string; type: string; label: string; minute: number; team: string; auto_detected?: boolean; confidence?: number | null; verified?: boolean }>>([]);
+
+  // Subscribe to DB events (incl. auto-detected from live-event-detector)
+  useEffect(() => {
+    if (!matchId) return;
+    let cancelled = false;
+
+    const eventLabel = (t: string) => {
+      for (const cat of EVENT_CATEGORIES) {
+        const found = cat.events.find((e) => e.type === t);
+        if (found) return found.label;
+      }
+      return t;
+    };
+
+    const load = async () => {
+      const { data } = await supabase
+        .from("match_events")
+        .select("id, event_type, minute, team, auto_detected, confidence, verified")
+        .eq("match_id", matchId)
+        .order("created_at", { ascending: false })
+        .limit(15);
+      if (!cancelled && Array.isArray(data)) {
+        setRecentEvents(
+          data.map((d: any) => ({
+            id: d.id,
+            type: d.event_type,
+            label: eventLabel(d.event_type),
+            minute: d.minute,
+            team: d.team,
+            auto_detected: d.auto_detected,
+            confidence: d.confidence,
+            verified: d.verified,
+          })),
+        );
+      }
+    };
+
+    load();
+
+    const channel = supabase
+      .channel(`live-events-${matchId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "match_events", filter: `match_id=eq.${matchId}` },
+        (payload: any) => {
+          const d = payload.new;
+          setRecentEvents((prev) => [
+            {
+              id: d.id,
+              type: d.event_type,
+              label: eventLabel(d.event_type),
+              minute: d.minute,
+              team: d.team,
+              auto_detected: d.auto_detected,
+              confidence: d.confidence,
+              verified: d.verified,
+            },
+            ...prev.slice(0, 14),
+          ]);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [matchId]);
 
   const currentMinute = Math.floor(elapsedSec / 60);
   const activePlayers = team === "home" ? homePlayers : (awayPlayers ?? []);
@@ -152,11 +220,7 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
         insertData.notes = `Raus: ${player?.player_name ?? "?"}, Rein: ${playerName}`;
       }
       await supabase.from("match_events").insert(insertData);
-
-      setRecentEvents((prev) => [
-        { type: selectedEvent.type, label: selectedEvent.label, minute: min, team },
-        ...prev.slice(0, 9),
-      ]);
+      // Realtime subscription updates recentEvents — no manual setState needed
 
       toast.success(`${selectedEvent.label} (${min}') erfasst`);
       setSelectedEvent(null);
@@ -215,14 +279,33 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
                 <div className="space-y-1">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Letzte Events</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {recentEvents.slice(0, 5).map((ev, i) => (
-                      <span key={i} className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                        {ev.minute}' {ev.label} {ev.team === "away" ? "(G)" : ""}
-                      </span>
-                    ))}
+                    {recentEvents.slice(0, 8).map((ev, i) => {
+                      const lowConf = ev.auto_detected && !ev.verified && (ev.confidence ?? 1) < 0.7;
+                      return (
+                        <span
+                          key={ev.id ?? i}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+                            lowConf
+                              ? "border-warning/40 bg-warning/10 text-warning"
+                              : ev.auto_detected
+                              ? "border-primary/30 bg-primary/10 text-primary"
+                              : "border-border bg-muted text-muted-foreground"
+                          }`}
+                          title={ev.auto_detected ? `KI-erkannt · Konfidenz ${Math.round((ev.confidence ?? 0) * 100)}%` : "Manuell erfasst"}
+                        >
+                          {ev.minute}' {ev.label} {ev.team === "away" ? "(G)" : ""}
+                          {ev.auto_detected && !ev.verified && (
+                            <span className="font-semibold">
+                              {lowConf ? "· Bitte prüfen" : "· KI"}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
+
 
               {/* Event categories */}
               {EVENT_CATEGORIES.map((cat) => (
