@@ -55,11 +55,17 @@ ${rosterText || "(unbekannt)"}
 
 Antworte NUR über das Tool extract_event. Wenn kein Event erkennbar ist, setze confidence < 0.3.`;
 
+    // Lookup club_id for usage tracking
+    const { data: matchRow } = await supabase.from("matches").select("home_club_id").eq("id", match_id).maybeSingle();
+    const clubId = matchRow?.home_club_id ?? null;
+    const MODEL = "google/gemini-2.5-flash";
+    const t0 = Date.now();
+
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           {
