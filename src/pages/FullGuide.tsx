@@ -237,6 +237,10 @@ const sections: GuideSection[] = [
     content: (
       <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
         <div>
+          <h4 className="font-semibold text-foreground">📋 Mannschafts-Bibliothek (NEU)</h4>
+          <p className="mt-1">Importiere deinen kompletten Verein einmalig von fussball.de — alle Mannschaften (Herren, Jugend), Kader, Spielpläne, Tabellen. Beim Anlegen eines neuen Spiels wählst du nur noch die Mannschaft im Dropdown — Datum, Gegner und Heim/Auswärts werden automatisch aus dem nächsten Spielplan-Eintrag übernommen. Aufruf: <strong>Einstellungen → Mannschafts-Bibliothek</strong> → fussball.de Vereins-URL einfügen → „Importieren". Eine Mannschaft als ⭐ Standard markieren.</p>
+        </div>
+        <div>
           <h4 className="font-semibold text-foreground">📥 Coach-KI-Inbox</h4>
           <p className="mt-1">Personalisierte Empfehlungen aus deinen letzten 5 Spielen — Lob, Warnungen, Taktik-Tipps, Fitness-Hinweise. Aufruf über Sidebar → <strong>Coach-Inbox</strong>.</p>
         </div>
