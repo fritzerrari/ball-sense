@@ -105,7 +105,7 @@ export default function PlayerPortal() {
       {heatmap && (
         <Card>
           <CardHeader><CardTitle className="text-base">Deine Heatmap (alle Spiele)</CardTitle></CardHeader>
-          <CardContent><HeatmapField grid={{ cols: heatmap[0]?.length ?? 10, rows: heatmap.length, data: heatmap }} /></CardContent>
+          <CardContent><HeatmapField grid={heatmap} /></CardContent>
         </Card>
       )}
 
