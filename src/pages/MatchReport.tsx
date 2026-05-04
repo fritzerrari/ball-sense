@@ -349,6 +349,16 @@ export default function MatchReport() {
           </Card>
         )}
 
+        {/* Pre-Match Readiness Check (only when match is in setup phase) */}
+        {!hasReport && !isProcessing && match?.status === "setup" && id && (
+          <PreFlightCheckCard
+            matchId={id}
+            homeClubId={match.home_club_id ?? null}
+            fieldId={match.field_id ?? null}
+            awayClubName={match.away_club_name ?? null}
+          />
+        )}
+
         {/* No report yet */}
         {!hasReport && !isProcessing && (
           <Card>
