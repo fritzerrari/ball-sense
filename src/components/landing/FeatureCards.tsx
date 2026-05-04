@@ -4,7 +4,7 @@ import {
   Smartphone, Brain, Shield, Users, Zap, FileText, Dumbbell, Share2,
   Sparkles, TrendingUp, AlertTriangle, MessageSquare, ArrowUp,
   ArrowRightLeft, Eye, Layers, Battery, Target, Camera, ChevronDown,
-  Radio, ScanLine, ClipboardEdit,
+  Radio, ScanLine, ClipboardEdit, Inbox, Bell, Trophy, Activity,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
