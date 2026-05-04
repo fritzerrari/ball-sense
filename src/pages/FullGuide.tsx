@@ -231,6 +231,43 @@ const sections: GuideSection[] = [
     ),
   },
   {
+    id: "whats-new",
+    icon: <HelpCircle className="h-5 w-5" />,
+    title: "🆕 Neu im System",
+    content: (
+      <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+        <div>
+          <h4 className="font-semibold text-foreground">📥 Coach-KI-Inbox</h4>
+          <p className="mt-1">Personalisierte Empfehlungen aus deinen letzten 5 Spielen — Lob, Warnungen, Taktik-Tipps, Fitness-Hinweise. Aufruf über Sidebar → <strong>Coach-Inbox</strong>.</p>
+        </div>
+        <div>
+          <h4 className="font-semibold text-foreground">🏆 Saison-Wrapped</h4>
+          <p className="mt-1">Spotify-Wrapped-Style Saisonrückblick mit Highlights, Top-Spielern, Erfolgen und Statistiken — als Dashboard-Seite.</p>
+        </div>
+        <div>
+          <h4 className="font-semibold text-foreground">🎤 Voice-Events (Helfer)</h4>
+          <p className="mt-1">Helfer können Events per Sprachbefehl loggen: <em>„Tor für uns Minute 23 von Müller"</em>. KI parst Event-Typ, Minute und Spieler — bei Konfidenz &lt;60% Bestätigung erforderlich.</p>
+        </div>
+        <div>
+          <h4 className="font-semibold text-foreground">👨‍👩‍👧 Eltern-Push-Benachrichtigungen</h4>
+          <p className="mt-1">Eltern abonnieren Push-Nachrichten pro Spieler. Nach Spielende kommt automatisch: Endstand + Tore des eigenen Kindes. Verwaltung über Magic-Link.</p>
+        </div>
+        <div>
+          <h4 className="font-semibold text-foreground">🔐 Spieler-Portal</h4>
+          <p className="mt-1">Spieler erhalten per E-Mail-Einladung Zugang zu ihrem persönlichen Profil mit allen Statistiken.</p>
+        </div>
+        <div>
+          <h4 className="font-semibold text-foreground">🛡️ Pipeline-Watchdog</h4>
+          <p className="mt-1">Hängende Analyse-Jobs werden nach 30min automatisch erkannt und neu gestartet. Trainer wird per Notification informiert (max 1× pro 24h pro Spiel).</p>
+        </div>
+        <div>
+          <h4 className="font-semibold text-foreground">📊 KI-Verbrauchs-Übersicht (Admin)</h4>
+          <p className="mt-1">Superadmin sieht im Admin-Bereich pro Verein: Gemini-Tokens, Modelle, Dauer pro KI-Call der letzten 30 Tage.</p>
+        </div>
+      </div>
+    ),
+  },
+  {
     id: "troubleshooting",
     icon: <HelpCircle className="h-5 w-5" />,
     title: "Tipps & Troubleshooting",
