@@ -39,7 +39,7 @@ export default function ProcessingPage() {
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("analysis_jobs")
-        .select("id, status, progress, error_message, job_kind")
+        .select("id, status, progress, error_message, job_kind, created_at, started_at")
         .eq("match_id", id)
         .eq("job_kind", "final")
         .order("created_at", { ascending: false })
@@ -51,11 +51,28 @@ export default function ProcessingPage() {
         setStatus(nextStatus);
         setProgress(data.progress ?? 0);
         setErrorMessage(data.error_message ?? null);
+        const startTs = data.started_at ?? data.created_at;
+        if (startTs) setJobStartedAt(new Date(startTs).getTime());
         if (TERMINAL_JOB_STATUSES.includes(nextStatus)) clearInterval(interval);
       }
     }, 2000);
     return () => clearInterval(interval);
   }, [id]);
+
+  // Slow-banner: show after 5min if progress still <10%
+  useEffect(() => {
+    if (!jobStartedAt || status === "complete" || status === "failed") {
+      setShowSlowBanner(false);
+      return;
+    }
+    const check = () => {
+      const elapsedMin = (Date.now() - jobStartedAt) / 60000;
+      setShowSlowBanner(elapsedMin > 5 && progress < 10);
+    };
+    check();
+    const t = setInterval(check, 15000);
+    return () => clearInterval(t);
+  }, [jobStartedAt, progress, status]);
 
   // Load frame diagnostics when analysis fails so the user gets a meaningful explanation
   useEffect(() => {
