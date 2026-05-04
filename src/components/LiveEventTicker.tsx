@@ -283,14 +283,33 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
                 <div className="space-y-1">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Letzte Events</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {recentEvents.slice(0, 5).map((ev, i) => (
-                      <span key={i} className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                        {ev.minute}' {ev.label} {ev.team === "away" ? "(G)" : ""}
-                      </span>
-                    ))}
+                    {recentEvents.slice(0, 8).map((ev, i) => {
+                      const lowConf = ev.auto_detected && !ev.verified && (ev.confidence ?? 1) < 0.7;
+                      return (
+                        <span
+                          key={ev.id ?? i}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+                            lowConf
+                              ? "border-warning/40 bg-warning/10 text-warning"
+                              : ev.auto_detected
+                              ? "border-primary/30 bg-primary/10 text-primary"
+                              : "border-border bg-muted text-muted-foreground"
+                          }`}
+                          title={ev.auto_detected ? `KI-erkannt · Konfidenz ${Math.round((ev.confidence ?? 0) * 100)}%` : "Manuell erfasst"}
+                        >
+                          {ev.minute}' {ev.label} {ev.team === "away" ? "(G)" : ""}
+                          {ev.auto_detected && !ev.verified && (
+                            <span className="font-semibold">
+                              {lowConf ? "· Bitte prüfen" : "· KI"}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
+
 
               {/* Event categories */}
               {EVENT_CATEGORIES.map((cat) => (
