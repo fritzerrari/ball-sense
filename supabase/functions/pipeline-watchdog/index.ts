@@ -79,10 +79,10 @@ Deno.serve(async (req) => {
 
       const notifications = (profiles ?? []).map((p: { user_id: string }) => ({
         user_id: p.user_id,
+        match_id: job.match_id,
         type: "analysis_stuck",
         title: "Analyse blockiert",
-        message: `Spiel vom ${match.date}${match.away_club_name ? ` gegen ${match.away_club_name}` : ""}: Analyse seit >${STUCK_AFTER_MIN} min in Wartestellung — bitte erneut starten.`,
-        link: `/matches/${job.match_id}`,
+        body: `Spiel vom ${match.date}${match.away_club_name ? ` gegen ${match.away_club_name}` : ""}: Analyse seit >${STUCK_AFTER_MIN} min in Wartestellung — bitte erneut starten.`,
       }));
 
       if (notifications.length > 0) {
