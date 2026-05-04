@@ -15,6 +15,7 @@ import { useTranslation } from "@/lib/i18n";
 import { Switch } from "@/components/ui/switch";
 import { useBenchmarkOptIn } from "@/hooks/use-benchmark";
 import { getUltraWidePreference, setUltraWidePreference } from "@/hooks/use-ultra-wide-camera";
+import { ClubTeamsManager } from "@/components/ClubTeamsManager";
 
 async function hashCode(code: string) {
   const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
@@ -263,6 +264,11 @@ export default function SettingsPage() {
 
         {/* Camera Settings */}
         <CameraSettingsSection />
+
+        {/* Club Teams Library — NEW */}
+        <div className="glass-card p-6">
+          <ClubTeamsManager />
+        </div>
 
         {/* Benchmark Opt-in — Pro only */}
         <BenchmarkOptInSection />

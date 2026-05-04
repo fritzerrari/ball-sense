@@ -40,6 +40,51 @@ export default function NewMatch() {
   const [oppSuggestions, setOppSuggestions] = useState<any[]>([]);
   const [selectedOpp, setSelectedOpp] = useState<{ id: number; name: string; logo: string; form?: any } | null>(null);
 
+  // 🆕 Club-Teams library
+  const [clubTeams, setClubTeams] = useState<any[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  const [nextFixture, setNextFixture] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (!clubId) return;
+    supabase
+      .from("club_teams")
+      .select("id, name, age_group, league, is_default")
+      .eq("club_id", clubId)
+      .eq("active", true)
+      .order("is_default", { ascending: false })
+      .order("name")
+      .then(({ data }) => {
+        const list = data ?? [];
+        setClubTeams(list);
+        const def = list.find((t: any) => t.is_default) || list[0];
+        if (def && !selectedTeamId) setSelectedTeamId(def.id);
+      });
+  }, [clubId]);
+
+  useEffect(() => {
+    if (!selectedTeamId) { setNextFixture(null); return; }
+    supabase
+      .from("team_fixtures")
+      .select("*")
+      .eq("team_id", selectedTeamId)
+      .eq("status", "scheduled")
+      .gte("match_date", new Date().toISOString().split("T")[0])
+      .order("match_date", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        setNextFixture(data);
+        if (data) {
+          setDate(data.match_date);
+          const opp = data.is_home ? data.away_team_name : data.home_team_name;
+          if (opp && !awayName) setAwayName(opp);
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTeamId]);
+
+
   const searchOpponent = useCallback(async () => {
     if (!awayName || awayName.length < 3) return;
     setOppSuggesting(true);
@@ -100,6 +145,9 @@ export default function NewMatch() {
         .single();
       if (error) throw error;
       setMatchId(newMatch.id);
+      if (nextFixture?.id) {
+        await supabase.from("team_fixtures").update({ used_for_match_id: newMatch.id }).eq("id", nextFixture.id);
+      }
       setStep("choice");
       toast.success("Spiel angelegt! Die Feldkalibrierung läuft automatisch beim Aufnahmestart.");
     } catch (err: any) {
@@ -240,6 +288,34 @@ export default function NewMatch() {
                 <p className="text-xs text-muted-foreground">Nur das Wichtigste</p>
               </div>
             </div>
+
+            {/* 🆕 Mannschaft auswählen */}
+            {clubTeams.length > 0 && (
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground flex items-center gap-2">
+                  Mannschaft
+                  <span className="rounded-full bg-primary/15 text-primary text-[10px] px-1.5 py-0.5 font-semibold">NEU</span>
+                </label>
+                <select
+                  value={selectedTeamId}
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 h-12 text-sm text-foreground"
+                >
+                  {clubTeams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}{t.age_group ? ` · ${t.age_group}` : ""}{t.is_default ? " ⭐" : ""}
+                    </option>
+                  ))}
+                </select>
+                {nextFixture && (
+                  <p className="text-xs text-primary mt-1.5 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Nächstes Spiel: {new Date(nextFixture.match_date).toLocaleDateString("de-DE")} ·{" "}
+                    {nextFixture.is_home ? "Heim" : "Auswärts"} vs {nextFixture.is_home ? nextFixture.away_team_name : nextFixture.home_team_name}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>

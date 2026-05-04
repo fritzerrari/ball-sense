@@ -799,6 +799,72 @@ export type Database = {
           },
         ]
       }
+      club_teams: {
+        Row: {
+          active: boolean
+          age_group: string | null
+          club_id: string
+          created_at: string
+          external_source: string | null
+          external_team_id: string | null
+          external_url: string | null
+          goal_difference: string | null
+          id: string
+          is_default: boolean
+          last_synced_at: string | null
+          league: string | null
+          logo_url: string | null
+          metadata: Json
+          name: string
+          points: number | null
+          spielklasse: string | null
+          table_position: number | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          age_group?: string | null
+          club_id: string
+          created_at?: string
+          external_source?: string | null
+          external_team_id?: string | null
+          external_url?: string | null
+          goal_difference?: string | null
+          id?: string
+          is_default?: boolean
+          last_synced_at?: string | null
+          league?: string | null
+          logo_url?: string | null
+          metadata?: Json
+          name: string
+          points?: number | null
+          spielklasse?: string | null
+          table_position?: number | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          age_group?: string | null
+          club_id?: string
+          created_at?: string
+          external_source?: string | null
+          external_team_id?: string | null
+          external_url?: string | null
+          goal_difference?: string | null
+          id?: string
+          is_default?: boolean
+          last_synced_at?: string | null
+          league?: string | null
+          logo_url?: string | null
+          metadata?: Json
+          name?: string
+          points?: number | null
+          spielklasse?: string | null
+          table_position?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clubs: {
         Row: {
           city: string | null
@@ -2273,6 +2339,71 @@ export type Database = {
         }
         Relationships: []
       }
+      team_fixtures: {
+        Row: {
+          away_score: number | null
+          away_team_name: string
+          club_id: string
+          competition: string | null
+          created_at: string
+          external_match_id: string | null
+          home_score: number | null
+          home_team_name: string
+          id: string
+          is_home: boolean
+          kickoff_time: string | null
+          match_date: string
+          status: string
+          team_id: string
+          updated_at: string
+          used_for_match_id: string | null
+        }
+        Insert: {
+          away_score?: number | null
+          away_team_name: string
+          club_id: string
+          competition?: string | null
+          created_at?: string
+          external_match_id?: string | null
+          home_score?: number | null
+          home_team_name: string
+          id?: string
+          is_home?: boolean
+          kickoff_time?: string | null
+          match_date: string
+          status?: string
+          team_id: string
+          updated_at?: string
+          used_for_match_id?: string | null
+        }
+        Update: {
+          away_score?: number | null
+          away_team_name?: string
+          club_id?: string
+          competition?: string | null
+          created_at?: string
+          external_match_id?: string | null
+          home_score?: number | null
+          home_team_name?: string
+          id?: string
+          is_home?: boolean
+          kickoff_time?: string | null
+          match_date?: string
+          status?: string
+          team_id?: string
+          updated_at?: string
+          used_for_match_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_fixtures_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "club_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_match_stats: {
         Row: {
           anomaly_flags: Json
@@ -2325,6 +2456,133 @@ export type Database = {
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_players: {
+        Row: {
+          age: number | null
+          assists: number | null
+          club_id: string
+          created_at: string
+          external_player_id: string | null
+          goals: number | null
+          id: string
+          matches_played: number | null
+          metadata: Json
+          minutes_played: number | null
+          player_name: string
+          position: string | null
+          red_cards: number | null
+          shirt_number: number | null
+          team_id: string
+          updated_at: string
+          yellow_cards: number | null
+        }
+        Insert: {
+          age?: number | null
+          assists?: number | null
+          club_id: string
+          created_at?: string
+          external_player_id?: string | null
+          goals?: number | null
+          id?: string
+          matches_played?: number | null
+          metadata?: Json
+          minutes_played?: number | null
+          player_name: string
+          position?: string | null
+          red_cards?: number | null
+          shirt_number?: number | null
+          team_id: string
+          updated_at?: string
+          yellow_cards?: number | null
+        }
+        Update: {
+          age?: number | null
+          assists?: number | null
+          club_id?: string
+          created_at?: string
+          external_player_id?: string | null
+          goals?: number | null
+          id?: string
+          matches_played?: number | null
+          metadata?: Json
+          minutes_played?: number | null
+          player_name?: string
+          position?: string | null
+          red_cards?: number | null
+          shirt_number?: number | null
+          team_id?: string
+          updated_at?: string
+          yellow_cards?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_players_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "club_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_standings: {
+        Row: {
+          club_id: string
+          draws: number | null
+          fetched_at: string
+          goals_against: number | null
+          goals_for: number | null
+          id: string
+          is_own: boolean
+          losses: number | null
+          played: number | null
+          points: number | null
+          position: number | null
+          team_id: string
+          team_name: string
+          wins: number | null
+        }
+        Insert: {
+          club_id: string
+          draws?: number | null
+          fetched_at?: string
+          goals_against?: number | null
+          goals_for?: number | null
+          id?: string
+          is_own?: boolean
+          losses?: number | null
+          played?: number | null
+          points?: number | null
+          position?: number | null
+          team_id: string
+          team_name: string
+          wins?: number | null
+        }
+        Update: {
+          club_id?: string
+          draws?: number | null
+          fetched_at?: string
+          goals_against?: number | null
+          goals_for?: number | null
+          id?: string
+          is_own?: boolean
+          losses?: number | null
+          played?: number | null
+          points?: number | null
+          position?: number | null
+          team_id?: string
+          team_name?: string
+          wins?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_standings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "club_teams"
             referencedColumns: ["id"]
           },
         ]
