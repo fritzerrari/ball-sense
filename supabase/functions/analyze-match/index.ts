@@ -15,6 +15,237 @@ interface FrameTelemetry {
   chunk_count: number;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Player-Stats Aggregation: from frame_positions → player_match_stats
+// ─────────────────────────────────────────────────────────────────
+const PITCH_W_M = 105;
+const PITCH_H_M = 68;
+const SPRINT_KMH = 20;
+const HEATMAP_BINS = 10;
+
+interface AggBucket {
+  team: "home" | "away";
+  number: number | null;
+  role: string | null;
+  positions: Array<{ t: number; x: number; y: number }>;
+  heatmap: number[][];
+  totalDistanceM: number;
+  topSpeedKmh: number;
+  speedSamples: number[];
+  sprintCount: number;
+  sprintDistanceM: number;
+  inSprint: boolean;
+  currentSprintM: number;
+}
+
+function makeBucket(team: "home" | "away", number: number | null, role: string | null): AggBucket {
+  return {
+    team, number, role,
+    positions: [],
+    heatmap: Array.from({ length: HEATMAP_BINS }, () => Array(HEATMAP_BINS).fill(0)),
+    totalDistanceM: 0,
+    topSpeedKmh: 0,
+    speedSamples: [],
+    sprintCount: 0,
+    sprintDistanceM: 0,
+    inSprint: false,
+    currentSprintM: 0,
+  };
+}
+
+function aggregatePlayerStats(
+  frames: any[],
+  durationSec: number,
+): AggBucket[] {
+  if (!Array.isArray(frames) || frames.length === 0) return [];
+
+  const buckets = new Map<string, AggBucket>();
+  // Sort by timestamp/frame_index
+  const sorted = [...frames].sort((a, b) => {
+    const ta = typeof a?.t === "number" ? a.t : (a?.frame_index ?? 0) * 1000;
+    const tb = typeof b?.t === "number" ? b.t : (b?.frame_index ?? 0) * 1000;
+    return ta - tb;
+  });
+
+  // Anonymous slot allocator per (team, role) when number is missing
+  const anonCounters = new Map<string, number>();
+  const allocAnonNumber = (team: string, role: string | null) => {
+    const key = `${team}:${role ?? "X"}`;
+    const next = (anonCounters.get(key) ?? 0) + 1;
+    anonCounters.set(key, next);
+    return -next; // negative numbers = anonymous slots
+  };
+
+  for (let i = 0; i < sorted.length; i++) {
+    const fr = sorted[i];
+    const tMs = typeof fr?.t === "number" ? fr.t : (fr?.frame_index ?? i) * (durationSec * 1000 / Math.max(1, sorted.length));
+    if (!Array.isArray(fr?.players)) continue;
+
+    // Reset anon counters per frame so the slot allocation matches across frames
+    // by stable (team, role, order) — only used when no jersey number provided
+    const perFrameAnonSeen = new Map<string, number>();
+    for (const p of fr.players) {
+      if (!p || typeof p.x !== "number" || typeof p.y !== "number") continue;
+      const team = (p.team === "away" ? "away" : "home") as "home" | "away";
+      const role = typeof p.role === "string" ? p.role : null;
+      let number: number | null = typeof p.number === "number" ? p.number : null;
+
+      if (number == null) {
+        const k = `${team}:${role ?? "X"}`;
+        const seen = (perFrameAnonSeen.get(k) ?? 0) + 1;
+        perFrameAnonSeen.set(k, seen);
+        // stable slot per (team,role,seen-index across frames)
+        const slotKey = `${team}:${role ?? "X"}:${seen}`;
+        let slot = anonCounters.get(slotKey);
+        if (slot == null) {
+          slot = allocAnonNumber(team, role);
+          anonCounters.set(slotKey, slot);
+        }
+        number = slot;
+      }
+
+      const bKey = `${team}:${number}`;
+      let b = buckets.get(bKey);
+      if (!b) {
+        b = makeBucket(team, number, role);
+        buckets.set(bKey, b);
+      }
+
+      // Convert 0-100 → meters
+      const xm = (p.x / 100) * PITCH_W_M;
+      const ym = (p.y / 100) * PITCH_H_M;
+      const last = b.positions[b.positions.length - 1];
+      b.positions.push({ t: tMs, x: xm, y: ym });
+
+      // Heatmap bin
+      const bx = Math.min(HEATMAP_BINS - 1, Math.max(0, Math.floor(p.x / (100 / HEATMAP_BINS))));
+      const by = Math.min(HEATMAP_BINS - 1, Math.max(0, Math.floor(p.y / (100 / HEATMAP_BINS))));
+      b.heatmap[by][bx]++;
+
+      if (last) {
+        const dxm = xm - last.x;
+        const dym = ym - last.y;
+        const dM = Math.sqrt(dxm * dxm + dym * dym);
+        const dtSec = Math.max(0.1, (tMs - last.t) / 1000);
+        // Cap unrealistic jumps (camera switch / detection error)
+        if (dM < 50 && dtSec < 30) {
+          b.totalDistanceM += dM;
+          const speedKmh = (dM / dtSec) * 3.6;
+          if (speedKmh > 0 && speedKmh < 45) {
+            b.speedSamples.push(speedKmh);
+            if (speedKmh > b.topSpeedKmh) b.topSpeedKmh = speedKmh;
+            if (speedKmh >= SPRINT_KMH) {
+              if (!b.inSprint) {
+                b.inSprint = true;
+                b.sprintCount++;
+                b.currentSprintM = 0;
+              }
+              b.currentSprintM += dM;
+            } else if (b.inSprint && speedKmh < SPRINT_KMH * 0.8) {
+              b.sprintDistanceM += b.currentSprintM;
+              b.inSprint = false;
+              b.currentSprintM = 0;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Close any open sprints
+  for (const b of buckets.values()) {
+    if (b.inSprint) {
+      b.sprintDistanceM += b.currentSprintM;
+      b.inSprint = false;
+    }
+  }
+
+  return Array.from(buckets.values());
+}
+
+async function persistPlayerMatchStats(
+  supabase: any,
+  matchId: string,
+  buckets: AggBucket[],
+  matchDurationMin: number,
+): Promise<{ inserted: number; matched: number }> {
+  if (buckets.length === 0) return { inserted: 0, matched: 0 };
+
+  // Load lineup once for jersey-number → player_id mapping
+  const { data: lineups } = await supabase
+    .from("match_lineups")
+    .select("player_id, team, shirt_number, player_name")
+    .eq("match_id", matchId);
+
+  const lineupMap = new Map<string, { player_id: string | null; player_name: string | null }>();
+  if (Array.isArray(lineups)) {
+    for (const l of lineups) {
+      if (l.shirt_number != null && l.team) {
+        lineupMap.set(`${l.team}:${l.shirt_number}`, {
+          player_id: l.player_id ?? null,
+          player_name: l.player_name ?? null,
+        });
+      }
+    }
+  }
+
+  // Wipe any previous stats for this match (re-run case)
+  await supabase.from("player_match_stats").delete().eq("match_id", matchId);
+
+  const rows: any[] = [];
+  let matched = 0;
+  for (const b of buckets) {
+    const isAnon = b.number != null && b.number < 0;
+    const lookupKey = isAnon ? null : `${b.team}:${b.number}`;
+    const lineup = lookupKey ? lineupMap.get(lookupKey) : undefined;
+    if (lineup?.player_id) matched++;
+
+    const avgSpeed = b.speedSamples.length
+      ? b.speedSamples.reduce((a, c) => a + c, 0) / b.speedSamples.length
+      : null;
+
+    rows.push({
+      match_id: matchId,
+      player_id: lineup?.player_id ?? null,
+      team: b.team,
+      data_source: "fieldiq",
+      period: "full",
+      minutes_played: Math.round(matchDurationMin),
+      distance_km: Math.round((b.totalDistanceM / 1000) * 100) / 100,
+      top_speed_kmh: Math.round(b.topSpeedKmh * 10) / 10,
+      avg_speed_kmh: avgSpeed != null ? Math.round(avgSpeed * 10) / 10 : null,
+      sprint_count: b.sprintCount,
+      sprint_distance_m: Math.round(b.sprintDistanceM),
+      heatmap_grid: b.heatmap,
+      positions_raw: b.positions.slice(0, 500), // cap payload size
+      raw_metrics: {
+        jersey_number: b.number,
+        role: b.role,
+        anonymous: isAnon,
+        sample_count: b.positions.length,
+        speed_samples: b.speedSamples.length,
+      },
+      anomaly_flags: [],
+    });
+  }
+
+  if (rows.length === 0) return { inserted: 0, matched: 0 };
+
+  // Insert in chunks to avoid payload limits
+  const CHUNK = 25;
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const slice = rows.slice(i, i + CHUNK);
+    const { error } = await supabase.from("player_match_stats").insert(slice);
+    if (error) {
+      console.error("[player_match_stats] insert error:", error.message);
+    } else {
+      inserted += slice.length;
+    }
+  }
+  return { inserted, matched };
+}
+
 function emptyTelemetry(): FrameTelemetry {
   return {
     total_skipped: 0,
