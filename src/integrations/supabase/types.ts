@@ -2543,6 +2543,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      player_has_match_lineup: {
+        Args: { _match_id: string; _player_id: string }
+        Returns: boolean
+      }
       recompute_match_scores: {
         Args: { _match_id: string }
         Returns: undefined
