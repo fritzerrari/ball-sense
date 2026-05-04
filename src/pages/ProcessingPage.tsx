@@ -27,6 +27,8 @@ export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [jobStartedAt, setJobStartedAt] = useState<number | null>(null);
+  const [showSlowBanner, setShowSlowBanner] = useState(false);
   const [frameDiagnostics, setFrameDiagnostics] = useState<{
     total: number; cameras: number; recordingMin: number | null;
   } | null>(null);
