@@ -18,6 +18,8 @@ import { PlayerConsentFields } from "@/components/PlayerConsentFields";
 import { useAuth } from "@/components/AuthProvider";
 import type { TrackingConsentStatus } from "@/lib/types";
 import PlayerPortalInviteDialog from "@/components/PlayerPortalInviteDialog";
+import ParentSubscribeDialog from "@/components/ParentSubscribeDialog";
+import { Bell } from "lucide-react";
 
 function round(value: number, decimals = 1) {
   const factor = 10 ** decimals;
@@ -35,6 +37,7 @@ export default function PlayerProfile() {
   const [editOpen, setEditOpen] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const [portalOpen, setPortalOpen] = useState(false);
+  const [parentOpen, setParentOpen] = useState(false);
   const [formName, setFormName] = useState("");
   const [formNumber, setFormNumber] = useState("");
   const [formPosition, setFormPosition] = useState("");
@@ -139,6 +142,7 @@ export default function PlayerProfile() {
               <Button variant="heroOutline" size="sm" onClick={openEdit} className="w-full lg:w-auto"><Pencil className="mr-1 h-4 w-4" /> Bearbeiten</Button>
               {canManageConsent && <Button variant="heroOutline" size="sm" onClick={openConsent} className="w-full lg:w-auto">Einwilligung pflegen</Button>}
               <Button variant="heroOutline" size="sm" onClick={() => setPortalOpen(true)} className="w-full lg:w-auto"><Mail className="mr-1 h-4 w-4" /> Portal-Einladung</Button>
+              <Button variant="heroOutline" size="sm" onClick={() => setParentOpen(true)} className="w-full lg:w-auto"><Bell className="mr-1 h-4 w-4" /> Eltern-Push</Button>
               {recentStats[0]?.matches?.id && <Button variant="heroOutline" size="sm" asChild><Link to={`/matches/${recentStats[0].matches.id}`}>Letztes Spiel <ArrowRight className="ml-1 h-4 w-4" /></Link></Button>}
             </div>
           </div>
@@ -164,6 +168,7 @@ export default function PlayerProfile() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}><DialogContent className="border-border bg-card"><DialogHeader><DialogTitle className="font-display">Spieler bearbeiten</DialogTitle></DialogHeader><div className="mt-2 space-y-4"><div><label className="mb-1 block text-sm text-muted-foreground">Name</label><input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground" /></div><div className="grid grid-cols-2 gap-4"><div><label className="mb-1 block text-sm text-muted-foreground">Nummer</label><input type="number" value={formNumber} onChange={(e) => setFormNumber(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground" /></div><div><label className="mb-1 block text-sm text-muted-foreground">Position</label><select value={formPosition} onChange={(e) => setFormPosition(e.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground"><option value="">Keine</option>{POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}</select></div></div><Button variant="hero" className="w-full" onClick={handleEdit} disabled={!formName.trim()}>Speichern</Button></div></DialogContent></Dialog>
       <Dialog open={consentOpen} onOpenChange={setConsentOpen}><DialogContent className="border-border bg-card"><DialogHeader><DialogTitle className="font-display">Einwilligung pflegen</DialogTitle></DialogHeader><div className="space-y-4"><PlayerConsentFields status={consentStatus} notes={consentNotes} updatedAt={player.tracking_consent_updated_at} onStatusChange={setConsentStatus} onNotesChange={setConsentNotes} disabled={updatePlayerConsent.isPending} /><Button variant="hero" className="w-full" onClick={handleConsentSave} disabled={updatePlayerConsent.isPending}>Einwilligung speichern</Button></div></DialogContent></Dialog>
       <PlayerPortalInviteDialog playerId={player.id} playerName={player.name} open={portalOpen} onOpenChange={setPortalOpen} />
+      <ParentSubscribeDialog playerId={player.id} clubId={player.club_id} playerName={player.name} open={parentOpen} onOpenChange={setParentOpen} />
     </AppLayout>
   );
 }
