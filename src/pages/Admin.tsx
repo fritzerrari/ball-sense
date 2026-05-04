@@ -26,6 +26,7 @@ import AdminGuides from "@/components/AdminGuides";
 import AdminApiFootball from "@/components/AdminApiFootball";
 import AdminPlayerConsents from "@/components/AdminPlayerConsents";
 import { AdminTrackingQuality } from "@/components/AdminTrackingQuality";
+import AdminAiUsage from "@/components/AdminAiUsage";
 
 function useAdminClubs() {
   return useQuery({
