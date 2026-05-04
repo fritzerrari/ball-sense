@@ -237,6 +237,7 @@ export default function Admin() {
           <TabsContent value="guides"><AdminGuides /></TabsContent>
           <TabsContent value="api-football"><AdminApiFootball /></TabsContent>
           <TabsContent value="tracking-quality"><AdminTrackingQuality /></TabsContent>
+          <TabsContent value="ai-usage"><AdminAiUsage /></TabsContent>
         </Tabs>
 
         <ConfirmDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }} title={`${deleteTarget?.type === "match" ? "Spiel" : "Feld"} löschen?`} description={`„${deleteTarget?.label}" wird unwiderruflich gelöscht.`} onConfirm={() => { if (deleteTarget) deleteEntity.mutate({ type: deleteTarget.type, id: deleteTarget.id }); }} />
