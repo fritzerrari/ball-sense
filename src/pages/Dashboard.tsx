@@ -87,6 +87,7 @@ export default function Dashboard() {
         </div>
 
         <PwaInstallPrompt />
+        <CoachWelcomeTour />
 
         {/* Match Preparation CTA */}
         {hasMatches && (
