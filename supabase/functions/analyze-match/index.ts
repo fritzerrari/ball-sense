@@ -1391,6 +1391,26 @@ UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
       body: JSON.stringify({ match_id }),
     }).catch((err) => console.error("update-opponent-scout trigger error:", err));
 
+    // Block D #1 — finalize match status so DB trigger fires parent-notify
+    try {
+      await supabase.from("matches")
+        .update({ status: "completed" })
+        .eq("id", match_id)
+        .neq("status", "completed");
+    } catch (err) {
+      console.error("[finalize] failed to set match status to completed:", err);
+    }
+
+    // Block D #11 — Auto-Run Coach-Inbox after final analysis (fire-and-forget)
+    fetch(`${supabaseUrl}/functions/v1/coach-inbox-generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ match_id, trigger: "post_analysis" }),
+    }).catch((err) => console.error("coach-inbox auto-trigger error:", err));
+
     return new Response(JSON.stringify({
       success: true,
       frames_analyzed: selectedFrames.length,
