@@ -21,12 +21,12 @@ Deno.serve(async (req) => {
 
   const cutoff = new Date(Date.now() - STUCK_AFTER_MIN * 60 * 1000).toISOString();
 
-  // Find stuck jobs
+  // Find stuck jobs: use COALESCE(started_at, created_at) as activity timestamp
   const { data: stuck, error } = await supabase
     .from("analysis_jobs")
-    .select("id, match_id, status, progress, created_at, updated_at, job_kind")
+    .select("id, match_id, status, progress, created_at, started_at, job_kind")
     .in("status", ["queued", "analyzing", "interpreting"])
-    .lt("updated_at", cutoff);
+    .or(`started_at.lt.${cutoff},and(started_at.is.null,created_at.lt.${cutoff})`);
 
   if (error) {
     console.error("[watchdog] query failed:", error);
