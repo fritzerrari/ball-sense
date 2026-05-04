@@ -71,23 +71,35 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (match?.home_club_id) {
-      // Notify all users in that club
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("club_id", match.home_club_id);
+      // Dedup: nur notifizieren, wenn in den letzten 24h KEINE analysis_stuck-Notif für dieses Match existiert
+      const dedupCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count: recentCount } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("match_id", job.match_id)
+        .eq("type", "analysis_stuck")
+        .gte("created_at", dedupCutoff);
 
-      const notifications = (profiles ?? []).map((p: { user_id: string }) => ({
-        user_id: p.user_id,
-        match_id: job.match_id,
-        type: "analysis_stuck",
-        title: "Analyse blockiert",
-        body: `Spiel vom ${match.date}${match.away_club_name ? ` gegen ${match.away_club_name}` : ""}: Analyse seit >${STUCK_AFTER_MIN} min in Wartestellung — bitte erneut starten.`,
-      }));
+      if ((recentCount ?? 0) > 0) {
+        console.log(`[watchdog] skip notif for match ${job.match_id} — already notified within 24h`);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("club_id", match.home_club_id);
 
-      if (notifications.length > 0) {
-        const { error: notifErr } = await supabase.from("notifications").insert(notifications);
-        if (notifErr) console.warn(`[watchdog] notif insert failed for job ${job.id}:`, notifErr);
+        const notifications = (profiles ?? []).map((p: { user_id: string }) => ({
+          user_id: p.user_id,
+          match_id: job.match_id,
+          type: "analysis_stuck",
+          title: "Analyse blockiert",
+          body: `Spiel vom ${match.date}${match.away_club_name ? ` gegen ${match.away_club_name}` : ""}: Analyse seit >${STUCK_AFTER_MIN} min in Wartestellung — bitte erneut starten.`,
+        }));
+
+        if (notifications.length > 0) {
+          const { error: notifErr } = await supabase.from("notifications").insert(notifications);
+          if (notifErr) console.warn(`[watchdog] notif insert failed for job ${job.id}:`, notifErr);
+        }
       }
     }
 
