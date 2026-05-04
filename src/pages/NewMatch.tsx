@@ -40,6 +40,51 @@ export default function NewMatch() {
   const [oppSuggestions, setOppSuggestions] = useState<any[]>([]);
   const [selectedOpp, setSelectedOpp] = useState<{ id: number; name: string; logo: string; form?: any } | null>(null);
 
+  // 🆕 Club-Teams library
+  const [clubTeams, setClubTeams] = useState<any[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  const [nextFixture, setNextFixture] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (!clubId) return;
+    supabase
+      .from("club_teams")
+      .select("id, name, age_group, league, is_default")
+      .eq("club_id", clubId)
+      .eq("active", true)
+      .order("is_default", { ascending: false })
+      .order("name")
+      .then(({ data }) => {
+        const list = data ?? [];
+        setClubTeams(list);
+        const def = list.find((t: any) => t.is_default) || list[0];
+        if (def && !selectedTeamId) setSelectedTeamId(def.id);
+      });
+  }, [clubId]);
+
+  useEffect(() => {
+    if (!selectedTeamId) { setNextFixture(null); return; }
+    supabase
+      .from("team_fixtures")
+      .select("*")
+      .eq("team_id", selectedTeamId)
+      .eq("status", "scheduled")
+      .gte("match_date", new Date().toISOString().split("T")[0])
+      .order("match_date", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        setNextFixture(data);
+        if (data) {
+          setDate(data.match_date);
+          const opp = data.is_home ? data.away_team_name : data.home_team_name;
+          if (opp && !awayName) setAwayName(opp);
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTeamId]);
+
+
   const searchOpponent = useCallback(async () => {
     if (!awayName || awayName.length < 3) return;
     setOppSuggesting(true);
