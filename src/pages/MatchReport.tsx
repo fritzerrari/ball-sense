@@ -17,6 +17,7 @@ import PostMatchEventEditor from "@/components/PostMatchEventEditor";
 import AISuggestionsPanel from "@/components/AISuggestionsPanel";
 import VideoBackfillUpload from "@/components/VideoBackfillUpload";
 import PendingFramesRecoveryBanner from "@/components/PendingFramesRecoveryBanner";
+import PreFlightCheckCard from "@/components/PreFlightCheckCard";
 import { useMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
