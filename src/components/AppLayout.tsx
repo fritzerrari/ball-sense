@@ -116,6 +116,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               >
                 <item.icon className="h-5 w-5 shrink-0" />
                 <span>{item.label}</span>
+                {(item as any).badge}
               </Link>
             ))}
           </nav>
