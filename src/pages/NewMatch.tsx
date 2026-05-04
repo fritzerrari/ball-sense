@@ -286,9 +286,36 @@ export default function NewMatch() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            {/* 🆕 Mannschaft auswählen */}
+            {clubTeams.length > 0 && (
               <div>
-                <label className="mb-1 block text-sm text-muted-foreground">Gegner (optional)</label>
+                <label className="mb-1 block text-sm text-muted-foreground flex items-center gap-2">
+                  Mannschaft
+                  <span className="rounded-full bg-primary/15 text-primary text-[10px] px-1.5 py-0.5 font-semibold">NEU</span>
+                </label>
+                <select
+                  value={selectedTeamId}
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 h-12 text-sm text-foreground"
+                >
+                  {clubTeams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}{t.age_group ? ` · ${t.age_group}` : ""}{t.is_default ? " ⭐" : ""}
+                    </option>
+                  ))}
+                </select>
+                {nextFixture && (
+                  <p className="text-xs text-primary mt-1.5 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Nächstes Spiel: {new Date(nextFixture.match_date).toLocaleDateString("de-DE")} ·{" "}
+                    {nextFixture.is_home ? "Heim" : "Auswärts"} vs {nextFixture.is_home ? nextFixture.away_team_name : nextFixture.home_team_name}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+
                 <div className="relative">
                   <input
                     type="text"
