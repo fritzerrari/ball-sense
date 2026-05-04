@@ -220,11 +220,7 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
         insertData.notes = `Raus: ${player?.player_name ?? "?"}, Rein: ${playerName}`;
       }
       await supabase.from("match_events").insert(insertData);
-
-      setRecentEvents((prev) => [
-        { type: selectedEvent.type, label: selectedEvent.label, minute: min, team },
-        ...prev.slice(0, 9),
-      ]);
+      // Realtime subscription updates recentEvents — no manual setState needed
 
       toast.success(`${selectedEvent.label} (${min}') erfasst`);
       setSelectedEvent(null);
