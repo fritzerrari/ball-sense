@@ -4,6 +4,7 @@ import {
   Brain,
   BookOpen,
   BrainCircuit,
+  Inbox,
   Download,
   Home,
   LogOut,
@@ -58,6 +59,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: "Season Hub", icon: Trophy, href: "/season" },
     { label: "Saison-Wrapped", icon: Trophy, href: "/season/wrapped" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
+    { label: "Coach-Inbox", icon: Inbox, href: "/inbox" },
   ];
 
   const manageItems = [
