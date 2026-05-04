@@ -24,6 +24,17 @@ export function FeatureCards() {
 
   const groups: FeatureGroup[] = [
     {
+      title: de ? "🆕 Neu im System" : "🆕 What's new",
+      subtitle: de ? "Frisch ausgerollt — automatisiert & vernetzt" : "Just rolled out — automated & connected",
+      accent: "from-primary/25 to-accent/10",
+      features: [
+        { icon: Inbox, title: de ? "Coach-Inbox" : "Coach Inbox", desc: de ? "KI-Empfehlungen aus deinen letzten 5 Spielen — Lob, Warnungen, Taktik & Fitness." : "AI insights from your last 5 matches — praise, warnings, tactics & fitness." },
+        { icon: Bell, title: de ? "Eltern-Push" : "Parent Push", desc: de ? "Eltern abonnieren ihr Kind und bekommen automatisch Push-Nachrichten nach dem Spiel." : "Parents subscribe to their child and receive automatic push notifications after the match." },
+        { icon: Trophy, title: de ? "Saison-Wrapped" : "Season Wrapped", desc: de ? "Animierte Saison-Highlights mit Top-Scorern, Best-of-Klips & Teilen-Button." : "Animated season highlights with top scorers, best-of clips & share button." },
+        { icon: Activity, title: de ? "Health & Watchdog" : "Health & Watchdog", desc: de ? "Selbstheilende Pipeline: stuck Jobs werden automatisch erkannt und neu gestartet." : "Self-healing pipeline: stuck jobs are automatically detected and restarted." },
+      ],
+    },
+    {
       title: de ? "🎥 Aufnahme & Setup" : "🎥 Recording & Setup",
       subtitle: de ? "So einfach wie ein Video drehen" : "As easy as shooting a video",
       accent: "from-primary/20 to-primary/5",
