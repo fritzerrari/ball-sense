@@ -835,6 +835,57 @@ export type Database = {
         }
         Relationships: []
       }
+      coach_inbox_items: {
+        Row: {
+          action_url: string | null
+          body: string
+          category: string
+          club_id: string
+          created_at: string
+          id: string
+          match_id: string | null
+          metadata: Json
+          player_id: string | null
+          priority: number
+          source: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          action_url?: string | null
+          body: string
+          category: string
+          club_id: string
+          created_at?: string
+          id?: string
+          match_id?: string | null
+          metadata?: Json
+          player_id?: string | null
+          priority?: number
+          source?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          action_url?: string | null
+          body?: string
+          category?: string
+          club_id?: string
+          created_at?: string
+          id?: string
+          match_id?: string | null
+          metadata?: Json
+          player_id?: string | null
+          priority?: number
+          source?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       device_guides: {
         Row: {
           active: boolean
@@ -1601,6 +1652,101 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      parent_notifications: {
+        Row: {
+          body: string
+          delivery_status: string
+          error: string | null
+          id: string
+          match_id: string | null
+          player_id: string
+          sent_at: string
+          subscription_id: string
+          title: string
+        }
+        Insert: {
+          body: string
+          delivery_status?: string
+          error?: string | null
+          id?: string
+          match_id?: string | null
+          player_id: string
+          sent_at?: string
+          subscription_id: string
+          title: string
+        }
+        Update: {
+          body?: string
+          delivery_status?: string
+          error?: string | null
+          id?: string
+          match_id?: string | null
+          player_id?: string
+          sent_at?: string
+          subscription_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parent_notifications_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "parent_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parent_subscriptions: {
+        Row: {
+          active: boolean
+          club_id: string
+          confirmed_at: string | null
+          created_at: string
+          id: string
+          manage_token: string
+          notify_on: Json
+          parent_email: string
+          parent_name: string | null
+          player_id: string
+          push_auth: string | null
+          push_endpoint: string | null
+          push_p256dh: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          club_id: string
+          confirmed_at?: string | null
+          created_at?: string
+          id?: string
+          manage_token?: string
+          notify_on?: Json
+          parent_email: string
+          parent_name?: string | null
+          player_id: string
+          push_auth?: string | null
+          push_endpoint?: string | null
+          push_p256dh?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          club_id?: string
+          confirmed_at?: string | null
+          created_at?: string
+          id?: string
+          manage_token?: string
+          notify_on?: Json
+          parent_email?: string
+          parent_name?: string | null
+          player_id?: string
+          push_auth?: string | null
+          push_endpoint?: string | null
+          push_p256dh?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       player_match_stats: {
         Row: {
