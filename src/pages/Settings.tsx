@@ -265,6 +265,11 @@ export default function SettingsPage() {
         {/* Camera Settings */}
         <CameraSettingsSection />
 
+        {/* Club Teams Library — NEW */}
+        <div className="glass-card p-6">
+          <ClubTeamsManager />
+        </div>
+
         {/* Benchmark Opt-in — Pro only */}
         <BenchmarkOptInSection />
 
