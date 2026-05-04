@@ -1696,6 +1696,60 @@ export type Database = {
           },
         ]
       }
+      player_portal_invites: {
+        Row: {
+          accepted_at: string | null
+          club_id: string
+          email: string
+          id: string
+          invited_at: string
+          invited_by: string
+          notes: string | null
+          player_id: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          club_id: string
+          email: string
+          id?: string
+          invited_at?: string
+          invited_by: string
+          notes?: string | null
+          player_id: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          club_id?: string
+          email?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string
+          notes?: string | null
+          player_id?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_portal_invites_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_portal_invites_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           active: boolean
@@ -1840,18 +1894,21 @@ export type Database = {
           club_id: string | null
           created_at: string
           id: string
+          player_portal_player_id: string | null
           user_id: string
         }
         Insert: {
           club_id?: string | null
           created_at?: string
           id?: string
+          player_portal_player_id?: string | null
           user_id: string
         }
         Update: {
           club_id?: string | null
           created_at?: string
           id?: string
+          player_portal_player_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -1860,6 +1917,13 @@ export type Database = {
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_player_portal_player_id_fkey"
+            columns: ["player_portal_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
             referencedColumns: ["id"]
           },
         ]
@@ -2248,6 +2312,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      current_portal_player_id: { Args: never; Returns: string }
       get_league_benchmarks: {
         Args: { _club_id: string; _league: string }
         Returns: Json
