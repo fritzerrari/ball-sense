@@ -36,6 +36,8 @@ const ComparePage = lazy(() => import("./pages/ComparePage"));
 const MatchPrep = lazy(() => import("./pages/MatchPrep"));
 const TutorialPage = lazy(() => import("./pages/TutorialPage"));
 const SeasonHub = lazy(() => import("./pages/SeasonHub"));
+const SeasonWrapped = lazy(() => import("./pages/SeasonWrapped"));
+const PlayerPortal = lazy(() => import("./pages/PlayerPortal"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +75,7 @@ const App = () => (
               <Route path="/legal/:slug" element={<LegalPage />} />
               <Route path="/compare" element={<ComparePage />} />
               <Route path="/tutorial" element={<TutorialPage />} />
+              <Route path="/player-portal" element={<ProtectedRoute><PlayerPortal /></ProtectedRoute>} />
 
               <Route element={<AuthAppShell />}>
                 <Route path="/login" element={<Login />} />
@@ -92,6 +95,7 @@ const App = () => (
                 <Route path="/players/compare" element={<ProtectedRoute><PlayerCompare /></ProtectedRoute>} />
                 <Route path="/match-prep" element={<ProtectedRoute><MatchPrep /></ProtectedRoute>} />
                 <Route path="/season" element={<ProtectedRoute><SeasonHub /></ProtectedRoute>} />
+                <Route path="/season/wrapped" element={<ProtectedRoute><SeasonWrapped /></ProtectedRoute>} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

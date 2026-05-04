@@ -56,6 +56,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { label: t("nav.trends"), icon: TrendingUp, href: "/trends" },
     { label: t("nav.matchPrep") ?? "Spielvorbereitung", icon: Brain, href: "/match-prep" },
     { label: "Season Hub", icon: Trophy, href: "/season" },
+    { label: "Saison-Wrapped", icon: Trophy, href: "/season/wrapped" },
     { label: t("nav.assistant"), icon: BrainCircuit, href: "/assistant" },
   ];
 
