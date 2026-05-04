@@ -1316,6 +1316,17 @@ UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
       });
     }
 
+    // ── Aggregate & persist player_match_stats from frame_positions ──
+    let aggResult = { inserted: 0, matched: 0 };
+    try {
+      const matchDurationMin = duration_sec ? duration_sec / 60 : 90;
+      const buckets = aggregatePlayerStats(analysis.frame_positions ?? [], duration_sec ?? 5400);
+      aggResult = await persistPlayerMatchStats(supabase, match_id, buckets, matchDurationMin);
+      console.log(`[player_stats] persisted ${aggResult.inserted} buckets, ${aggResult.matched} matched to roster`);
+    } catch (err) {
+      console.error("[player_stats] aggregation failed:", err);
+    }
+
     // ── Persist tracking telemetry on the match (Phase A) ──
     // Aggregate per-frame player detections + AI token usage for trend analysis
     try {
