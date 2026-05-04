@@ -2533,6 +2533,7 @@ export type Database = {
           player_name: string
         }[]
       }
+      get_system_health: { Args: never; Returns: Json }
       get_user_club_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

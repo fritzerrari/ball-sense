@@ -4,7 +4,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
-  Shield, Users, Building2, BarChart3, Activity,
+  Shield, Users, Building2, BarChart3, Activity, HeartPulse,
   Search, RefreshCw, Calendar, FileText, ScrollText, Upload, BookOpen, Globe, Trash2, MapPin, ShieldCheck, Coins,
 } from "lucide-react";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -27,6 +27,7 @@ import AdminApiFootball from "@/components/AdminApiFootball";
 import AdminPlayerConsents from "@/components/AdminPlayerConsents";
 import { AdminTrackingQuality } from "@/components/AdminTrackingQuality";
 import AdminAiUsage from "@/components/AdminAiUsage";
+import AdminHealth from "@/components/AdminHealth";
 
 function useAdminClubs() {
   return useQuery({
@@ -210,6 +211,7 @@ export default function Admin() {
             <TabsTrigger value="api-football" className="rounded-lg text-xs"><Globe className="h-4 w-4 mr-1.5" /> API-Football</TabsTrigger>
             <TabsTrigger value="tracking-quality" className="rounded-lg text-xs"><Activity className="h-4 w-4 mr-1.5" /> Tracking-Qualität</TabsTrigger>
             <TabsTrigger value="ai-usage" className="rounded-lg text-xs"><Coins className="h-4 w-4 mr-1.5" /> KI-Verbrauch</TabsTrigger>
+            <TabsTrigger value="health" className="rounded-lg text-xs"><HeartPulse className="h-4 w-4 mr-1.5" /> Gesundheit <span className="ml-1 text-[8px] px-1 rounded bg-emerald-500/20 text-emerald-400">NEU</span></TabsTrigger>
           </TabsList>
 
           <TabsContent value="users"><AdminUsers /></TabsContent>
@@ -238,6 +240,7 @@ export default function Admin() {
           <TabsContent value="api-football"><AdminApiFootball /></TabsContent>
           <TabsContent value="tracking-quality"><AdminTrackingQuality /></TabsContent>
           <TabsContent value="ai-usage"><AdminAiUsage /></TabsContent>
+          <TabsContent value="health"><AdminHealth /></TabsContent>
         </Tabs>
 
         <ConfirmDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }} title={`${deleteTarget?.type === "match" ? "Spiel" : "Feld"} löschen?`} description={`„${deleteTarget?.label}" wird unwiderruflich gelöscht.`} onConfirm={() => { if (deleteTarget) deleteEntity.mutate({ type: deleteTarget.type, id: deleteTarget.id }); }} />
