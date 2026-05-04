@@ -32,6 +32,7 @@ export function FeatureCards() {
         { icon: Bell, title: de ? "Eltern-Push" : "Parent Push", desc: de ? "Eltern abonnieren ihr Kind und bekommen automatisch Push-Nachrichten nach dem Spiel." : "Parents subscribe to their child and receive automatic push notifications after the match." },
         { icon: Trophy, title: de ? "Saison-Wrapped" : "Season Wrapped", desc: de ? "Animierte Saison-Highlights mit Top-Scorern, Best-of-Klips & Teilen-Button." : "Animated season highlights with top scorers, best-of clips & share button." },
         { icon: Activity, title: de ? "Health & Watchdog" : "Health & Watchdog", desc: de ? "Selbstheilende Pipeline: stuck Jobs werden automatisch erkannt und neu gestartet." : "Self-healing pipeline: stuck jobs are automatically detected and restarted." },
+        { icon: ListChecks, title: de ? "Mannschafts-Bibliothek" : "Team Library", desc: de ? "Importiere alle Teams deines Vereins (Kader, Spielplan, Tabelle) – beim neuen Spiel nur Mannschaft wählen, Rest wird auto-ausgefüllt." : "Import all teams of your club (roster, schedule, standings) — just pick a team, the rest auto-fills." },
       ],
     },
     {
