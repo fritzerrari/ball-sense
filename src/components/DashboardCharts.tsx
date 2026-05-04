@@ -122,7 +122,28 @@ export function DashboardCharts() {
     enabled: !!clubId,
   });
 
-  if (!data?.trendData.length) return null;
+  if (!data?.trendData.length) {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold font-display">{t("dashboard.seasonTrend")}</h2>
+          <p className="text-sm text-muted-foreground">Saisontrend, Leaderboards und Belastungsanalyse.</p>
+        </div>
+        <div className="game-panel p-8 text-center space-y-3">
+          <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto" />
+          <div>
+            <p className="font-medium">Noch keine Spielanalysen verfügbar</p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+              Sobald du dein erstes Spiel mit Kamera-Tracking aufgenommen und analysiert hast, erscheinen hier Trendkurven, Top-Spieler und Belastungswerte.
+            </p>
+          </div>
+          <Link to="/matches" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+            Zu den Spielen →
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const chartConfig = {
     distance: { label: t("matchReport.distance"), color: "hsl(var(--primary))", icon: Activity },
