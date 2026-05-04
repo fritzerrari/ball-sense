@@ -15,6 +15,7 @@ import { useTranslation } from "@/lib/i18n";
 import { Switch } from "@/components/ui/switch";
 import { useBenchmarkOptIn } from "@/hooks/use-benchmark";
 import { getUltraWidePreference, setUltraWidePreference } from "@/hooks/use-ultra-wide-camera";
+import { ClubTeamsManager } from "@/components/ClubTeamsManager";
 
 async function hashCode(code: string) {
   const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
