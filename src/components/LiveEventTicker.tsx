@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -116,7 +116,75 @@ export function LiveEventTicker({ matchId, elapsedSec, homePlayers, awayPlayers,
   const [notes, setNotes] = useState("");
   const [zone, setZone] = useState("");
   const [saving, setSaving] = useState(false);
-  const [recentEvents, setRecentEvents] = useState<Array<{ type: string; label: string; minute: number; team: string }>>([]);
+  const [recentEvents, setRecentEvents] = useState<Array<{ id?: string; type: string; label: string; minute: number; team: string; auto_detected?: boolean; confidence?: number | null; verified?: boolean }>>([]);
+
+  // Subscribe to DB events (incl. auto-detected from live-event-detector)
+  useEffect(() => {
+    if (!matchId) return;
+    let cancelled = false;
+
+    const eventLabel = (t: string) => {
+      for (const cat of EVENT_CATEGORIES) {
+        const found = cat.events.find((e) => e.type === t);
+        if (found) return found.label;
+      }
+      return t;
+    };
+
+    const load = async () => {
+      const { data } = await supabase
+        .from("match_events")
+        .select("id, event_type, minute, team, auto_detected, confidence, verified")
+        .eq("match_id", matchId)
+        .order("created_at", { ascending: false })
+        .limit(15);
+      if (!cancelled && Array.isArray(data)) {
+        setRecentEvents(
+          data.map((d: any) => ({
+            id: d.id,
+            type: d.event_type,
+            label: eventLabel(d.event_type),
+            minute: d.minute,
+            team: d.team,
+            auto_detected: d.auto_detected,
+            confidence: d.confidence,
+            verified: d.verified,
+          })),
+        );
+      }
+    };
+
+    load();
+
+    const channel = supabase
+      .channel(`live-events-${matchId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "match_events", filter: `match_id=eq.${matchId}` },
+        (payload: any) => {
+          const d = payload.new;
+          setRecentEvents((prev) => [
+            {
+              id: d.id,
+              type: d.event_type,
+              label: eventLabel(d.event_type),
+              minute: d.minute,
+              team: d.team,
+              auto_detected: d.auto_detected,
+              confidence: d.confidence,
+              verified: d.verified,
+            },
+            ...prev.slice(0, 14),
+          ]);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [matchId]);
 
   const currentMinute = Math.floor(elapsedSec / 60);
   const activePlayers = team === "home" ? homePlayers : (awayPlayers ?? []);
