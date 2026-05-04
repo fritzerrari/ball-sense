@@ -1,138 +1,114 @@
-# Plan: Erweiterte Spielerkennung + Season Hub Integration + Presse-Berichte
 
-## Teil A — Bessere automatische Spielerkennung (Live & Post-Match)
+# Plan: U19 Viktoria Live-Daten + Coach Mission Control UX
 
-### A1. Erweiterte Event-Erkennung im AI-Prompt
-Die bestehende `analyze-match` Edge Function mit Gemini 2.5 Flash erkennt aktuell Spielerpositionen + grobe Szenen. Ausbau um spezifische Event-Klassen:
+Zwei zusammenhängende Bausteine: **(A)** vollautomatisches, dauerhaft aktuelles Datenfundament für die U19 Viktoria Aschaffenburg, und **(B)** ein radikal vereinfachtes, geführtes Trainer-Erlebnis ("Mission Control"), das jeden Klick erklärt.
 
-**Neue erkannte Events (über Gemini Vision Multi-Frame-Analyse):**
-- **Tor-Erkennung** (verfeinert): Ball-im-Tor + Jubel-Cluster + Spielfluss-Stop als Trigger → Confidence-Score
-- **Ecke**: Ball verlässt Grundlinie + Spieler-Cluster an Eckfahne
-- **Einwurf** / **Freistoß** / **Elfmeter**: Ball ruht + Spieler-Formation
-- **Kopfball-Duell**: Zwei Spieler springen gleichzeitig + Ball auf Kopfhöhe
-- **Schuss aufs Tor**: Schnelle Ballbewegung Richtung Tor (>40 km/h Ballspeed)
-- **Großchance**: Schuss aus Strafraum + freie Schussbahn
-- **Fehlpass**: Ball wechselt Teambesitz binnen <3s ohne Defensiv-Aktion
-- **Zweikampf gewonnen/verloren**: Ball-Possession-Wechsel im 1v1-Cluster
-- **Pressing-Aktion**: ≥3 eigene Spieler in 15m-Radius um ballführenden Gegner
+---
 
-### A2. Live-Event-Stream (während des Spiels)
-Neuer Mechanismus `live-event-detector` Edge Function:
-- Wird alle 30s vom Tracking-Client getriggert
-- Holt die letzten 4–6 Frames aus Storage
-- Sendet Mini-Prompt an Gemini Flash-Lite (schnell, billig)
-- Schreibt erkannte Events sofort in `match_events` mit `auto_detected: true` und `confidence`
-- Frontend `LiveEventTicker` zeigt sie in Echtzeit (existiert bereits)
+## A) U19-Daten – automatisch & immer aktuell
 
-### A3. Spielerstärken-Profil
-Neue Berechnung in `analyze-performance`:
-- **Top-Speed**: Bereits vorhanden (`top_speed_kmh`)
-- **Sprint-Profil**: Anzahl Sprints + Gesamtsprintdistanz pro Spieler
-- **Zweikampf-Rate**: gewonnene / total (aus Event-Clustern)
-- **Pass-Genauigkeit**: completed / total (aus Ballbesitz-Wechseln)
-- **Schuss-Effizienz**: shots_on_target / shots_total
-- **Kopfball-Stärke**: aerial_won / aerial_total
-- **Defensiv-Aktionen**: tackles + interceptions + ball_recoveries
-Ausgegeben als **5-Achsen-Radar** im Spielerprofil und MatchReport.
+### Auto-Import beim ersten Login
+- Beim Login eines Viktoria-Vereins erkennt das System fehlende Team-Bibliothek und startet **automatisch** den Scrape (keine URL-Eingabe nötig).
+- Default-URL für SV Viktoria Aschaffenburg ist hinterlegt; **U19 wird automatisch als `is_default` markiert**, sobald der Verein das wünscht (oder per One-Click-Button "U19 als Standard").
+- Sichtbare Live-Progress-Anzeige: "Lade U19 Kader… Spielplan… Tabelle… Spielerstatistiken…" mit Fortschrittsbalken.
 
-### A4. Schwächen-Heatmap
-Neue Auswertung pro Spieler in PDF-Report:
-- Zonen mit überdurchschnittlich vielen Fehlpässen → rot eingefärbt
-- Zweikampf-Verlust-Hotspots auf der Heatmap
-- "Stille Zonen" (Spieler nie dort gewesen, obwohl Position es erwartet)
+### Was importiert wird (U19 vollständig)
+- **Kader**: Name, Rückennummer, Position, Tore, Vorlagen, Karten, Einsätze.
+- **Spielplan**: Alle anstehenden Spiele (Datum, Uhrzeit, Gegner, Heim/Auswärts, Wettbewerb).
+- **Ergebnisse**: Letzte Spiele inkl. Endstand & Wettbewerb.
+- **Tabelle**: Aktuelle Position, Punkte, Tordifferenz, Form (letzte 5).
+- **Saisonverlauf**: Punkte pro Spieltag → Trend-Chart.
 
-### A5. Tabelle für ungeprüfte Auto-Events
-Migration: `match_events` bekommt zwei neue Felder:
-- `auto_detected boolean DEFAULT false`
-- `confidence numeric` (0–1)
-- `verified boolean DEFAULT false` (Ground-Truth-Flag nach manuellem Review)
+### Dauerhafte Aktualisierung (3 Ebenen)
+1. **pg_cron Nightly** (03:00) – ruft `scrape-club-teams` für alle Vereine mit hinterlegter URL erneut auf, mergt via `external_match_id` (kein Duplikat).
+2. **Pull-to-Refresh** – Button "🔄 Jetzt aktualisieren" auf Dashboard und Mannschafts-Bibliothek (max. 1×/h Throttle).
+3. **Pre-Match-Trigger** – 24h vor dem nächsten geplanten Spiel automatischer Re-Scrape, damit Aufstellung/Statistiken fresh sind.
 
-Bei `confidence < 0.7` zeigt der Live-Ticker einen "Bitte prüfen"-Badge. Im `PostMatchEventEditor` werden diese Events priorisiert angezeigt.
+### Neue Sichtbarkeit (wo der Trainer es findet)
+- **Dashboard-Hero-Karte**: "Nächstes U19-Spiel: Sa 15.05. · 14:00 · vs. TSV X (Auswärts)" mit Countdown.
+- **Tab "Mannschaft" → U19**: Tabelle, Form, Top-Scorer, Spielplan-Liste.
+- **Im "Neues Spiel"-Wizard**: Gegner & Datum sind bereits **vorausgefüllt** aus dem nächsten Fixture – Trainer bestätigt nur noch.
 
-## Teil B — Season Hub im Trainer-Menü & PDF-Report
+---
 
-### B1. Bereits in Sidebar — jetzt auch ins Mobile-Menü
-- **Mobile Bottom-Nav** bekommt 5. Tab "Season" (Trophy-Icon) statt nur über "Mehr" erreichbar
-- **Dashboard** bekommt Quick-Card "Season Hub öffnen" mit Live-Tabellenplatz + nächstem Gegner
+## B) Mission Control – das neue Trainer-Erlebnis
 
-### B2. Season-Daten in PDF-Report
-Erweiterung von `generate-pdf-report`:
-- **Neue PDF-Seite** "Saison-Kontext" zwischen Deckblatt und Match-Analyse:
-  - Aktueller Tabellenplatz + Punktekonto
-  - Letzte 5 Ergebnisse als Form-Strip (W/D/L Badges)
-  - Restspielplan kompakt (nächste 3 Spiele)
-  - Vergleich: Eigene Tore/Spiel vs. Liga-Schnitt
-- Daten kommen aus `season_hub_cache` (72h TTL bereits vorhanden)
-- Falls kein Cache: Fallback zur bestehenden eigenen Match-Historie
+Problem heute: Sidebar mit ~15 Einträgen, viele Fachbegriffe, kein klarer Einstieg. Lösung: ein **handlungsorientiertes Cockpit** statt eines Werkzeugkastens.
 
-## Teil C — Presse-Berichte (Vor- & Nach-Spiel)
+### B1) Neues Dashboard "Mission Control"
+Drei klare Zonen, in dieser Reihenfolge:
 
-### C1. Datenbank
-Neue Tabelle `press_releases`:
-- `match_id` (FK auf matches)
-- `kind` enum: `pre_match` | `post_match`
-- `language` text default `'de'`
-- `headline`, `lead`, `body_html`, `quotes_jsonb`
-- `tone` enum: `neutral` | `enthusiastic` | `analytical`
-- `length` enum: `short` (300W) | `medium` (600W) | `long` (1200W)
-- `status`: `draft` | `approved` | `published`
-- `generated_by_ai boolean`, `manually_edited boolean`
-- RLS: nur Vereinsmitglieder
+```
+┌──────────────────────────────────────────────────────┐
+│  HEUTE                                                │
+│  ▸ Großer Status-Held: "Was musst du jetzt tun?"     │
+│    z.B. "🎬 Spiel in 2 Tagen – Aufstellung planen"   │
+│  ▸ 1 primärer CTA-Button (groß, grün)                │
+├──────────────────────────────────────────────────────┤
+│  DEINE U19  (Live-Daten)                              │
+│  ▸ Tabelle (Pos. 4 · 22 Pkt · Form WWUNW)            │
+│  ▸ Nächstes Spiel · Top-Scorer · letzter Sieg        │
+├──────────────────────────────────────────────────────┤
+│  WERKZEUGE  (4 große Tiles, mit Erklärung)           │
+│  📹 Spiel aufnehmen · 📊 Analysen · 👥 Kader · ⚙️    │
+└──────────────────────────────────────────────────────┘
+```
 
-### C2. Edge Function `generate-press-release`
-- Eingabe: `match_id`, `kind`, `tone`, `length`, optional `quotes` (Trainer-O-Töne)
-- **Pre-Match**: Holt aus `season_hub_cache` (Tabellenplatz, Form, Gegner-Form, Bilanz), historische Begegnungen aus eigener Match-DB, Vorschau-Tonalität
-- **Post-Match**: Holt finale Stats (`team_match_stats`, `match_events`, `player_match_stats`), Highlights + KI-Matchplan-Rückblick
-- Gemini 2.5 Flash erstellt: Headline + Lead + Body in Pressetext-Stil (Konjunktiv für Zitate, Aktiv-Formulierung, Vereinsperspektive)
-- Speichert in `press_releases`, gibt JSON zurück
+Jede Tile hat **Titel + 1 Satz Erklärung** ("Nimm ein Spiel mit dem Handy auf – wir analysieren es automatisch"), kein Fachjargon.
 
-### C3. UI `PressReleaseGenerator` Komponente
-Eingebettet in `MatchReport` Seite (neuer Tab "Presse"):
-- Zwei Buttons: **Vorbericht erstellen** / **Spielbericht erstellen** (letzterer aktiv erst wenn Match-Status = `final`)
-- Form: Tonalität (Dropdown), Länge (Dropdown), optional Trainer-Zitate (2 Textfelder)
-- Generieren-Button → ruft Edge Function
-- Vorschau im Rich-Text-Editor (Tiptap-light, plain HTML reicht)
-- Aktionen:
-  - **Bearbeiten** (markiert `manually_edited = true`)
-  - **Kopieren** (Plaintext für E-Mail)
-  - **Als PDF speichern** (window.print mit Press-Stylesheet)
-  - **Per WhatsApp teilen** (über bestehenden `share-whatsapp.ts`)
-  - **An Verteiler senden** (mailto: mit Pressetext im Body)
+### B2) Geführter 3-Minuten-Onboarding-Flow
+Erweiterung des bestehenden `CoachWelcomeTour` zu einem **vollwertigen Onboarding-Wizard** beim allerersten Login:
 
-### C4. Pre-Match-Bericht-Quelle (Vor dem Spiel)
-Bereits via `season-hub` + `match-preparation` vorhanden — wird wiederverwendet:
-- Gegner-DNA aus eigener Match-Historie
-- Aktuelle Form beider Mannschaften
-- Letzte direkte Begegnungen
-- Coach-Statement-Vorschlag (KI-generiert, austauschbar)
+1. **"Willkommen, Trainer!"** – 1 Satz: was macht das System.
+2. **"Welcher Verein?"** – Suchfeld mit fussball.de-Autocomplete → 1-Klick-Import.
+3. **"Welche Mannschaft trainierst du?"** – Liste der gerade importierten Teams → Auswahl (z.B. U19) wird Standard.
+4. **"So nimmst du dein erstes Spiel auf"** – 30-Sekunden-Erklärvideo / animiertes GIF.
+5. **"Fertig!"** – Direkter Sprung ins Mission Control mit "Erstes Spiel anlegen" CTA.
 
-## Technischer Bereich
+Onboarding-Status in `profiles.onboarding_completed_at` (neue Spalte). Nicht abgeschlossene Trainer sehen oben einen sanften Hinweis-Banner mit "Tour fortsetzen".
 
-**Neue / geänderte Dateien:**
-- Migration: `match_events` + `auto_detected`, `confidence`, `verified` Spalten
-- Migration: `press_releases` Tabelle + RLS
-- Edge Function (neu): `live-event-detector/index.ts` (30s-Trigger)
-- Edge Function (neu): `generate-press-release/index.ts`
-- Edge Function (geändert): `analyze-match/index.ts` — erweiterter Prompt + Event-Klassen
-- Edge Function (geändert): `analyze-performance/index.ts` — Spieler-Stärken-Profil
-- Edge Function (geändert): `generate-pdf-report/index.ts` — Saison-Seite
-- Frontend: `src/pages/MatchReport.tsx` — neuer Tab "Presse"
-- Frontend (neu): `src/components/PressReleaseGenerator.tsx`
-- Frontend (neu): `src/components/PlayerStrengthRadar.tsx`
-- Frontend (neu): `src/components/PlayerWeaknessHeatmap.tsx`
-- Frontend (geändert): `src/components/AppLayout.tsx` — Season-Tab ins Mobile-Bottom
-- Frontend (geändert): `src/pages/Dashboard.tsx` — Season-Hub Quick-Card
-- Frontend (geändert): `src/components/PostMatchEventEditor.tsx` — Filter "Nur ungeprüfte (auto)"
-- Frontend (geändert): `src/components/LiveEventTicker.tsx` — Confidence-Badge
+### B3) Vereinfachte Sidebar
+Reduktion von ~15 auf **5 Hauptpunkte** mit Sub-Menüs (collapsible):
 
-**Memories anlegen:**
-- `architecture/live-event-detection` — 30s-Trigger, Confidence-Schema, Auto vs Verified
-- `features/press-release-system` — Tonalitäten, Längen, Datenquellen
-- `features/player-strength-profile` — 5-Achsen-Radar Berechnung
+- **🏠 Cockpit** (Mission Control)
+- **⚽ Spiele** (Neu, Laufend, Vergangen)
+- **👥 Mannschaft** (Kader, Tabelle, Spielplan, Eltern-Push)
+- **📊 Analysen** (Reports, Trends, Vergleich, Scouting)
+- **⚙️ Einstellungen** (Verein, Bibliothek, Helfer-Codes, Plan)
 
-**Reihenfolge der Implementierung:**
-1. Migrationen (match_events Felder + press_releases Tabelle)
-2. Backend: erweiterte analyze-match + neuer live-event-detector
-3. Backend: generate-press-release + PDF-Report Saison-Seite
-4. Frontend: Presse-Tab + Strengths-Radar + Mobile-Nav-Update
-5. Memory-Dateien + Index-Update
+Admin-Tab nur sichtbar wenn `is_super_admin`.
+
+### B4) "Was bedeutet das?" überall
+- Kleine **(?)-Icons** neben jedem Fachbegriff (Heatmap, xG, Pressing-Index, Compactness…) → Tooltip mit 1 Satz Klartext.
+- Erste Nutzung einer Funktion zeigt **Coach-Mark** (Spotlight-Overlay) – einmalig, dismissable.
+
+### B5) Empty-States als Lehrer
+Statt "Noch keine Daten" zeigen leere Bereiche **was der Trainer als Nächstes tun kann**:
+- Kader leer → "Importiere deinen Kader in 30 Sek. → [Button]"
+- Keine Spiele → "Lege dein erstes Spiel an, Datum & Gegner sind aus deiner U19 schon da → [Button]"
+
+### B6) Spracheinstellung & Tonalität
+- Konsequent **"Du"-Ansprache**, keine Fachwörter im Hauptflow.
+- Zahlen werden immer mit Kontext angezeigt: "68 % Ballbesitz (Liga-Schnitt: 51 %)".
+
+---
+
+## Technische Details (für Entwickler)
+
+| Bereich | Änderung |
+|---|---|
+| DB | `ALTER TABLE profiles ADD COLUMN onboarding_completed_at timestamptz`; neue View `v_next_fixture_per_team` für Dashboard. |
+| pg_cron | Job `nightly-team-resync` (03:00) → `net.http_post` an `scrape-club-teams` für jeden Verein mit `external_url`. |
+| Edge Function | `scrape-club-teams` erweitern: optional `auto=true` → ohne URL, nimmt gespeicherte URL aus letztem Import. Pre-Match-Trigger: neuer Job `prematch-resync` der `team_fixtures` mit kickoff < now()+24h prüft. |
+| Frontend | Neue Komponenten: `MissionControl.tsx` (ersetzt aktuellen `Dashboard.tsx`-Hauptbereich), `OnboardingWizard.tsx` (5 Steps), `HelpTooltip.tsx`, `SmartEmptyState.tsx`, neue `Sidebar.tsx`-Struktur. |
+| FullGuide / FeatureCards | Aktualisieren um U19-Auto-Import & neues Cockpit zu erklären. |
+| i18n | Neue Keys für Onboarding, Tooltips, Empty-States (DE + EN). |
+
+---
+
+## Was du danach hast
+- Die **U19 Viktoria** ist mit Kader, Tabelle, Spielplan & Statistiken im System – aktualisiert sich nachts und vor jedem Spiel von selbst.
+- Ein Trainer, der zum ersten Mal einloggt, weiß **innerhalb von 60 Sekunden**, was er sieht und was er als Nächstes tun soll.
+- Die App fühlt sich nicht mehr an wie ein Werkzeugkasten, sondern wie ein **Co-Trainer**, der durch die Saison führt.
+
+Sag "los" und ich baue es in dieser Reihenfolge: (1) Auto-Import + Cron, (2) Mission Control Dashboard, (3) Onboarding Wizard + Sidebar-Refactor, (4) Tooltips & Empty-States, (5) Doku-Update.

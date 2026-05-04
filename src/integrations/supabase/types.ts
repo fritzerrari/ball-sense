@@ -2162,6 +2162,7 @@ export type Database = {
           club_id: string | null
           created_at: string
           id: string
+          onboarding_completed_at: string | null
           player_portal_player_id: string | null
           user_id: string
         }
@@ -2169,6 +2170,7 @@ export type Database = {
           club_id?: string | null
           created_at?: string
           id?: string
+          onboarding_completed_at?: string | null
           player_portal_player_id?: string | null
           user_id: string
         }
@@ -2176,6 +2178,7 @@ export type Database = {
           club_id?: string | null
           created_at?: string
           id?: string
+          onboarding_completed_at?: string | null
           player_portal_player_id?: string | null
           user_id?: string
         }

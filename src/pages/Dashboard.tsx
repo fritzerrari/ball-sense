@@ -13,6 +13,8 @@ import { PlanBadge } from "@/components/PlanBadge";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import { MatchFlowGuide } from "@/components/MatchFlowGuide";
 import { CoachWelcomeTour } from "@/components/CoachWelcomeTour";
+import { MissionControl } from "@/components/MissionControl";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { useTranslation, useLocale } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -86,8 +88,12 @@ export default function Dashboard() {
           </div>
         </div>
 
+        <OnboardingWizard />
         <PwaInstallPrompt />
         <CoachWelcomeTour />
+
+        {/* Mission Control — geführter Einstieg */}
+        <MissionControl />
 
         {/* Match Preparation CTA */}
         {hasMatches && (
