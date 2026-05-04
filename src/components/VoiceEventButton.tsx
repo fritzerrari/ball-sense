@@ -126,9 +126,21 @@ export default function VoiceEventButton({
       </p>
 
       {proposal && (
-        <div className="border border-primary/40 bg-primary/5 rounded-lg p-3 space-y-2">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">KI-Vorschlag · Konfidenz {Math.round(proposal.confidence * 100)}%</p>
+        <div className={`border rounded-lg p-3 space-y-2 ${
+          proposal.confidence < 0.6
+            ? "border-amber-500/50 bg-amber-500/5"
+            : "border-primary/40 bg-primary/5"
+        }`}>
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            KI-Vorschlag · Konfidenz {Math.round(proposal.confidence * 100)}%
+            {proposal.confidence < 0.6 && <span className="ml-1 text-amber-600 font-semibold">· Bitte prüfen</span>}
+          </p>
           <p className="text-xs italic text-muted-foreground">"{proposal.transcript}"</p>
+          {proposal.confidence < 0.6 && (
+            <p className="text-[11px] text-amber-700 dark:text-amber-400">
+              Erkennung unsicher — bitte Werte prüfen oder Event manuell tippen.
+            </p>
+          )}
           <div className="flex flex-wrap gap-1.5 text-xs">
             <span className="rounded bg-background px-2 py-0.5 font-mono">{proposal.minute}'</span>
             <span className={`rounded px-2 py-0.5 ${proposal.team === "home" ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive"}`}>
