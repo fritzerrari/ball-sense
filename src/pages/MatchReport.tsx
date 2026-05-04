@@ -17,6 +17,7 @@ import PostMatchEventEditor from "@/components/PostMatchEventEditor";
 import AISuggestionsPanel from "@/components/AISuggestionsPanel";
 import VideoBackfillUpload from "@/components/VideoBackfillUpload";
 import PendingFramesRecoveryBanner from "@/components/PendingFramesRecoveryBanner";
+import PreFlightCheckCard from "@/components/PreFlightCheckCard";
 import { useMatch } from "@/hooks/use-matches";
 import { useAuth } from "@/components/AuthProvider";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -347,6 +348,16 @@ export default function MatchReport() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Pre-Match Readiness Check (only when match is in setup phase) */}
+        {!hasReport && !isProcessing && match?.status === "setup" && id && (
+          <PreFlightCheckCard
+            matchId={id}
+            homeClubId={match.home_club_id ?? null}
+            fieldId={match.field_id ?? null}
+            awayClubName={match.away_club_name ?? null}
+          />
         )}
 
         {/* No report yet */}
