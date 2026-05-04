@@ -1392,13 +1392,14 @@ UMGANG MIT UNSICHERHEIT (kritisch für Datenqualität):
     }).catch((err) => console.error("update-opponent-scout trigger error:", err));
 
     // Block D #1 — finalize match status so DB trigger fires parent-notify
+    // System-wide canonical final status is 'done' (not 'completed').
     try {
       await supabase.from("matches")
-        .update({ status: "completed" })
+        .update({ status: "done" })
         .eq("id", match_id)
-        .neq("status", "completed");
+        .neq("status", "done");
     } catch (err) {
-      console.error("[finalize] failed to set match status to completed:", err);
+      console.error("[finalize] failed to set match status to done:", err);
     }
 
     // Block D #11 — Auto-Run Coach-Inbox after final analysis (fire-and-forget)

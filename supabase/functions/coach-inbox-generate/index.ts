@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       .from("matches")
       .select("id, away_club_name, date, home_score, away_score")
       .eq("home_club_id", clubId)
-      .eq("status", "completed")
+      .eq("status", "done")
       .order("date", { ascending: false })
       .limit(5);
 
