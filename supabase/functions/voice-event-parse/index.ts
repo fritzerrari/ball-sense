@@ -1,5 +1,6 @@
 // Voice-Event Parser — transkribiert Audio (Gemini multimodal) und extrahiert Event-Vorschlag.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { logAiUsage, extractUsage } from "../_shared/ai-usage-logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,11 +55,17 @@ ${rosterText || "(unbekannt)"}
 
 Antworte NUR über das Tool extract_event. Wenn kein Event erkennbar ist, setze confidence < 0.3.`;
 
+    // Lookup club_id for usage tracking
+    const { data: matchRow } = await supabase.from("matches").select("home_club_id").eq("id", match_id).maybeSingle();
+    const clubId = matchRow?.home_club_id ?? null;
+    const MODEL = "google/gemini-2.5-flash";
+    const t0 = Date.now();
+
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           {
@@ -95,14 +102,19 @@ Antworte NUR über das Tool extract_event. Wenn kein Event erkennbar ist, setze 
     });
 
     if (!aiResp.ok) {
-      if (aiResp.status === 429) return new Response(JSON.stringify({ error: "Rate-Limit erreicht." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (aiResp.status === 402) return new Response(JSON.stringify({ error: "AI-Guthaben aufgebraucht." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const t = await aiResp.text();
       console.error("voice-event AI error", aiResp.status, t);
+      const status = aiResp.status === 429 ? "rate_limit" : aiResp.status === 402 ? "out_of_credits" : "error";
+      await logAiUsage({ supabase, function_name: "voice-event-parse", model: MODEL, club_id: clubId, match_id, duration_ms: Date.now() - t0, status, error_message: `HTTP ${aiResp.status}` });
+      if (aiResp.status === 429) return new Response(JSON.stringify({ error: "Rate-Limit erreicht." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (aiResp.status === 402) return new Response(JSON.stringify({ error: "AI-Guthaben aufgebraucht." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ error: "AI-Gateway Fehler" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const data = await aiResp.json();
+    const usage = extractUsage(data);
+    await logAiUsage({ supabase, function_name: "voice-event-parse", model: MODEL, club_id: clubId, match_id, duration_ms: Date.now() - t0, status: "ok", ...usage });
+
     const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
       return new Response(JSON.stringify({ error: "Keine Erkennung" }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });

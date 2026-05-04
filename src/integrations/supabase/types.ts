@@ -68,6 +68,62 @@ export type Database = {
           },
         ]
       }
+      ai_usage_log: {
+        Row: {
+          club_id: string | null
+          completion_tokens: number | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          function_name: string
+          id: string
+          match_id: string | null
+          metadata: Json | null
+          model: string
+          prompt_tokens: number | null
+          status: string
+          total_tokens: number | null
+        }
+        Insert: {
+          club_id?: string | null
+          completion_tokens?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          match_id?: string | null
+          metadata?: Json | null
+          model: string
+          prompt_tokens?: number | null
+          status?: string
+          total_tokens?: number | null
+        }
+        Update: {
+          club_id?: string | null
+          completion_tokens?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          match_id?: string | null
+          metadata?: Json | null
+          model?: string
+          prompt_tokens?: number | null
+          status?: string
+          total_tokens?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_log_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       analysis_jobs: {
         Row: {
           completed_at: string | null

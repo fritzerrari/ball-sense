@@ -27,6 +27,8 @@ export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [jobStartedAt, setJobStartedAt] = useState<number | null>(null);
+  const [showSlowBanner, setShowSlowBanner] = useState(false);
   const [frameDiagnostics, setFrameDiagnostics] = useState<{
     total: number; cameras: number; recordingMin: number | null;
   } | null>(null);
@@ -37,7 +39,7 @@ export default function ProcessingPage() {
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("analysis_jobs")
-        .select("id, status, progress, error_message, job_kind")
+        .select("id, status, progress, error_message, job_kind, created_at, started_at")
         .eq("match_id", id)
         .eq("job_kind", "final")
         .order("created_at", { ascending: false })
@@ -49,11 +51,28 @@ export default function ProcessingPage() {
         setStatus(nextStatus);
         setProgress(data.progress ?? 0);
         setErrorMessage(data.error_message ?? null);
+        const startTs = data.started_at ?? data.created_at;
+        if (startTs) setJobStartedAt(new Date(startTs).getTime());
         if (TERMINAL_JOB_STATUSES.includes(nextStatus)) clearInterval(interval);
       }
     }, 2000);
     return () => clearInterval(interval);
   }, [id]);
+
+  // Slow-banner: show after 5min if progress still <10%
+  useEffect(() => {
+    if (!jobStartedAt || status === "complete" || status === "failed") {
+      setShowSlowBanner(false);
+      return;
+    }
+    const check = () => {
+      const elapsedMin = (Date.now() - jobStartedAt) / 60000;
+      setShowSlowBanner(elapsedMin > 5 && progress < 10);
+    };
+    check();
+    const t = setInterval(check, 15000);
+    return () => clearInterval(t);
+  }, [jobStartedAt, progress, status]);
 
   // Load frame diagnostics when analysis fails so the user gets a meaningful explanation
   useEffect(() => {
@@ -187,6 +206,15 @@ export default function ProcessingPage() {
 
             {!isComplete && !isFailed && (
               <Progress value={progress} className="mt-4" />
+            )}
+
+            {showSlowBanner && !isFailed && (
+              <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
+                <p className="font-semibold text-amber-700 dark:text-amber-400">⏱ Etwas dauert länger als gewohnt…</p>
+                <p className="mt-1 text-muted-foreground">
+                  Die Analyse läuft seit über 5 Minuten ohne sichtbaren Fortschritt. Falls nach 30 Minuten nichts passiert ist, markiert das System den Job automatisch als fehlgeschlagen und du kannst neu starten.
+                </p>
+              </div>
             )}
 
             {isFailed && (
