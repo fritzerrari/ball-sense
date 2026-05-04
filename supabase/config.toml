@@ -67,3 +67,5 @@ verify_jwt = false
 [functions.live-event-detector]
 verify_jwt = false
 
+[functions.pipeline-watchdog]
+verify_jwt = false
