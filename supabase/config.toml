@@ -69,3 +69,10 @@ verify_jwt = false
 
 [functions.pipeline-watchdog]
 verify_jwt = false
+
+[functions.vapid-public-key]
+verify_jwt = false
+
+[functions.parent-notify]
+verify_jwt = false
+
