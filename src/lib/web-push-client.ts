@@ -1,7 +1,17 @@
 // Web-Push Helpers für die Eltern-Self-Service-Seite.
 // Registriert einen separaten Service Worker (/push-sw.js) und subscribed via VAPID.
+import { supabase } from "@/integrations/supabase/client";
 
-const VAPID_PUBLIC_KEY = "BN9VvQA2SDNJ4nZav6SmNB0mnKqhNP8gUJEFQE6vR1qDnopr9U9LEr4awcLGi3adI-f6aGfVQ7YAWZ1hlx2iIJU";
+let cachedVapidKey: string | null = null;
+async function getVapidPublicKey(): Promise<string> {
+  if (cachedVapidKey) return cachedVapidKey;
+  const { data, error } = await supabase.functions.invoke("vapid-public-key");
+  if (error || !data?.publicKey) {
+    throw new Error("VAPID-Schlüssel konnte nicht geladen werden");
+  }
+  cachedVapidKey = data.publicKey;
+  return cachedVapidKey!;
+}
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -41,9 +51,10 @@ export async function subscribeForPush(): Promise<PushKeys> {
   const existing = await reg.pushManager.getSubscription();
   if (existing) await existing.unsubscribe();
 
+  const vapidKey = await getVapidPublicKey();
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY).buffer as ArrayBuffer,
+    applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
   });
 
   return {
